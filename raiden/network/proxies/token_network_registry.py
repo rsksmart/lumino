@@ -20,7 +20,7 @@ from raiden.exceptions import InvalidAddress, RaidenRecoverableError, RaidenUnre
 from raiden.network.proxies.utils import compare_contract_versions
 from raiden.network.rpc.client import StatelessFilter, check_address_has_code
 from raiden.network.rpc.transactions import check_transaction_threw
-from raiden.utils import pex, privatekey_to_address, safe_gas_limit
+from raiden.utils import pex, safe_gas_limit
 from raiden.utils.typing import (
     Address,
     BlockSpecification,
@@ -66,7 +66,7 @@ class TokenNetworkRegistry:
         self.address = registry_address
         self.proxy = proxy
         self.client = jsonrpc_client
-        self.node_address = privatekey_to_address(self.client.privkey)
+        self.node_address = self.client.address
 
     def get_token_network(
             self,
@@ -100,9 +100,10 @@ class TokenNetworkRegistry:
         }
         log.debug('createERC20TokenNetwork called', **log_details)
 
+        checking_block = self.client.get_checking_block()
         error_prefix = 'Call to createERC20TokenNetwork will fail'
         gas_limit = self.proxy.estimate_gas(
-            'pending',
+            checking_block,
             'createERC20TokenNetwork',
             token_address,
         )
@@ -124,7 +125,7 @@ class TokenNetworkRegistry:
             if transaction_executed:
                 block = receipt_or_none['blockNumber']
             else:
-                block = 'pending'
+                block = checking_block
 
             required_gas = gas_limit if gas_limit else GAS_REQUIRED_FOR_CREATE_ERC20_TOKEN_NETWORK
             self.proxy.jsonrpc_client.check_for_insufficient_eth(

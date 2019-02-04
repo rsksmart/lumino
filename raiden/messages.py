@@ -27,7 +27,7 @@ from raiden.transfer.mediated_transfer.events import (
 from raiden.transfer.state import HashTimeLockState
 from raiden.transfer.utils import hash_balance_data
 from raiden.utils import ishash, pex, sha3, typing
-from raiden.utils.signing import eth_recover, eth_sign
+from raiden.utils.signer import Signer, recover
 from raiden.utils.typing import (
     Address,
     BlockExpiration,
@@ -52,7 +52,7 @@ __all__ = (
     'Ping',
     'Processed',
     'RefundTransfer',
-    'Secret',
+    'Unlock',
     'SecretRequest',
     'SignedMessage',
     'decode',
@@ -142,7 +142,7 @@ def message_from_sendevent(send_event: SendMessageEvent, our_address: Address) -
     elif type(send_event) == SendSecretReveal:
         message = RevealSecret.from_event(send_event)
     elif type(send_event) == SendBalanceProof:
-        message = Secret.from_event(send_event)
+        message = Unlock.from_event(send_event)
     elif type(send_event) == SendSecretRequest:
         message = SecretRequest.from_event(send_event)
     elif type(send_event) == SendRefundTransfer:
@@ -232,10 +232,10 @@ class SignedMessage(Message):
         # this slice must be from the end of the buffer
         return packed.data[:-field.size_bytes]
 
-    def sign(self, private_key):
-        """ Sign message using `private_key`. """
+    def sign(self, signer: Signer):
+        """ Sign message using signer. """
         message_data = self._data_to_sign()
-        self.signature = eth_sign(privkey=private_key, data=message_data)
+        self.signature = signer.sign(data=message_data)
 
     @property
     @cached(_senders_cache, key=attrgetter('signature'))
@@ -246,7 +246,7 @@ class SignedMessage(Message):
         message_signature = self.signature
 
         try:
-            address: Optional[Address] = eth_recover(
+            address: Optional[Address] = recover(
                 data=data_that_was_signed,
                 signature=message_signature,
             )
@@ -551,14 +551,14 @@ class SecretRequest(SignedMessage):
         return secret_request
 
 
-class Secret(EnvelopeMessage):
+class Unlock(EnvelopeMessage):
     """ Message used to do state changes on a partner Raiden Channel.
 
     Locksroot changes need to be synchronized among both participants, the
-    protocol is for only the side unlocking to send the Secret message allowing
+    protocol is for only the side unlocking to send the Unlock message allowing
     the other party to claim the unlocked lock.
     """
-    cmdid = messages.SECRET
+    cmdid = messages.UNLOCK
 
     def __init__(
             self,
@@ -671,7 +671,7 @@ class Secret(EnvelopeMessage):
 
     def to_dict(self):
         return {
-            'type': self.__class__.__name__,
+            'type': 'Secret',
             'chain_id': self.chain_id,
             'message_identifier': self.message_identifier,
             'payment_identifier': self.payment_identifier,
@@ -687,7 +687,7 @@ class Secret(EnvelopeMessage):
 
     @classmethod
     def from_dict(cls, data):
-        assert data['type'] == cls.__name__
+        assert data['type'] == 'Secret'
         message = cls(
             chain_id=data['chain_id'],
             message_identifier=data['message_identifier'],
@@ -1424,9 +1424,10 @@ CMDID_TO_CLASS = {
     messages.PROCESSED: Processed,
     messages.REFUNDTRANSFER: RefundTransfer,
     messages.REVEALSECRET: RevealSecret,
-    messages.SECRET: Secret,
+    messages.UNLOCK: Unlock,
     messages.SECRETREQUEST: SecretRequest,
     messages.LOCKEXPIRED: LockExpired,
 }
 
 CLASSNAME_TO_CLASS = {klass.__name__: klass for klass in CMDID_TO_CLASS.values()}
+CLASSNAME_TO_CLASS['Secret'] = Unlock

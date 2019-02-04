@@ -3,7 +3,6 @@ from copy import deepcopy
 from random import Random
 
 import pytest
-
 from hypothesis import assume, event
 from hypothesis.stateful import (
     Bundle,
@@ -276,7 +275,6 @@ class InitiatorMixin:
         if action.secrethash in self.processed_secret_requests or self._is_removed(previous):
             assert not result.events
         else:
-            assert event_types_match(result.events, EventPaymentSentFailed)
             self.processed_secret_requests.add(action.secrethash)
 
     def _unauthentic_secret_request(self, action):

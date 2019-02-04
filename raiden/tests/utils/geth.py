@@ -16,7 +16,7 @@ from web3 import Web3
 
 from raiden.tests.fixtures.variables import DEFAULT_BALANCE_BIN, DEFAULT_PASSPHRASE
 from raiden.tests.utils.genesis import GENESIS_STUB
-from raiden.utils import privatekey_to_address, privtopub, typing
+from raiden.utils import privatekey_to_address, privatekey_to_publickey, typing
 
 log = structlog.get_logger(__name__)  # pylint: disable=invalid-name
 
@@ -30,15 +30,6 @@ GethNodeDescription = namedtuple(
         'miner',
     ],
 )
-
-
-def wait_until_block(chain, block):
-    # we expect `next_block` to block until the next block, but, it could
-    # advance miss and advance two or more
-    curr_block = chain.block_number()
-    while curr_block < block:
-        curr_block = chain.next_block()
-        gevent.sleep(0.001)
 
 
 def geth_clique_extradata(extra_vanity, extra_seal):
@@ -197,8 +188,19 @@ def geth_init_datadir(datadir: str, genesis_path: str):
         raise ValueError(msg)
 
 
-def geth_wait_and_check(web3, accounts_addresses, random_marker):
-    """ Wait until the geth cluster is ready. """
+def geth_wait_and_check(
+        web3,
+        accounts_addresses,
+        random_marker,
+        processes_list,
+):
+    """ Wait until the geth cluster is ready.
+
+    This will raise an exception if either:
+
+    - The geth process exists (sucessfully or not)
+    - The JSON RPC interface is not available after a very short moment
+    """
     jsonrpc_running = False
 
     tries = 5
@@ -223,6 +225,12 @@ def geth_wait_and_check(web3, accounts_addresses, random_marker):
                     'parallel with the same port?',
                 )
 
+    for process in processes_list:
+        process.poll()
+
+        if process.returncode is not None:
+            raise ValueError(f'geth process failed with exit code {process.returncode}')
+
     if jsonrpc_running is False:
         raise ValueError('geth didnt start the jsonrpc interface')
 
@@ -240,7 +248,7 @@ def geth_wait_and_check(web3, accounts_addresses, random_marker):
 
 def geth_node_config(miner_pkey, p2p_port, rpc_port):
     address = privatekey_to_address(miner_pkey)
-    pub = remove_0x_prefix(encode_hex(privtopub(miner_pkey)))
+    pub = privatekey_to_publickey(miner_pkey).hex()
 
     config = {
         'nodekey': miner_pkey,
@@ -313,7 +321,7 @@ def geth_run_nodes(
         verbosity,
         logdir,
 ):
-    os.makedirs(logdir)
+    os.makedirs(logdir, exist_ok=True)
 
     password_path = os.path.join(base_datadir, 'pw')
     with open(password_path, 'w') as handler:
@@ -427,14 +435,12 @@ def geth_run_private_blockchain(
     )
 
     try:
-        geth_wait_and_check(web3, accounts_to_fund, random_marker)
-
-        for process in processes_list:
-            process.poll()
-
-            if process.returncode is not None:
-                raise ValueError(f'geth process failed with exit code {process.returncode}')
-
+        geth_wait_and_check(
+            web3=web3,
+            accounts_addresses=accounts_to_fund,
+            random_marker=random_marker,
+            processes_list=processes_list,
+        )
     except (ValueError, RuntimeError) as e:
         # If geth_wait_and_check or the above loop throw an exception make sure
         # we don't end up with a rogue geth process running in the background

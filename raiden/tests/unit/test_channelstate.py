@@ -7,10 +7,10 @@ from itertools import cycle
 import pytest
 
 from raiden.constants import UINT64_MAX
-from raiden.messages import Secret
+from raiden.messages import Unlock
 from raiden.settings import DEFAULT_NUMBER_OF_BLOCK_CONFIRMATIONS
 from raiden.tests.utils import factories
-from raiden.tests.utils.events import must_contain_entry
+from raiden.tests.utils.events import search_for_item
 from raiden.tests.utils.factories import (
     HOP1,
     UNIT_CHAIN_ID,
@@ -61,6 +61,7 @@ from raiden.transfer.state_change import (
     ReceiveUnlock,
 )
 from raiden.utils import random_secret, sha3
+from raiden.utils.signer import LocalSigner
 
 PartnerStateModel = namedtuple(
     'PartnerStateModel',
@@ -452,6 +453,7 @@ def test_channelstate_receive_lockedtransfer():
     """
     our_model1, _ = create_model(70)
     partner_model1, privkey2 = create_model(100)
+    signer2 = LocalSigner(privkey2)
     channel_state = create_channel_from_models(our_model1, partner_model1)
 
     # Step 1: Simulate receiving a transfer
@@ -505,7 +507,7 @@ def test_channelstate_receive_lockedtransfer():
     transferred_amount = 0
     message_identifier = random.randint(0, UINT64_MAX)
     token_network_identifier = channel_state.token_network_identifier
-    secret_message = Secret(
+    unlock_message = Unlock(
         chain_id=UNIT_CHAIN_ID,
         message_identifier=message_identifier,
         payment_identifier=1,
@@ -517,9 +519,9 @@ def test_channelstate_receive_lockedtransfer():
         locksroot=EMPTY_MERKLE_ROOT,
         secret=lock_secret,
     )
-    secret_message.sign(privkey2)
+    unlock_message.sign(signer2)
     # Let's also create an invalid secret to test unlock with invalid chain id
-    invalid_secret_message = Secret(
+    invalid_unlock_message = Unlock(
         chain_id=UNIT_CHAIN_ID + 1,
         message_identifier=message_identifier,
         payment_identifier=1,
@@ -531,9 +533,9 @@ def test_channelstate_receive_lockedtransfer():
         locksroot=EMPTY_MERKLE_ROOT,
         secret=lock_secret,
     )
-    invalid_secret_message.sign(privkey2)
+    invalid_unlock_message.sign(signer2)
 
-    balance_proof = balanceproof_from_envelope(secret_message)
+    balance_proof = balanceproof_from_envelope(unlock_message)
     unlock_state_change = ReceiveUnlock(
         message_identifier=random.randint(0, UINT64_MAX),
         secret=lock_secret,
@@ -541,7 +543,7 @@ def test_channelstate_receive_lockedtransfer():
     )
 
     # First test that unlock with invalid chain_id fails
-    invalid_balance_proof = balanceproof_from_envelope(invalid_secret_message)
+    invalid_balance_proof = balanceproof_from_envelope(invalid_unlock_message)
     invalid_unlock_state_change = ReceiveUnlock(
         message_identifier=random.randint(0, UINT64_MAX),
         secret=lock_secret,
@@ -825,6 +827,7 @@ def test_interwoven_transfers():
 
     our_model, _ = create_model(70)
     partner_model, privkey2 = create_model(balance_for_all_transfers)
+    signer2 = LocalSigner(privkey2)
     channel_state = create_channel_from_models(our_model, partner_model)
 
     block_number = 1000
@@ -918,7 +921,7 @@ def test_interwoven_transfers():
             )
 
             message_identifier = random.randint(0, UINT64_MAX)
-            secret_message = Secret(
+            unlock_message = Unlock(
                 chain_id=UNIT_CHAIN_ID,
                 message_identifier=message_identifier,
                 payment_identifier=nonce,
@@ -930,9 +933,9 @@ def test_interwoven_transfers():
                 locksroot=locksroot,
                 secret=lock_secret,
             )
-            secret_message.sign(privkey2)
+            unlock_message.sign(signer2)
 
-            balance_proof = balanceproof_from_envelope(secret_message)
+            balance_proof = balanceproof_from_envelope(unlock_message)
             unlock_state_change = ReceiveUnlock(
                 message_identifier=random.randint(0, UINT64_MAX),
                 secret=lock_secret,
@@ -1422,7 +1425,7 @@ def test_channelstate_unlock():
         closed_block_number,
     )
     iteration = channel.handle_channel_closed(channel_state, close_state_change)
-    assert not must_contain_entry(iteration.events, ContractSendChannelBatchUnlock, {})
+    assert search_for_item(iteration.events, ContractSendChannelBatchUnlock, {}) is None
 
     settle_block_number = lock_expiration + channel_state.reveal_timeout + 1
     settle_state_change = ContractReceiveChannelSettled(
@@ -1436,7 +1439,7 @@ def test_channelstate_unlock():
         settle_state_change,
         settle_block_number,
     )
-    assert must_contain_entry(iteration.events, ContractSendChannelBatchUnlock, {})
+    assert search_for_item(iteration.events, ContractSendChannelBatchUnlock, {}) is not None
 
 
 def test_refund_transfer_matches_received():
@@ -1549,7 +1552,7 @@ def test_settle_transaction_must_be_sent_only_once():
         settle_state_change,
         settle_block_number,
     )
-    assert must_contain_entry(iteration.events, ContractSendChannelBatchUnlock, {})
+    assert search_for_item(iteration.events, ContractSendChannelBatchUnlock, {}) is not None
 
     iteration = channel.handle_channel_settled(
         channel_state,
@@ -1557,7 +1560,7 @@ def test_settle_transaction_must_be_sent_only_once():
         settle_block_number,
     )
     msg = 'BatchUnlock must be sent only once, the second transaction will always fail'
-    assert not must_contain_entry(iteration.events, ContractSendChannelBatchUnlock, {}), msg
+    assert search_for_item(iteration.events, ContractSendChannelBatchUnlock, {}) is None, msg
 
 
 def test_action_close_must_change_the_channel_state():
@@ -1639,7 +1642,7 @@ def test_update_must_be_called_if_close_lost_race():
         closed_block_number,
     )
     iteration = channel.handle_channel_closed(channel_state, state_change)
-    assert must_contain_entry(iteration.events, ContractSendChannelUpdateTransfer, {})
+    assert search_for_item(iteration.events, ContractSendChannelUpdateTransfer, {}) is not None
 
 
 def test_update_transfer():

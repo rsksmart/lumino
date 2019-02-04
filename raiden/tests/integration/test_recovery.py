@@ -5,10 +5,10 @@ from raiden import waiting
 from raiden.api.python import RaidenAPI
 from raiden.app import App
 from raiden.message_handler import MessageHandler
-from raiden.messages import Secret
+from raiden.messages import Unlock
 from raiden.network.transport import UDPTransport
 from raiden.raiden_event_handler import RaidenEventHandler
-from raiden.tests.utils.events import must_contain_entry
+from raiden.tests.utils.events import search_for_item
 from raiden.tests.utils.network import CHAIN
 from raiden.tests.utils.protocol import WaitForMessage
 from raiden.tests.utils.transfer import assert_synced_channel_state, mediated_transfer
@@ -116,7 +116,7 @@ def test_recovery_happy_case(
     )
 
     identifier = create_default_identifier()
-    wait_for_payment = app2_wait_for.wait_for_message(Secret, {'payment_identifier': identifier})
+    wait_for_payment = app2_wait_for.wait_for_message(Unlock, {'payment_identifier': identifier})
 
     mediated_transfer(
         app2,
@@ -242,7 +242,7 @@ def test_recovery_unhappy_case(
         to_identifier='latest',
     )
 
-    assert must_contain_entry(state_changes, ContractReceiveChannelSettled, {
+    assert search_for_item(state_changes, ContractReceiveChannelSettled, {
         'token_network_identifier': token_network_identifier,
         'channel_identifier': channel01.identifier,
     })
@@ -327,4 +327,4 @@ def test_recovery_blockchain_events(
         0,
         'latest',
     )
-    assert must_contain_entry(restarted_state_changes, ContractReceiveChannelClosed, {})
+    assert search_for_item(restarted_state_changes, ContractReceiveChannelClosed, {})

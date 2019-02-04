@@ -43,7 +43,6 @@ from raiden.transfer.utils import (
     get_state_change_with_balance_proof_by_locksroot,
 )
 from raiden.utils import pex
-from raiden.utils.signing import eth_sign
 
 # type alias to avoid both circular dependencies and flake8 errors
 RaidenService = 'RaidenService'
@@ -147,11 +146,11 @@ class RaidenEventHandler:
             raiden: RaidenService,
             balance_proof_event: SendBalanceProof,
     ):
-        secret_message = message_from_sendevent(balance_proof_event, raiden.address)
-        raiden.sign(secret_message)
+        unlock_message = message_from_sendevent(balance_proof_event, raiden.address)
+        raiden.sign(unlock_message)
         raiden.transport.send_async(
             balance_proof_event.queue_identifier,
-            secret_message,
+            unlock_message,
         )
 
     def handle_send_secretrequest(
@@ -202,7 +201,10 @@ class RaidenEventHandler:
         # With the introduction of the lock we should always get
         # here only once per identifier so payment_status should always exist
         # see: https://github.com/raiden-network/raiden/pull/3191
-        payment_status.payment_done.set(True)
+        payment_status.payment_done.set({
+            'secret': payment_status.secret,
+            'secret_hash': payment_status.secret_hash,
+        })
 
     def handle_paymentsentfailed(
             self,
@@ -294,7 +296,7 @@ class RaidenEventHandler:
                 chain_id=balance_proof.chain_id,
                 partner_signature=balance_proof.signature,
             )
-            our_signature = eth_sign(privkey=raiden.privkey, data=non_closing_data)
+            our_signature = raiden.signer.sign(data=non_closing_data)
 
             try:
                 channel.update_transfer(
@@ -329,6 +331,7 @@ class RaidenEventHandler:
         participants_details = token_network.detail_participants(
             participant1=raiden.address,
             participant2=participant,
+            block_identifier='latest',
             channel_identifier=channel_identifier,
         )
 
@@ -435,6 +438,7 @@ class RaidenEventHandler:
         participants_details = token_network_proxy.detail_participants(
             participant1=payment_channel.participant1,
             participant2=payment_channel.participant2,
+            block_identifier='latest',
             channel_identifier=channel_settle_event.channel_identifier,
         )
 

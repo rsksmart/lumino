@@ -4,16 +4,15 @@ import pytest
 from raiden import routing, waiting
 from raiden.api.python import RaidenAPI
 from raiden.exceptions import InvalidAmount
-from raiden.tests.utils.geth import wait_until_block
 from raiden.transfer import channel, views
 from raiden.transfer.state import CHANNEL_STATE_OPENED
 
 
 def wait_for_transaction(
-    receiver,
-    registry_address,
-    token_address,
-    sender_address,
+        receiver,
+        registry_address,
+        token_address,
+        sender_address,
 ):
     """Wait until a first transaction in a channel is received"""
     while True:
@@ -136,10 +135,8 @@ def test_participant_selection(raiden_network, token_addresses):
     ]
 
     unsaturated_connection_managers = connection_managers[:]
-    with gevent.Timeout(
-        120,
-        AssertionError('Unsaturated connection managers', unsaturated_connection_managers),
-    ):
+    exception = AssertionError('Unsaturated connection managers', unsaturated_connection_managers)
+    with gevent.Timeout(120, exception):
         while unsaturated_connection_managers:
             for manager in unsaturated_connection_managers:
                 if is_manager_saturated(manager, registry_address, token_address):
@@ -165,12 +162,13 @@ def test_participant_selection(raiden_network, token_addresses):
             if target.raiden.address == app.raiden.address:
                 continue
             routes = routing.get_best_routes(
-                node_state,
-                network_state.address,
-                app.raiden.address,
-                target.raiden.address,
-                1,
-                None,
+                chain_state=node_state,
+                token_network_id=network_state.address,
+                from_address=app.raiden.address,
+                to_address=target.raiden.address,
+                amount=1,
+                previous_address=None,
+                config={},
             )
             assert routes is not None
 
@@ -247,13 +245,11 @@ def test_participant_selection(raiden_network, token_addresses):
     before_block = connection_manager.raiden.chain.block_number()
     wait_blocks = sender_channel.settle_timeout + 10
     # wait until both chains are synced?
-    wait_until_block(
-        connection_manager.raiden.chain,
-        before_block + wait_blocks,
+    connection_manager.raiden.chain.wait_until_block(
+        target_block_number=before_block + wait_blocks,
     )
-    wait_until_block(
-        receiver.chain,
-        before_block + wait_blocks,
+    receiver.chain.wait_until_block(
+        target_block_number=before_block + wait_blocks,
     )
     receiver_channel = RaidenAPI(receiver).get_channel_list(
         registry_address=registry_address,

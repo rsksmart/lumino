@@ -8,8 +8,8 @@ from raiden.messages import (
     Processed,
     RefundTransfer,
     RevealSecret,
-    Secret,
     SecretRequest,
+    Unlock,
 )
 from raiden.raiden_service import RaidenService
 from raiden.routing import get_best_routes
@@ -39,8 +39,8 @@ class MessageHandler:
             self.handle_message_secretrequest(raiden, message)
         elif type(message) == RevealSecret:
             self.handle_message_revealsecret(raiden, message)
-        elif type(message) == Secret:
-            self.handle_message_secret(raiden, message)
+        elif type(message) == Unlock:
+            self.handle_message_unlock(raiden, message)
         elif type(message) == LockExpired:
             self.handle_message_lockexpired(raiden, message)
         elif type(message) == RefundTransfer:
@@ -71,7 +71,7 @@ class MessageHandler:
         )
         raiden.handle_state_change(state_change)
 
-    def handle_message_secret(self, raiden: RaidenService, message: Secret):
+    def handle_message_unlock(self, raiden: RaidenService, message: Unlock):
         balance_proof = balanceproof_from_envelope(message)
         state_change = ReceiveUnlock(
             message_identifier=message.message_identifier,
@@ -95,12 +95,13 @@ class MessageHandler:
         chain_state = views.state_from_raiden(raiden)
 
         routes = get_best_routes(
-            chain_state,
-            typing.TokenNetworkID(token_network_address),
-            typing.InitiatorAddress(raiden.address),
-            from_transfer.target,
-            from_transfer.lock.amount,
-            message.sender,
+            chain_state=chain_state,
+            token_network_id=typing.TokenNetworkID(token_network_address),
+            from_address=typing.InitiatorAddress(raiden.address),
+            to_address=from_transfer.target,
+            amount=from_transfer.lock.amount,
+            previous_address=message.sender,
+            config=raiden.config,
         )
 
         role = views.get_transfer_role(

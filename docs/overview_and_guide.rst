@@ -44,6 +44,21 @@ Or you can use Homebrew to install the most up to date binary::
 An Ethereum client is required in both cases. The Raiden binary takes the same command line
 arguments as the ``raiden`` script.
 
+Docker
+******
+
+There are two options to run a raiden docker image:
+
+Create the Image yourself and use our `Dockerfile <https://github.com/raiden-network/raiden/blob/master/docker/Dockerfile>`_ as template or use the already built image from Dockerhub::
+
+      docker run -it raidennetwork/raiden:latest
+
+The required keystore can easily be mounted in the docker container::
+
+      docker run -it --mount src=/PATH/TO/LOCAL/KEYSTORE,target=/keystore,type=bind raidennetwork/raiden:latest --keystore-path /keystore
+
+Other flags such as the JSON-RPC endpoint to an Ethereum node can easily be chained to the command.
+
 
 Dependencies
 ************
@@ -89,7 +104,7 @@ Navigate to the directory::
 
     cd raiden
 
-It's advised to create a `virtualenv <http://docs.python-guide.org/en/latest/dev/virtualenvs/>`_ for Raiden (requires python3.6) and install all python dependencies there.
+It's advised to create a `virtualenv <http://docs.python-guide.org/en/latest/dev/virtualenvs/>`_ for Raiden (requires python3.7) and install all python dependencies there.
 
 After you have done that you can proceed to install the dependencies::
 

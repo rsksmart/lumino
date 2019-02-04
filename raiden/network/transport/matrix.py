@@ -59,9 +59,10 @@ from raiden.transfer.state_change import (
 )
 from raiden.utils import pex
 from raiden.utils.runnable import Runnable
-from raiden.utils.signing import eth_recover, eth_sign
+from raiden.utils.signer import recover
 from raiden.utils.typing import (
     Address,
+
     AddressHex,
     Callable,
     Dict,
@@ -339,10 +340,10 @@ class MatrixTransport(Runnable):
         self._account_data_lock = Semaphore()
 
     def start(
-        self,
-        raiden_service: RaidenService,
-        message_handler: MessageHandler,
-        prev_auth_data: str,
+            self,
+            raiden_service: RaidenService,
+            message_handler: MessageHandler,
+            prev_auth_data: str,
     ):
         if not self._stop_event.ready():
             raise RuntimeError(f'{self!r} already started')
@@ -486,9 +487,9 @@ class MatrixTransport(Runnable):
             self._update_address_presence(node_address)
 
     def send_async(
-        self,
-        queue_identifier: QueueIdentifier,
-        message: Message,
+            self,
+            queue_identifier: QueueIdentifier,
+            message: Message,
     ):
         """Queue the message for sending to recipient in the queue_identifier
 
@@ -997,9 +998,9 @@ class MatrixTransport(Runnable):
         return self._address_to_retrier[receiver]
 
     def _send_with_retry(
-        self,
-        queue_identifier: QueueIdentifier,
-        message: Message,
+            self,
+            queue_identifier: QueueIdentifier,
+            message: Message,
     ):
         retrier = self._get_retrier(queue_identifier.recipient)
         retrier.enqueue(queue_identifier=queue_identifier, message=message)
@@ -1022,9 +1023,9 @@ class MatrixTransport(Runnable):
         room.send_text(data)
 
     def _get_room_for_address(
-        self,
-        address: Address,
-        allow_missing_peers=False,
+            self,
+            address: Address,
+            allow_missing_peers=False,
     ) -> Optional[Room]:
         if self._stop_event.ready():
             return
@@ -1307,18 +1308,12 @@ class MatrixTransport(Runnable):
 
     def _sign(self, data: bytes) -> bytes:
         """ Use eth_sign compatible hasher to sign matrix data """
-        return eth_sign(
-            privkey=self._raiden_service.private_key,
-            data=data,
-        )
+        return self._raiden_service.signer.sign(data=data)
 
     @staticmethod
     def _recover(data: bytes, signature: bytes) -> Address:
         """ Use eth_sign compatible hasher to recover address from signed data """
-        return eth_recover(
-            data=data,
-            signature=signature,
-        )
+        return recover(data=data, signature=signature)
 
     def _validate_userid_signature(self, user: User) -> Optional[Address]:
         """ Validate a userId format and signature on displayName, and return its address"""
@@ -1339,11 +1334,11 @@ class MatrixTransport(Runnable):
             if not (address and recovered and recovered == address):
                 return None
         except (
-            DecodeError,
-            TypeError,
-            InvalidSignature,
-            MatrixRequestError,
-            json.decoder.JSONDecodeError,
+                DecodeError,
+                TypeError,
+                InvalidSignature,
+                MatrixRequestError,
+                json.decoder.JSONDecodeError,
         ):
             return None
         return address

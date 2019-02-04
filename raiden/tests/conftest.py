@@ -1,25 +1,23 @@
 # pylint: disable=wrong-import-position,redefined-outer-name,unused-wildcard-import,wildcard-import
-from gevent import monkey
+from gevent import monkey  # isort:skip # noqa
+monkey.patch_all()  # isort:skip # noqa
 
-monkey.patch_all()
+import datetime
+import os
+import re
+import sys
+import tempfile
+from pathlib import Path
 
-if True:
-    import os
-    import re
-    import sys
-    import tempfile
-    from pathlib import Path
+import gevent
+import pytest
+from _pytest.pathlib import LOCK_TIMEOUT, ensure_reset_dir, make_numbered_dir_with_cleanup
+from _pytest.tmpdir import get_user
 
-    import gevent
-    import pytest
-
-    from _pytest.pathlib import LOCK_TIMEOUT, ensure_reset_dir, make_numbered_dir_with_cleanup
-    from _pytest.tmpdir import get_user
-
-    from raiden.log_config import configure_logging
-    from raiden.tests.fixtures.variables import *  # noqa: F401,F403
-    from raiden.tests.utils.transport import make_requests_insecure
-    from raiden.utils.cli import LogLevelConfigType
+from raiden.log_config import configure_logging
+from raiden.tests.fixtures.variables import *  # noqa: F401,F403
+from raiden.tests.utils.transport import make_requests_insecure
+from raiden.utils.cli import LogLevelConfigType
 
 
 def pytest_addoption(parser):
@@ -147,19 +145,18 @@ def logging_level(request):
     else:
         logging_levels = {'': level}
 
+    time = datetime.datetime.utcnow().isoformat()
+    debug_path = os.path.join(
+        tempfile.gettempdir(),
+        f'raiden-debug_{time}.log',
+    )
     configure_logging(
         logging_levels,
         colorize=not request.config.option.plain_log,
         log_file=request.config.option.log_file,
         cache_logger_on_first_use=False,
+        debug_log_file_name=debug_path,
     )
-
-
-@pytest.fixture(scope='session', autouse=False)
-def validate_solidity_compiler():
-    """ Check the solc prior to running any test. """
-    from raiden.utils.solc import validate_solc
-    validate_solc()
 
 
 @pytest.fixture(scope='session', autouse=True)

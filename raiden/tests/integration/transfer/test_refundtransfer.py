@@ -2,10 +2,9 @@ import gevent
 import pytest
 
 from raiden.api.python import RaidenAPI
-from raiden.settings import DEFAULT_NUMBER_OF_BLOCK_CONFIRMATIONS
 from raiden.tests.utils.events import (
-    must_contain_entry,
-    raiden_events_must_contain_entry,
+    raiden_events_search_for_item,
+    search_for_item,
     wait_for_raiden_event,
     wait_for_state_change,
 )
@@ -19,7 +18,7 @@ from raiden.tests.utils.transfer import (
     get_channelstate,
     mediated_transfer,
 )
-from raiden.transfer import views
+from raiden.transfer import channel, views
 from raiden.transfer.mediated_transfer.events import (
     SendLockedTransfer,
     SendLockExpired,
@@ -71,14 +70,14 @@ def test_refund_messages(raiden_chain, token_addresses, deposit):
     # The transfer from app0 to app2 failed, so the balances did change.
     # Since the refund is not unlocked both channels have the corresponding
     # amount locked (issue #1091)
-    send_lockedtransfer = raiden_events_must_contain_entry(
+    send_lockedtransfer = raiden_events_search_for_item(
         app0.raiden,
         SendLockedTransfer,
         {'transfer': {'lock': {'amount': refund_amount}}},
     )
     assert send_lockedtransfer
 
-    send_refundtransfer = raiden_events_must_contain_entry(app1.raiden, SendRefundTransfer, {})
+    send_refundtransfer = raiden_events_search_for_item(app1.raiden, SendRefundTransfer, {})
     assert send_refundtransfer
 
     assert_synced_channel_state(
@@ -182,7 +181,7 @@ def test_refund_transfer(
 
     # A lock structure with the correct amount
 
-    send_locked = raiden_events_must_contain_entry(
+    send_locked = raiden_events_search_for_item(
         app0.raiden,
         SendLockedTransfer,
         {'transfer': {'lock': {'amount': amount_refund}}},
@@ -190,7 +189,7 @@ def test_refund_transfer(
     assert send_locked
     secrethash = send_locked.transfer.lock.secrethash
 
-    send_refund = raiden_events_must_contain_entry(app1.raiden, SendRefundTransfer, {})
+    send_refund = raiden_events_search_for_item(app1.raiden, SendRefundTransfer, {})
     assert send_refund
 
     lock = send_locked.transfer.lock
@@ -221,7 +220,7 @@ def test_refund_transfer(
     with dont_handle_lock_expired_mock(app0):
         wait_for_block(
             raiden=app0.raiden,
-            block_number=lock.expiration + DEFAULT_NUMBER_OF_BLOCK_CONFIRMATIONS * 2 + 1,
+            block_number=channel.get_sender_expiration_threshold(lock) + 1,
             retry_timeout=retry_timeout,
         )
         # make sure that app0 still has the payment task for the secrethash
@@ -229,7 +228,7 @@ def test_refund_transfer(
         assert secrethash in state_from_raiden(app0.raiden).payment_mapping.secrethashes_to_task
 
         # make sure that app1 sent a lock expired message for the secrethash
-        send_lock_expired = raiden_events_must_contain_entry(
+        send_lock_expired = raiden_events_search_for_item(
             app1.raiden,
             SendLockExpired,
             {'secrethash': secrethash},
@@ -237,7 +236,7 @@ def test_refund_transfer(
         assert send_lock_expired
         # make sure that app0 never got it
         state_changes = app0.raiden.wal.storage.get_statechanges_by_identifier(0, 'latest')
-        assert not must_contain_entry(
+        assert not search_for_item(
             state_changes,
             ReceiveLockExpired,
             {'secrethash': secrethash},
@@ -369,7 +368,7 @@ def test_different_view_of_last_bp_during_unlock(
 
     # A lock structure with the correct amount
 
-    send_locked = raiden_events_must_contain_entry(
+    send_locked = raiden_events_search_for_item(
         app0.raiden,
         SendLockedTransfer,
         {'transfer': {'lock': {'amount': amount_refund}}},
@@ -377,7 +376,7 @@ def test_different_view_of_last_bp_during_unlock(
     assert send_locked
     secrethash = send_locked.transfer.lock.secrethash
 
-    send_refund = raiden_events_must_contain_entry(app1.raiden, SendRefundTransfer, {})
+    send_refund = raiden_events_search_for_item(app1.raiden, SendRefundTransfer, {})
     assert send_refund
 
     lock = send_locked.transfer.lock
@@ -413,7 +412,7 @@ def test_different_view_of_last_bp_during_unlock(
         # Wait for lock expiration so that app0 sends a LockExpired
         wait_for_block(
             raiden=app0.raiden,
-            block_number=lock.expiration + DEFAULT_NUMBER_OF_BLOCK_CONFIRMATIONS * 2 + 1,
+            block_number=channel.get_sender_expiration_threshold(lock) + 1,
             retry_timeout=retry_timeout,
         )
 
@@ -564,14 +563,14 @@ def test_refund_transfer_after_2nd_hop(
 
     # Lock structures with the correct amount
 
-    send_locked1 = raiden_events_must_contain_entry(
+    send_locked1 = raiden_events_search_for_item(
         app0.raiden,
         SendLockedTransfer,
         {'transfer': {'lock': {'amount': amount_refund}}},
     )
     assert send_locked1
 
-    send_refund1 = raiden_events_must_contain_entry(app1.raiden, SendRefundTransfer, {})
+    send_refund1 = raiden_events_search_for_item(app1.raiden, SendRefundTransfer, {})
     assert send_refund1
 
     lock1 = send_locked1.transfer.lock
@@ -579,14 +578,14 @@ def test_refund_transfer_after_2nd_hop(
     assert lock1.amount == refund_lock1.amount
     assert lock1.secrethash == refund_lock1.secrethash
 
-    send_locked2 = raiden_events_must_contain_entry(
+    send_locked2 = raiden_events_search_for_item(
         app1.raiden,
         SendLockedTransfer,
         {'transfer': {'lock': {'amount': amount_refund}}},
     )
     assert send_locked2
 
-    send_refund2 = raiden_events_must_contain_entry(app2.raiden, SendRefundTransfer, {})
+    send_refund2 = raiden_events_search_for_item(app2.raiden, SendRefundTransfer, {})
     assert send_refund2
 
     lock2 = send_locked2.transfer.lock

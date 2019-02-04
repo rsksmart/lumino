@@ -25,10 +25,10 @@ def matrix_server_count():
 
 @pytest.fixture
 def local_matrix_servers(
-    request,
-    transport_protocol,
-    matrix_server_count,
-    synapse_config_generator,
+        request,
+        transport_protocol,
+        matrix_server_count,
+        synapse_config_generator,
 ):
     if transport_protocol is not TransportProtocol.MATRIX:
         yield [None]
@@ -44,9 +44,16 @@ def local_matrix_servers(
 
 
 @pytest.fixture
-def matrix_transports(local_matrix_servers, retries_before_backoff, retry_interval, private_rooms):
+def matrix_transports(
+        local_matrix_servers,
+        retries_before_backoff,
+        retry_interval,
+        private_rooms,
+        number_of_transports,
+):
     transports = []
-    for server in local_matrix_servers:
+    for transport_index in range(number_of_transports):
+        server = local_matrix_servers[transport_index % len(local_matrix_servers)]
         transports.append(
             MatrixTransport({
                 'discovery_room': 'discovery',

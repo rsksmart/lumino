@@ -4,8 +4,7 @@ from eth_utils import is_same_address, to_normalized_address
 from raiden.api.python import RaidenAPI
 from raiden.exceptions import DepositMismatch, UnknownTokenAddress
 from raiden.settings import DEFAULT_NUMBER_OF_BLOCK_CONFIRMATIONS
-from raiden.tests.utils.events import must_contain_entry
-from raiden.tests.utils.geth import wait_until_block
+from raiden.tests.utils.events import search_for_item
 from raiden.tests.utils.transfer import get_channelstate
 from raiden.transfer import channel, views
 from raiden.transfer.state import (
@@ -89,12 +88,20 @@ def test_channel_lifecycle(raiden_network, token_addresses, deposit, transport_p
     assert token_events[0]['event'] == ChannelEvent.OPENED
 
     registry_address = api1.raiden.default_registry.address
+    # Check that giving a 0 total deposit is not accepted
+    with pytest.raises(DepositMismatch):
+        api1.set_total_channel_deposit(
+            registry_address=registry_address,
+            token_address=token_address,
+            partner_address=api2.address,
+            total_deposit=0,
+        )
     # Load the new state with the deposit
     api1.set_total_channel_deposit(
-        registry_address,
-        token_address,
-        api2.address,
-        deposit,
+        registry_address=registry_address,
+        token_address=token_address,
+        partner_address=api2.address,
+        total_deposit=deposit,
     )
 
     # let's make sure it's idempotent. Same deposit should raise deposit mismatch limit
@@ -160,14 +167,16 @@ def test_channel_lifecycle(raiden_network, token_addresses, deposit, transport_p
         channel12.settle_timeout +
         10  # arbitrary number of additional blocks, used to wait for the settle() call
     )
-    wait_until_block(node1.raiden.chain, settlement_block + DEFAULT_NUMBER_OF_BLOCK_CONFIRMATIONS)
+    node1.raiden.chain.wait_until_block(
+        target_block_number=settlement_block + DEFAULT_NUMBER_OF_BLOCK_CONFIRMATIONS,
+    )
 
     state_changes = node1.raiden.wal.storage.get_statechanges_by_identifier(
         from_identifier=0,
         to_identifier='latest',
     )
 
-    assert must_contain_entry(state_changes, ContractReceiveChannelSettled, {
+    assert search_for_item(state_changes, ContractReceiveChannelSettled, {
         'token_network_identifier': token_network_identifier,
         'channel_identifier': channel12.identifier,
     })

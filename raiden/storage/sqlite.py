@@ -1,25 +1,25 @@
 import sqlite3
 import threading
-from typing import Any, Optional, Tuple
 
 from raiden.constants import SQLITE_MIN_REQUIRED_VERSION
 from raiden.exceptions import InvalidDBData, InvalidNumberInput
 from raiden.storage.utils import DB_SCRIPT_CREATE_TABLES, TimestampedEvent
-from raiden.utils import get_system_spec, typing
+from raiden.utils import get_system_spec
+from raiden.utils.typing import Any, Dict, NamedTuple, Optional, Tuple
 
 # The latest DB version
-RAIDEN_DB_VERSION = 16
+RAIDEN_DB_VERSION = 17
 
 
-class EventRecord(typing.NamedTuple):
+class EventRecord(NamedTuple):
     event_identifier: int
     state_change_identifier: int
-    data: typing.Any
+    data: Any
 
 
-class StateChangeRecord(typing.NamedTuple):
+class StateChangeRecord(NamedTuple):
     state_change_identifier: int
-    data: typing.Any
+    data: Any
 
 
 def assert_sqlite_version() -> bool:
@@ -44,9 +44,6 @@ class SQLiteStorage:
                     'Manual user intervention required. Bailing ...'.format(database_path),
                 )
 
-        self._run_updates()
-        self._log_raiden_run()
-
         # When writting to a table where the primary key is the identifier and we want
         # to return said identifier we use cursor.lastrowid, which uses sqlite's last_insert_rowid
         # https://github.com/python/cpython/blob/2.7/Modules/_sqlite/cursor.c#L727-L732
@@ -62,11 +59,9 @@ class SQLiteStorage:
         self.write_lock = threading.Lock()
         self.serializer = serializer
 
-    def _run_updates(self):
-        # TODO: Here add upgrade mechanism depending on the version
-        # current_version = self.get_version()
+        self.update_version()
 
-        # And finally at the end write the latest version in the DB
+    def update_version(self):
         cursor = self.conn.cursor()
         cursor.execute(
             'INSERT OR REPLACE INTO settings(name, value) VALUES(?, ?)',
@@ -74,7 +69,7 @@ class SQLiteStorage:
         )
         self.conn.commit()
 
-    def _log_raiden_run(self):
+    def log_run(self):
         """ Log timestamp and raiden version to help with debugging """
         version = get_system_spec()['raiden']
         cursor = self.conn.cursor()
@@ -204,7 +199,7 @@ class SQLiteStorage:
 
     def get_latest_event_by_data_field(
             self,
-            filters: typing.Dict[str, typing.Any],
+            filters: Dict[str, Any],
     ) -> EventRecord:
         """ Return all state changes filtered by a named field and value."""
         cursor = self.conn.cursor()
@@ -248,7 +243,7 @@ class SQLiteStorage:
 
     def get_latest_state_change_by_data_field(
             self,
-            filters: typing.Dict[str, str],
+            filters: Dict[str, str],
     ) -> StateChangeRecord:
         """ Return all state changes filtered by a named field and value."""
         cursor = self.conn.cursor()

@@ -2,7 +2,6 @@ from os import urandom
 
 # increase block gas limit
 import eth_tester.backends.pyevm.main as pyevm_main
-from coincurve import PrivateKey
 from eth_tester import EthereumTester, PyEVMBackend
 from eth_utils import encode_hex
 from web3 import EthereumTesterProvider, Web3
@@ -10,7 +9,7 @@ from web3 import EthereumTesterProvider, Web3
 from raiden.constants import TRANSACTION_GAS_LIMIT
 from raiden.transfer.balance_proof import pack_balance_proof
 from raiden.transfer.utils import hash_balance_data
-from raiden.utils.signing import eth_sign
+from raiden.utils.signer import LocalSigner
 from raiden_contracts.contract_manager import CONTRACTS_SOURCE_DIRS, ContractManager
 from raiden_contracts.utils.utils import get_pending_transfers_tree
 
@@ -22,11 +21,10 @@ class ContractTester:
         self.tester = EthereumTester(PyEVMBackend())
         self.web3 = Web3(EthereumTesterProvider(self.tester))
         if generate_keys > 0:
-            generated_keys = [urandom(32) for _ in range(generate_keys)]
-            self.private_keys = [PrivateKey(key) for key in generated_keys]
+            self.private_keys = [urandom(32) for _ in range(generate_keys)]
             self.accounts = [
-                self.tester.add_account(f'{encode_hex(key)}')
-                for key in generated_keys
+                self.tester.add_account(encode_hex(key))
+                for key in self.private_keys
             ]
             for account in self.accounts:
                 self.tester.send_transaction({
@@ -171,7 +169,7 @@ def find_max_pending_transfers(gas_limit):
             token_network_identifier=token_network_identifier,
             chain_id=1,
         )
-        signature = eth_sign(privkey=tester.private_keys[1], data=data_to_sign)
+        signature = LocalSigner(tester.private_keys[1]).sign(data=data_to_sign)
 
         tester.call_transaction(
             'TokenNetwork',

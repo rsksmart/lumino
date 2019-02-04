@@ -1,6 +1,7 @@
 cachetools
 coincurve
 colorama
+eth-keys
 eth-keyfile
 eth-utils
 filelock
@@ -25,6 +26,7 @@ pytoml
 raiden-contracts
 raiden-libs
 raiden-webui
+requests
 structlog
 web3
 webargs

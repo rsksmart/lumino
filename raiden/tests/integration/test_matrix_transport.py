@@ -16,6 +16,7 @@ from raiden.transfer.mediated_transfer.events import CHANNEL_IDENTIFIER_GLOBAL_Q
 from raiden.transfer.queue_identifier import QueueIdentifier
 from raiden.transfer.state_change import ActionUpdateTransportAuthData
 from raiden.utils import pex
+from raiden.utils.signer import LocalSigner
 from raiden.utils.typing import Address, List, Optional, Union
 from raiden_libs.network.matrix import Room
 
@@ -62,10 +63,6 @@ def mock_matrix(
     def mock_receive_message(klass, message):
         # We are just unit testing the matrix transport receive so do nothing
         assert message
-
-    def mock_receive_delivered(klass, delivered):
-        # We are just unit testing the matrix transport receive so do nothing
-        assert delivered
 
     config = dict(
         retry_interval=retry_interval,
@@ -117,7 +114,7 @@ def make_message(convert_to_hex: bool = False, overwrite_data=None):
             amount=1,
             expiration=10,
         )
-        message.sign(HOP1_KEY)
+        message.sign(LocalSigner(HOP1_KEY))
         data = message.encode()
         if convert_to_hex:
             data = '0x' + data.hex()
@@ -262,7 +259,7 @@ def test_matrix_message_sync(
 
     for i in range(5):
         message = Processed(i)
-        message.sign(transport0._raiden_service.private_key)
+        transport0._raiden_service.sign(message)
         transport0.send_async(
             queue_identifier,
             message,
@@ -281,7 +278,7 @@ def test_matrix_message_sync(
     # Send more messages while the other end is offline
     for i in range(10, 15):
         message = Processed(i)
-        message.sign(transport0._raiden_service.private_key)
+        transport0._raiden_service.sign(message)
         transport0.send_async(
             queue_identifier,
             message,
@@ -307,10 +304,10 @@ def test_matrix_message_sync(
 
 
 def test_matrix_message_retry(
-    local_matrix_servers,
-    private_rooms,
-    retry_interval,
-    retries_before_backoff,
+        local_matrix_servers,
+        private_rooms,
+        retry_interval,
+        retries_before_backoff,
 ):
     """ Test the retry mechanism implemented into the matrix client.
     The test creates a transport and sends a message. Given that the
@@ -355,7 +352,7 @@ def test_matrix_message_retry(
 
     # Send the initial message
     message = Processed(0)
-    message.sign(transport._raiden_service.private_key)
+    transport._raiden_service.sign(message)
     chain_state.queueids_to_queues[queueid] = [message]
     retry_queue.enqueue_global(message)
 
@@ -390,10 +387,10 @@ def test_matrix_message_retry(
 
 
 def test_join_invalid_discovery(
-    local_matrix_servers,
-    private_rooms,
-    retry_interval,
-    retries_before_backoff,
+        local_matrix_servers,
+        private_rooms,
+        retry_interval,
+        retries_before_backoff,
 ):
     """_join_discovery_room tries to join on all servers on available_servers config
 
@@ -429,50 +426,73 @@ def test_join_invalid_discovery(
 
 
 @pytest.mark.parametrize('matrix_server_count', [2])
-def test_matrix_cross_server(matrix_transports, retry_interval):
-    transport0, transport1 = matrix_transports
-
+@pytest.mark.parametrize('number_of_transports', [3])
+def test_matrix_cross_server_with_load_balance(matrix_transports, retry_interval):
+    transport0, transport1, transport2 = matrix_transports
     received_messages0 = set()
     received_messages1 = set()
+    received_messages2 = set()
 
     message_handler0 = MessageHandler(received_messages0)
     message_handler1 = MessageHandler(received_messages1)
+    message_handler2 = MessageHandler(received_messages2)
+
     raiden_service0 = MockRaidenService(message_handler0)
     raiden_service1 = MockRaidenService(message_handler1)
+    raiden_service2 = MockRaidenService(message_handler2)
 
     transport0.start(raiden_service0, message_handler0, '')
     transport1.start(raiden_service1, message_handler1, '')
+    transport2.start(raiden_service2, message_handler2, '')
+
+    transport0.start_health_check(raiden_service1.address)
+    transport0.start_health_check(raiden_service2.address)
 
     transport1.start_health_check(raiden_service0.address)
-    transport0.start_health_check(raiden_service1.address)
+    transport1.start_health_check(raiden_service2.address)
 
-    queueid = QueueIdentifier(
+    transport2.start_health_check(raiden_service0.address)
+    transport2.start_health_check(raiden_service1.address)
+
+    queueid1 = QueueIdentifier(
         recipient=raiden_service1.address,
         channel_identifier=CHANNEL_IDENTIFIER_GLOBAL_QUEUE,
     )
+    queueid2 = QueueIdentifier(
+        recipient=raiden_service2.address,
+        channel_identifier=CHANNEL_IDENTIFIER_GLOBAL_QUEUE,
+    )
     message = Processed(0)
-    message.sign(raiden_service0.private_key)
+    raiden_service0.sign(message)
 
-    transport0.send_async(queueid, message)
+    transport0.send_async(queueid1, message)
+    transport0.send_async(queueid2, message)
 
     with Timeout(retry_interval * 10, exception=False):
-        while not (len(received_messages0) == 1 and len(received_messages1) == 1):
-            gevent.sleep(.1)
+        all_messages_received = False
 
-    assert len(received_messages0) == 1
-    assert len(received_messages1) == 1
+        while not all_messages_received:
+            all_messages_received = (
+                len(received_messages0) == 2 and
+                len(received_messages1) == 1 and
+                len(received_messages2) == 1
+            )
+            gevent.sleep(.1)
 
     transport0.stop()
     transport1.stop()
+    transport2.stop()
+
     transport0.get()
     transport1.get()
+    transport2.get()
 
 
 def test_matrix_discovery_room_offline_server(
-    local_matrix_servers,
-    retries_before_backoff,
-    retry_interval,
-    private_rooms,
+        local_matrix_servers,
+        retries_before_backoff,
+        retry_interval,
+        private_rooms,
 ):
 
     transport = MatrixTransport({

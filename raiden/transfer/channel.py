@@ -72,7 +72,7 @@ from raiden.transfer.state_change import (
 )
 from raiden.transfer.utils import hash_balance_data
 from raiden.utils import pex
-from raiden.utils.signing import eth_recover
+from raiden.utils.signer import recover
 from raiden.utils.typing import (
     Address,
     Any,
@@ -111,6 +111,29 @@ BalanceProofData = Tuple[
     TokenAmount,
 ]
 SendUnlockAndMerkleTree = Tuple[SendBalanceProof, MerkleTreeState]
+
+
+def get_sender_expiration_threshold(lock: HashTimeLockState) -> BlockNumber:
+    """ Returns the block number at which the sender can send the remove expired lock.
+
+    The remove lock expired message will be rejected if the expiration block
+    has not been confirmed. Additionally the sender can account for possible
+    delays in the receiver, so a few additional blocks are used to avoid hanging the channel.
+    """
+    return BlockNumber(
+        lock.expiration + DEFAULT_NUMBER_OF_BLOCK_CONFIRMATIONS * 2,
+    )
+
+
+def get_receiver_expiration_threshold(lock: HashTimeLockState) -> BlockNumber:
+    """ Returns the block number at which a remove lock expired can be accepted.
+
+    The receiver must wait for the block at which the lock expires to be confirmed.
+    This is necessary to handle reorgs which could hide a secret registration.
+    """
+    return BlockNumber(
+        lock.expiration + DEFAULT_NUMBER_OF_BLOCK_CONFIRMATIONS,
+    )
 
 
 def is_lock_pending(
@@ -181,10 +204,7 @@ def transfer_expired(
         affected_channel: NettingChannelState,
         block_number: BlockNumber,
 ) -> bool:
-    lock_expiration_threshold = BlockNumber(
-        transfer.lock.expiration +
-        DEFAULT_NUMBER_OF_BLOCK_CONFIRMATIONS * 2,
-    )
+    lock_expiration_threshold = get_sender_expiration_threshold(transfer.lock)
     has_lock_expired, _ = is_lock_expired(
         end_state=affected_channel.our_state,
         lock=transfer.lock,
@@ -300,11 +320,11 @@ def is_valid_signature(
     )
 
     try:
-        signer_address = eth_recover(
+        signer_address = recover(
             data=data_that_was_signed,
             signature=balance_proof.signature,
         )
-        # InvalidSignature is raised by eth_utils.eth_recover if signature
+        # InvalidSignature is raised by raiden.utils.signer.recover if signature
         # is not bytes or has the incorrect length
         #
         # ValueError is raised if the PublicKey instantiation failed, let it
@@ -496,9 +516,7 @@ def is_valid_lock_expired(
             end_state=receiver_state,
             lock=lock,
             block_number=block_number,
-            lock_expiration_threshold=BlockNumber(
-                lock.expiration + DEFAULT_NUMBER_OF_BLOCK_CONFIRMATIONS,
-            ),
+            lock_expiration_threshold=get_receiver_expiration_threshold(lock),
         )
 
         if not has_expired:
@@ -748,7 +766,7 @@ def is_valid_unlock(
         result = (False, msg, None)
 
     elif received_balance_proof.locksroot != locksroot_without_lock:
-        # Secret messages remove a known lock, the new locksroot must have only
+        # Unlock messages remove a known lock, the new locksroot must have only
         # that lock removed, otherwise the sender may be trying to remove
         # additional locks.
         msg = (
@@ -762,7 +780,7 @@ def is_valid_unlock(
         result = (False, msg, None)
 
     elif received_balance_proof.transferred_amount != expected_transferred_amount:
-        # Secret messages must increase the transferred_amount by lock amount,
+        # Unlock messages must increase the transferred_amount by lock amount,
         # otherwise the sender is trying to play the protocol and steal token.
         msg = (
             "Invalid Unlock message. "
@@ -775,7 +793,7 @@ def is_valid_unlock(
         result = (False, msg, None)
 
     elif received_balance_proof.locked_amount != expected_locked_amount:
-        # Secret messages must increase the transferred_amount by lock amount,
+        # Unlock messages must increase the transferred_amount by lock amount,
         # otherwise the sender is trying to play the protocol and steal token.
         msg = (
             "Invalid Unlock message. "

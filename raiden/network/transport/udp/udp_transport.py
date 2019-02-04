@@ -2,6 +2,7 @@ import socket
 
 import cachetools
 import gevent
+import gevent.pool
 import structlog
 from eth_utils import encode_hex, is_binary_address
 from gevent.event import AsyncResult, Event
@@ -160,7 +161,7 @@ class UDPTransport(Runnable):
     def __init__(self, address, discovery, udpsocket, throttle_policy, config):
         super().__init__()
         # these values are initialized by the start method
-        self.queueids_to_queues = dict()
+        self.queueids_to_queues: typing.Dict = dict()
         self.raiden: RaidenService
         self.message_handler: MessageHandler
 
@@ -194,7 +195,12 @@ class UDPTransport(Runnable):
         self.get_host_port = cache_wrapper(discovery.get)
 
         self.throttle_policy = throttle_policy
-        self.server = DatagramServer(udpsocket, handle=self.receive)
+        pool = gevent.pool.Pool()
+        self.server = DatagramServer(
+            udpsocket,
+            handle=self.receive,
+            spawn=pool,
+        )
 
     def start(
             self,
@@ -211,13 +217,17 @@ class UDPTransport(Runnable):
         self.log_healthcheck = log_healthcheck.bind(node=pex(self.raiden.address))
         self.message_handler = message_handler
 
-        # server.stop() clears the handle. Since this may be a restart the
-        # handle must always be set
+        # server.stop() clears the handle and the pool. Since this may be a
+        # restart the handle must always be set
         self.server.set_handle(self.receive)
+        pool = gevent.pool.Pool()
+        self.server.set_spawn(pool)
 
         self.server.start()
         self.log.debug('UDP started')
         super().start()
+
+        log.debug('UDP transport started')
 
     def _run(self):
         """ Runnable main method, perform wait on long-running subtasks """
@@ -262,7 +272,7 @@ class UDPTransport(Runnable):
         for async_result in self.messageids_to_asyncresults.values():
             async_result.set(False)
 
-        self.log.debug('UDP stopped')
+        log.debug('UDP stopped', node=pex(self.raiden.address))
         del self.log_healthcheck
         del self.log
 

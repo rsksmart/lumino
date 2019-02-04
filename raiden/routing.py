@@ -1,15 +1,19 @@
 from heapq import heappop, heappush
-from typing import List
+from typing import Any, Dict, List, Tuple
 
 import networkx
+import requests
 import structlog
+from eth_utils import to_canonical_address, to_checksum_address
 
+from raiden.constants import DEFAULT_HTTP_REQUEST_TIMEOUT
 from raiden.transfer import channel, views
 from raiden.transfer.state import (
     CHANNEL_STATE_OPENED,
     NODE_NETWORK_REACHABLE,
     NODE_NETWORK_UNKNOWN,
     ChainState,
+    NettingChannelState,
     RouteState,
 )
 from raiden.utils import pex, typing
@@ -17,7 +21,97 @@ from raiden.utils import pex, typing
 log = structlog.get_logger(__name__)  # pylint: disable=invalid-name
 
 
+def check_channel_constraints(
+        channel_state: NettingChannelState,
+        from_address: typing.InitiatorAddress,
+        partner_address: typing.Address,
+        amount: int,
+        network_statuses: Dict[typing.Address, str],
+        routing_module: str,
+) -> bool:
+    # check channel state
+    if channel.get_status(channel_state) != CHANNEL_STATE_OPENED:
+        log.info(
+            'Channel is not opened, ignoring',
+            from_address=pex(from_address),
+            partner_address=pex(partner_address),
+            routing_source=routing_module,
+        )
+        return False
+
+    # check channel distributable
+    distributable = channel.get_distributable(
+        channel_state.our_state,
+        channel_state.partner_state,
+    )
+
+    if amount > distributable:
+        log.info(
+            'Channel doesnt have enough funds, ignoring',
+            from_address=pex(from_address),
+            partner_address=pex(partner_address),
+            amount=amount,
+            distributable=distributable,
+            routing_source=routing_module,
+        )
+        return False
+
+    # check channel partner reachability
+    network_state = network_statuses.get(partner_address, NODE_NETWORK_UNKNOWN)
+    if network_state != NODE_NETWORK_REACHABLE:
+        log.info(
+            'Partner for channel isn\'t reachable, ignoring',
+            from_address=pex(from_address),
+            partner_address=pex(partner_address),
+            status=network_state,
+            routing_source=routing_module,
+        )
+        return False
+
+    return True
+
+
 def get_best_routes(
+        chain_state: ChainState,
+        token_network_id: typing.TokenNetworkID,
+        from_address: typing.InitiatorAddress,
+        to_address: typing.TargetAddress,
+        amount: int,
+        previous_address: typing.Optional[typing.Address],
+        config: Dict[str, Any],
+) -> List[RouteState]:
+    services_config = config.get('services', None)
+
+    if services_config and services_config['pathfinding_service_address'] is not None:
+        pfs_answer_ok, pfs_routes = get_best_routes_pfs(
+            chain_state=chain_state,
+            token_network_id=token_network_id,
+            from_address=from_address,
+            to_address=to_address,
+            amount=amount,
+            previous_address=previous_address,
+            config=services_config,
+        )
+
+        if pfs_answer_ok:
+            return pfs_routes
+        else:
+            log.warning(
+                'Request to Pathfinding Service was not successful, '
+                'falling back to internal routing.',
+            )
+
+    return get_best_routes_internal(
+        chain_state=chain_state,
+        token_network_id=token_network_id,
+        from_address=from_address,
+        to_address=to_address,
+        amount=amount,
+        previous_address=previous_address,
+    )
+
+
+def get_best_routes_internal(
         chain_state: ChainState,
         token_network_id: typing.TokenNetworkID,
         from_address: typing.InitiatorAddress,
@@ -62,40 +156,15 @@ def get_best_routes(
             partner_address,
         )
 
-        assert channel_state is not None
-
-        if channel.get_status(channel_state) != CHANNEL_STATE_OPENED:
-            log.info(
-                'channel is not opened, ignoring',
-                from_address=pex(from_address),
-                partner_address=pex(partner_address),
-            )
-            continue
-
-        distributable = channel.get_distributable(
-            channel_state.our_state,
-            channel_state.partner_state,
+        channel_constraints_fulfilled = check_channel_constraints(
+            channel_state=channel_state,
+            from_address=from_address,
+            partner_address=partner_address,
+            amount=amount,
+            network_statuses=network_statuses,
+            routing_module='Internal Routing',
         )
-
-        if amount > distributable:
-            log.info(
-                'channel doesnt have enough funds, ignoring',
-                from_address=pex(from_address),
-                partner_address=pex(partner_address),
-                amount=amount,
-                distributable=distributable,
-            )
-            continue
-
-        network_state = network_statuses.get(partner_address, NODE_NETWORK_UNKNOWN)
-
-        if network_state != NODE_NETWORK_REACHABLE:
-            log.info(
-                'partner for channel state isn\'t reachable, ignoring',
-                from_address=pex(from_address),
-                partner_address=pex(partner_address),
-                status=network_state,
-            )
+        if not channel_constraints_fulfilled:
             continue
 
         nonrefundable = amount > channel.get_distributable(
@@ -129,3 +198,106 @@ def get_best_routes(
         route_state = RouteState(partner_address, channel_state_id)
         available_routes.append(route_state)
     return available_routes
+
+
+def get_best_routes_pfs(
+        chain_state: ChainState,
+        token_network_id: typing.TokenNetworkID,
+        from_address: typing.InitiatorAddress,
+        to_address: typing.TargetAddress,
+        amount: int,
+        previous_address: typing.Optional[typing.Address],
+        config: Dict[str, Any],
+) -> Tuple[bool, List[RouteState]]:
+    pfs_path = '{}/api/v1/{}/paths'.format(
+        config['pathfinding_service_address'],
+        to_checksum_address(token_network_id),
+    )
+    payload = {
+        'from': to_checksum_address(from_address),
+        'to': to_checksum_address(to_address),
+        'value': amount,
+        'max_paths': config['pathfinding_max_paths'],
+    }
+
+    # check that the response is successful
+    try:
+        response = requests.get(pfs_path, params=payload, timeout=DEFAULT_HTTP_REQUEST_TIMEOUT)
+    except requests.RequestException:
+        log.warning(
+            'Could not connect to Pathfinding Service',
+            request=pfs_path,
+            parameters=payload,
+            exc_info=True,
+        )
+        return False, []
+
+    # check that the response contains valid json
+    try:
+        response_json = response.json()
+    except ValueError:
+        log.warning(
+            'Pathfinding Service returned invalid JSON',
+            response_text=response.text,
+            exc_info=True,
+        )
+        return False, []
+
+    if response.status_code != 200:
+        log_info = {
+            'error_code': response.status_code,
+        }
+
+        error = response_json.get('errors')
+        if error is not None:
+            log_info['pfs_error'] = error
+
+        log.info(
+            'Pathfinding Service returned error code',
+            **log_info,
+        )
+        return False, []
+
+    if response_json.get('result') is None:
+        log.info(
+            'Pathfinding Service returned unexpected result',
+            result=response_json,
+        )
+        return False, []
+
+    paths = []
+    network_statuses = views.get_networkstatuses(chain_state)
+    for path_object in response_json['result']:
+        path = path_object['path']
+
+        # get the second entry, as the first one is the node itself
+        # also needs to be converted to canonical representation
+        partner_address = to_canonical_address(path[1])
+
+        # don't route back
+        if partner_address == previous_address:
+            continue
+
+        channel_state = views.get_channelstate_by_token_network_and_partner(
+            chain_state=chain_state,
+            token_network_id=token_network_id,
+            partner_address=partner_address,
+        )
+
+        channel_constraints_fulfilled = check_channel_constraints(
+            channel_state=channel_state,
+            from_address=from_address,
+            partner_address=partner_address,
+            amount=amount,
+            network_statuses=network_statuses,
+            routing_module='Pathfinding Service',
+        )
+        if not channel_constraints_fulfilled:
+            continue
+
+        paths.append(RouteState(
+            node_address=partner_address,
+            channel_identifier=channel_state.identifier,
+        ))
+
+    return True, paths

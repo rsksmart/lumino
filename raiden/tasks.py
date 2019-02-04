@@ -72,7 +72,7 @@ def check_gas_reserve(raiden):
     while True:
         has_enough_balance, estimated_required_balance = gas_reserve.has_enough_gas_reserve(
             raiden,
-            channels_to_open=0,
+            channels_to_open=1,
         )
         estimated_required_balance_eth = Web3.fromWei(estimated_required_balance, 'ether')
 
@@ -102,7 +102,6 @@ class AlarmTask(Runnable):
         self.chain = chain
         self.chain_id = None
         self.known_block_number = None
-        self._stop_event = AsyncResult()
 
         # TODO: Start with a larger sleep_time and decrease it as the
         # probability of a new block increases.
@@ -110,7 +109,7 @@ class AlarmTask(Runnable):
 
     def start(self):
         log.debug('Alarm task started', node=pex(self.chain.node_address))
-        self._stop_event.set(False)
+        self._stop_event = AsyncResult()
         super().start()
 
     def _run(self):  # pylint: disable=method-hidden

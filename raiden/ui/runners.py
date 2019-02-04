@@ -118,16 +118,17 @@ class NodeRunner:
 
         if self._options['rpc']:
             rest_api = RestAPI(self._raiden_api)
+            (api_host, api_port) = split_endpoint(self._options['api_address'])
             api_server = APIServer(
                 rest_api,
+                config={'host': api_host, 'port': api_port},
                 cors_domain_list=domain_list,
                 web_ui=self._options['web_ui'],
                 eth_rpc_endpoint=self._options['eth_rpc_endpoint'],
             )
-            (api_host, api_port) = split_endpoint(self._options['api_address'])
 
             try:
-                api_server.start(api_host, api_port)
+                api_server.start()
             except APIServerPortInUseError:
                 click.secho(
                     f'ERROR: API Address {api_host}:{api_port} is in use. '
@@ -183,12 +184,13 @@ class NodeRunner:
         except RaidenError as ex:
             click.secho(f'FATAL: {ex}', fg='red')
         except Exception as ex:
-            with NamedTemporaryFile(
+            file = NamedTemporaryFile(
                 'w',
                 prefix=f'raiden-exception-{datetime.utcnow():%Y-%m-%dT%H-%M}',
                 suffix='.txt',
                 delete=False,
-            ) as traceback_file:
+            )
+            with file as traceback_file:
                 traceback.print_exc(file=traceback_file)
                 click.secho(
                     f'FATAL: An unexpected exception occured. '
@@ -223,9 +225,12 @@ class UDPRunner(NodeRunner):
 
         (listen_host, listen_port) = split_endpoint(self._options['listen_address'])
         try:
-            with SocketFactory(
-                listen_host, listen_port, strategy=self._options['nat'],
-            ) as mapped_socket:
+            factory = SocketFactory(
+                listen_host,
+                listen_port,
+                strategy=self._options['nat'],
+            )
+            with factory as mapped_socket:
                 self._options['mapped_socket'] = mapped_socket
                 app = self._start_services()
 

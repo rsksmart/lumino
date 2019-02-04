@@ -9,7 +9,7 @@ from raiden.exceptions import InvalidAddress, RaidenUnrecoverableError
 from raiden.network.proxies.utils import compare_contract_versions
 from raiden.network.rpc.client import StatelessFilter, check_address_has_code
 from raiden.network.rpc.transactions import check_transaction_threw
-from raiden.utils import pex, privatekey_to_address, safe_gas_limit, sha3
+from raiden.utils import pex, safe_gas_limit, sha3
 from raiden.utils.typing import BlockSpecification, Keccak256, Secret
 from raiden_contracts.constants import CONTRACT_SECRET_REGISTRY, EVENT_SECRET_REVEALED
 from raiden_contracts.contract_manager import ContractManager
@@ -45,7 +45,7 @@ class SecretRegistry:
         self.address = secret_registry_address
         self.proxy = proxy
         self.client = jsonrpc_client
-        self.node_address = privatekey_to_address(self.client.privkey)
+        self.node_address = self.client.address
         self.open_secret_transactions = dict()
 
     def register_secret(self, secret: Secret):
@@ -83,8 +83,9 @@ class SecretRegistry:
             log.debug('registerSecretBatch skipped', **log_details)
             return
 
+        checking_block = self.client.get_checking_block()
         error_prefix = 'Call to registerSecretBatch will fail'
-        gas_limit = self.proxy.estimate_gas('pending', 'registerSecretBatch', secrets)
+        gas_limit = self.proxy.estimate_gas(checking_block, 'registerSecretBatch', secrets)
         if gas_limit:
             error_prefix = 'Call to registerSecretBatch failed'
             try:
@@ -109,7 +110,7 @@ class SecretRegistry:
             if transaction_executed:
                 block = receipt_or_none['blockNumber']
             else:
-                block = 'pending'
+                block = checking_block
 
             self.proxy.jsonrpc_client.check_for_insufficient_eth(
                 transaction_name='registerSecretBatch',

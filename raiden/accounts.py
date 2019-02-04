@@ -8,7 +8,7 @@ import structlog
 from eth_keyfile import decode_keyfile_json
 from eth_utils import add_0x_prefix, decode_hex, encode_hex, remove_0x_prefix, to_checksum_address
 
-from raiden.utils import privatekey_to_address, privtopub
+from raiden.utils import privatekey_to_address, privatekey_to_publickey
 from raiden.utils.typing import AddressHex
 
 log = structlog.get_logger(__name__)
@@ -100,11 +100,11 @@ class AccountManager:
                             address = add_0x_prefix(str(data['address']).lower())
                             self.accounts[address] = str(fullpath)
                     except (
-                        IOError,
-                        json.JSONDecodeError,
-                        KeyError,
-                        OSError,
-                        UnicodeDecodeError,
+                            IOError,
+                            json.JSONDecodeError,
+                            KeyError,
+                            OSError,
+                            UnicodeDecodeError,
                     ) as ex:
                         # Invalid file - skip
                         if f.startswith('UTC--'):
@@ -252,7 +252,7 @@ class Account:
     def pubkey(self):
         """The account's public key or `None` if the account is locked"""
         if not self.locked:
-            return privtopub(self.privkey)
+            return privatekey_to_publickey(self.privkey)
 
         return None
 

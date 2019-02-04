@@ -28,8 +28,8 @@ from raiden.network.proxies.utils import compare_contract_versions
 from raiden.network.rpc.client import StatelessFilter, check_address_has_code
 from raiden.network.rpc.transactions import check_transaction_threw
 from raiden.transfer.balance_proof import pack_balance_proof
-from raiden.utils import pex, privatekey_to_address, safe_gas_limit
-from raiden.utils.signing import eth_recover
+from raiden.utils import pex, safe_gas_limit
+from raiden.utils.signer import recover
 from raiden.utils.typing import (
     AdditionalHash,
     Address,
@@ -124,7 +124,7 @@ class TokenNetwork:
         self.address = token_network_address
         self.proxy = proxy
         self.client = jsonrpc_client
-        self.node_address = privatekey_to_address(self.client.privkey)
+        self.node_address = self.client.address
         self.open_channel_transactions = dict()
 
         # Forbids concurrent operations on the same channel
@@ -188,15 +188,14 @@ class TokenNetwork:
             self,
             partner: Address,
             block: BlockSpecification,
-    ) -> Tuple[bool, str]:
+    ):
         channel_created = self.channel_exists_and_not_settled(
             participant1=self.node_address,
             participant2=partner,
             block_identifier=block,
         )
         if channel_created:
-            return True, 'Channel with given partner address already exists'
-        return False, ''
+            raise DuplicatedChannelError('Channel with given partner address already exists')
 
     def new_netting_channel(
             self,
@@ -212,30 +211,33 @@ class TokenNetwork:
         Returns:
             The ChannelID of the new netting channel.
         """
-
-        self._new_channel_preconditions(partner, settle_timeout, 'pending')
+        checking_block = self.client.get_checking_block()
+        self._new_channel_preconditions(partner, settle_timeout, checking_block)
         log_details = {
             'peer1': pex(self.node_address),
             'peer2': pex(partner),
         }
         gas_limit = self.proxy.estimate_gas(
-            'pending',
+            checking_block,
             'openChannel',
             self.node_address,
             partner,
             settle_timeout,
         )
         if not gas_limit:
-            channel_exists = self.channel_exists_and_not_settled(
-                participant1=self.node_address,
-                participant2=partner,
-                block_identifier='pending',
+            self.proxy.jsonrpc_client.check_for_insufficient_eth(
+                transaction_name='openChannel',
+                transaction_executed=False,
+                required_gas=GAS_REQUIRED_FOR_OPEN_CHANNEL,
+                block_identifier=checking_block,
             )
-            if channel_exists:
-                raise DuplicatedChannelError('Duplicated channel')
+            self._new_channel_postconditions(
+                partner=partner,
+                block='pending',
+            )
 
-            log.critical('Call to openChannel will fail', **log_details)
-            raise RaidenUnrecoverableError('Call to openChannel will fail')
+            log.critical('new_netting_channel call will fail', **log_details)
+            raise RaidenUnrecoverableError('Creating a new channel will fail')
 
         log.debug('new_netting_channel called', **log_details)
         # Prevent concurrent attempts to open a channel with the same token and
@@ -255,12 +257,10 @@ class TokenNetwork:
                 self.client.poll(transaction_hash)
                 receipt_or_none = check_transaction_threw(self.client, transaction_hash)
                 if receipt_or_none:
-                    known_race, msg = self._new_channel_postconditions(
+                    self._new_channel_postconditions(
                         partner=partner,
                         block=receipt_or_none['blockNumber'],
                     )
-                    if known_race:
-                        raise DuplicatedChannelError(msg)
                     log.critical('new_netting_channel failed', **log_details)
                     raise RaidenUnrecoverableError('creating new channel failed')
 
@@ -275,22 +275,6 @@ class TokenNetwork:
         else:
             # All other concurrent threads should block on the result of opening this channel
             self.open_channel_transactions[partner].get()
-
-        if not gas_limit:
-            self.proxy.jsonrpc_client.check_for_insufficient_eth(
-                transaction_name='openChannel',
-                transaction_executed=False,
-                required_gas=GAS_REQUIRED_FOR_OPEN_CHANNEL,
-                block_identifier='pending',
-            )
-            known_race, msg = self._new_channel_postconditions(
-                partner=partner,
-                block='pending',
-            )
-            if known_race:
-                raise DuplicatedChannelError(msg)
-            log.critical('new_netting_channel call will fail', **log_details)
-            raise RaidenUnrecoverableError('Creating a new channel will fail')
 
         channel_identifier: ChannelID = self.detail_channel(
             participant1=self.node_address,
@@ -307,17 +291,18 @@ class TokenNetwork:
             participant1: Address,
             participant2: Address,
             called_by_fn: str,
+            block_identifier: BlockSpecification,
             channel_identifier: ChannelID = None,
-            block_identifier: BlockSpecification = 'pending',
     ) -> ChannelID:
         if not channel_identifier:
-            channel_identifier = self._call_and_check_result(
-                block_identifier,
-                'getChannelIdentifier',
+            channel_identifier = self.proxy.contract.functions.getChannelIdentifier(
                 to_checksum_address(participant1),
                 to_checksum_address(participant2),
-            )
-        assert isinstance(channel_identifier, T_ChannelID)
+            ).call(block_identifier=block_identifier)
+
+        if not isinstance(channel_identifier, T_ChannelID):
+            raise ValueError('channel_identifier must be of type T_ChannelID')
+
         if channel_identifier == 0:
             raise RaidenRecoverableError(
                 f'When calling {called_by_fn} either 0 value was given for the '
@@ -325,22 +310,23 @@ class TokenNetwork:
                 f'no channel currently exists between {pex(participant1)} and '
                 f'{pex(participant2)}',
             )
+
         return channel_identifier
 
     def channel_exists_and_not_settled(
             self,
             participant1: Address,
             participant2: Address,
+            block_identifier: BlockSpecification,
             channel_identifier: ChannelID = None,
-            block_identifier: BlockSpecification = 'pending',
     ) -> bool:
         """Returns if the channel exists and is in a non-settled state"""
         try:
             channel_state = self._get_channel_state(
                 participant1=participant1,
                 participant2=participant2,
-                channel_identifier=channel_identifier,
                 block_identifier=block_identifier,
+                channel_identifier=channel_identifier,
             )
         except RaidenRecoverableError:
             return False
@@ -381,8 +367,8 @@ class TokenNetwork:
             self,
             participant1: Address,
             participant2: Address,
+            block_identifier: BlockSpecification,
             channel_identifier: ChannelID = None,
-            block_identifier: BlockSpecification = 'pending',
     ) -> ChannelData:
         """ Returns a ChannelData instance with the channel specific information.
 
@@ -394,8 +380,8 @@ class TokenNetwork:
             participant1=participant1,
             participant2=participant2,
             called_by_fn='detail_channel',
-            channel_identifier=channel_identifier,
             block_identifier=block_identifier,
+            channel_identifier=channel_identifier,
         )
 
         channel_data = self._call_and_check_result(
@@ -416,8 +402,8 @@ class TokenNetwork:
             self,
             participant1: Address,
             participant2: Address,
+            block_identifier: BlockSpecification,
             channel_identifier: ChannelID = None,
-            block_identifier: BlockSpecification = 'pending',
     ) -> ParticipantsDetails:
         """ Returns a ParticipantsDetails instance with the participants'
             channel information.
@@ -435,8 +421,8 @@ class TokenNetwork:
             participant1=participant1,
             participant2=participant2,
             called_by_fn='details_participants',
-            channel_identifier=channel_identifier,
             block_identifier=block_identifier,
+            channel_identifier=channel_identifier,
         )
 
         our_data = self.detail_participant(
@@ -457,8 +443,8 @@ class TokenNetwork:
             self,
             participant1: Address,
             participant2: Address,
+            block_identifier: BlockSpecification,
             channel_identifier: ChannelID = None,
-            block_identifier: BlockSpecification = 'pending',
     ) -> ChannelDetails:
         """ Returns a ChannelDetails instance with all the details of the
             channel and the channel participants.
@@ -475,14 +461,14 @@ class TokenNetwork:
         channel_data = self.detail_channel(
             participant1=participant1,
             participant2=participant2,
-            channel_identifier=channel_identifier,
             block_identifier=block_identifier,
+            channel_identifier=channel_identifier,
         )
         participants_data = self.detail_participants(
             participant1=participant1,
             participant2=participant2,
-            channel_identifier=channel_data.channel_identifier,
             block_identifier=block_identifier,
+            channel_identifier=channel_data.channel_identifier,
         )
         chain_id = self.proxy.contract.functions.chain_id().call()
 
@@ -507,8 +493,14 @@ class TokenNetwork:
             channel_identifier: ChannelID,
     ) -> bool:
         """ Returns true if the channel is in an open state, false otherwise. """
+        checking_block = self.client.get_checking_block()
         try:
-            channel_state = self._get_channel_state(participant1, participant2, channel_identifier)
+            channel_state = self._get_channel_state(
+                participant1=participant1,
+                participant2=participant2,
+                block_identifier=checking_block,
+                channel_identifier=channel_identifier,
+            )
         except RaidenRecoverableError:
             return False
         return channel_state == ChannelState.OPENED
@@ -520,8 +512,14 @@ class TokenNetwork:
             channel_identifier: ChannelID,
     ) -> bool:
         """ Returns true if the channel is in a closed state, false otherwise. """
+        checking_block = self.client.get_checking_block()
         try:
-            channel_state = self._get_channel_state(participant1, participant2, channel_identifier)
+            channel_state = self._get_channel_state(
+                participant1=participant1,
+                participant2=participant2,
+                block_identifier=checking_block,
+                channel_identifier=channel_identifier,
+            )
         except RaidenRecoverableError:
             return False
         return channel_state == ChannelState.CLOSED
@@ -530,16 +528,16 @@ class TokenNetwork:
             self,
             participant1: Address,
             participant2: Address,
-            channel_identifier: ChannelID,
             block_identifier: BlockSpecification,
+            channel_identifier: ChannelID,
     ) -> bool:
         """ Returns true if the channel is in a settled state, false otherwise. """
         try:
             channel_state = self._get_channel_state(
                 participant1=participant1,
                 participant2=participant2,
-                channel_identifier=channel_identifier,
                 block_identifier=block_identifier,
+                channel_identifier=channel_identifier,
             )
         except RaidenRecoverableError:
             return False
@@ -549,8 +547,8 @@ class TokenNetwork:
             self,
             participant1: Address,
             participant2: Address,
-            channel_identifier: ChannelID = None,
             block_identifier: BlockSpecification = 'latest',
+            channel_identifier: ChannelID = None,
     ) -> Optional[Address]:
         """ Returns the address of the closer, if the channel is closed and not settled. None
         otherwise. """
@@ -559,8 +557,8 @@ class TokenNetwork:
             channel_data = self.detail_channel(
                 participant1=participant1,
                 participant2=participant2,
-                channel_identifier=channel_identifier,
                 block_identifier=block_identifier,
+                channel_identifier=channel_identifier,
             )
         except RaidenRecoverableError:
             return None
@@ -571,8 +569,8 @@ class TokenNetwork:
         participants_data = self.detail_participants(
             participant1=participant1,
             participant2=participant2,
-            channel_identifier=channel_data.channel_identifier,
             block_identifier=block_identifier,
+            channel_identifier=channel_data.channel_identifier,
         )
 
         if participants_data.our_details.is_closer:
@@ -620,8 +618,8 @@ class TokenNetwork:
         self._check_for_outdated_channel(
             participant1=self.node_address,
             participant2=partner,
-            channel_identifier=channel_identifier,
             block_identifier=block_identifier,
+            channel_identifier=channel_identifier,
         )
 
         # setTotalDeposit requires a monotonically increasing value. This
@@ -734,6 +732,7 @@ class TokenNetwork:
             token_address=token_address,
             contract_manager=self.contract_manager,
         )
+        checking_block = self.client.get_checking_block()
         error_prefix = 'setTotalDeposit call will fail'
         with self.channel_operations_lock[partner], self.deposit_lock:
             amount_to_deposit, log_details = self._deposit_preconditions(
@@ -741,11 +740,11 @@ class TokenNetwork:
                 total_deposit=total_deposit,
                 partner=partner,
                 token=token,
-                block_identifier='pending',
+                block_identifier=checking_block,
             )
 
             gas_limit = self.proxy.estimate_gas(
-                'pending',
+                checking_block,
                 'setTotalDeposit',
                 channel_identifier,
                 self.node_address,
@@ -774,7 +773,7 @@ class TokenNetwork:
                 if transaction_executed:
                     block = receipt_or_none['blockNumber']
                 else:
-                    block = 'pending'
+                    block = checking_block
 
                 self.proxy.jsonrpc_client.check_for_insufficient_eth(
                     transaction_name='setTotalDeposit',
@@ -836,14 +835,14 @@ class TokenNetwork:
             participant_details = self.detail_participants(
                 participant1=self.node_address,
                 participant2=partner,
-                channel_identifier=channel_identifier,
                 block_identifier=block_identifier,
+                channel_identifier=channel_identifier,
             )
             channel_state = self._get_channel_state(
                 participant1=self.node_address,
                 participant2=partner,
-                channel_identifier=channel_identifier,
                 block_identifier=block_identifier,
+                channel_identifier=channel_identifier,
             )
             # Check if deposit is being made on a nonexistent channel
             if channel_state in (ChannelState.NONEXISTENT, ChannelState.REMOVED):
@@ -872,15 +871,15 @@ class TokenNetwork:
         self._check_for_outdated_channel(
             participant1=self.node_address,
             participant2=partner,
-            channel_identifier=channel_identifier,
             block_identifier=block_identifier,
+            channel_identifier=channel_identifier,
         )
 
         error_type, msg = self._check_channel_state_for_close(
             participant1=self.node_address,
             participant2=partner,
-            channel_identifier=channel_identifier,
             block_identifier=block_identifier,
+            channel_identifier=channel_identifier,
         )
         if error_type:
             raise error_type(msg)
@@ -895,6 +894,12 @@ class TokenNetwork:
             signature: Signature,
     ):
         """ Close the channel using the provided balance proof.
+
+        Note:
+            This method must *not* be called without updating the application
+            state, otherwise the node may accept new transfers which cannot be
+            used, because the closer is not allowed to update the balance proof
+            submitted on chain after closing
 
         Raises:
             RaidenRecoverableError: If the channel is already closed.
@@ -912,16 +917,17 @@ class TokenNetwork:
         }
         log.debug('closeChannel called', **log_details)
 
+        checking_block = self.client.get_checking_block()
         self._close_preconditions(
             channel_identifier,
             partner=partner,
-            block_identifier='pending',
+            block_identifier=checking_block,
         )
 
         error_prefix = 'closeChannel call will fail'
         with self.channel_operations_lock[partner]:
             gas_limit = self.proxy.estimate_gas(
-                'pending',
+                checking_block,
                 'closeChannel',
                 channel_identifier,
                 partner,
@@ -951,7 +957,7 @@ class TokenNetwork:
                 if transaction_executed:
                     block = receipt_or_none['blockNumber']
                 else:
-                    block = 'pending'
+                    block = checking_block
 
                 self.proxy.jsonrpc_client.check_for_insufficient_eth(
                     transaction_name='closeChannel',
@@ -962,8 +968,8 @@ class TokenNetwork:
                 error_type, msg = self._check_channel_state_for_close(
                     participant1=self.node_address,
                     participant2=partner,
-                    channel_identifier=channel_identifier,
                     block_identifier=block,
+                    channel_identifier=channel_identifier,
                 )
                 error_msg = f'{error_prefix}. {msg}'
                 if error_type == RaidenRecoverableError:
@@ -998,12 +1004,12 @@ class TokenNetwork:
         )
 
         try:
-            signer_address = eth_recover(
+            signer_address = recover(
                 data=data_that_was_signed,
                 signature=closing_signature,
             )
 
-            # InvalidSignature is raised by eth_utils.eth_recover if signature
+            # InvalidSignature is raised by raiden.utils.signer.recover if signature
             # is not bytes or has the incorrect length
             #
             # ValueError is raised if the PublicKey instantiation failed, let it
@@ -1011,24 +1017,23 @@ class TokenNetwork:
             #
             # Exception is raised if the public key recovery failed.
         except Exception:  # pylint: disable=broad-except
-            msg = "Couldn't verify the balance proof signature"
-            return RaidenUnrecoverableError, msg
+            raise RaidenUnrecoverableError("Couldn't verify the balance proof signature")
 
         if signer_address != partner:
             raise RaidenUnrecoverableError('Invalid balance proof signature')
 
         self._check_for_outdated_channel(
-            self.node_address,
-            partner,
-            channel_identifier,
+            participant1=self.node_address,
+            participant2=partner,
             block_identifier=block_identifier,
+            channel_identifier=channel_identifier,
         )
 
         detail = self.detail_channel(
             participant1=self.node_address,
             participant2=partner,
-            channel_identifier=channel_identifier,
             block_identifier=block_identifier,
+            channel_identifier=channel_identifier,
         )
         if detail.state != ChannelState.CLOSED:
             raise RaidenUnrecoverableError('Channel is not in a closed state')
@@ -1070,6 +1075,7 @@ class TokenNetwork:
         }
         log.debug('updateNonClosingBalanceProof called', **log_details)
 
+        checking_block = self.client.get_checking_block()
         self._update_preconditions(
             channel_identifier=channel_identifier,
             partner=partner,
@@ -1077,12 +1083,12 @@ class TokenNetwork:
             nonce=nonce,
             additional_hash=additional_hash,
             closing_signature=closing_signature,
-            block_identifier='pending',
+            block_identifier=checking_block,
         )
 
         error_prefix = 'updateNonClosingBalanceProof call will fail'
         gas_limit = self.proxy.estimate_gas(
-            'pending',
+            checking_block,
             'updateNonClosingBalanceProof',
             channel_identifier,
             partner,
@@ -1117,7 +1123,7 @@ class TokenNetwork:
                 block = receipt_or_none['blockNumber']
                 to_compare_block = block
             else:
-                block = 'pending'
+                block = checking_block
                 to_compare_block = self.client.block_number()
 
             self.proxy.jsonrpc_client.check_for_insufficient_eth(
@@ -1129,8 +1135,8 @@ class TokenNetwork:
             detail = self.detail_channel(
                 participant1=self.node_address,
                 participant2=partner,
-                channel_identifier=channel_identifier,
                 block_identifier=block,
+                channel_identifier=channel_identifier,
             )
             if detail.settle_block_number < to_compare_block:
                 error_type = RaidenRecoverableError
@@ -1151,8 +1157,8 @@ class TokenNetwork:
                     channel_settled = self.channel_is_settled(
                         participant1=self.node_address,
                         participant2=partner,
-                        channel_identifier=channel_identifier,
                         block_identifier=block,
+                        channel_identifier=channel_identifier,
                     )
                     if channel_settled is True:
                         error_type = RaidenUnrecoverableError
@@ -1189,9 +1195,10 @@ class TokenNetwork:
 
         leaves_packed = b''.join(lock.encoded for lock in merkle_tree_leaves)
 
+        checking_block = self.client.get_checking_block()
         error_prefix = 'Call to unlock will fail'
         gas_limit = self.proxy.estimate_gas(
-            'pending',
+            checking_block,
             'unlock',
             channel_identifier,
             self.node_address,
@@ -1220,7 +1227,7 @@ class TokenNetwork:
             if transaction_executed:
                 block = receipt_or_none['blockNumber']
             else:
-                block = 'pending'
+                block = checking_block
 
             self.proxy.jsonrpc_client.check_for_insufficient_eth(
                 transaction_name='unlock',
@@ -1231,8 +1238,8 @@ class TokenNetwork:
             channel_settled = self.channel_is_settled(
                 participant1=self.node_address,
                 participant2=partner,
-                channel_identifier=channel_identifier,
                 block_identifier=block,
+                channel_identifier=channel_identifier,
             )
             if channel_settled is False:
                 msg = 'Channel is not in a settled state'
@@ -1259,8 +1266,8 @@ class TokenNetwork:
         self._check_for_outdated_channel(
             participant1=self.node_address,
             participant2=partner,
-            channel_identifier=channel_identifier,
             block_identifier=block_identifier,
+            channel_identifier=channel_identifier,
         )
 
         # and now find out
@@ -1318,6 +1325,7 @@ class TokenNetwork:
         }
         log.debug('settle called', **log_details)
 
+        checking_block = self.client.get_checking_block()
         args = self._settle_preconditions(
             channel_identifier=channel_identifier,
             transferred_amount=transferred_amount,
@@ -1327,13 +1335,13 @@ class TokenNetwork:
             partner_transferred_amount=partner_transferred_amount,
             partner_locked_amount=partner_locked_amount,
             partner_locksroot=partner_locksroot,
-            block_identifier='pending',
+            block_identifier=checking_block,
         )
 
         with self.channel_operations_lock[partner]:
             error_prefix = 'Call to settle will fail'
             gas_limit = self.proxy.estimate_gas(
-                'pending',
+                checking_block,
                 'settleChannel',
                 channel_identifier,
                 *args,
@@ -1357,7 +1365,7 @@ class TokenNetwork:
             if transaction_executed:
                 block = receipt_or_none['blockNumber']
             else:
-                block = 'pending'
+                block = checking_block
 
             self.proxy.jsonrpc_client.check_for_insufficient_eth(
                 transaction_name='settleChannel',
@@ -1368,8 +1376,8 @@ class TokenNetwork:
             msg = self._check_channel_state_after_settle(
                 participant1=self.node_address,
                 participant2=partner,
-                channel_identifier=channel_identifier,
                 block_identifier=block,
+                channel_identifier=channel_identifier,
             )
             error_msg = f'{error_prefix}. {msg}'
             log.critical(error_msg, **log_details)
@@ -1420,8 +1428,8 @@ class TokenNetwork:
             self,
             participant1: Address,
             participant2: Address,
-            channel_identifier: ChannelID,
             block_identifier: BlockSpecification,
+            channel_identifier: ChannelID,
     ) -> None:
         """
         Checks whether an operation is being executed on a channel
@@ -1449,14 +1457,14 @@ class TokenNetwork:
             self,
             participant1: Address,
             participant2: Address,
+            block_identifier: BlockSpecification,
             channel_identifier: ChannelID = None,
-            block_identifier: BlockSpecification = 'pending',
     ) -> ChannelState:
         channel_data = self.detail_channel(
             participant1=participant1,
             participant2=participant2,
-            channel_identifier=channel_identifier,
             block_identifier=block_identifier,
+            channel_identifier=channel_identifier,
         )
 
         if not isinstance(channel_data.state, T_ChannelState):
@@ -1468,8 +1476,8 @@ class TokenNetwork:
             self,
             participant1: Address,
             participant2: Address,
-            channel_identifier: ChannelID,
             block_identifier: BlockSpecification,
+            channel_identifier: ChannelID,
     ) -> Tuple[
         Optional[Union[RaidenRecoverableError, RaidenUnrecoverableError]],
         str,
@@ -1479,8 +1487,8 @@ class TokenNetwork:
         channel_state = self._get_channel_state(
             participant1=participant1,
             participant2=participant2,
-            channel_identifier=channel_identifier,
             block_identifier=block_identifier,
+            channel_identifier=channel_identifier,
         )
 
         if channel_state in (ChannelState.NONEXISTENT, ChannelState.REMOVED):
@@ -1502,15 +1510,15 @@ class TokenNetwork:
             self,
             participant1: Address,
             participant2: Address,
-            channel_identifier: ChannelID,
             block_identifier: BlockSpecification,
+            channel_identifier: ChannelID,
     ) -> ChannelData:
 
         channel_data = self.detail_channel(
             participant1=participant1,
             participant2=participant2,
-            channel_identifier=channel_identifier,
             block_identifier=block_identifier,
+            channel_identifier=channel_identifier,
         )
         if channel_data.state == ChannelState.SETTLED:
             raise RaidenRecoverableError(
@@ -1536,15 +1544,15 @@ class TokenNetwork:
             self,
             participant1: Address,
             participant2: Address,
-            channel_identifier: ChannelID,
             block_identifier: BlockSpecification,
+            channel_identifier: ChannelID,
     ) -> str:
         msg = ''
         channel_data = self._check_channel_state_before_settle(
             participant1=participant1,
             participant2=participant2,
-            channel_identifier=channel_identifier,
             block_identifier=block_identifier,
+            channel_identifier=channel_identifier,
         )
         if channel_data.state == ChannelState.CLOSED:
             msg = (

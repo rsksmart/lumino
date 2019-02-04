@@ -2,9 +2,8 @@
 import random
 
 from raiden.messages import message_from_sendevent
-from raiden.settings import DEFAULT_NUMBER_OF_BLOCK_CONFIRMATIONS
 from raiden.tests.utils import factories
-from raiden.tests.utils.events import must_contain_entry
+from raiden.tests.utils.events import search_for_item
 from raiden.tests.utils.factories import (
     HOP1,
     HOP2,
@@ -37,7 +36,7 @@ from raiden.transfer.mediated_transfer.state_change import (
 )
 from raiden.transfer.state import balanceproof_from_envelope, message_identifier_from_prng
 from raiden.transfer.state_change import Block, ContractReceiveSecretReveal
-
+from raiden.utils.signer import LocalSigner
 
 LONG_EXPIRATION = factories.create_properties(factories.LockedTransferSignedStateProperties(
     transfer=factories.LockedTransferProperties(expiration=30),
@@ -67,7 +66,7 @@ def test_payer_enter_danger_zone_with_transfer_payed():
         block_number=block_number,
     )
 
-    send_transfer = must_contain_entry(initial_iteration.events, SendLockedTransfer, {})
+    send_transfer = search_for_item(initial_iteration.events, SendLockedTransfer, {})
     assert send_transfer
 
     lock_expiration = send_transfer.transfer.lock.expiration
@@ -179,7 +178,7 @@ def test_regression_send_refund():
         secrethash=UNIT_SECRETHASH,
     )
     token_network_identifier = first_payer_transfer.balance_proof.token_network_identifier
-    assert must_contain_entry(iteration.events, SendRefundTransfer, {
+    assert search_for_item(iteration.events, SendRefundTransfer, {
         'recipient': setup.channels.partner_address(0),
         'queue_identifier': {
             'recipient': setup.channels.partner_address(0),
@@ -214,7 +213,7 @@ def test_regression_send_refund():
         block_number=setup.block_number,
     )
 
-    assert must_contain_entry(duplicate_iteration.events, SendRefundTransfer, {}) is None
+    assert search_for_item(duplicate_iteration.events, SendRefundTransfer, {}) is None
 
     assert duplicate_iteration.new_state is not None
     assert duplicate_iteration.new_state == iteration.new_state
@@ -237,12 +236,12 @@ def test_regression_mediator_send_lock_expired_with_new_block():
         block_number=5,
     )
     assert init_iteration.new_state is not None
-    send_transfer = must_contain_entry(init_iteration.events, SendLockedTransfer, {})
+    send_transfer = search_for_item(init_iteration.events, SendLockedTransfer, {})
     assert send_transfer
 
     transfer = send_transfer.transfer
 
-    block_expiration_number = transfer.lock.expiration + DEFAULT_NUMBER_OF_BLOCK_CONFIRMATIONS * 2
+    block_expiration_number = channel.get_sender_expiration_threshold(transfer.lock)
     block = Block(
         block_number=block_expiration_number,
         gas_limit=1,
@@ -265,7 +264,7 @@ def test_regression_mediator_send_lock_expired_with_new_block():
     msg = 'The payer has not yet sent an expired lock, the task can not be cleared yet'
     assert iteration.new_state is not None, msg
 
-    assert must_contain_entry(iteration.events, SendLockExpired, {
+    assert search_for_item(iteration.events, SendLockExpired, {
         'secrethash': transfer.lock.secrethash,
     })
     assert transfer.lock.secrethash not in channels[1].our_state.secrethashes_to_lockedlocks
@@ -318,8 +317,8 @@ def test_regression_mediator_task_no_routes():
     msg = 'The task must not be cleared, even if there is no route to forward the transfer'
     assert init_iteration.new_state is not None, msg
     assert init_iteration.new_state.waiting_transfer.transfer == payer_transfer
-    assert must_contain_entry(init_iteration.events, SendLockedTransfer, {}) is None
-    assert must_contain_entry(init_iteration.events, SendRefundTransfer, {}) is None
+    assert search_for_item(init_iteration.events, SendLockedTransfer, {}) is None
+    assert search_for_item(init_iteration.events, SendRefundTransfer, {}) is None
 
     secrethash = UNIT_SECRETHASH
     lock = channels[0].partner_state.secrethashes_to_lockedlocks[secrethash]
@@ -336,14 +335,14 @@ def test_regression_mediator_task_no_routes():
     )
     assert send_lock_expired
     lock_expired_message = message_from_sendevent(send_lock_expired, HOP1)
-    lock_expired_message.sign(channels.partner_privatekeys[0])
+    lock_expired_message.sign(LocalSigner(channels.partner_privatekeys[0]))
     balance_proof = balanceproof_from_envelope(lock_expired_message)
 
     message_identifier = message_identifier_from_prng(pseudo_random_generator)
-    expired_block_number = lock.expiration + DEFAULT_NUMBER_OF_BLOCK_CONFIRMATIONS * 2
 
     # Regression: The mediator must still be able to process the block which
     # expires the lock
+    expired_block_number = channel.get_sender_expiration_threshold(lock)
     expire_block_iteration = mediator.state_transition(
         mediator_state=init_iteration.new_state,
         state_change=Block(
@@ -402,11 +401,11 @@ def test_regression_mediator_not_update_payer_state_twice():
     assert iteration.new_state is not None
 
     current_state = iteration.new_state
-    send_transfer = must_contain_entry(iteration.events, SendLockedTransfer, {})
+    send_transfer = search_for_item(iteration.events, SendLockedTransfer, {})
     assert send_transfer
 
     transfer = send_transfer.transfer
-    block_expiration_number = transfer.lock.expiration + DEFAULT_NUMBER_OF_BLOCK_CONFIRMATIONS * 2
+    block_expiration_number = channel.get_sender_expiration_threshold(transfer.lock)
 
     block = Block(
         block_number=block_expiration_number,
@@ -422,7 +421,7 @@ def test_regression_mediator_not_update_payer_state_twice():
     )
 
     msg = 'At the expiration block we should get an EventUnlockClaimFailed'
-    assert must_contain_entry(iteration.events, EventUnlockClaimFailed, {}), msg
+    assert search_for_item(iteration.events, EventUnlockClaimFailed, {}), msg
 
     current_state = iteration.new_state
     next_block = Block(
@@ -466,7 +465,7 @@ def test_regression_mediator_not_update_payer_state_twice():
         block_number=block_expiration_number,
     )
     msg = 'At the next block we should not get the same event'
-    assert not must_contain_entry(iteration.events, EventUnlockClaimFailed, {}), msg
+    assert not search_for_item(iteration.events, EventUnlockClaimFailed, {}), msg
 
 
 def test_regression_onchain_secret_reveal_must_update_channel_state():
@@ -524,11 +523,11 @@ def test_regression_onchain_secret_reveal_must_update_channel_state():
     )
     assert send_lock_expired
     expired_message = message_from_sendevent(send_lock_expired, setup.channels.our_address(0))
-    expired_message.sign(setup.channels.partner_privatekeys[0])
+    expired_message.sign(LocalSigner(setup.channels.partner_privatekeys[0]))
     balance_proof = balanceproof_from_envelope(expired_message)
 
     message_identifier = message_identifier_from_prng(pseudo_random_generator)
-    expired_block_number = lock.expiration + DEFAULT_NUMBER_OF_BLOCK_CONFIRMATIONS * 2
+    expired_block_number = channel.get_sender_expiration_threshold(lock)
     mediator.state_transition(
         mediator_state=mediator_state,
         state_change=ReceiveLockExpired(

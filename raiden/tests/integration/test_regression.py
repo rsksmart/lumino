@@ -4,10 +4,10 @@ import gevent
 import pytest
 
 from raiden.constants import UINT64_MAX
-from raiden.messages import Lock, LockedTransfer, RevealSecret, Secret
+from raiden.messages import Lock, LockedTransfer, RevealSecret, Unlock
 from raiden.tests.fixtures.variables import TransportProtocol
 from raiden.tests.integration.fixtures.raiden_network import CHAIN, wait_for_channels
-from raiden.tests.utils.events import must_contain_entry
+from raiden.tests.utils.events import search_for_item
 from raiden.tests.utils.factories import UNIT_CHAIN_ID
 from raiden.tests.utils.network import payment_channel_open_and_deposit
 from raiden.tests.utils.transfer import get_channelstate
@@ -87,7 +87,7 @@ def test_regression_unfiltered_routes(
 @pytest.mark.parametrize('number_of_nodes', [3])
 @pytest.mark.parametrize('channels_per_node', [CHAIN])
 def test_regression_revealsecret_after_secret(raiden_network, token_addresses, transport_protocol):
-    """ A RevealSecret message received after a Secret message must be cleanly
+    """ A RevealSecret message received after a Unlock message must be cleanly
     handled.
     """
     app0, app1, app2 = raiden_network
@@ -108,7 +108,7 @@ def test_regression_revealsecret_after_secret(raiden_network, token_addresses, t
     )
     assert transfer.wait()
 
-    event = must_contain_entry(
+    event = search_for_item(
         app1.raiden.wal.storage.get_events(),
         SendSecretReveal,
         {},
@@ -138,9 +138,9 @@ def test_regression_multiple_revealsecret(raiden_network, token_addresses, trans
     """ Multiple RevealSecret messages arriving at the same time must be
     handled properly.
 
-    Secret handling followed these steps:
+    Unlock handling followed these steps:
 
-        The Secret message arrives
+        The Unlock message arrives
         The secret is registered
         The channel is updated and the correspoding lock is removed
         * A balance proof for the new channel state is created and sent to the
@@ -148,7 +148,7 @@ def test_regression_multiple_revealsecret(raiden_network, token_addresses, trans
         The channel is unregistered for the given secrethash
 
     The step marked with an asterisk above introduced a context-switch. This
-    allowed a second Reveal Secret message to be handled before the channel was
+    allowed a second Reveal Unlock message to be handled before the channel was
     unregistered. And because the channel was already updated an exception was raised
     for an unknown secret.
     """
@@ -208,7 +208,7 @@ def test_regression_multiple_revealsecret(raiden_network, token_addresses, trans
     app0.raiden.sign(reveal_secret)
 
     token_network_identifier = channelstate_0_1.token_network_identifier
-    secret = Secret(
+    unlock = Unlock(
         chain_id=UNIT_CHAIN_ID,
         message_identifier=random.randint(0, UINT64_MAX),
         payment_identifier=payment_identifier,
@@ -220,11 +220,11 @@ def test_regression_multiple_revealsecret(raiden_network, token_addresses, trans
         locksroot=EMPTY_MERKLE_ROOT,
         secret=secret,
     )
-    app0.raiden.sign(secret)
+    app0.raiden.sign(unlock)
 
     if transport_protocol is TransportProtocol.UDP:
         messages = [
-            secret.encode(),
+            unlock.encode(),
             reveal_secret.encode(),
         ]
         host_port = None
@@ -240,7 +240,7 @@ def test_regression_multiple_revealsecret(raiden_network, token_addresses, trans
         ]
     elif transport_protocol is TransportProtocol.MATRIX:
         messages = [
-            secret,
+            unlock,
             reveal_secret,
         ]
         receive_method = app1.raiden.transport._receive_message

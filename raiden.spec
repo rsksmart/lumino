@@ -1,8 +1,8 @@
 # -*- mode: python -*-
 from __future__ import print_function
 import sys
+import pdb
 import platform
-from distutils.spawn import find_executable
 
 from raiden.utils import get_system_spec
 
@@ -60,11 +60,18 @@ def Entrypoint(dist, group, name, scripts=None, pathex=None, hiddenimports=None,
     )
 
 
+if hasattr(pdb, 'pdb'):
+    # pdbpp moves the stdlib pdb to the `pdb` attribute of it's own patched pdb module
+    raise RuntimeError(
+        'pdbpp is installed which causes broken PyInstaller builds. Please uninstall it.',
+    )
+
+
 # We don't need Tk and friends
 sys.modules['FixTk'] = None
 
-executable_name = 'raiden-v{}-{}'.format(
-    get_system_spec()['raiden'],
+executable_name = 'raiden-{}-{}'.format(
+    os.environ.get('ARCHIVE_TAG', 'v' + get_system_spec()['raiden']),
     'macOS' if platform.system() == 'Darwin' else platform.system().lower()
 )
 

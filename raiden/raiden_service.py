@@ -7,7 +7,6 @@ from typing import Dict, List, NamedTuple, Union
 import filelock
 import gevent
 import structlog
-from coincurve import PrivateKey
 from eth_utils import is_binary_address
 from gevent.event import AsyncResult, Event
 from gevent.lock import Semaphore
@@ -53,15 +52,9 @@ from raiden.transfer.state_change import (
     Block,
     ContractReceiveNewPaymentNetwork,
 )
-from raiden.utils import (
-    create_default_identifier,
-    lpex,
-    pex,
-    privatekey_to_address,
-    random_secret,
-    sha3,
-)
+from raiden.utils import create_default_identifier, lpex, pex, random_secret, sha3
 from raiden.utils.runnable import Runnable
+from raiden.utils.signer import LocalSigner, Signer
 from raiden.utils.typing import (
     Address,
     BlockNumber,
@@ -69,11 +62,13 @@ from raiden.utils.typing import (
     PaymentAmount,
     PaymentID,
     Secret,
+    SecretHash,
     TargetAddress,
     TokenAmount,
     TokenNetworkAddress,
     TokenNetworkID,
 )
+from raiden.utils.upgrades import UpgradeManager
 from raiden_contracts.contract_manager import ContractManager
 
 log = structlog.get_logger(__name__)  # pylint: disable=invalid-name
@@ -126,12 +121,13 @@ def initiator_init(
     )
     previous_address = None
     routes = routing.get_best_routes(
-        views.state_from_raiden(raiden),
-        token_network_identifier,
-        InitiatorAddress(raiden.address),
-        target_address,
-        transfer_amount,
-        previous_address,
+        chain_state=views.state_from_raiden(raiden),
+        token_network_id=token_network_identifier,
+        from_address=InitiatorAddress(raiden.address),
+        to_address=target_address,
+        amount=transfer_amount,
+        previous_address=previous_address,
+        config=raiden.config,
     )
     init_initiator_statechange = ActionInitInitiator(
         transfer_state,
@@ -143,12 +139,13 @@ def initiator_init(
 def mediator_init(raiden, transfer: LockedTransfer):
     from_transfer = lockedtransfersigned_from_message(transfer)
     routes = routing.get_best_routes(
-        views.state_from_raiden(raiden),
-        from_transfer.balance_proof.token_network_identifier,
-        raiden.address,
-        from_transfer.target,
-        from_transfer.lock.amount,
-        transfer.sender,
+        chain_state=views.state_from_raiden(raiden),
+        token_network_id=from_transfer.balance_proof.token_network_identifier,
+        from_address=raiden.address,
+        to_address=from_transfer.target,
+        amount=from_transfer.lock.amount,
+        previous_address=transfer.sender,
+        config=raiden.config,
     )
     from_route = RouteState(
         transfer.sender,
@@ -185,6 +182,8 @@ class PaymentStatus(NamedTuple):
     amount: TokenAmount
     token_network_identifier: TokenNetworkID
     payment_done: AsyncResult
+    secret: Secret = None
+    secret_hash: SecretHash = None
 
     def matches(
             self,
@@ -209,7 +208,6 @@ class RaidenService(Runnable):
             query_start_block: BlockNumber,
             default_registry: TokenNetworkRegistry,
             default_secret_registry: SecretRegistry,
-            private_key_bin,
             transport,
             raiden_event_handler,
             message_handler,
@@ -217,9 +215,6 @@ class RaidenService(Runnable):
             discovery=None,
     ):
         super().__init__()
-        if not isinstance(private_key_bin, bytes) or len(private_key_bin) != 32:
-            raise ValueError('invalid private_key')
-
         self.tokennetworkids_to_connectionmanagers = dict()
         self.targets_to_identifiers_to_statuses: StatusesDict = defaultdict(dict)
 
@@ -228,12 +223,10 @@ class RaidenService(Runnable):
         self.query_start_block = query_start_block
         self.default_secret_registry = default_secret_registry
         self.config = config
-        self.privkey = private_key_bin
-        self.address = privatekey_to_address(private_key_bin)
-        self.discovery = discovery
 
-        self.private_key = PrivateKey(private_key_bin)
-        self.pubkey = self.private_key.public_key.format(compressed=False)
+        self.signer: Signer = LocalSigner(self.chain.client.privkey)
+        self.address = self.signer.address
+        self.discovery = discovery
         self.transport = transport
 
         self.blockchain_events = BlockchainEvents()
@@ -292,7 +285,10 @@ class RaidenService(Runnable):
                 self.config['transport']['udp']['external_port'],
             )
 
+        self.maybe_upgrade_db()
+
         storage = sqlite.SQLiteStorage(self.database_path, serialize.JSONSerializer())
+        storage.log_run()
         self.wal = wal.restore_to_state_change(
             transition_function=node.state_transition,
             storage=storage,
@@ -669,7 +665,7 @@ class RaidenService(Runnable):
         if not isinstance(message, SignedMessage):
             raise ValueError('{} is not signable.'.format(repr(message)))
 
-        message.sign(self.private_key)
+        message.sign(self.signer)
 
     def install_all_blockchain_filters(
             self,
@@ -797,6 +793,8 @@ class RaidenService(Runnable):
                 amount=amount,
                 token_network_identifier=token_network_identifier,
                 payment_done=AsyncResult(),
+                secret=secret,
+                secret_hash=secret_hash,
             )
             self.targets_to_identifiers_to_statuses[target][identifier] = payment_status
 
@@ -823,3 +821,7 @@ class RaidenService(Runnable):
         self.start_health_check_for(transfer.initiator)
         init_target_statechange = target_init(transfer)
         self.handle_state_change(init_target_statechange)
+
+    def maybe_upgrade_db(self):
+        manager = UpgradeManager(db_filename=self.database_path)
+        manager.run()

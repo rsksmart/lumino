@@ -453,7 +453,7 @@ def run(ctx, **kwargs):
     is_flag=True,
     help='Only display Raiden version',
 )
-def version(short, **kwargs):  # pylint: disable=unused-argument
+def version(short):
     """Print version information and exit. """
     if short:
         print(get_system_spec()['raiden'])
@@ -471,7 +471,7 @@ def version(short, **kwargs):  # pylint: disable=unused-argument
     help='Drop into pdb on errors.',
 )
 @click.pass_context
-def smoketest(ctx, debug, **kwargs):  # pylint: disable=unused-argument
+def smoketest(ctx, debug):
     """ Test, that the raiden installation is sane. """
     from raiden.api.python import RaidenAPI
     from raiden.tests.utils.smoketest import (
@@ -558,9 +558,9 @@ def smoketest(ctx, debug, **kwargs):  # pylint: disable=unused-argument
 
                 raiden_api = RaidenAPI(app.raiden)
                 rest_api = RestAPI(raiden_api)
-                api_server = APIServer(rest_api)
                 (api_host, api_port) = split_endpoint(args['api_address'])
-                api_server.start(api_host, api_port)
+                api_server = APIServer(rest_api, config={'host': api_host, 'port': api_port})
+                api_server.start()
 
                 raiden_api.channel_open(
                     registry_address=contract_addresses[CONTRACT_TOKEN_NETWORK_REGISTRY],
