@@ -100,7 +100,7 @@ def _setup_web3(eth_rpc_endpoint):
     supported, _ = is_supported_client(node_version)
     if not supported:
         click.secho(
-            'You need a Byzantium enabled ethereum node. Parity >= 1.7.6,ro Geth >= 1.7.2',
+            'You need a Byzantium enabled ethereum node. Parity >= 1.7.6, Geth >= 1.7.2 or RSK -= 0.6.0',
             fg='red',
         )
         sys.exit(1)
