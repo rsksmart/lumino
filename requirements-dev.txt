@@ -35,3 +35,7 @@ bump2version==0.5.8
 
 # Test support
 matrix-synapse==0.33.9
+
+#Web3 RSK compatible
+
+git+git://github.com/infuy/web3.py@rsk-4.8.2#egg=web3
