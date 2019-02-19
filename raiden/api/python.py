@@ -1,9 +1,14 @@
 import structlog
-from eth_utils import is_binary_address, to_checksum_address
+from eth_utils import is_binary_address, is_hex, to_bytes, to_checksum_address
 
 import raiden.blockchain.events as blockchain_events
 from raiden import waiting
-from raiden.constants import GENESIS_BLOCK_NUMBER, Environment
+from raiden.constants import (
+    GENESIS_BLOCK_NUMBER,
+    SECRET_HASH_HEXSTRING_LENGTH,
+    SECRET_HEXSTRING_LENGTH,
+    Environment,
+)
 from raiden.exceptions import (
     AlreadyRegisteredTokenAddress,
     ChannelNotFound,
@@ -14,11 +19,13 @@ from raiden.exceptions import (
     InsufficientGasReserve,
     InvalidAddress,
     InvalidAmount,
+    InvalidSecretOrSecretHash,
     InvalidSettleTimeout,
     RaidenRecoverableError,
     TokenNotRegistered,
     UnknownTokenAddress,
 )
+from raiden.messages import RequestMonitoring
 from raiden.settings import DEFAULT_RETRY_TIMEOUT
 from raiden.transfer import architecture, views
 from raiden.transfer.events import (
@@ -26,9 +33,10 @@ from raiden.transfer.events import (
     EventPaymentSentFailed,
     EventPaymentSentSuccess,
 )
-from raiden.transfer.state import NettingChannelState
+from raiden.transfer.mediated_transfer.state import LockedTransferState
+from raiden.transfer.state import BalanceProofSignedState, NettingChannelState, TransferTask
 from raiden.transfer.state_change import ActionChannelClose
-from raiden.utils import pex, typing
+from raiden.utils import pex, sha3, typing
 from raiden.utils.gas_reserve import has_enough_gas_reserve
 
 log = structlog.get_logger(__name__)  # pylint: disable=invalid-name
@@ -78,6 +86,67 @@ def event_filter_for_payments(
         )
     )
     return sent_and_target_matches or received_and_initiator_matches
+
+
+def flatten_transfer(transfer: LockedTransferState, role: str) -> typing.Dict[str, typing.Any]:
+    return {
+        'payment_identifier': str(transfer.payment_identifier),
+        'token_address': to_checksum_address(transfer.token),
+        'token_network_identifier': to_checksum_address(
+            transfer.balance_proof.token_network_identifier,
+        ),
+        'channel_identifier': str(transfer.balance_proof.channel_identifier),
+        'initiator': to_checksum_address(transfer.initiator),
+        'target': to_checksum_address(transfer.target),
+        'transferred_amount': str(transfer.balance_proof.transferred_amount),
+        'locked_amount': str(transfer.balance_proof.locked_amount),
+        'role': role,
+    }
+
+
+def get_transfer_from_task(
+        secrethash: typing.SecretHash,
+        transfer_task: TransferTask,
+) -> LockedTransferState:
+    transfer = None
+    role = views.role_from_transfer_task(transfer_task)
+
+    if role == 'initiator':
+        transfer = transfer_task.manager_state.initiator_transfers[secrethash].transfer
+    elif role == 'mediator':
+        pairs = transfer_task.mediator_state.transfers_pair
+        if pairs:
+            transfer = pairs[-1].payer_transfer
+        elif transfer_task.mediator_state.waiting_transfer:
+            transfer = transfer_task.mediator_state.waiting_transfer.transfer
+    elif role == 'target':
+        transfer = transfer_task.target_state.transfer
+
+    return transfer, role
+
+
+def transfer_tasks_view(
+        transfer_tasks: typing.Dict[typing.SecretHash, TransferTask],
+        token_address: typing.TokenAddress = None,
+        channel_id: typing.ChannelID = None,
+) -> typing.List[typing.Dict[str, typing.Any]]:
+    view = list()
+
+    for secrethash, transfer_task in transfer_tasks.items():
+        transfer, role = get_transfer_from_task(secrethash, transfer_task)
+
+        if transfer is None:
+            continue
+        if token_address is not None:
+            if transfer.token != token_address:
+                continue
+            elif channel_id is not None:
+                if transfer.balance_proof.channel_identifier != channel_id:
+                    continue
+
+        view.append(flatten_transfer(transfer, role))
+
+    return view
 
 
 class RaidenAPI:
@@ -144,8 +213,11 @@ class RaidenAPI:
 
         try:
             registry = self.raiden.chain.token_network_registry(registry_address)
-
-            return registry.add_token(token_address)
+            # LEFTODO: Supply a proper block id
+            return registry.add_token(
+                token_address=token_address,
+                given_block_identifier='latest',
+            )
         except RaidenRecoverableError as e:
             if 'Token already registered' in str(e):
                 raise AlreadyRegisteredTokenAddress('Token already registered')
@@ -304,9 +376,11 @@ class RaidenAPI:
                 ))
 
             try:
+                # LEFTODO: Supply a proper block id
                 token_network.new_netting_channel(
                     partner=partner_address,
                     settle_timeout=settle_timeout,
+                    given_block_identifier='latest',
                 )
             except DuplicatedChannelError:
                 log.info('partner opened channel first')
@@ -342,7 +416,7 @@ class RaidenAPI:
         Raises:
             InvalidAddress: If either token_address or partner_address is not
                 20 bytes long.
-                TransactionThrew: May happen for multiple reasons:
+            TransactionThrew: May happen for multiple reasons:
                 - If the token approval fails, e.g. the token may validate if
                 account has enough balance for the allowance.
                 - The deposit failed, e.g. the allowance did not set the token
@@ -425,8 +499,9 @@ class RaidenAPI:
             raise InsufficientFunds(msg)
 
         # set_total_deposit calls approve
-        # token.approve(netcontract_address, addendum)
-        channel_proxy.set_total_deposit(total_deposit)
+        # token.approve(netcontract_address, addendum, 'latest')
+        # LEFTODO: Supply a proper block id
+        channel_proxy.set_total_deposit(total_deposit, block_identifier='latest')
 
         target_address = self.raiden.address
         waiting.wait_for_participant_newbalance(
@@ -603,18 +678,23 @@ class RaidenAPI:
             target: typing.Address,
             identifier: typing.PaymentID = None,
             transfer_timeout: int = None,
+            secret: typing.Secret = None,
+            secret_hash: typing.SecretHash = None,
     ):
         """ Do a transfer with `target` with the given `amount` of `token_address`. """
         # pylint: disable=too-many-arguments
 
-        async_result = self.transfer_async(
+        payment_status = self.transfer_async(
             registry_address=registry_address,
             token_address=token_address,
             amount=amount,
             target=target,
             identifier=identifier,
+            secret=secret,
+            secret_hash=secret_hash,
         )
-        return async_result.wait(timeout=transfer_timeout)
+        payment_status.payment_done.wait(timeout=transfer_timeout)
+        return payment_status
 
     def transfer_async(
             self,
@@ -623,6 +703,8 @@ class RaidenAPI:
             amount: typing.TokenAmount,
             target: typing.Address,
             identifier: typing.PaymentID = None,
+            secret: typing.Secret = None,
+            secret_hash: typing.SecretHash = None,
     ):
 
         if not isinstance(amount, int):
@@ -636,6 +718,34 @@ class RaidenAPI:
 
         if not is_binary_address(target):
             raise InvalidAddress('target address is not valid.')
+
+        if secret is not None:
+            if len(secret) != SECRET_HEXSTRING_LENGTH:
+                raise InvalidSecretOrSecretHash(
+                    'secret length should be ' +
+                    str(SECRET_HEXSTRING_LENGTH) +
+                    '.',
+                )
+            if not is_hex(secret):
+                raise InvalidSecretOrSecretHash('provided secret is not an hexadecimal string.')
+            secret = to_bytes(hexstr=secret)
+
+        if secret_hash is not None:
+            if len(secret_hash) != SECRET_HASH_HEXSTRING_LENGTH:
+                raise InvalidSecretOrSecretHash(
+                    'secret_hash length should be ' +
+                    str(SECRET_HASH_HEXSTRING_LENGTH) +
+                    '.',
+                )
+            if not is_hex(secret_hash):
+                raise InvalidSecretOrSecretHash('secret_hash is not an hexadecimal string.')
+            secret_hash = to_bytes(hexstr=secret_hash)
+
+        if secret is None and secret_hash is not None:
+            raise InvalidSecretOrSecretHash('secret_hash without a secret is not supported yet.')
+
+        if secret is not None and secret_hash is not None and secret_hash != sha3(secret):
+            raise InvalidSecretOrSecretHash('provided secret and secret_hash do not match.')
 
         valid_tokens = views.get_token_network_addresses_for(
             views.state_from_raiden(self.raiden),
@@ -659,13 +769,15 @@ class RaidenAPI:
             payment_network_id=payment_network_identifier,
             token_address=token_address,
         )
-        async_result = self.raiden.mediated_transfer_async(
+        payment_status = self.raiden.mediated_transfer_async(
             token_network_identifier=token_network_identifier,
             amount=amount,
             target=target,
             identifier=identifier,
+            secret=secret,
+            secret_hash=secret_hash,
         )
-        return async_result
+        return payment_status
 
     def get_raiden_events_payment_history_with_timestamps(
             self,
@@ -819,3 +931,45 @@ class RaidenAPI:
             ))
         returned_events.sort(key=lambda evt: evt.get('block_number'), reverse=True)
         return returned_events
+
+    def create_monitoring_request(
+            self,
+            balance_proof: BalanceProofSignedState,
+            reward_amount: typing.TokenAmount,
+    ) -> typing.Optional[RequestMonitoring]:
+        """ This method can be used to create a `RequestMonitoring` message.
+        It will contain all data necessary for an external monitoring service to
+        - send an updateNonClosingBalanceProof transaction to the TokenNetwork contract,
+        for the `balance_proof` that we received from a channel partner.
+        - claim the `reward_amount` from the UDC.
+        """
+        # create RequestMonitoring message from the above + `reward_amount`
+        monitor_request = RequestMonitoring.from_balance_proof_signed_state(
+            balance_proof=balance_proof,
+            reward_amount=reward_amount,
+        )
+        # sign RequestMonitoring and return
+        monitor_request.sign(self.raiden.signer)
+        return monitor_request
+
+    def get_pending_transfers(
+            self,
+            token_address: typing.TokenAddress = None,
+            partner_address: typing.Address = None,
+    ) -> typing.List[typing.Dict[str, typing.Any]]:
+        chain_state = views.state_from_raiden(self.raiden)
+        transfer_tasks = views.get_all_transfer_tasks(chain_state)
+        channel_id = None
+
+        if token_address is not None:
+            if self.raiden.default_registry.get_token_network(token_address) is None:
+                raise UnknownTokenAddress(f'Token {token_address} not found.')
+            if partner_address is not None:
+                partner_channel = self.get_channel(
+                    registry_address=self.raiden.default_registry.address,
+                    token_address=token_address,
+                    partner_address=partner_address,
+                )
+                channel_id = partner_channel.identifier
+
+        return transfer_tasks_view(transfer_tasks, token_address, channel_id)

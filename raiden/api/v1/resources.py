@@ -213,7 +213,7 @@ class ConnectionsInfoResource(BaseResource):
 class PaymentResource(BaseResource):
 
     post_schema = PaymentSchema(
-        only=('amount', 'identifier'),
+        only=('amount', 'identifier', 'secret', 'secret_hash'),
     )
     get_schema = RaidenEventsRequestSchema()
 
@@ -239,6 +239,8 @@ class PaymentResource(BaseResource):
             target_address: typing.TargetAddress,
             amount: typing.PaymentAmount,
             identifier: typing.PaymentID,
+            secret: typing.Secret,
+            secret_hash: typing.SecretHash,
     ):
         return self.rest_api.initiate_payment(
             registry_address=self.rest_api.raiden_api.raiden.default_registry.address,
@@ -246,4 +248,24 @@ class PaymentResource(BaseResource):
             target_address=target_address,
             amount=amount,
             identifier=identifier,
+            secret=secret,
+            secret_hash=secret_hash,
         )
+
+
+class PendingTransfersResource(BaseResource):
+
+    def get(self):
+        return self.rest_api.get_pending_transfers()
+
+
+class PendingTransfersResourceByTokenAddress(BaseResource):
+
+    def get(self, token_address):
+        return self.rest_api.get_pending_transfers(token_address)
+
+
+class PendingTransfersResourceByTokenAndPartnerAddress(BaseResource):
+
+    def get(self, token_address, partner_address):
+        return self.rest_api.get_pending_transfers(token_address, partner_address)

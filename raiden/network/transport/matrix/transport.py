@@ -1,31 +1,20 @@
 import json
-import re
 import time
 from binascii import Error as DecodeError
 from collections import defaultdict
 from enum import Enum
-from operator import itemgetter
-from random import Random
 from urllib.parse import urlparse
 
 import gevent
 import structlog
-from eth_utils import (
-    decode_hex,
-    encode_hex,
-    is_binary_address,
-    to_canonical_address,
-    to_checksum_address,
-    to_normalized_address,
-)
+from eth_utils import decode_hex, is_binary_address, to_checksum_address, to_normalized_address
 from gevent.lock import Semaphore
-from matrix_client.errors import MatrixError, MatrixRequestError
-from matrix_client.user import User
+from matrix_client.errors import MatrixRequestError
 
+from raiden.constants import DISCOVERY_DEFAULT_ROOM
 from raiden.exceptions import (
     InvalidAddress,
     InvalidProtocolMessage,
-    InvalidSignature,
     TransportError,
     UnknownAddress,
     UnknownTokenAddress,
@@ -40,8 +29,16 @@ from raiden.messages import (
     decode as message_from_bytes,
     from_dict as message_from_dict,
 )
+from raiden.network.transport.matrix.client import GMatrixClient, Room, User
+from raiden.network.transport.matrix.utils import (
+    JOIN_RETRIES,
+    join_global_room,
+    login_or_register,
+    make_client,
+    make_room_alias,
+    validate_userid_signature,
+)
 from raiden.network.transport.udp import udp_utils
-from raiden.network.utils import get_http_rtt
 from raiden.raiden_service import RaidenService
 from raiden.storage.serialize import JSONSerializer
 from raiden.transfer import views
@@ -59,11 +56,10 @@ from raiden.transfer.state_change import (
 )
 from raiden.utils import pex
 from raiden.utils.runnable import Runnable
-from raiden.utils.signer import recover
 from raiden.utils.typing import (
     Address,
-
     AddressHex,
+    Any,
     Callable,
     Dict,
     Iterable,
@@ -75,9 +71,8 @@ from raiden.utils.typing import (
     Set,
     Tuple,
     Union,
+    cast,
 )
-from raiden_contracts.constants import ID_TO_NETWORKNAME
-from raiden_libs.network.matrix import GMatrixClient, Room
 
 log = structlog.get_logger(__name__)
 
@@ -92,7 +87,6 @@ class UserPresence(Enum):
 
 
 _PRESENCE_REACHABLE_STATES = {UserPresence.ONLINE, UserPresence.UNAVAILABLE}
-_JOIN_RETRIES = 5
 
 
 class _RetryQueue(Runnable):
@@ -274,7 +268,6 @@ class _RetryQueue(Runnable):
 class MatrixTransport(Runnable):
     _room_prefix = 'raiden'
     _room_sep = '_'
-    _userid_re = re.compile(r'^@(0x[0-9a-f]{40})(?:\.[0-9a-f]{8})?(?::.+)?$')
     log = log
 
     def __init__(self, config: dict):
@@ -282,44 +275,31 @@ class MatrixTransport(Runnable):
         self._config = config
         self._raiden_service: RaidenService = None
 
+        if config['server'] == 'auto':
+            available_servers = config['available_servers']
+        elif urlparse(config['server']).scheme in {'http', 'https'}:
+            available_servers = [config['server']]
+        else:
+            raise TransportError('Invalid matrix server specified (valid values: "auto" or a URL)')
+
         def _http_retry_delay() -> Iterable[float]:
             # below constants are defined in raiden.app.App.DEFAULT_CONFIG
             return udp_utils.timeout_exponential_backoff(
-                self._config['retries_before_backoff'],
-                self._config['retry_interval'] / 5,
-                self._config['retry_interval'],
+                config['retries_before_backoff'],
+                config['retry_interval'] / 5,
+                config['retry_interval'],
             )
 
-        while True:
-            self._server_url: str = self._select_server(config)
-            self._server_name = config.get('server_name', urlparse(self._server_url).netloc)
-            client_class = config.get('client_class', GMatrixClient)
-            self._client: GMatrixClient = client_class(
-                self._server_url,
-                http_pool_maxsize=4,
-                http_retry_timeout=40,
-                http_retry_delay=_http_retry_delay,
-            )
-            try:
-                self._client.api._send('GET', '/versions', api_path='/_matrix/client')
-                break
-            except MatrixError as ex:
-                if config['server'] != 'auto':
-                    raise TransportError(
-                        f"Could not connect to requested server '{config['server']}'",
-                    ) from ex
-
-                config['available_servers'].remove(self._server_url)
-                if len(config['available_servers']) == 0:
-                    raise TransportError(
-                        f"Unable to find a reachable Matrix server. "
-                        f"Please check your network connectivity.",
-                    ) from ex
-                log.warning(f"Selected server '{self._server_url}' not usable. Retrying.")
+        self._client: GMatrixClient = make_client(
+            available_servers,
+            http_pool_maxsize=4,
+            http_retry_timeout=40,
+            http_retry_delay=_http_retry_delay,
+        )
+        self._server_url = self._client.api.base_url
+        self._server_name = config.get('server_name', urlparse(self._server_url).netloc)
 
         self.greenlets = list()
-
-        self._discovery_room: Room = None
 
         # partner need to be in this dict to be listened on
         self._address_to_userids: Dict[Address, Set[str]] = defaultdict(set)
@@ -327,7 +307,7 @@ class MatrixTransport(Runnable):
         self._userid_to_presence: Dict[str, UserPresence] = dict()
         self._address_to_retrier: Dict[Address, _RetryQueue] = dict()
 
-        self._discovery_room_alias = None
+        self._global_rooms: Dict[str, Optional[Room]] = dict()
 
         self._stop_event = gevent.event.Event()
         self._stop_event.set()
@@ -356,7 +336,9 @@ class MatrixTransport(Runnable):
         else:
             prev_user_id = prev_access_token = None
 
-        self._login_or_register(
+        login_or_register(
+            client=self._client,
+            signer=self._raiden_service.signer,
             prev_user_id=prev_user_id,
             prev_access_token=prev_access_token,
         )
@@ -367,7 +349,16 @@ class MatrixTransport(Runnable):
             # wait on _handle_thread for initial sync
             # this is needed so the rooms are populated before we _inventory_rooms
             self._client._handle_thread.get()
-        self._join_discovery_room()
+
+        for suffix in self._config['global_rooms']:
+            room_name = make_room_alias(self.network_id, suffix)  # e.g. raiden_ropsten_discovery
+            room = join_global_room(
+                self._client,
+                room_name,
+                self._config.get('available_servers') or (),
+            )
+            self._global_rooms[room_name] = room
+
         self._inventory_rooms()
 
         self._client.start_listener_thread()
@@ -477,7 +468,7 @@ class MatrixTransport(Runnable):
             user_ids = {
                 user.user_id
                 for user in candidates
-                if self._validate_userid_signature(user) == node_address
+                if validate_userid_signature(user) == node_address
             }
             self.whitelist(node_address)
             self._address_to_userids[node_address].update(user_ids)
@@ -517,6 +508,41 @@ class MatrixTransport(Runnable):
 
         self._send_with_retry(queue_identifier, message)
 
+    def send_global(self, room: str, message: Message) -> None:
+        """Sends a message to one of the global rooms
+
+        These rooms aren't being listened on and therefore no reply could be heard, so these
+        messages are sent in a send-and-forget async way.
+        The actual room name is composed from the suffix given as parameter and chain name or id
+        e.g.: raiden_ropsten_discovery
+        Params:
+            room: name suffix as passed in config['global_rooms'] list
+            message: Message instance to be serialized and sent
+        """
+        room_name = make_room_alias(self.network_id, room)
+        if room_name not in self._global_rooms:
+            room = join_global_room(
+                self._client,
+                room_name,
+                self._config.get('available_servers') or (),
+            )
+            self._global_rooms[room_name] = room
+
+        assert self._global_rooms.get(room_name), f'Unknown global room: {room_name!r}'
+
+        def _send_global():
+            text = JSONSerializer.serialize(message)
+            room = self._global_rooms[room_name]
+            self.log.debug(
+                'Send global',
+                room_name=room_name,
+                room=room,
+                data=text.replace('\n', '\\n'),
+            )
+            room.send_text(text)
+
+        self._spawn(_send_global)
+
     @property
     def _queueids_to_queues(self) -> QueueIdsToQueues:
         chain_state = views.state_from_raiden(self._raiden_service)
@@ -527,159 +553,25 @@ class MatrixTransport(Runnable):
         return getattr(self, '_client', None) and getattr(self._client, 'user_id', None)
 
     @property
-    def _network_name(self) -> str:
-        netid = self._raiden_service.chain.network_id
-        return ID_TO_NETWORKNAME.get(netid, str(netid))
+    def network_id(self) -> str:
+        return self._raiden_service.chain.network_id
 
     @property
     def _private_rooms(self) -> bool:
         return bool(self._config.get('private_rooms'))
 
-    def _login_or_register(self, prev_user_id=None, prev_access_token=None):
-        base_username = to_normalized_address(self._raiden_service.address)
-        _match_user = re.match(
-            f'^@{re.escape(base_username)}.*:{re.escape(self._server_name)}$',
-            prev_user_id or '',
-        )
-        if _match_user:  # same user as before
-            self.log.debug('Trying previous user login', user_id=prev_user_id)
-            self._client.set_access_token(user_id=prev_user_id, token=prev_access_token)
-
-            try:
-                self._client.api.get_devices()
-            except MatrixRequestError as ex:
-                self.log.debug(
-                    'Couldn\'t use previous login credentials, discarding',
-                    prev_user_id=prev_user_id,
-                    _exception=ex,
-                )
-            else:
-                prev_sync_limit = self._client.set_sync_limit(0)
-                self._client._sync()
-                self._client.set_sync_limit(prev_sync_limit)
-                self.log.debug('Success. Valid previous credentials', user_id=prev_user_id)
-                return
-        elif prev_user_id:
-            self.log.debug(
-                'Different server or account, discarding',
-                prev_user_id=prev_user_id,
-                current_address=base_username,
-                current_server=self._server_name,
-            )
-
-        # password is signed server address
-        password = encode_hex(self._sign(self._server_name.encode()))
-        seed = int.from_bytes(self._sign(b'seed')[-32:], 'big')
-        rand = Random()  # deterministic, random secret for username suffixes
-        rand.seed(seed)
-        # try login and register on first 5 possible accounts
-        for i in range(_JOIN_RETRIES):
-            username = base_username
-            if i:
-                username = f'{username}.{rand.randint(0, 0xffffffff):08x}'
-
-            try:
-                self._client.login(username, password, sync=False)
-                prev_sync_limit = self._client.set_sync_limit(0)
-                self._client._sync()  # when logging, do initial_sync with limit=0
-                self._client.set_sync_limit(prev_sync_limit)
-                self.log.debug(
-                    'Login',
-                    homeserver=self._server_name,
-                    server_url=self._server_url,
-                    username=username,
-                )
-                break
-            except MatrixRequestError as ex:
-                if ex.code != 403:
-                    raise
-                self.log.debug(
-                    'Could not login. Trying register',
-                    homeserver=self._server_name,
-                    server_url=self._server_url,
-                    username=username,
-                )
-                try:
-                    self._client.register_with_password(username, password)
-                    self.log.debug(
-                        'Register',
-                        homeserver=self._server_name,
-                        server_url=self._server_url,
-                        username=username,
-                    )
-                    break
-                except MatrixRequestError as ex:
-                    if ex.code != 400:
-                        raise
-                    self.log.debug('Username taken. Continuing')
-                    continue
-        else:
-            raise ValueError('Could not register or login!')
-
-        name = encode_hex(self._sign(self._user_id.encode()))
-        self._get_user(self._user_id).set_display_name(name)
-
-    def _join_discovery_room(self):
-        self._discovery_room_alias = self._make_room_alias(self._config['discovery_room'])
-
-        servers = self._config.get('available_servers') or list()
-        servers = [urlparse(s).netloc for s in servers if urlparse(s).netloc]
-        if self._server_name not in servers:
-            servers.append(self._server_name)
-        servers.sort(key=lambda s: '' if s == self._server_name else s)  # our server goes first
-
-        our_server_discovery_room_alias_full = f'#{self._discovery_room_alias}:{self._server_name}'
-
-        # try joining a discovery room on any of the available servers, starting with ours
-        for server in servers:
-            discovery_room_alias_full = f'#{self._discovery_room_alias}:{server}'
-            try:
-                discovery_room = self._client.join_room(discovery_room_alias_full)
-            except MatrixRequestError as ex:
-                if ex.code not in (403, 404, 500):
-                    raise
-                self.log.debug(
-                    'Could not join discovery room',
-                    room_alias_full=discovery_room_alias_full,
-                    _exception=ex,
-                )
-            else:
-                if our_server_discovery_room_alias_full not in discovery_room.aliases:
-                    # we managed to join a discovery room, but it's not aliased in our server
-                    discovery_room.add_room_alias(our_server_discovery_room_alias_full)
-                    discovery_room.aliases.append(our_server_discovery_room_alias_full)
-                break
-        else:
-            self.log.debug('Could not join any discovery room, trying to create one')
-            for _ in range(_JOIN_RETRIES):
-                try:
-                    discovery_room = self._client.create_room(
-                        self._discovery_room_alias,
-                        is_public=True,
-                    )
-                except MatrixRequestError as ex:
-                    if ex.code not in (400, 409):
-                        raise
-                    try:
-                        discovery_room = self._client.join_room(
-                            our_server_discovery_room_alias_full,
-                        )
-                    except MatrixRequestError as ex:
-                        if ex.code not in (404, 403):
-                            raise
-                    else:
-                        break
-                else:
-                    break
-            else:
-                raise TransportError('Could neither join nor create a discovery room')
-
-        self._discovery_room = discovery_room
-
     def _inventory_rooms(self):
         self.log.debug('Inventory rooms', rooms=self._client.rooms)
         for room in self._client.rooms.values():
-            if any(self._discovery_room_alias in alias for alias in room.aliases):
+            room_aliases = set(room.aliases)
+            if room.canonical_alias:
+                room_aliases.add(room.canonical_alias)
+            room_alias_is_global = any(
+                global_alias in room_alias
+                for global_alias in self._global_rooms
+                for room_alias in room_aliases
+            )
+            if room_alias_is_global:
                 continue
             # we add listener for all valid rooms, _handle_message should ignore them
             # if msg sender weren't start_health_check'ed yet
@@ -725,7 +617,7 @@ class MatrixTransport(Runnable):
 
         user = self._get_user(sender)
         user.displayname = sender_join_event['content'].get('displayname') or user.displayname
-        peer_address = self._validate_userid_signature(user)
+        peer_address = validate_userid_signature(user)
         if not peer_address:
             self.log.debug(
                 'Got invited to a room by invalid signed user - ignoring',
@@ -758,7 +650,7 @@ class MatrixTransport(Runnable):
         # _get_room_ids_for_address will take care of returning only matching rooms and
         # _leave_unused_rooms will clear it in the future, if and when needed
         last_ex = None
-        for _ in range(_JOIN_RETRIES):
+        for _ in range(JOIN_RETRIES):
             try:
                 room = self._client.join_room(room_id)
             except MatrixRequestError as e:
@@ -800,7 +692,7 @@ class MatrixTransport(Runnable):
             return False
 
         user = self._get_user(sender_id)
-        peer_address = self._validate_userid_signature(user)
+        peer_address = validate_userid_signature(user)
         if not peer_address:
             self.log.debug(
                 'Message from invalid user displayName signature',
@@ -1042,7 +934,7 @@ class MatrixTransport(Runnable):
             to_normalized_address(address)
             for address in [address, self._raiden_service.address]
         ])
-        room_name = self._make_room_alias(*address_pair)
+        room_name = make_room_alias(self.network_id, *address_pair)
 
         # no room with expected name => create one and invite peer
         candidates = [
@@ -1054,7 +946,7 @@ class MatrixTransport(Runnable):
         peers = [
             user
             for user in candidates
-            if self._validate_userid_signature(user) == address
+            if validate_userid_signature(user) == address
         ]
         if not peers and not allow_missing_peers:
             self.log.error('No valid peer found', peer_address=address_hex)
@@ -1091,7 +983,7 @@ class MatrixTransport(Runnable):
         room_name_full = f'#{room_name}:{self._server_name}'
         invitees_uids = [user.user_id for user in invitees]
 
-        for _ in range(_JOIN_RETRIES):
+        for _ in range(JOIN_RETRIES):
             # try joining room
             try:
                 room = self._client.join_room(room_name_full)
@@ -1159,9 +1051,6 @@ class MatrixTransport(Runnable):
 
         return room
 
-    def _make_room_alias(self, *parts):
-        return self._room_sep.join([self._room_prefix, self._network_name, *parts])
-
     def _handle_presence_change(self, event):
         """
         Update node network reachability from presence events.
@@ -1177,7 +1066,7 @@ class MatrixTransport(Runnable):
 
         user = self._get_user(user_id)
         user.displayname = event['content'].get('displayname') or user.displayname
-        address = self._validate_userid_signature(user)
+        address = validate_userid_signature(user)
         if not address:
             # Malformed address - skip
             return
@@ -1193,7 +1082,7 @@ class MatrixTransport(Runnable):
 
         self._userid_to_presence[user_id] = new_state
         self._update_address_presence(address)
-        # maybe inviting user used to also possibly invite user's from discovery presence changes
+        # maybe inviting user used to also possibly invite user's from presence changes
         self._spawn(self._maybe_invite_user, user)
 
     def _get_user_presence(self, user_id: str) -> UserPresence:
@@ -1249,7 +1138,7 @@ class MatrixTransport(Runnable):
         self._raiden_service.handle_state_change(state_change)
 
     def _maybe_invite_user(self, user: User):
-        address = self._validate_userid_signature(user)
+        address = validate_userid_signature(user)
         if not address:
             return
 
@@ -1272,84 +1161,20 @@ class MatrixTransport(Runnable):
                     exc_info=True,
                 )
 
-    def _select_server(self, config):
-        server = config['server']
-        if server.startswith('http'):
-            return server
-        elif server != 'auto':
-            raise TransportError('Invalid matrix server specified (valid values: "auto" or a URL)')
-
-        def _get_rtt(server_name):
-            return server_name, get_http_rtt(server_name)
-
-        get_rtt_jobs = [
-            gevent.spawn(_get_rtt, server_name)
-            for server_name
-            in config['available_servers']
-        ]
-        gevent.joinall(get_rtt_jobs, raise_error=True)
-        sorted_servers = sorted(
-            (job.value for job in get_rtt_jobs if job.value[1] is not None),
-            key=itemgetter(1),
-        )
-        self.log.debug('Matrix homeserver RTT times', rtt_times=sorted_servers)
-        if not sorted_servers:
-            raise TransportError(
-                'Could not select a Matrix server. No candidates remaining. '
-                'Please check your network connectivity.',
-            )
-        best_server, rtt = sorted_servers[0]
-        self.log.info(
-            'Automatically selecting matrix homeserver based on RTT',
-            homeserver=best_server,
-            rtt=rtt,
-        )
-        return best_server
-
     def _sign(self, data: bytes) -> bytes:
         """ Use eth_sign compatible hasher to sign matrix data """
         return self._raiden_service.signer.sign(data=data)
-
-    @staticmethod
-    def _recover(data: bytes, signature: bytes) -> Address:
-        """ Use eth_sign compatible hasher to recover address from signed data """
-        return recover(data=data, signature=signature)
-
-    def _validate_userid_signature(self, user: User) -> Optional[Address]:
-        """ Validate a userId format and signature on displayName, and return its address"""
-        # display_name should be an address in the self._userid_re format
-        match = self._userid_re.match(user.user_id)
-        if not match:
-            return None
-
-        encoded_address = match.group(1)
-        address: Address = to_canonical_address(encoded_address)
-
-        try:
-            displayname = user.get_display_name()
-            recovered = self._recover(
-                user.user_id.encode(),
-                decode_hex(displayname),
-            )
-            if not (address and recovered and recovered == address):
-                return None
-        except (
-                DecodeError,
-                TypeError,
-                InvalidSignature,
-                MatrixRequestError,
-                json.decoder.JSONDecodeError,
-        ):
-            return None
-        return address
 
     def _get_user(self, user: Union[User, str]) -> User:
         """Creates an User from an user_id, if none, or fetch a cached User
 
         As all users are supposed to be in discovery room, its members dict is used for caching"""
         user_id: str = getattr(user, 'user_id', user)
-        if self._discovery_room and user_id in self._discovery_room._members:
-            duser = self._discovery_room._members[user_id]
+        discovery_room = self._global_rooms.get(
+            make_room_alias(self.network_id, DISCOVERY_DEFAULT_ROOM),
+        )
+        if discovery_room and user_id in discovery_room._members:
+            duser = discovery_room._members[user_id]
             # if handed a User instance with displayname set, update the discovery room cache
             if getattr(user, 'displayname', None):
                 duser.displayname = user.displayname
@@ -1370,10 +1195,11 @@ class MatrixTransport(Runnable):
 
         with self._account_data_lock:
             # no need to deepcopy, we don't modify lists in-place
-            _address_to_room_ids: Dict[AddressHex, List[_RoomID]] = self._client.account_data.get(
-                'network.raiden.rooms',
-                {},
-            ).copy()
+            # cast generic Dict[str, Any] to types we expect, to satisfy mypy, runtime no-op
+            _address_to_room_ids = cast(
+                Dict[AddressHex, List[_RoomID]],
+                self._client.account_data.get('network.raiden.rooms', {}).copy(),
+            )
 
             changed = False
             if not room_id:  # falsy room_id => clear list
@@ -1441,8 +1267,11 @@ class MatrixTransport(Runnable):
         _msg = '_leave_unused_rooms called without account data lock'
         assert self._account_data_lock.locked(), _msg
 
-        # TODO: Remove the next two lines and check if transfers start hanging again
-        self._client.set_account_data('network.raiden.rooms', _address_to_room_ids)
+        # TODO: Remove the next five lines and check if transfers start hanging again
+        self._client.set_account_data(
+            'network.raiden.rooms',  # back from cast in _set_room_id_for_address
+            cast(Dict[str, Any], _address_to_room_ids),
+        )
         return
 
         # cache in a set all whitelisted addresses
@@ -1500,8 +1329,8 @@ class MatrixTransport(Runnable):
                 return True
 
         for room_id, room in rooms:
-            if self._discovery_room and room_id == self._discovery_room.room_id:
-                # don't leave discovery room
+            if room_id in {groom.room_id for groom in self._global_rooms.values() if groom}:
+                # don't leave global room
                 continue
             if room_id not in keep_rooms:
                 self._spawn(leave, room)

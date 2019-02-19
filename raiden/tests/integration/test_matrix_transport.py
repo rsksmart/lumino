@@ -1,24 +1,40 @@
 import json
 import random
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, Mock
 
 import gevent
 import pytest
 from gevent import Timeout
 
-from raiden.constants import UINT64_MAX
+from raiden import raiden_event_handler
+from raiden.constants import (
+    MONITORING_BROADCASTING_ROOM,
+    PATH_FINDING_BROADCASTING_ROOM,
+    UINT64_MAX,
+)
 from raiden.messages import Processed, SecretRequest
-from raiden.network.transport import MatrixTransport
-from raiden.network.transport.matrix import UserPresence, _RetryQueue
+from raiden.network.transport.matrix import MatrixTransport, UserPresence, _RetryQueue
+from raiden.network.transport.matrix.client import Room
+from raiden.network.transport.matrix.utils import make_room_alias
+from raiden.raiden_event_handler import SEND_BALANCE_PROOF_EVENTS, RaidenMonitoringEventHandler
 from raiden.tests.utils.factories import HOP1, HOP1_KEY, UNIT_SECRETHASH, make_address
+from raiden.tests.utils.messages import make_balance_proof, make_lock
 from raiden.tests.utils.mocks import MockRaidenService
-from raiden.transfer.mediated_transfer.events import CHANNEL_IDENTIFIER_GLOBAL_QUEUE
+from raiden.transfer.mediated_transfer.events import (
+    CHANNEL_IDENTIFIER_GLOBAL_QUEUE,
+    EventNewBalanceProofReceived,
+    SendBalanceProof,
+    SendLockedTransfer,
+    SendLockExpired,
+    SendRefundTransfer,
+)
+from raiden.transfer.mediated_transfer.state import LockedTransferUnsignedState
 from raiden.transfer.queue_identifier import QueueIdentifier
+from raiden.transfer.state import BalanceProofUnsignedState, HashTimeLockState
 from raiden.transfer.state_change import ActionUpdateTransportAuthData
 from raiden.utils import pex
 from raiden.utils.signer import LocalSigner
 from raiden.utils.typing import Address, List, Optional, Union
-from raiden_libs.network.matrix import Room
 
 USERID1 = '@Alice:Wonderland'
 
@@ -44,7 +60,7 @@ def mock_matrix(
         private_rooms,
 ):
 
-    from matrix_client.user import User
+    from raiden.network.transport.matrix.client import User
     monkeypatch.setattr(User, 'get_display_name', lambda _: 'random_display_name')
 
     def mock_get_user(klass, user: Union[User, str]) -> User:
@@ -70,7 +86,7 @@ def mock_matrix(
         server=local_matrix_servers[0],
         server_name=local_matrix_servers[0].netloc,
         available_servers=[],
-        discovery_room='discovery',
+        global_rooms=['discovery'],
         private_rooms=private_rooms,
     )
 
@@ -93,12 +109,26 @@ def mock_matrix(
 
 @pytest.fixture()
 def skip_userid_validation(monkeypatch):
-    def mock_validate_userid_signature(klass, user):
+    import raiden.network.transport.matrix
+    import raiden.network.transport.matrix.transport
+    import raiden.network.transport.matrix.utils
+
+    def mock_validate_userid_signature(user):
         return HOP1
 
     monkeypatch.setattr(
-        MatrixTransport,
-        '_validate_userid_signature',
+        raiden.network.transport.matrix,
+        'validate_userid_signature',
+        mock_validate_userid_signature,
+    )
+    monkeypatch.setattr(
+        raiden.network.transport.matrix.transport,
+        'validate_userid_signature',
+        mock_validate_userid_signature,
+    )
+    monkeypatch.setattr(
+        raiden.network.transport.matrix.utils,
+        'validate_userid_signature',
         mock_validate_userid_signature,
     )
 
@@ -204,7 +234,7 @@ def test_matrix_message_sync(
         retries_before_backoff,
 ):
     transport0 = MatrixTransport({
-        'discovery_room': 'discovery',
+        'global_rooms': ['discovery'],
         'retries_before_backoff': retries_before_backoff,
         'retry_interval': retry_interval,
         'server': local_matrix_servers[0],
@@ -213,7 +243,7 @@ def test_matrix_message_sync(
         'private_rooms': private_rooms,
     })
     transport1 = MatrixTransport({
-        'discovery_room': 'discovery',
+        'global_rooms': ['discovery'],
         'retries_before_backoff': retries_before_backoff,
         'retry_interval': retry_interval,
         'server': local_matrix_servers[0],
@@ -320,7 +350,7 @@ def test_matrix_message_retry(
     partner_address = make_address()
 
     transport = MatrixTransport({
-        'discovery_room': 'discovery',
+        'global_rooms': ['discovery'],
         'retries_before_backoff': retries_before_backoff,
         'retry_interval': retry_interval,
         'server': local_matrix_servers[0],
@@ -392,14 +422,14 @@ def test_join_invalid_discovery(
         retry_interval,
         retries_before_backoff,
 ):
-    """_join_discovery_room tries to join on all servers on available_servers config
+    """join_global_room tries to join on all servers on available_servers config
 
     If any of the servers isn't reachable by synapse, it'll return a 500 response, which needs
     to be handled, and if no discovery room is found on any of the available_servers, one in
     our current server should be created
     """
     transport = MatrixTransport({
-        'discovery_room': 'discovery',
+        'global_rooms': ['discovery'],
         'retries_before_backoff': retries_before_backoff,
         'retry_interval': retry_interval,
         'server': local_matrix_servers[0],
@@ -417,9 +447,8 @@ def test_join_invalid_discovery(
         None,
     )
     transport.log = MagicMock()
-
-    transport._join_discovery_room()
-    assert isinstance(transport._discovery_room, Room)
+    discovery_room_name = make_room_alias(transport.network_id, 'discovery')
+    assert isinstance(transport._global_rooms.get(discovery_room_name), Room)
 
     transport.stop()
     transport.get()
@@ -479,6 +508,8 @@ def test_matrix_cross_server_with_load_balance(matrix_transports, retry_interval
             )
             gevent.sleep(.1)
 
+    assert all_messages_received
+
     transport0.stop()
     transport1.stop()
     transport2.stop()
@@ -496,7 +527,7 @@ def test_matrix_discovery_room_offline_server(
 ):
 
     transport = MatrixTransport({
-        'discovery_room': 'discovery',
+        'global_rooms': ['discovery'],
         'retries_before_backoff': retries_before_backoff,
         'retry_interval': retry_interval,
         'server': local_matrix_servers[0],
@@ -506,5 +537,200 @@ def test_matrix_discovery_room_offline_server(
     })
     transport.start(MockRaidenService(None), MessageHandler(set()), '')
     gevent.sleep(.2)
+
+    discovery_room_name = make_room_alias(transport.network_id, 'discovery')
+    assert isinstance(transport._global_rooms.get(discovery_room_name), Room)
+
+    transport.stop()
+    transport.get()
+
+
+def test_matrix_send_global(
+        local_matrix_servers,
+        retries_before_backoff,
+        retry_interval,
+        private_rooms,
+):
+    transport = MatrixTransport({
+        'global_rooms': ['discovery', MONITORING_BROADCASTING_ROOM],
+        'retries_before_backoff': retries_before_backoff,
+        'retry_interval': retry_interval,
+        'server': local_matrix_servers[0],
+        'server_name': local_matrix_servers[0].netloc,
+        'available_servers': [local_matrix_servers[0]],
+        'private_rooms': private_rooms,
+    })
+    transport.start(MockRaidenService(None), MessageHandler(set()), '')
+    gevent.idle()
+
+    ms_room_name = make_room_alias(transport.network_id, MONITORING_BROADCASTING_ROOM)
+    ms_room = transport._global_rooms.get(ms_room_name)
+    assert isinstance(ms_room, Room)
+
+    ms_room.send_text = MagicMock(spec=ms_room.send_text)
+
+    for i in range(5):
+        message = Processed(i)
+        transport._raiden_service.sign(message)
+        transport.send_global(
+            MONITORING_BROADCASTING_ROOM,
+            message,
+        )
+
+    gevent.idle()
+
+    assert ms_room.send_text.call_count == 5
+
+    transport.stop()
+    transport.get()
+
+
+def test_monitoring_global_messages(
+        local_matrix_servers,
+        private_rooms,
+        retry_interval,
+        retries_before_backoff,
+):
+    """
+    Test that RaidenMonitoringEventHandler sends RequestMonitoring messages to global
+    MONITORING_BROADCASTING_ROOM room on EventNewBalanceProofReceived.
+    """
+    transport = MatrixTransport({
+        'global_rooms': ['discovery', MONITORING_BROADCASTING_ROOM],
+        'retries_before_backoff': retries_before_backoff,
+        'retry_interval': retry_interval,
+        'server': local_matrix_servers[0],
+        'server_name': local_matrix_servers[0].netloc,
+        'available_servers': [local_matrix_servers[0]],
+        'private_rooms': private_rooms,
+    })
+    transport._client.api.retry_timeout = 0
+    transport._send_raw = MagicMock()
+    raiden_service = MockRaidenService(None)
+
+    transport.start(
+        raiden_service,
+        raiden_service.message_handler,
+        None,
+    )
+
+    ms_room_name = make_room_alias(transport.network_id, MONITORING_BROADCASTING_ROOM)
+    ms_room = transport._global_rooms.get(ms_room_name)
+    assert isinstance(ms_room, Room)
+    ms_room.send_text = MagicMock(spec=ms_room.send_text)
+
+    raiden_service.transport = transport
+    transport.log = MagicMock()
+    new_balance_proof_event = EventNewBalanceProofReceived(
+        make_balance_proof(signer=LocalSigner(HOP1_KEY), amount=1),
+    )
+    RaidenMonitoringEventHandler().on_raiden_event(
+        raiden_service,
+        new_balance_proof_event,
+    )
+    gevent.idle()
+
+    assert ms_room.send_text.call_count == 1
+    transport.stop()
+    transport.get()
+
+
+@pytest.mark.parametrize('matrix_server_count', [1])
+@pytest.mark.parametrize('number_of_transports', [1])
+@pytest.mark.parametrize('global_rooms', [['discovery', PATH_FINDING_BROADCASTING_ROOM]])
+def test_pfs_global_messages(
+        matrix_transports,
+        monkeypatch,
+):
+    """
+    Test that `update_pfs` from `RaidenEventHandler` sends balance proof updates to the global
+    PATH_FINDING_BROADCASTING_ROOM room on Send($BalanceProof)* events, i.e. events, that send
+    a new balance proof to the channel partner.
+    """
+    transport = matrix_transports[0]
+    transport._client.api.retry_timeout = 0
+    transport._send_raw = MagicMock()
+    raiden_service = MockRaidenService(None)
+
+    transport.start(
+        raiden_service,
+        raiden_service.message_handler,
+        None,
+    )
+
+    pfs_room_name = make_room_alias(transport.network_id, PATH_FINDING_BROADCASTING_ROOM)
+    pfs_room = transport._global_rooms.get(pfs_room_name)
+    assert isinstance(pfs_room, Room)
+    pfs_room.send_text = MagicMock(spec=pfs_room.send_text)
+
+    raiden_service.transport = transport
+    transport.log = MagicMock()
+
+    # create mock events that should trigger a send
+    lock = make_lock()
+    hash_time_lock = HashTimeLockState(lock.amount, lock.expiration, lock.secrethash)
+
+    def make_unsigned_balance_proof(nonce):
+        return BalanceProofUnsignedState.from_dict(
+            make_balance_proof(nonce=nonce, signer=LocalSigner(HOP1_KEY), amount=1).to_dict(),
+        )
+    transfer1 = LockedTransferUnsignedState(
+        balance_proof=make_unsigned_balance_proof(nonce=1),
+        payment_identifier=1,
+        token=b'1',
+        lock=hash_time_lock,
+        target=HOP1,
+        initiator=HOP1,
+    )
+    transfer2 = LockedTransferUnsignedState(
+        balance_proof=make_unsigned_balance_proof(nonce=2),
+        payment_identifier=1,
+        token=b'1',
+        lock=hash_time_lock,
+        target=HOP1,
+        initiator=HOP1,
+    )
+
+    send_balance_proof_events = [
+        SendLockedTransfer(HOP1, 1, 1, transfer1),
+        SendRefundTransfer(HOP1, 1, 1, transfer2),
+        SendBalanceProof(HOP1, 1, 1, 1, b'1', b'x' * 32, make_unsigned_balance_proof(nonce=3)),
+        SendLockExpired(HOP1, 1, make_unsigned_balance_proof(nonce=4), b'x' * 32),
+    ]
+    for num, event in enumerate(send_balance_proof_events):
+        assert event.balance_proof.nonce == num + 1
+    # make sure we cover all configured event types
+    assert all(event in [type(event) for event in send_balance_proof_events]
+               for event in SEND_BALANCE_PROOF_EVENTS)
+
+    event_handler = raiden_event_handler.RaidenEventHandler()
+
+    # let our mock objects pass validation
+    channelstate_mock = Mock()
+    channelstate_mock.reveal_timeout = 1
+
+    monkeypatch.setattr(
+        raiden_event_handler,
+        'get_channelstate_by_token_network_and_partner',
+        lambda *args, **kwargs: channelstate_mock,
+    )
+    monkeypatch.setattr(raiden_event_handler, 'state_from_raiden', lambda *args, **kwargs: 1)
+    monkeypatch.setattr(event_handler, 'handle_send_lockedtransfer', lambda *args, **kwargs: 1)
+    monkeypatch.setattr(event_handler, 'handle_send_refundtransfer', lambda *args, **kwargs: 1)
+
+    # handle the events
+    for event in send_balance_proof_events:
+        event_handler.on_raiden_event(
+            raiden_service,
+            event,
+        )
+    gevent.idle()
+
+    # ensure all events triggered a send for their respective balance_proof
+    assert pfs_room.send_text.call_count == len(SEND_BALANCE_PROOF_EVENTS)
+    assert all(
+        f'"nonce": {i + 1}' in str(pfs_room.send_text.call_args_list[i])
+        for i in range(len(SEND_BALANCE_PROOF_EVENTS))
+    )
     transport.stop()
     transport.get()

@@ -832,7 +832,7 @@ def test_routing_issue2663(
         previous_address=None,
         config={},
     )
-    assert routes2[0].node_address == address2
+    assert routes2[0].node_address == address1
 
     # test routing with node 2 offline
     chain_state.nodeaddresses_to_networkstates = {
@@ -861,7 +861,7 @@ def test_routing_issue2663(
         previous_address=None,
         config={},
     )
-    assert routes2 == []
+    assert routes2[0].node_address == address1
 
     # test routing with node 3 offline
     # the routing doesn't care as node 3 is not directly connected
@@ -892,7 +892,7 @@ def test_routing_issue2663(
         previous_address=None,
         config={},
     )
-    assert routes2[0].node_address == address2
+    assert routes2[0].node_address == address1
 
     # test routing with node 1 offline
     chain_state.nodeaddresses_to_networkstates = {
@@ -911,7 +911,7 @@ def test_routing_issue2663(
         config={},
     )
     # right now the channel to 1 gets filtered out as it is offline
-    assert routes1[0].node_address == address2
+    assert routes1[0].node_address == address1
 
     routes2 = get_best_routes(
         chain_state=chain_state,
@@ -922,7 +922,7 @@ def test_routing_issue2663(
         previous_address=None,
         config={},
     )
-    assert routes2[0].node_address == address2
+    assert routes2[0].node_address == address1
 
 
 def test_routing_priority(
@@ -1104,39 +1104,3 @@ def test_routing_priority(
     )
     assert routes[0].node_address == address2
     assert routes[1].node_address == address1
-
-    # sufficient routing capacity overwrites refunding capacity
-    chain_state.nodeaddresses_to_networkstates = {
-        address1: NODE_NETWORK_REACHABLE,
-        address2: NODE_NETWORK_REACHABLE,
-        address3: NODE_NETWORK_REACHABLE,
-    }
-
-    routes = get_best_routes(
-        chain_state=chain_state,
-        token_network_id=token_network_state.address,
-        from_address=our_address,
-        to_address=address3,
-        amount=2,
-        previous_address=None,
-        config={},
-    )
-    assert routes[0].node_address == address2
-
-    # availability overwrites refunding capacity (node 1 offline)
-    chain_state.nodeaddresses_to_networkstates = {
-        address1: NODE_NETWORK_UNREACHABLE,
-        address2: NODE_NETWORK_REACHABLE,
-        address3: NODE_NETWORK_REACHABLE,
-    }
-
-    routes = get_best_routes(
-        chain_state=chain_state,
-        token_network_id=token_network_state.address,
-        from_address=our_address,
-        to_address=address3,
-        amount=1,
-        previous_address=None,
-        config={},
-    )
-    assert routes[0].node_address == address2

@@ -22,7 +22,7 @@ from raiden.exceptions import ReplacementTransactionUnderpriced, TransactionAlre
 from raiden.log_config import configure_logging
 from raiden.network.sockfactory import SocketFactory
 from raiden.network.utils import get_free_port
-from raiden.settings import INITIAL_PORT
+from raiden.settings import DEVELOPMENT_CONTRACT_VERSION, INITIAL_PORT
 from raiden.tests.utils.transport import make_requests_insecure, matrix_server_starter
 from raiden.utils import get_system_spec, merge_dict, split_endpoint
 from raiden.utils.cli import (
@@ -207,16 +207,24 @@ def options(func):
             ),
             option(
                 '--pathfinding-service-address',
-                help='"host:port" for the raiden pathfinding service to request paths.',
+                help=(
+                    'URL for the raiden pathfinding service to request paths.\n'
+                    'Example: https://pfs-ropsten.services-dev.raiden.network'
+                ),
                 type=str,
                 show_default=True,
             ),
             option(
                 '--pathfinding-max-paths',
-                help='sets maximum paths to be requested from the pathfinding service.',
+                help='Set maximum paths to be requested from the pathfinding service.',
                 default=3,
                 type=int,
                 show_default=True,
+            ),
+            option(
+                '--enable-monitoring',
+                help='Enable the broadcasting of balance proofs to the monitoring services',
+                is_flag=True,
             ),
         ),
         option_group(
@@ -524,7 +532,8 @@ def smoketest(ctx, debug):
         ctx.parent.params['transport'],
         ctx.parent.params['matrix_server'],
         print_step,
-        'pre_limits',  # smoke test should work with pre-limits contract version
+        # smoke test should work with pre-limits contract version
+        DEVELOPMENT_CONTRACT_VERSION,
     )
     args = result['args']
     contract_addresses = result['contract_addresses']
@@ -552,10 +561,9 @@ def smoketest(ctx, debug):
 
         raiden_stdout = StringIO()
         with contextlib.redirect_stdout(raiden_stdout):
-            try:
-                # invoke the raiden app
-                app = run_app(**args)
+            app = run_app(**args)
 
+            try:
                 raiden_api = RaidenAPI(app.raiden)
                 rest_api = RestAPI(raiden_api)
                 (api_host, api_port) = split_endpoint(args['api_address'])

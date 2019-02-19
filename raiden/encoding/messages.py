@@ -19,6 +19,8 @@ REFUNDTRANSFER = 8
 REVEALSECRET = 11
 DELIVERED = 12
 LOCKEXPIRED = 13
+REQUESTMONITORING = 20
+UPDATEPFS = 30
 
 
 # pylint: disable=invalid-name
@@ -47,13 +49,19 @@ channel_identifier = make_field('channel_identifier', 32, '32s', integer(0, UINT
 
 locksroot = make_field('locksroot', 32, '32s')
 secrethash = make_field('secrethash', 32, '32s')
+balance_hash = make_field('balance_hash', 32, '32s')
+additional_hash = make_field('additional_hash', 32, '32s')
 secret = make_field('secret', 32, '32s')
 transferred_amount = make_field('transferred_amount', 32, '32s', integer(0, UINT256_MAX))
 locked_amount = make_field('locked_amount', 32, '32s', integer(0, UINT256_MAX))
 amount = make_field('amount', 32, '32s', integer(0, UINT256_MAX))
+reward_amount = make_field('reward_amount', 32, '32s', integer(0, UINT256_MAX))
 fee = make_field('fee', 32, '32s', integer(0, UINT256_MAX))
+reveal_timeout = make_field('reveal_timeout', 32, '32s', integer(0, UINT256_MAX))
 
 signature = make_field('signature', 65, '65s')
+non_closing_signature = make_field('non_closing_signature', 65, '65s')
+reward_proof_signature = make_field('reward_proof_signature', 65, '65s')
 
 Processed = namedbuffer(
     'processed',
@@ -222,6 +230,42 @@ Lock = namedbuffer(
 )
 
 
+RequestMonitoring = namedbuffer(
+    'request_monitoring',
+    [
+        cmdid(REQUESTMONITORING),
+        pad(3),
+        nonce,
+        chain_id,
+        token_network_address,
+        channel_identifier,
+        balance_hash,
+        additional_hash,
+        signature,
+        non_closing_signature,
+        reward_amount,
+        reward_proof_signature,
+    ],
+)
+
+
+UpdatePFS = namedbuffer(
+    'update_pfs',
+    [
+        cmdid(UPDATEPFS),
+        pad(3),
+        nonce,
+        chain_id,
+        token_network_address,
+        channel_identifier,
+        transferred_amount,
+        locked_amount,
+        locksroot,
+        reveal_timeout,
+        signature,
+    ],
+)
+
 CMDID_MESSAGE = {
     PROCESSED: Processed,
     PING: Ping,
@@ -233,6 +277,8 @@ CMDID_MESSAGE = {
     REFUNDTRANSFER: RefundTransfer,
     DELIVERED: Delivered,
     LOCKEXPIRED: LockExpired,
+    REQUESTMONITORING: RequestMonitoring,
+    UPDATEPFS: UpdatePFS,
 }
 
 

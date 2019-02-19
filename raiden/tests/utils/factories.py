@@ -4,7 +4,7 @@ import string
 from functools import singledispatch
 from typing import NamedTuple
 
-from raiden.constants import UINT64_MAX, UINT256_MAX
+from raiden.constants import EMPTY_MERKLE_ROOT, UINT64_MAX, UINT256_MAX
 from raiden.messages import Lock, LockedTransfer
 from raiden.transfer import balance_proof, channel
 from raiden.transfer.mediated_transfer import mediator
@@ -19,7 +19,7 @@ from raiden.transfer.mediated_transfer.state import (
 from raiden.transfer.mediated_transfer.state_change import ActionInitMediator
 from raiden.transfer.merkle_tree import compute_layers, merkleroot
 from raiden.transfer.state import (
-    EMPTY_MERKLE_ROOT,
+    NODE_NETWORK_REACHABLE,
     BalanceProofSignedState,
     BalanceProofUnsignedState,
     MerkleTreeState,
@@ -31,7 +31,7 @@ from raiden.transfer.state import (
 )
 from raiden.transfer.utils import hash_balance_data
 from raiden.utils import privatekey_to_address, random_secret, sha3, typing
-from raiden.utils.signer import LocalSigner
+from raiden.utils.signer import LocalSigner, Signer
 
 EMPTY = object()
 
@@ -113,6 +113,11 @@ def make_privatekey_address(
     privatekey = if_empty(privatekey, make_privatekey())
     address = privatekey_to_address(privatekey)
     return privatekey, address
+
+
+def make_signer(privatekey: bytes = EMPTY) -> Signer:
+    privatekey = if_empty(privatekey, make_privatekey())
+    return LocalSigner(privatekey)
 
 
 def make_route_from_channel(channel_state: NettingChannelState = EMPTY) -> RouteState:
@@ -903,6 +908,10 @@ class ChannelSet:
     def channel_map(self) -> typing.ChannelMap:
         return {channel.identifier: channel for channel in self.channels}
 
+    @property
+    def nodeaddresses_to_networkstates(self) -> typing.NodeNetworkStateMap:
+        return {address: NODE_NETWORK_REACHABLE for address in self.ADDRESSES}
+
     def our_address(self, index: int) -> typing.Address:
         return self.channels[index].our_state.address
 
@@ -1067,3 +1076,10 @@ def make_transfers_pair(
         transfers_pairs.append(pair)
 
     return MediatorTransfersPair(channels, transfers_pairs, amount, block_number)
+
+
+def make_node_availability_map(nodes):
+    return {
+        node: NODE_NETWORK_REACHABLE
+        for node in nodes
+    }

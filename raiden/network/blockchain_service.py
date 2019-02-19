@@ -1,5 +1,4 @@
 import gevent
-from cachetools.func import ttl_cache
 from eth_utils import is_binary_address
 from gevent.lock import Semaphore
 
@@ -29,7 +28,7 @@ class BlockChainService:
     def __init__(
             self,
             jsonrpc_client: JSONRPCClient,
-            contract_manager: ContractManager = None,
+            contract_manager: ContractManager,
     ):
         self.address_to_discovery = dict()
         self.address_to_secret_registry = dict()
@@ -40,6 +39,9 @@ class BlockChainService:
 
         self.client = jsonrpc_client
         self.contract_manager = contract_manager
+
+        # Ask for the network id only once and store it here
+        self.network_id = int(self.client.web3.version.network)
 
         self._token_creation_lock = Semaphore()
         self._discovery_creation_lock = Semaphore()
@@ -57,9 +59,6 @@ class BlockChainService:
 
     def get_block(self, block_identifier):
         return self.client.web3.eth.getBlock(block_identifier=block_identifier)
-
-    def inject_contract_manager(self, contract_manager: ContractManager):
-        self.contract_manager = contract_manager
 
     def is_synced(self) -> bool:
         result = self.client.web3.eth.syncing
@@ -210,8 +209,3 @@ class BlockChainService:
                 )
 
         return self.identifier_to_payment_channel[dict_key]
-
-    @property
-    @ttl_cache(ttl=30)
-    def network_id(self) -> int:
-        return int(self.client.web3.version.network)

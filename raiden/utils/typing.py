@@ -1,5 +1,9 @@
 from typing import *  # NOQA pylint:disable=wildcard-import,unused-wildcard-import
-from typing import Dict, List, NewType, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Dict, List, NewType, Optional, Tuple, TypeVar, Union
+
+MYPY_ANNOTATION = (
+    'This assert is used to tell mypy what is the type of the variable'
+)
 
 T_ABI = dict
 ABI = NewType('ABI', T_ABI)
@@ -51,7 +55,7 @@ Locksroot = NewType('Locksroot', T_Locksroot)
 T_LockHash = bytes
 LockHash = NewType('LockHash', T_LockHash)
 
-T_MerkleTreeLeaves = List['HashTimeLockState']
+T_MerkleTreeLeaves = List[Union['HashTimeLockState', 'UnlockPartialProofState']]
 MerkleTreeLeaves = NewType('MerkleTreeLeaves', T_MerkleTreeLeaves)
 
 T_MessageID = int
@@ -117,6 +121,16 @@ SecretRegistryAddress = NewType('SecretRegistryAddress', T_SecretRegistryAddress
 T_Signature = bytes
 Signature = NewType('Signature', T_Signature)
 
+T_SignedBlindedBalanceProof = TypeVar(
+    'T_SignedBlindedBalanceProof',
+    bound='SignedBlindedBalanceProof',
+)
+
+T_RequestMonitoring = TypeVar(
+    'T_RequestMonitoring',
+    bound='RequestMonitoring',
+)
+
 T_TransactionHash = bytes
 TransactionHash = NewType('TransactionHash', T_TransactionHash)
 
@@ -128,3 +142,15 @@ BlockSpecification = Union[str, T_BlockNumber]
 ChannelMap = Dict[ChannelID, 'NettingChannelState']
 
 InitiatorTransfersMap = Dict[SecretHash, 'InitiatorTransferState']
+
+NodeNetworkStateMap = Dict[Address, str]
+
+if TYPE_CHECKING:
+    from raiden.transfer.state import (  # noqa: F401
+        HashTimeLockState,
+        NettingChannelState,
+        UnlockPartialProofState,
+    )
+    from raiden.transfer.mediated_transfer.state import InitiatorTransferState  # noqa: F401
+    from raiden.messages import SignedBlindedBalanceProof  # noqa: F401
+    from raiden.messages import RequestMonitoring  # noqa: F401

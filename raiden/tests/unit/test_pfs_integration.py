@@ -4,6 +4,7 @@ from unittest.mock import Mock, patch
 import requests
 from eth_utils import to_checksum_address
 
+from raiden.network.pathfinding import get_pfs_info
 from raiden.routing import get_best_routes
 from raiden.tests.utils import factories
 from raiden.transfer import token_network
@@ -136,6 +137,44 @@ def create_square_network_topology(
         [address1, address2, address3],
         (channel_state1, channel_state2),
     )
+
+
+def test_get_pfs_info_success():
+    json_data = {
+        'price_info': 0,
+        'network_info': {
+            'chain_id': 1,
+            'registry_address': "0xB9633dd9a9a71F22C933bF121d7a22008f66B908",
+        },
+        'message': "This is your favorite pathfinding service",
+        'operator': "John Doe",
+        'version': "0.0.1",
+    }
+
+    response = Mock()
+    response.configure_mock(status_code=200)
+    response.json = Mock(return_value=json_data)
+
+    with patch.object(requests, 'get', return_value=response):
+        pathfinding_service_info = get_pfs_info("url")
+
+        req_registry_address = '0xB9633dd9a9a71F22C933bF121d7a22008f66B908'
+        assert pathfinding_service_info['price_info'] == 0
+        assert pathfinding_service_info['network_info']['chain_id'] == 1
+        assert pathfinding_service_info['network_info']['registry_address'] == req_registry_address
+        assert pathfinding_service_info['message'] == 'This is your favorite pathfinding service'
+        assert pathfinding_service_info['operator'] == 'John Doe'
+        assert pathfinding_service_info['version'] == '0.0.1'
+
+
+def test_get_pfs_info_request_error():
+    response = Mock()
+    response.configure_mock(status_code=400)
+
+    with patch.object(requests, 'get', side_effect=requests.RequestException()):
+        pathfinding_service_info = get_pfs_info("url")
+
+    assert pathfinding_service_info is False
 
 
 def test_routing_mocked_pfs_happy_path(
@@ -404,7 +443,7 @@ def test_routing_mocked_pfs_unavailabe_peer(
         our_address=our_address,
     )
     address1, address2, address3 = addresses
-    channel_state1, _ = channel_states
+    _, channel_state2 = channel_states
 
     # test routing with all nodes available
     chain_state.nodeaddresses_to_networkstates = {
@@ -453,5 +492,5 @@ def test_routing_mocked_pfs_unavailabe_peer(
                 },
             },
         )
-        assert routes[0].node_address == address1
-        assert routes[0].channel_identifier == channel_state1.identifier
+        assert routes[0].node_address == address2
+        assert routes[0].channel_identifier == channel_state2.identifier

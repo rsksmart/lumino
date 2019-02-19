@@ -6,7 +6,7 @@ from functools import total_ordering
 import networkx
 from eth_utils import encode_hex, to_canonical_address, to_checksum_address
 
-from raiden.constants import UINT64_MAX, UINT256_MAX
+from raiden.constants import EMPTY_MERKLE_ROOT, UINT64_MAX, UINT256_MAX
 from raiden.encoding import messages
 from raiden.encoding.format import buffer_for
 from raiden.transfer.architecture import SendMessageEvent, State
@@ -103,19 +103,22 @@ def balanceproof_from_envelope(envelope_message):
     )
 
 
-def lockstate_from_lock(lock):
-    return HashTimeLockState(
-        lock.amount,
-        lock.expiration,
-        lock.secrethash,
-    )
+def make_empty_merkle_tree():
+    return MerkleTreeState([
+        [],                   # the leaves are empty
+        [EMPTY_MERKLE_ROOT],  # the root is the constant 0
+    ])
 
 
 def message_identifier_from_prng(prng):
     return prng.randint(0, UINT64_MAX)
 
 
-class InitiatorTask(State):
+class TransferTask(State):
+    pass
+
+
+class InitiatorTask(TransferTask):
     __slots__ = (
         'token_network_identifier',
         'manager_state',
@@ -159,7 +162,7 @@ class InitiatorTask(State):
         )
 
 
-class MediatorTask(State):
+class MediatorTask(TransferTask):
     __slots__ = (
         'token_network_identifier',
         'mediator_state',
@@ -205,7 +208,7 @@ class MediatorTask(State):
         return restored
 
 
-class TargetTask(State):
+class TargetTask(TransferTask):
     __slots__ = (
         'token_network_identifier',
         'channel_identifier',
@@ -301,7 +304,7 @@ class ChainState(State):
         self.pending_transactions = list()
         self.pseudo_random_generator = pseudo_random_generator
         self.queueids_to_queues: QueueIdsToQueues = dict()
-        self.last_transport_authdata = None
+        self.last_transport_authdata: Optional[str] = None
 
     def __repr__(self):
         return '<ChainState block:{} networks:{} qty_transfers:{} chain_id:{}>'.format(
@@ -469,7 +472,9 @@ class TokenNetworkState(State):
         self.network_graph = TokenNetworkGraphState(self.address)
 
         self.channelidentifiers_to_channels = dict()
-        self.partneraddresses_to_channelidentifiers = defaultdict(list)
+        self.partneraddresses_to_channelidentifiers: Dict[Address, List[ChannelID]] = defaultdict(
+            list,
+        )
 
     def __repr__(self):
         return '<TokenNetworkState id:{} token:{}>'.format(
@@ -528,7 +533,7 @@ class TokenNetworkState(State):
             serialization.identity,
             data['partneraddresses_to_channelidentifiers'],
         )
-        restored.partneraddresses_to_channelidentifiers = defaultdict(
+        restored.partneraddresses_to_channelidentifiers = defaultdict(  # type: ignore
             list,
             restored_partneraddresses_to_channelidentifiers,
         )
@@ -733,7 +738,7 @@ class BalanceProofUnsignedState(State):
             locked_amount: TokenAmount,
             locksroot: Locksroot,
             token_network_identifier: TokenNetworkID,
-            channel_identifier: ChannelID,  # FIXME: is this used anywhere
+            channel_identifier: ChannelID,
             chain_id: ChainID,
     ):
         if not isinstance(nonce, int):
@@ -1377,7 +1382,7 @@ class NettingChannelEndState(State):
         #: unlocked off chain yet, and the secret has been registered onchain
         #: before the lock has expired.
         self.secrethashes_to_onchain_unlockedlocks: SecretHashToPartialUnlockProof = dict()
-        self.merkletree = EMPTY_MERKLE_TREE
+        self.merkletree = make_empty_merkle_tree()
         self.balance_proof: OptionalBalanceProofState = None
 
     def __repr__(self):
@@ -1777,10 +1782,3 @@ class TransactionOrder(State):
         )
 
         return restored
-
-
-EMPTY_MERKLE_ROOT: Locksroot = bytes(32)
-EMPTY_MERKLE_TREE = MerkleTreeState([
-    [],                   # the leaves are empty
-    [EMPTY_MERKLE_ROOT],  # the root is the constant 0
-])

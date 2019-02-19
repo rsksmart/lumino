@@ -3,7 +3,7 @@ from eth_utils import to_canonical_address, to_checksum_address
 
 from raiden.transfer.architecture import Event, SendMessageEvent
 from raiden.transfer.mediated_transfer.state import LockedTransferUnsignedState
-from raiden.transfer.state import BalanceProofUnsignedState
+from raiden.transfer.state import BalanceProofSignedState, BalanceProofUnsignedState
 from raiden.utils import pex, serialization, sha3
 from raiden.utils.typing import (
     Address,
@@ -562,6 +562,25 @@ class EventUnlockFailed(Event):
         return restored
 
 
+class EventNewBalanceProofReceived(Event):
+    """ Event for newly received balance proofs. Useful for notifying monitoring services. """
+
+    def __init__(self, balance_proof: BalanceProofSignedState):
+        self.balance_proof = balance_proof
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            'balance_proof': self.balance_proof.to_dict(),
+        }
+
+    @classmethod
+    def from_dict(
+            cls,
+            data: Dict[str, any],
+    ):
+        return cls(data['balance_proof'])
+
+
 class EventUnlockClaimSuccess(Event):
     """ Event emitted when a lock claim succeded. """
 
@@ -686,7 +705,7 @@ class EventUnexpectedSecretReveal(Event):
     def from_dict(
             cls,
             data: Dict[str, Any],
-    )-> 'EventUnexpectedSecretReveal':
+    ) -> 'EventUnexpectedSecretReveal':
         restored = cls(
             secrethash=serialization.deserialize_bytes(data['secrethash']),
             reason=data['reason'],
