@@ -269,3 +269,9 @@ class PendingTransfersResourceByTokenAndPartnerAddress(BaseResource):
 
     def get(self, token_address, partner_address):
         return self.rest_api.get_pending_transfers(token_address, partner_address)
+
+
+class NetworkResource(BaseResource):
+
+    def get(self, token_network_address):
+        return self.rest_api.get_network_graph(token_network_address)

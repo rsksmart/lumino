@@ -973,3 +973,11 @@ class RaidenAPI:
                 channel_id = partner_channel.identifier
 
         return transfer_tasks_view(transfer_tasks, token_address, channel_id)
+
+    def get_network_graph(self, token_network_address):
+        chain_state = views.state_from_raiden(self.raiden)
+        token_network_state = views.get_token_network_by_identifier(
+            chain_state=chain_state,
+            token_network_id=token_network_address
+        )
+        return token_network_state.network_graph
