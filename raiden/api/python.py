@@ -1,5 +1,7 @@
+import gevent
 import structlog
 from eth_utils import is_binary_address, is_hex, to_bytes, to_checksum_address
+from gevent import Greenlet
 
 import raiden.blockchain.events as blockchain_events
 from raiden import waiting
@@ -213,10 +215,9 @@ class RaidenAPI:
 
         try:
             registry = self.raiden.chain.token_network_registry(registry_address)
-            # LEFTODO: Supply a proper block id
             return registry.add_token(
                 token_address=token_address,
-                given_block_identifier='latest',
+                given_block_identifier=views.state_from_raiden(self.raiden).block_hash,
             )
         except RaidenRecoverableError as e:
             if 'Token already registered' in str(e):
@@ -376,11 +377,10 @@ class RaidenAPI:
                 ))
 
             try:
-                # LEFTODO: Supply a proper block id
                 token_network.new_netting_channel(
                     partner=partner_address,
                     settle_timeout=settle_timeout,
-                    given_block_identifier='latest',
+                    given_block_identifier=views.state_from_raiden(self.raiden).block_hash,
                 )
             except DuplicatedChannelError:
                 log.info('partner opened channel first')
@@ -429,7 +429,7 @@ class RaidenAPI:
         """
         chain_state = views.state_from_raiden(self.raiden)
 
-        token_networks = views.get_token_network_addresses_for(
+        token_addresses = views.get_token_identifiers(
             chain_state,
             registry_address,
         )
@@ -446,7 +446,7 @@ class RaidenAPI:
         if not is_binary_address(partner_address):
             raise InvalidAddress('Expected binary address format for partner in channel deposit')
 
-        if token_address not in token_networks:
+        if token_address not in token_addresses:
             raise UnknownTokenAddress('Unknown token address')
 
         if channel_state is None:
@@ -500,8 +500,10 @@ class RaidenAPI:
 
         # set_total_deposit calls approve
         # token.approve(netcontract_address, addendum, 'latest')
-        # LEFTODO: Supply a proper block id
-        channel_proxy.set_total_deposit(total_deposit, block_identifier='latest')
+        channel_proxy.set_total_deposit(
+            total_deposit=total_deposit,
+            block_identifier=views.state_from_raiden(self.raiden).block_hash,
+        )
 
         target_address = self.raiden.address
         waiting.wait_for_participant_newbalance(
@@ -552,7 +554,7 @@ class RaidenAPI:
         if not all(map(is_binary_address, partner_addresses)):
             raise InvalidAddress('Expected binary address format for partner in channel close')
 
-        valid_tokens = views.get_token_network_addresses_for(
+        valid_tokens = views.get_token_identifiers(
             chain_state=views.state_from_raiden(self.raiden),
             payment_network_id=registry_address,
         )
@@ -572,13 +574,18 @@ class RaidenAPI:
             token_address=token_address,
         )
 
+        greenlets: typing.List[Greenlet] = list()
         for channel_state in channels_to_close:
             channel_close = ActionChannelClose(
                 token_network_identifier=token_network_identifier,
                 channel_identifier=channel_state.identifier,
             )
 
-            self.raiden.handle_state_change(channel_close)
+            greenlets.extend(
+                self.raiden.handle_state_change(channel_close),
+            )
+
+        gevent.joinall(greenlets, raise_error=True)
 
         channel_ids = [channel_state.identifier for channel_state in channels_to_close]
 
@@ -664,11 +671,22 @@ class RaidenAPI:
 
     def get_tokens_list(self, registry_address: typing.PaymentNetworkID):
         """Returns a list of tokens the node knows about"""
-        tokens_list = views.get_token_network_addresses_for(
+        tokens_list = views.get_token_identifiers(
             chain_state=views.state_from_raiden(self.raiden),
             payment_network_id=registry_address,
         )
         return tokens_list
+
+    def get_token_network_address_for_token_address(
+            self,
+            registry_address: typing.PaymentNetworkID,
+            token_address: typing.TokenAddress,
+    ) -> typing.Optional[typing.TokenNetworkID]:
+        return views.get_token_network_identifier_by_token_address(
+            chain_state=views.state_from_raiden(self.raiden),
+            payment_network_id=registry_address,
+            token_address=token_address,
+        )
 
     def transfer_and_wait(
             self,
@@ -747,7 +765,7 @@ class RaidenAPI:
         if secret is not None and secret_hash is not None and secret_hash != sha3(secret):
             raise InvalidSecretOrSecretHash('provided secret and secret_hash do not match.')
 
-        valid_tokens = views.get_token_network_addresses_for(
+        valid_tokens = views.get_token_identifiers(
             views.state_from_raiden(self.raiden),
             registry_address,
         )

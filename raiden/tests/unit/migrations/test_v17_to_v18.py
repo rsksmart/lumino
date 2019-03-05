@@ -1,10 +1,11 @@
+import json
 import random
 from datetime import datetime
 from pathlib import Path
 from unittest.mock import patch
 
 from raiden.storage.serialize import JSONSerializer
-from raiden.storage.sqlite import SerializedSQLiteStorage
+from raiden.storage.sqlite import SerializedSQLiteStorage, SQLiteStorage
 from raiden.tests.utils import factories
 from raiden.transfer.state_change import ActionInitChain
 from raiden.utils.upgrades import UpgradeManager
@@ -20,6 +21,7 @@ def setup_storage(db_path):
         ActionInitChain(
             pseudo_random_generator=random.Random(),
             block_number=1,
+            block_hash=factories.make_block_hash(),
             our_address=factories.make_address(),
             chain_id=1,
         ),
@@ -51,10 +53,11 @@ def test_upgrade_v17_to_v18(tmp_path):
     manager = UpgradeManager(db_filename=str(db_path))
     manager.run()
 
-    storage = SerializedSQLiteStorage(str(db_path), JSONSerializer())
+    storage = SQLiteStorage(str(db_path))
     _, snapshot = storage.get_latest_state_snapshot()
 
-    secrethash = list(snapshot.payment_mapping.secrethashes_to_task.keys())[0]
-    mediator_task = snapshot.payment_mapping.secrethashes_to_task[secrethash]
-    assert mediator_task.mediator_state.waiting_transfer is not None
-    assert mediator_task.mediator_state.routes
+    snapshot_data = json.loads(snapshot)
+    secrethash = list(snapshot_data['payment_mapping']['secrethashes_to_task'].keys())[0]
+    mediator_task = snapshot_data['payment_mapping']['secrethashes_to_task'][secrethash]
+    assert mediator_task['mediator_state']['waiting_transfer'] is not None
+    assert mediator_task['mediator_state']['routes']

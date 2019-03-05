@@ -5,11 +5,13 @@ from raiden.transfer.queue_identifier import QueueIdentifier
 from raiden.utils.typing import (
     Address,
     BlockExpiration,
+    BlockHash,
     BlockNumber,
     ChannelID,
     Generic,
     List,
     MessageID,
+    T_BlockHash,
     T_BlockNumber,
     T_ChannelID,
     TransactionHash,
@@ -173,7 +175,20 @@ class BalanceProofStateChange(AuthenticatedSenderStateChange):
 
 class ContractSendEvent(Event):
     """ Marker used for events which represent on-chain transactions. """
-    pass
+    def __init__(self, triggered_by_block_hash: BlockHash):
+        if not isinstance(triggered_by_block_hash, T_BlockHash):
+            raise ValueError('triggered_by_block_hash must be of type block_hash')
+        # This is the blockhash for which the event was triggered
+        self.triggered_by_block_hash = triggered_by_block_hash
+
+    def __eq__(self, other):
+        return (
+            isinstance(other, ContractSendEvent) and
+            self.triggered_by_block_hash == other.triggered_by_block_hash
+        )
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
 
 
 class ContractSendExpirableEvent(ContractSendEvent):
@@ -181,11 +196,13 @@ class ContractSendExpirableEvent(ContractSendEvent):
     time dependent.
     """
 
-    def __init__(self, expiration: BlockExpiration):
+    def __init__(self, triggered_by_block_hash: BlockHash, expiration: BlockExpiration):
+        super().__init__(triggered_by_block_hash)
         self.expiration = expiration
 
     def __eq__(self, other):
         return (
+            super().__eq__(other) and
             isinstance(other, ContractSendExpirableEvent) and
             self.expiration == other.expiration
         )
@@ -197,18 +214,27 @@ class ContractSendExpirableEvent(ContractSendEvent):
 class ContractReceiveStateChange(StateChange):
     """ Marker used for state changes which represent on-chain logs. """
 
-    def __init__(self, transaction_hash: TransactionHash, block_number: BlockNumber):
+    def __init__(
+            self,
+            transaction_hash: TransactionHash,
+            block_number: BlockNumber,
+            block_hash: BlockHash,
+    ):
         if not isinstance(block_number, T_BlockNumber):
             raise ValueError('block_number must be of type block_number')
+        if not isinstance(block_hash, T_BlockHash):
+            raise ValueError('block_hash must be of type block_hash')
 
         self.transaction_hash = transaction_hash
         self.block_number = block_number
+        self.block_hash = block_hash
 
     def __eq__(self, other):
         return (
             isinstance(other, ContractReceiveStateChange) and
             self.transaction_hash == other.transaction_hash and
-            self.block_number == other.block_number
+            self.block_number == other.block_number and
+            self.block_hash == other.block_hash
         )
 
     def __ne__(self, other):

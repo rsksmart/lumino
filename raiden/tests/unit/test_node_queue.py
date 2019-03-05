@@ -18,10 +18,11 @@ def test_delivered_message_must_clean_unordered_messages(chain_id):
     secret = factories.random_secret()
 
     chain_state = state.ChainState(
-        pseudo_random_generator,
-        block_number,
-        our_address,
-        chain_id,
+        pseudo_random_generator=pseudo_random_generator,
+        block_number=block_number,
+        block_hash=factories.make_block_hash(),
+        our_address=our_address,
+        chain_id=chain_id,
     )
     queue_identifier = QueueIdentifier(
         recipient,
@@ -134,6 +135,7 @@ def test_channel_closed_must_clear_ordered_messages(
         token_network_identifier=token_network_state.address,
         channel_identifier=channel_identifier,
         block_number=1,
+        block_hash=factories.make_block_hash(),
     )
 
     iteration = node.handle_state_change(

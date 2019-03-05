@@ -47,6 +47,7 @@ from raiden.utils.typing import (
     MYPY_ANNOTATION,
     Address,
     BlockExpiration,
+    BlockHash,
     BlockNumber,
     BlockTimeout,
     ChannelMap,
@@ -636,7 +637,7 @@ def events_for_expired_pairs(
         if not payer_channel:
             continue
 
-        has_payer_transfer_expired = channel.transfer_expired(
+        has_payer_transfer_expired = channel.is_transfer_expired(
             transfer=pair.payer_transfer,
             affected_channel=payer_channel,
             block_number=block_number,
@@ -809,6 +810,7 @@ def events_for_onchain_secretreveal_if_dangerzone(
         secrethash: SecretHash,
         transfers_pair: List[MediationPairState],
         block_number: BlockNumber,
+        block_hash: BlockHash,
 ) -> List[Event]:
     """ Reveal the secret on-chain if the lock enters the unsafe region and the
     secret is not yet on-chain.
@@ -864,6 +866,7 @@ def events_for_onchain_secretreveal_if_dangerzone(
                     channel_state=payer_channel,
                     secret=secret,
                     expiration=lock.expiration,
+                    block_hash=block_hash,
                 )
                 events.extend(reveal_events)
 
@@ -877,6 +880,7 @@ def events_for_onchain_secretreveal_if_closed(
         transfers_pair: List[MediationPairState],
         secret: Secret,
         secrethash: SecretHash,
+        block_hash: BlockHash,
 ) -> List[Event]:
     """ Register the secret on-chain if the payer channel is already closed and
     the mediator learned the secret off-chain.
@@ -918,6 +922,7 @@ def events_for_onchain_secretreveal_if_closed(
                     channel_state=payer_channel,
                     secret=secret,
                     expiration=lock.expiration,
+                    block_hash=block_hash,
                 )
                 events.extend(reveal_events)
                 transaction_sent = True
@@ -988,6 +993,7 @@ def secret_learned(
         channelidentifiers_to_channels: ChannelMap,
         pseudo_random_generator: random.Random,
         block_number: BlockNumber,
+        block_hash: BlockHash,
         secret: Secret,
         secrethash: SecretHash,
         payee_address: Address,
@@ -1008,10 +1014,11 @@ def secret_learned(
     )
 
     onchain_secret_reveal = events_for_onchain_secretreveal_if_closed(
-        channelidentifiers_to_channels,
-        state.transfers_pair,
-        secret,
-        secrethash,
+        channelmap=channelidentifiers_to_channels,
+        transfers_pair=state.transfers_pair,
+        secret=secret,
+        secrethash=secrethash,
+        block_hash=block_hash,
     )
 
     offchain_secret_reveal = events_for_secretreveal(
@@ -1055,13 +1062,13 @@ def mediate_transfer(
     send a refund back to the payer, allowing the payer to try a different
     route.
     """
-    available_routes = filter_reachable_routes(
+    reachable_routes = filter_reachable_routes(
         possible_routes,
         nodeaddresses_to_networkstates,
     )
     available_routes = filter_used_routes(
         state.transfers_pair,
-        possible_routes,
+        reachable_routes,
     )
 
     assert payer_channel.partner_state.address == payer_transfer.balance_proof.sender
@@ -1178,10 +1185,11 @@ def handle_block(
     )
 
     secret_reveal_events = events_for_onchain_secretreveal_if_dangerzone(
-        channelidentifiers_to_channels,
-        mediator_state.secrethash,
-        mediator_state.transfers_pair,
-        state_change.block_number,
+        channelmap=channelidentifiers_to_channels,
+        secrethash=mediator_state.secrethash,
+        transfers_pair=mediator_state.transfers_pair,
+        block_number=state_change.block_number,
+        block_hash=state_change.block_hash,
     )
 
     unlock_fail_events = events_for_expired_pairs(
@@ -1266,6 +1274,7 @@ def handle_offchain_secretreveal(
         channelidentifiers_to_channels: ChannelMap,
         pseudo_random_generator: random.Random,
         block_number: BlockNumber,
+        block_hash: BlockHash,
 ) -> TransitionResult[MediatorTransferState]:
     """ Handles the secret reveal and sends SendBalanceProof/RevealSecret if necessary. """
     is_valid_reveal = is_valid_secret_reveal(
@@ -1285,7 +1294,7 @@ def handle_offchain_secretreveal(
     if not payer_channel:
         return TransitionResult(mediator_state, list())
 
-    has_payer_transfer_expired = channel.transfer_expired(
+    has_payer_transfer_expired = channel.is_transfer_expired(
         transfer=transfer_pair.payer_transfer,
         affected_channel=payer_channel,
         block_number=block_number,
@@ -1293,13 +1302,14 @@ def handle_offchain_secretreveal(
 
     if is_secret_unknown and is_valid_reveal and not has_payer_transfer_expired:
         iteration = secret_learned(
-            mediator_state,
-            channelidentifiers_to_channels,
-            pseudo_random_generator,
-            block_number,
-            mediator_state_change.secret,
-            mediator_state_change.secrethash,
-            mediator_state_change.sender,
+            state=mediator_state,
+            channelidentifiers_to_channels=channelidentifiers_to_channels,
+            pseudo_random_generator=pseudo_random_generator,
+            block_number=block_number,
+            block_hash=block_hash,
+            secret=mediator_state_change.secret,
+            secrethash=mediator_state_change.secrethash,
+            payee_address=mediator_state_change.sender,
         )
 
     else:
@@ -1493,6 +1503,7 @@ def state_transition(
         nodeaddresses_to_networkstates: NodeNetworkStateMap,
         pseudo_random_generator: random.Random,
         block_number: BlockNumber,
+        block_hash: BlockHash,
 ) -> TransitionResult[Optional[MediatorTransferState]]:
     """ State machine for a node mediating a transfer. """
     # pylint: disable=too-many-branches
@@ -1538,11 +1549,12 @@ def state_transition(
     elif type(state_change) == ReceiveSecretReveal:
         assert isinstance(state_change, ReceiveSecretReveal), MYPY_ANNOTATION
         iteration = handle_offchain_secretreveal(
-            mediator_state,
-            state_change,
-            channelidentifiers_to_channels,
-            pseudo_random_generator,
-            block_number,
+            mediator_state=mediator_state,
+            mediator_state_change=state_change,
+            channelidentifiers_to_channels=channelidentifiers_to_channels,
+            pseudo_random_generator=pseudo_random_generator,
+            block_number=block_number,
+            block_hash=block_hash,
         )
 
     elif type(state_change) == ContractReceiveSecretReveal:

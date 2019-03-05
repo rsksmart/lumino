@@ -32,6 +32,7 @@ from raiden.transfer.state_change import (
     ContractReceiveChannelSettled,
 )
 from raiden.utils import random_secret, sha3
+from raiden.utils.typing import BlockNumber
 
 
 @composite
@@ -93,10 +94,11 @@ class ChainStateStateMachine(RuleBasedStateMachine):
         partner_address = self.new_channel()
 
         channel_new_state_change = ContractReceiveChannelNew(
-            factories.make_transaction_hash(),
-            self.token_network_id,
-            self.address_to_channel[partner_address],
-            self.block_number,
+            transaction_hash=factories.make_transaction_hash(),
+            token_network_identifier=self.token_network_id,
+            channel_state=self.address_to_channel[partner_address],
+            block_number=self.block_number,
+            block_hash=factories.make_block_hash(),
         )
         node.state_transition(self.chain_state, channel_new_state_change)
 
@@ -112,14 +114,16 @@ class ChainStateStateMachine(RuleBasedStateMachine):
         self.random_seed = random_seed
 
         self.block_number = block_number
+        self.block_hash = factories.make_block_hash()
         self.random = random
         self.private_key, self.address = factories.make_privkey_address()
 
         self.chain_state = ChainState(
-            self.random,
-            self.block_number,
-            self.address,
-            factories.UNIT_CHAIN_ID,
+            pseudo_random_generator=self.random,
+            block_number=self.block_number,
+            block_hash=self.block_hash,
+            our_address=self.address,
+            chain_id=factories.UNIT_CHAIN_ID,
         )
 
         self.token_network_id = factories.make_address()
@@ -301,7 +305,7 @@ class InitiatorMixin:
         partner=partners,
         payment_id=integers(min_value=1),
         amount=integers(min_value=1, max_value=100),
-        secret=secret(),
+        secret=secret(),  # pylint: disable=no-value-for-parameter
     )
     def valid_init_initiator(self, partner, payment_id, amount, secret):
         assume(amount <= self._available_amount(partner))
@@ -322,7 +326,7 @@ class InitiatorMixin:
         partner=partners,
         payment_id=integers(min_value=1),
         excess_amount=integers(min_value=1),
-        secret=secret(),
+        secret=secret(),  # pylint: disable=no-value-for-parameter
     )
     def exceeded_capacity_init_initiator(self, partner, payment_id, excess_amount, secret):
         amount = self._available_amount(partner) + excess_amount
@@ -378,7 +382,10 @@ class InitiatorMixin:
         action = self._receive_secret_request(transfer)
         self._invalid_authentic_secret_request(previous_action, action)
 
-    @rule(previous_action=init_initiators, secret=secret())
+    @rule(
+        previous_action=init_initiators,
+        secret=secret(),  # pylint: disable=no-value-for-parameter
+    )
     def secret_request_with_wrong_secrethash(self, previous_action, secret):
         assume(sha3(secret) != sha3(previous_action.transfer.secret))
         self._assume_channel_opened(previous_action)
@@ -398,6 +405,8 @@ class InitiatorMixin:
 
 
 class OnChainMixin:
+
+    block_number: BlockNumber
 
     @rule(number=integers(min_value=1, max_value=50))
     def new_blocks(self, number):
@@ -427,6 +436,7 @@ class OnChainMixin:
             token_network_identifier=channel.token_network_identifier,
             channel_identifier=channel.identifier,
             block_number=self.block_number + 1,
+            block_hash=factories.make_block_hash(),
         )
 
         node.state_transition(self.chain_state, channel_settled_state_change)

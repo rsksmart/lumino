@@ -30,7 +30,7 @@ from raiden.transfer.state import (
     message_identifier_from_prng,
 )
 from raiden.transfer.utils import hash_balance_data
-from raiden.utils import privatekey_to_address, random_secret, sha3, typing
+from raiden.utils import CanonicalIdentifier, privatekey_to_address, random_secret, sha3, typing
 from raiden.utils.signer import LocalSigner, Signer
 
 EMPTY = object()
@@ -82,6 +82,10 @@ def make_32bytes() -> bytes:
 
 def make_transaction_hash() -> typing.TransactionHash:
     return typing.TransactionHash(make_32bytes())
+
+
+def make_block_hash() -> typing.BlockHash:
+    return typing.BlockHash(make_32bytes())
 
 
 def make_privatekey_bin() -> bin:
@@ -270,9 +274,11 @@ def make_transfer(
         transferred_amount=transferred_amount,
         locked_amount=locked_amount,
         locksroot=locksroot,
-        token_network_identifier=token_network_identifier,
-        channel_identifier=channel_identifier,
-        chain_id=UNIT_CHAIN_ID,
+        canonical_identifier=CanonicalIdentifier(
+            chain_identifier=UNIT_CHAIN_ID,
+            token_network_address=token_network_identifier,
+            channel_identifier=channel_identifier,
+        ),
     )
 
     return LockedTransferUnsignedState(
@@ -303,7 +309,7 @@ def make_signed_transfer(
         token: typing.TargetAddress = EMPTY,
         pkey: bytes = EMPTY,
         sender: typing.Address = EMPTY,
-) -> LockedTransferSignedState:
+) -> LockedTransfer:
 
     amount = if_empty(amount, UNIT_TRANSFER_AMOUNT)
     initiator = if_empty(initiator, make_address())
@@ -354,7 +360,48 @@ def make_signed_transfer(
     )
     transfer.sign(signer)
     assert transfer.sender == sender
+    return transfer
 
+
+def make_signed_transfer_state(
+        amount: typing.TokenAmount = EMPTY,
+        initiator: typing.InitiatorAddress = EMPTY,
+        target: typing.TargetAddress = EMPTY,
+        expiration: typing.BlockExpiration = EMPTY,
+        secret: typing.Secret = EMPTY,
+        payment_identifier: typing.PaymentID = EMPTY,
+        message_identifier: typing.MessageID = EMPTY,
+        nonce: typing.Nonce = EMPTY,
+        transferred_amount: typing.TokenAmount = EMPTY,
+        locked_amount: typing.TokenAmount = EMPTY,
+        locksroot: typing.Locksroot = EMPTY,
+        recipient: typing.Address = EMPTY,
+        channel_identifier: typing.ChannelID = EMPTY,
+        token_network_address: typing.TokenNetworkID = EMPTY,
+        token: typing.TargetAddress = EMPTY,
+        pkey: bytes = EMPTY,
+        sender: typing.Address = EMPTY,
+) -> LockedTransferSignedState:
+
+    transfer = make_signed_transfer(
+        amount=amount,
+        initiator=initiator,
+        target=target,
+        expiration=expiration,
+        secret=secret,
+        payment_identifier=payment_identifier,
+        message_identifier=message_identifier,
+        nonce=nonce,
+        transferred_amount=transferred_amount,
+        locked_amount=locked_amount,
+        locksroot=locksroot,
+        recipient=recipient,
+        channel_identifier=channel_identifier,
+        token_network_address=token_network_address,
+        token=token,
+        pkey=pkey,
+        sender=sender,
+    )
     return lockedtransfersigned_from_message(transfer)
 
 
@@ -390,9 +437,11 @@ def make_signed_balance_proof(
         nonce=nonce,
         balance_hash=balance_hash,
         additional_hash=extra_hash,
-        channel_identifier=channel_identifier,
-        token_network_identifier=token_network_address,
-        chain_id=UNIT_CHAIN_ID,
+        canonical_identifier=CanonicalIdentifier(
+            chain_identifier=UNIT_CHAIN_ID,
+            token_network_address=token_network_address,
+            channel_identifier=channel_identifier,
+        ),
     )
 
     signature = signer.sign(data=data_to_sign)
@@ -402,12 +451,14 @@ def make_signed_balance_proof(
         transferred_amount=transferred_amount,
         locked_amount=locked_amount,
         locksroot=locksroot,
-        token_network_identifier=token_network_address,
-        channel_identifier=channel_identifier,
         message_hash=extra_hash,
         signature=signature,
         sender=sender_address,
-        chain_id=UNIT_CHAIN_ID,
+        canonical_identifier=CanonicalIdentifier(
+            chain_identifier=UNIT_CHAIN_ID,
+            token_network_address=token_network_address,
+            channel_identifier=channel_identifier,
+        ),
     )
 
 
@@ -658,12 +709,18 @@ def _(properties: BalanceProofSignedStateProperties, defaults=None) -> BalancePr
         keys = ('transferred_amount', 'locked_amount', 'locksroot')
         balance_hash = hash_balance_data(**_partial_dict(params, *keys))
 
-        keys = ('nonce', 'channel_identifier', 'token_network_identifier')
+        canonical_identifier = CanonicalIdentifier(
+            chain_identifier=params.pop('chain_id'),
+            token_network_address=params.pop('token_network_identifier'),
+            channel_identifier=params.pop('channel_identifier'),
+        )
+        params['canonical_identifier'] = canonical_identifier
+
         data_to_sign = balance_proof.pack_balance_proof(
             balance_hash=balance_hash,
             additional_hash=params['message_hash'],
-            chain_id=UNIT_CHAIN_ID,
-            **_partial_dict(params, *keys),
+            canonical_identifier=canonical_identifier,
+            nonce=params.get('nonce'),
         )
 
         params['signature'] = signer.sign(data=data_to_sign)
@@ -708,6 +765,11 @@ def _(properties, defaults=None) -> LockedTransferUnsignedState:
     balance_proof_parameters = _properties_to_dict(
         parameters.pop('balance_proof'),
         defaults.balance_proof,
+    )
+    balance_proof_parameters['canonical_identifier'] = CanonicalIdentifier(
+        chain_identifier=balance_proof_parameters.pop('chain_id'),
+        token_network_address=balance_proof_parameters.pop('token_network_identifier'),
+        channel_identifier=balance_proof_parameters.pop('channel_identifier'),
     )
     if balance_proof_parameters['locksroot'] == EMPTY_MERKLE_ROOT:
         balance_proof_parameters['locksroot'] = lock.lockhash
@@ -910,7 +972,10 @@ class ChannelSet:
 
     @property
     def nodeaddresses_to_networkstates(self) -> typing.NodeNetworkStateMap:
-        return {address: NODE_NETWORK_REACHABLE for address in self.ADDRESSES}
+        return {
+            channel.partner_state.address: NODE_NETWORK_REACHABLE
+            for channel in self.channels
+        }
 
     def our_address(self, index: int) -> typing.Address:
         return self.channels[index].our_state.address
@@ -986,7 +1051,8 @@ class MediatorTransfersPair(NamedTuple):
     channels: ChannelSet
     transfers_pair: typing.List[MediationPairState]
     amount: int
-    block_number: int
+    block_number: typing.BlockNumber
+    block_hash: typing.BlockHash
 
     @property
     def channel_map(self) -> typing.ChannelMap:
@@ -1029,7 +1095,7 @@ def make_transfers_pair(
         payee_index = payer_index + 1
 
         receiver_channel = channels[payer_index]
-        received_transfer = make_signed_transfer(
+        received_transfer = make_signed_transfer_state(
             amount=amount,
             initiator=UNIT_TRANSFER_INITIATOR,
             target=UNIT_TRANSFER_TARGET,
@@ -1075,7 +1141,13 @@ def make_transfers_pair(
         )
         transfers_pairs.append(pair)
 
-    return MediatorTransfersPair(channels, transfers_pairs, amount, block_number)
+    return MediatorTransfersPair(
+        channels=channels,
+        transfers_pair=transfers_pairs,
+        amount=amount,
+        block_number=block_number,
+        block_hash=make_block_hash(),
+    )
 
 
 def make_node_availability_map(nodes):

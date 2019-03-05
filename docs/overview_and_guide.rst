@@ -44,6 +44,22 @@ Or you can use Homebrew to install the most up to date binary::
 An Ethereum client is required in both cases. The Raiden binary takes the same command line
 arguments as the ``raiden`` script.
 
+Raspberry Pi
+************
+
+Download the latest :code:`raiden-<version>-linux-armv7l.tar.gz` for the Raspberry Pi Model 2B or
+download the latest :code:`raiden-<version>-linux-aarch64.tar.gz` for the Raspberry Pi Model 2B v 1.2 or later,
+and extract it::
+
+    tar -xvzf  raiden-<version>-linux-*.tar.gz
+
+The resulting binary will work on any Raspberry Pi from Model 2B onwards without any other
+dependencies.
+
+An Ethereum client is required in both cases. The Raiden binary takes the same command line
+arguments as the ``raiden`` script.
+
+
 Docker
 ******
 
@@ -86,7 +102,7 @@ Additional dependencies for development installations
 
 - You need to make sure that your system has ``solc``, the ethereum solidity compiler installed. Refer to `its documentation`_ for the installation steps.
 - You will also need to obtain the `system dependencies for pyethapp <https://github.com/ethereum/pyethapp/#installation-on-ubuntudebian>`_.
-- For running ``raiden smoketest``, you will need to have ``synapse`` installed. Run ``./tools/install_synapse.sh`` (synapse needs ``tk`` as a dependency).
+
 
 .. _its documentation: http://solidity.readthedocs.io/en/latest/installing-solidity.html
 

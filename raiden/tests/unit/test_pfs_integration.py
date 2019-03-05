@@ -28,6 +28,7 @@ def create_square_network_topology(
     typing.List[NettingChannelState],
 ]:
     open_block_number = 10
+    open_block_hash = factories.make_block_hash()
     pseudo_random_generator = random.Random()
     address1 = factories.make_address()
     address2 = factories.make_address()
@@ -62,12 +63,14 @@ def create_square_network_topology(
         token_network_identifier=token_network_state.address,
         channel_state=channel_state1,
         block_number=open_block_number,
+        block_hash=open_block_hash,
     )
     channel_new_state_change2 = ContractReceiveChannelNew(
         transaction_hash=factories.make_transaction_hash(),
         token_network_identifier=token_network_state.address,
         channel_state=channel_state2,
         block_number=open_block_number,
+        block_hash=open_block_hash,
     )
 
     channel_new_iteration1 = token_network.state_transition(
@@ -76,6 +79,7 @@ def create_square_network_topology(
         state_change=channel_new_state_change1,
         pseudo_random_generator=pseudo_random_generator,
         block_number=open_block_number,
+        block_hash=open_block_hash,
     )
 
     channel_new_iteration2 = token_network.state_transition(
@@ -84,6 +88,7 @@ def create_square_network_topology(
         state_change=channel_new_state_change2,
         pseudo_random_generator=pseudo_random_generator,
         block_number=open_block_number,
+        block_hash=open_block_hash,
     )
 
     graph_state = channel_new_iteration2.new_state.network_graph
@@ -98,6 +103,7 @@ def create_square_network_topology(
         participant1=address2,
         participant2=address3,
         block_number=open_block_number,
+        block_hash=open_block_hash,
     )
 
     channel_new_iteration3 = token_network.state_transition(
@@ -106,6 +112,7 @@ def create_square_network_topology(
         state_change=channel_new_state_change3,
         pseudo_random_generator=pseudo_random_generator,
         block_number=open_block_number + 10,
+        block_hash=factories.make_block_hash(),
     )
 
     graph_state = channel_new_iteration3.new_state.network_graph
@@ -119,6 +126,7 @@ def create_square_network_topology(
         participant1=address3,
         participant2=address1,
         block_number=open_block_number,
+        block_hash=open_block_hash,
     )
     channel_new_iteration4 = token_network.state_transition(
         payment_network_identifier=payment_network_state.address,
@@ -126,6 +134,7 @@ def create_square_network_topology(
         state_change=channel_new_state_change4,
         pseudo_random_generator=pseudo_random_generator,
         block_number=open_block_number + 10,
+        block_hash=factories.make_block_hash(),
     )
 
     graph_state = channel_new_iteration4.new_state.network_graph
@@ -216,7 +225,7 @@ def test_routing_mocked_pfs_happy_path(
     response.configure_mock(status_code=200)
     response.json = Mock(return_value=json_data)
 
-    with patch.object(requests, 'get', return_value=response):
+    with patch.object(requests, 'post', return_value=response):
         routes = get_best_routes(
             chain_state=chain_state,
             token_network_id=token_network_state.address,
@@ -258,7 +267,7 @@ def test_routing_mocked_pfs_request_error(
         address3: NODE_NETWORK_REACHABLE,
     }
 
-    with patch.object(requests, 'get', side_effect=requests.RequestException()):
+    with patch.object(requests, 'post', side_effect=requests.RequestException()):
         routes = get_best_routes(
             chain_state=chain_state,
             token_network_id=token_network_state.address,
@@ -318,7 +327,7 @@ def test_routing_mocked_pfs_bad_http_code(
     response.configure_mock(status_code=400)
     response.json = Mock(return_value=json_data)
 
-    with patch.object(requests, 'get', return_value=response):
+    with patch.object(requests, 'post', return_value=response):
         routes = get_best_routes(
             chain_state=chain_state,
             token_network_id=token_network_state.address,
@@ -364,7 +373,7 @@ def test_routing_mocked_pfs_invalid_json(
     response.configure_mock(status_code=400)
     response.json = Mock(side_effect=ValueError())
 
-    with patch.object(requests, 'get', return_value=response):
+    with patch.object(requests, 'post', return_value=response):
         routes = get_best_routes(
             chain_state=chain_state,
             token_network_id=token_network_state.address,
@@ -410,7 +419,7 @@ def test_routing_mocked_pfs_invalid_json_structure(
     response.configure_mock(status_code=400)
     response.json = Mock(return_value={})
 
-    with patch.object(requests, 'get', return_value=response):
+    with patch.object(requests, 'post', return_value=response):
         routes = get_best_routes(
             chain_state=chain_state,
             token_network_id=token_network_state.address,
@@ -477,7 +486,7 @@ def test_routing_mocked_pfs_unavailabe_peer(
     response.configure_mock(status_code=200)
     response.json = Mock(return_value=json_data)
 
-    with patch.object(requests, 'get', return_value=response):
+    with patch.object(requests, 'post', return_value=response):
         routes = get_best_routes(
             chain_state=chain_state,
             token_network_id=token_network_state.address,

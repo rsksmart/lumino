@@ -7,6 +7,7 @@ import traceback
 from copy import deepcopy
 from io import StringIO
 from tempfile import mktemp
+from typing import Any, Dict, List, Tuple
 
 import click
 import structlog
@@ -22,7 +23,11 @@ from raiden.exceptions import ReplacementTransactionUnderpriced, TransactionAlre
 from raiden.log_config import configure_logging
 from raiden.network.sockfactory import SocketFactory
 from raiden.network.utils import get_free_port
-from raiden.settings import DEVELOPMENT_CONTRACT_VERSION, INITIAL_PORT
+from raiden.settings import (
+    DEFAULT_NUMBER_OF_BLOCK_CONFIRMATIONS,
+    DEVELOPMENT_CONTRACT_VERSION,
+    INITIAL_PORT,
+)
 from raiden.tests.utils.transport import make_requests_insecure, matrix_server_starter
 from raiden.utils import get_system_spec, merge_dict, split_endpoint
 from raiden.utils.cli import (
@@ -38,13 +43,26 @@ from raiden.utils.cli import (
     group,
     option,
     option_group,
+    validate_option_dependencies,
 )
+from raiden.waiting import wait_for_block
 from raiden_contracts.constants import CONTRACT_ENDPOINT_REGISTRY, CONTRACT_TOKEN_NETWORK_REGISTRY
 
 from .app import run_app
 from .runners import EchoNodeRunner, MatrixRunner, UDPRunner
 
 log = structlog.get_logger(__name__)
+
+
+OPTION_DEPENDENCIES: Dict[str, List[Tuple[str, Any]]] = {
+    'pathfinding-service-address': [('transport', 'matrix')],
+    'enable-monitoring': [('transport', 'matrix')],
+    'matrix-server': [('transport', 'matrix')],
+    'listen-address': [('transport', 'udp')],
+    'max-unresponsive-time': [('transport', 'udp')],
+    'send-ping-time': [('transport', 'udp')],
+    'nat': [('transport', 'udp')],
+}
 
 
 def options(func):
@@ -56,7 +74,7 @@ def options(func):
         option(
             '--datadir',
             help='Directory for storing raiden data.',
-            default=os.path.join(os.path.expanduser('~'), '.raiden'),
+            default=lambda: os.path.join(os.path.expanduser('~'), '.raiden'),
             type=click.Path(
                 exists=False,
                 dir_okay=True,
@@ -205,10 +223,13 @@ def options(func):
                 type=str,
                 show_default=True,
             ),
+        ),
+        option_group(
+            'Raiden Services Options',
             option(
                 '--pathfinding-service-address',
                 help=(
-                    'URL for the raiden pathfinding service to request paths.\n'
+                    'URL to the Raiden path finding service to request paths from.\n'
                     'Example: https://pfs-ropsten.services-dev.raiden.network'
                 ),
                 type=str,
@@ -216,14 +237,14 @@ def options(func):
             ),
             option(
                 '--pathfinding-max-paths',
-                help='Set maximum paths to be requested from the pathfinding service.',
+                help='Set maximum number of paths to be requested from the path finding service.',
                 default=3,
                 type=int,
                 show_default=True,
             ),
             option(
                 '--enable-monitoring',
-                help='Enable the broadcasting of balance proofs to the monitoring services',
+                help='Enable broadcasting of balance proofs to the monitoring services.',
                 is_flag=True,
             ),
         ),
@@ -382,12 +403,13 @@ def run(ctx, **kwargs):
     if kwargs['config_file']:
         apply_config_file(run, kwargs, ctx)
 
+    validate_option_dependencies(run, ctx, kwargs, OPTION_DEPENDENCIES)
+
     if ctx.invoked_subcommand is not None:
         # Pass parsed args on to subcommands.
         ctx.obj = kwargs
         return
 
-    runner = None
     if kwargs['transport'] == 'udp':
         runner = UDPRunner(kwargs, ctx)
     elif kwargs['transport'] == 'matrix':
@@ -516,6 +538,8 @@ def smoketest(ctx, debug):
         step_count = 8
     step = 0
 
+    stdout = sys.stdout
+
     def print_step(description, error=False):
         nonlocal step
         step += 1
@@ -524,6 +548,7 @@ def smoketest(ctx, debug):
                 click.style(f'[{step}/{step_count}]', fg='blue'),
                 click.style(description, fg='green' if not error else 'red'),
             ),
+            file=stdout,
         )
 
     print_step('Getting smoketest configuration')
@@ -570,6 +595,16 @@ def smoketest(ctx, debug):
                 api_server = APIServer(rest_api, config={'host': api_host, 'port': api_port})
                 api_server.start()
 
+                block = app.raiden.get_block_number() + DEFAULT_NUMBER_OF_BLOCK_CONFIRMATIONS
+                # Proxies now use the confirmed block hash to query the chain for
+                # prerequisite checks. Wait a bit here to make sure that the confirmed
+                # block hash contains the deployed token network or else things break
+                wait_for_block(
+                    raiden=app.raiden,
+                    block_number=block,
+                    retry_timeout=1.0,
+                )
+
                 raiden_api.channel_open(
                     registry_address=contract_addresses[CONTRACT_TOKEN_NETWORK_REGISTRY],
                     token_address=to_canonical_address(token.contract.address),
@@ -591,6 +626,7 @@ def smoketest(ctx, debug):
                     token_addresses,
                     contract_addresses[CONTRACT_ENDPOINT_REGISTRY],
                     debug=debug,
+                    orig_stdout=stdout,
                 )
                 if error is not None:
                     append_report('Smoketest assertion error', error)

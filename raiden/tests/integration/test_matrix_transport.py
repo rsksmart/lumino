@@ -12,17 +12,20 @@ from raiden.constants import (
     PATH_FINDING_BROADCASTING_ROOM,
     UINT64_MAX,
 )
+from raiden.exceptions import InsufficientFunds
 from raiden.messages import Processed, SecretRequest
 from raiden.network.transport.matrix import MatrixTransport, UserPresence, _RetryQueue
 from raiden.network.transport.matrix.client import Room
 from raiden.network.transport.matrix.utils import make_room_alias
-from raiden.raiden_event_handler import SEND_BALANCE_PROOF_EVENTS, RaidenMonitoringEventHandler
+from raiden.raiden_event_handler import SEND_BALANCE_PROOF_EVENTS
+from raiden.raiden_service import update_monitoring_service_from_balance_proof
+from raiden.tests.utils.client import burn_eth
 from raiden.tests.utils.factories import HOP1, HOP1_KEY, UNIT_SECRETHASH, make_address
 from raiden.tests.utils.messages import make_balance_proof, make_lock
 from raiden.tests.utils.mocks import MockRaidenService
+from raiden.transfer import views
 from raiden.transfer.mediated_transfer.events import (
     CHANNEL_IDENTIFIER_GLOBAL_QUEUE,
-    EventNewBalanceProofReceived,
     SendBalanceProof,
     SendLockedTransfer,
     SendLockExpired,
@@ -31,7 +34,7 @@ from raiden.transfer.mediated_transfer.events import (
 from raiden.transfer.mediated_transfer.state import LockedTransferUnsignedState
 from raiden.transfer.queue_identifier import QueueIdentifier
 from raiden.transfer.state import BalanceProofUnsignedState, HashTimeLockState
-from raiden.transfer.state_change import ActionUpdateTransportAuthData
+from raiden.transfer.state_change import ActionChannelClose, ActionUpdateTransportAuthData
 from raiden.utils import pex
 from raiden.utils.signer import LocalSigner
 from raiden.utils.typing import Address, List, Optional, Union
@@ -260,7 +263,7 @@ def test_matrix_message_sync(
     raiden_service0 = MockRaidenService(message_handler)
     raiden_service1 = MockRaidenService(message_handler)
 
-    raiden_service1.handle_state_change = MagicMock()
+    raiden_service1.handle_and_track_state_change = MagicMock()
 
     transport0.start(
         raiden_service0,
@@ -277,7 +280,7 @@ def test_matrix_message_sync(
 
     latest_auth_data = f'{transport1._user_id}/{transport1._client.api.token}'
     update_transport_auth_data = ActionUpdateTransportAuthData(latest_auth_data)
-    raiden_service1.handle_state_change.assert_called_with(update_transport_auth_data)
+    raiden_service1.handle_and_track_state_change.assert_called_with(update_transport_auth_data)
 
     transport0.start_health_check(transport1._raiden_service.address)
     transport1.start_health_check(transport0._raiden_service.address)
@@ -288,7 +291,7 @@ def test_matrix_message_sync(
     )
 
     for i in range(5):
-        message = Processed(i)
+        message = Processed(message_identifier=i)
         transport0._raiden_service.sign(message)
         transport0.send_async(
             queue_identifier,
@@ -307,7 +310,7 @@ def test_matrix_message_sync(
 
     # Send more messages while the other end is offline
     for i in range(10, 15):
-        message = Processed(i)
+        message = Processed(message_identifier=i)
         transport0._raiden_service.sign(message)
         transport0.send_async(
             queue_identifier,
@@ -331,6 +334,41 @@ def test_matrix_message_sync(
     transport1.stop()
     transport0.get()
     transport1.get()
+
+
+@pytest.mark.parametrize('number_of_nodes', [2])
+@pytest.mark.parametrize('channels_per_node', [1])
+@pytest.mark.parametrize('number_of_tokens', [1])
+def test_matrix_tx_error_handling(
+        skip_if_not_matrix,
+        skip_if_parity,
+        raiden_chain,
+        token_addresses,
+):
+    """Proxies exceptions must be forwarded by the transport."""
+    app0, app1 = raiden_chain
+    token_address = token_addresses[0]
+
+    channel_state = views.get_channelstate_for(
+        chain_state=views.state_from_app(app0),
+        payment_network_id=app0.raiden.default_registry.address,
+        token_address=token_address,
+        partner_address=app1.raiden.address,
+    )
+    burn_eth(app0.raiden)
+
+    def make_tx(*args, **kwargs):
+        close_channel = ActionChannelClose(
+            token_network_identifier=channel_state.token_network_identifier,
+            channel_identifier=channel_state.identifier,
+        )
+        app0.raiden.handle_and_track_state_change(close_channel)
+
+    app0.raiden.transport._client.add_presence_listener(make_tx)
+
+    exception = ValueError('exception was not raised from the transport')
+    with pytest.raises(InsufficientFunds), gevent.Timeout(200, exception=exception):
+        app0.raiden.get()
 
 
 def test_matrix_message_retry(
@@ -381,14 +419,14 @@ def test_matrix_message_retry(
     assert bool(retry_queue), 'retry_queue not running'
 
     # Send the initial message
-    message = Processed(0)
+    message = Processed(message_identifier=0)
     transport._raiden_service.sign(message)
     chain_state.queueids_to_queues[queueid] = [message]
     retry_queue.enqueue_global(message)
 
     gevent.sleep(1)
 
-    transport._send_raw.call_count = 1
+    assert transport._send_raw.call_count == 1
 
     # Receiver goes offline
     transport._address_to_presence[partner_address] = UserPresence.OFFLINE
@@ -491,7 +529,7 @@ def test_matrix_cross_server_with_load_balance(matrix_transports, retry_interval
         recipient=raiden_service2.address,
         channel_identifier=CHANNEL_IDENTIFIER_GLOBAL_QUEUE,
     )
-    message = Processed(0)
+    message = Processed(message_identifier=0)
     raiden_service0.sign(message)
 
     transport0.send_async(queueid1, message)
@@ -570,16 +608,21 @@ def test_matrix_send_global(
     ms_room.send_text = MagicMock(spec=ms_room.send_text)
 
     for i in range(5):
-        message = Processed(i)
+        message = Processed(message_identifier=i)
         transport._raiden_service.sign(message)
         transport.send_global(
             MONITORING_BROADCASTING_ROOM,
             message,
         )
+    transport._spawn(transport._global_send_worker)
 
     gevent.idle()
 
-    assert ms_room.send_text.call_count == 5
+    assert ms_room.send_text.call_count >= 1
+    # messages could have been bundled
+    call_args_str = ' '.join(str(arg) for arg in ms_room.send_text.call_args_list)
+    for i in range(5):
+        assert f'"message_identifier": {i}' in call_args_str
 
     transport.stop()
     transport.get()
@@ -592,8 +635,8 @@ def test_monitoring_global_messages(
         retries_before_backoff,
 ):
     """
-    Test that RaidenMonitoringEventHandler sends RequestMonitoring messages to global
-    MONITORING_BROADCASTING_ROOM room on EventNewBalanceProofReceived.
+    Test that RaidenService sends RequestMonitoring messages to global
+    MONITORING_BROADCASTING_ROOM room on newly received balance proofs.
     """
     transport = MatrixTransport({
         'global_rooms': ['discovery', MONITORING_BROADCASTING_ROOM],
@@ -607,6 +650,7 @@ def test_monitoring_global_messages(
     transport._client.api.retry_timeout = 0
     transport._send_raw = MagicMock()
     raiden_service = MockRaidenService(None)
+    raiden_service.config = dict(services=dict(monitoring_enabled=True))
 
     transport.start(
         raiden_service,
@@ -621,12 +665,10 @@ def test_monitoring_global_messages(
 
     raiden_service.transport = transport
     transport.log = MagicMock()
-    new_balance_proof_event = EventNewBalanceProofReceived(
-        make_balance_proof(signer=LocalSigner(HOP1_KEY), amount=1),
-    )
-    RaidenMonitoringEventHandler().on_raiden_event(
+    balance_proof = make_balance_proof(signer=LocalSigner(HOP1_KEY), amount=1)
+    update_monitoring_service_from_balance_proof(
         raiden_service,
-        new_balance_proof_event,
+        balance_proof,
     )
     gevent.idle()
 
@@ -727,9 +769,11 @@ def test_pfs_global_messages(
     gevent.idle()
 
     # ensure all events triggered a send for their respective balance_proof
-    assert pfs_room.send_text.call_count == len(SEND_BALANCE_PROOF_EVENTS)
+    # matrix transport may concatenate multiple messages send in one interval
+    assert pfs_room.send_text.call_count >= 1
+    concatenated_call_args = ' '.join(str(arg) for arg in pfs_room.send_text.call_args_list)
     assert all(
-        f'"nonce": {i + 1}' in str(pfs_room.send_text.call_args_list[i])
+        f'"nonce": {i + 1}' in concatenated_call_args
         for i in range(len(SEND_BALANCE_PROOF_EVENTS))
     )
     transport.stop()

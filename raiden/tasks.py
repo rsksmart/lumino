@@ -21,12 +21,13 @@ from raiden.constants import (
 from raiden.exceptions import EthNodeCommunicationError
 from raiden.utils import gas_reserve, pex
 from raiden.utils.runnable import Runnable
+from raiden.utils.typing import Tuple
 
 REMOVE_CALLBACK = object()
 log = structlog.get_logger(__name__)  # pylint: disable=invalid-name
 
 
-def _do_check_version(current_version: str):
+def _do_check_version(current_version: Tuple[str, ...]):
     content = requests.get(LATEST).json()
     if 'tag_name' not in content:
         # probably API rate limit exceeded
@@ -123,12 +124,16 @@ class AlarmTask(Runnable):
         # probability of a new block increases.
         self.sleep_time = 0.5
 
+    def __repr__(self):
+        return f'<{self.__class__.__name__} node:{pex(self.chain.client.address)}>'
+
     def start(self):
         log.debug('Alarm task started', node=pex(self.chain.node_address))
         self._stop_event = AsyncResult()
         super().start()
 
     def _run(self):  # pylint: disable=method-hidden
+        self.greenlet.name = f'AlarmTask._run node:{pex(self.chain.client.address)}'
         try:
             self.loop_until_stop()
         finally:
