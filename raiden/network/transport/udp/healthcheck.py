@@ -1,6 +1,5 @@
 from collections import namedtuple
 from itertools import repeat
-from typing import TYPE_CHECKING
 
 import structlog
 from gevent.event import Event
@@ -13,8 +12,10 @@ from raiden.transfer.state import (
     NODE_NETWORK_UNKNOWN,
     NODE_NETWORK_UNREACHABLE,
 )
-from raiden.utils import pex
-from raiden.utils.typing import Address, Dict
+from raiden.utils import pex, typing
+
+# type alias to avoid both circular dependencies and flake8 errors
+UDPTransport = 'UDPTransport'
 
 log = structlog.get_logger(__name__)  # pylint: disable=invalid-name
 
@@ -26,15 +27,15 @@ HealthEvents = namedtuple('HealthEvents', (
 
 
 def healthcheck(
-        transport: 'UDPTransport',
-        recipient: Address,
+        transport: UDPTransport,
+        recipient: typing.Address,
         stop_event: Event,
         event_healthy: Event,
         event_unhealthy: Event,
         nat_keepalive_retries: int,
         nat_keepalive_timeout: int,
         nat_invitation_timeout: int,
-        ping_nonce: Dict[str, int],
+        ping_nonce: int,
 ):
     """ Sends a periodical Ping to `recipient` to check its health. """
     # pylint: disable=too-many-branches
@@ -165,7 +166,3 @@ def healthcheck(
                 )
                 event_unhealthy.clear()
                 event_healthy.set()
-
-
-if TYPE_CHECKING:
-    from raiden.network.transport.udp.udp_transport import UDPTransport

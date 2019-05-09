@@ -34,11 +34,10 @@ def chain_state(our_address):
     block_number = 1
 
     return ChainState(
-        pseudo_random_generator=random.Random(),
-        block_number=block_number,
-        block_hash=factories.make_block_hash(),
-        our_address=our_address,
-        chain_id=UNIT_CHAIN_ID,
+        random.Random(),
+        block_number,
+        our_address,
+        UNIT_CHAIN_ID,
     )
 
 

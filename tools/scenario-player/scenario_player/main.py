@@ -28,12 +28,7 @@ from scenario_player.ui import (
     UrwidLogRenderer,
     UrwidLogWalker,
 )
-from scenario_player.utils import (
-    ChainConfigType,
-    ConcatenableNone,
-    DummyStream,
-    send_notification_mail,
-)
+from scenario_player.utils import ChainConfigType, DummyStream, send_notification_mail
 
 log = structlog.get_logger(__name__)
 
@@ -98,7 +93,7 @@ def main(
         log_buffer = UrwidLogWalker([])
         for handler in logging.getLogger('').handlers:
             if isinstance(handler, logging.StreamHandler):
-                handler.terminator = ConcatenableNone()
+                handler.terminator = None
                 handler.formatter = NonStringifyingProcessorFormatter(
                     UrwidLogRenderer(),
                     foreign_pre_chain=LOGGING_PROCESSORS,

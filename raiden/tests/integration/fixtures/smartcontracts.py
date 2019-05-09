@@ -1,12 +1,7 @@
 import pytest
-from eth_utils import to_canonical_address, to_checksum_address
+from eth_utils import to_checksum_address
 
-from raiden.network.proxies import SecretRegistry, Token, TokenNetwork, TokenNetworkRegistry
-from raiden.tests.utils.smartcontracts import (
-    deploy_contract_web3,
-    deploy_token,
-    deploy_tokens_and_fund_accounts,
-)
+from raiden.tests.utils.smartcontracts import deploy_contract_web3, deploy_tokens_and_fund_accounts
 from raiden.utils import privatekey_to_address, typing
 from raiden_contracts.constants import (
     CONTRACT_ENDPOINT_REGISTRY,
@@ -15,8 +10,8 @@ from raiden_contracts.constants import (
 )
 
 
-@pytest.fixture(name='token_addresses')
-def deploy_all_tokens_register_and_return_their_addresses(
+@pytest.fixture
+def token_addresses(
         token_amount,
         number_of_tokens,
         private_keys,
@@ -47,8 +42,7 @@ def deploy_all_tokens_register_and_return_their_addresses(
 
     if register_tokens:
         for token in token_addresses:
-            registry = deploy_service.token_network_registry(token_network_registry_address)
-            registry.add_token(token_address=token, given_block_identifier='latest')
+            deploy_service.token_network_registry(token_network_registry_address).add_token(token)
 
     return token_addresses
 
@@ -63,8 +57,8 @@ def endpoint_registry_address(deploy_client, contract_manager) -> typing.Address
     return address
 
 
-@pytest.fixture(name='secret_registry_address')
-def deploy_secret_registry_and_return_address(deploy_client, contract_manager) -> typing.Address:
+@pytest.fixture
+def secret_registry_address(deploy_client, contract_manager) -> typing.Address:
     address = deploy_contract_web3(
         contract_name=CONTRACT_SECRET_REGISTRY,
         deploy_client=deploy_client,
@@ -74,24 +68,7 @@ def deploy_secret_registry_and_return_address(deploy_client, contract_manager) -
 
 
 @pytest.fixture
-def secret_registry_proxy(deploy_client, secret_registry_address, contract_manager):
-    """This uses the available SecretRegistry JSONRPCClient proxy to
-    instantiate a Raiden proxy.
-
-    The JSONRPCClient proxy just exposes the functions from the smart contract
-    as methods in a generate python object, the Raiden proxy uses it to
-    provider alternative interfaces *and* most importantly to do additional
-    error checking (reason for transaction failure, gas usage, etc.).
-    """
-    return SecretRegistry(
-        jsonrpc_client=deploy_client,
-        secret_registry_address=to_canonical_address(secret_registry_address),
-        contract_manager=contract_manager,
-    )
-
-
-@pytest.fixture(name='token_network_registry_address')
-def deploy_token_network_registry_and_return_address(
+def token_network_registry_address(
         deploy_client,
         secret_registry_address,
         chain_id,
@@ -111,47 +88,3 @@ def deploy_token_network_registry_and_return_address(
         ),
     )
     return address
-
-
-@pytest.fixture(name='token_network_proxy')
-def register_token_and_return_the_network_proxy(
-        contract_manager,
-        deploy_client,
-        token_proxy,
-        token_network_registry_address,
-):
-    registry_address = to_canonical_address(token_network_registry_address)
-
-    token_network_registry_proxy = TokenNetworkRegistry(
-        jsonrpc_client=deploy_client,
-        registry_address=registry_address,
-        contract_manager=contract_manager,
-    )
-    token_network_address = token_network_registry_proxy.add_token(
-        token_address=token_proxy.address,
-        given_block_identifier='latest',
-    )
-
-    return TokenNetwork(
-        jsonrpc_client=deploy_client,
-        token_network_address=token_network_address,
-        contract_manager=contract_manager,
-    )
-
-
-@pytest.fixture(name='token_proxy')
-def deploy_token_and_return_proxy(deploy_client, contract_manager):
-    token_contract = deploy_token(
-        deploy_client=deploy_client,
-        contract_manager=contract_manager,
-        initial_amount=10000,
-        decimals=0,
-        token_name='TKN',
-        token_symbol='TKN',
-    )
-
-    return Token(
-        jsonrpc_client=deploy_client,
-        token_address=to_canonical_address(token_contract.contract.address),
-        contract_manager=contract_manager,
-    )

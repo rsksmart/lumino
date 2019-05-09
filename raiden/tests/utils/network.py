@@ -14,7 +14,7 @@ from raiden.network.transport import MatrixTransport, UDPTransport
 from raiden.raiden_event_handler import RaidenEventHandler
 from raiden.settings import DEFAULT_NUMBER_OF_BLOCK_CONFIRMATIONS, DEFAULT_RETRY_TIMEOUT
 from raiden.tests.utils.factories import UNIT_CHAIN_ID
-from raiden.utils import merge_dict, pex
+from raiden.utils import merge_dict
 from raiden.waiting import wait_for_payment_network
 
 CHAIN = object()  # Flag used by create a network does make a loop with the channels
@@ -52,11 +52,11 @@ def check_channel(
     assert settle_timeout == netcontract2.settle_timeout()
 
     if deposit_amount > 0:
-        assert netcontract1.can_transfer('latest')
-        assert netcontract2.can_transfer('latest')
+        assert netcontract1.can_transfer()
+        assert netcontract2.can_transfer()
 
-    app1_details = netcontract1.detail('latest')
-    app2_details = netcontract2.detail('latest')
+    app1_details = netcontract1.detail()
+    app2_details = netcontract2.detail()
 
     assert (
         app1_details.participants_data.our_details.address ==
@@ -92,9 +92,8 @@ def payment_channel_open_and_deposit(app0, app1, token_address, deposit, settle_
     token_network_proxy = app0.raiden.chain.token_network(token_network_address)
 
     channel_identifier = token_network_proxy.new_netting_channel(
-        partner=app1.raiden.address,
-        settle_timeout=settle_timeout,
-        given_block_identifier='latest',
+        app1.raiden.address,
+        settle_timeout,
     )
     assert channel_identifier
 
@@ -112,8 +111,8 @@ def payment_channel_open_and_deposit(app0, app1, token_address, deposit, settle_
         assert previous_balance >= deposit
 
         # the payment channel proxy will call approve
-        # token.approve(token_network_proxy.address, deposit, 'latest')
-        payment_channel_proxy.set_total_deposit(total_deposit=deposit, block_identifier='latest')
+        # token.approve(token_network_proxy.address, deposit)
+        payment_channel_proxy.set_total_deposit(deposit)
 
         # Balance must decrease by at least but not exactly `deposit` amount,
         # because channels can be openned in parallel
@@ -335,7 +334,7 @@ def create_apps(
                     'transport_type': 'matrix',
                     'transport': {
                         'matrix': {
-                            'global_rooms': ['discovery'],
+                            'discovery_room': 'discovery',
                             'retries_before_backoff': retries_before_backoff,
                             'retry_interval': retry_interval,
                             'server': local_matrix_url,
@@ -386,18 +385,6 @@ def create_apps(
         apps.append(app)
 
     return apps
-
-
-def parallel_start_apps(raiden_apps):
-    """Start all the raiden apps in parallel."""
-    start_tasks = list()
-
-    for app in raiden_apps:
-        greenlet = gevent.spawn(app.raiden.start)
-        greenlet.name = f'Fixture:raiden_network node:{pex(app.raiden.address)}'
-        start_tasks.append(greenlet)
-
-    gevent.joinall(start_tasks, raise_error=True)
 
 
 def jsonrpc_services(

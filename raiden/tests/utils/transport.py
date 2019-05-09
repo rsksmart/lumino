@@ -25,8 +25,7 @@ _SYNAPSE_CONFIG_TEMPLATE = Path(__file__).parent.joinpath('synapse_config.yaml.t
 
 
 class MockDiscovery(object):
-    @staticmethod
-    def get(node_address: bytes):
+    def get(self, node_address: bytes):
         return '127.0.0.1:5252'
 
 

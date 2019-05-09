@@ -4,7 +4,6 @@ from unittest.mock import Mock, patch
 import requests
 from eth_utils import to_checksum_address
 
-from raiden.network.pathfinding import get_pfs_info
 from raiden.routing import get_best_routes
 from raiden.tests.utils import factories
 from raiden.transfer import token_network
@@ -28,7 +27,6 @@ def create_square_network_topology(
     typing.List[NettingChannelState],
 ]:
     open_block_number = 10
-    open_block_hash = factories.make_block_hash()
     pseudo_random_generator = random.Random()
     address1 = factories.make_address()
     address2 = factories.make_address()
@@ -63,14 +61,12 @@ def create_square_network_topology(
         token_network_identifier=token_network_state.address,
         channel_state=channel_state1,
         block_number=open_block_number,
-        block_hash=open_block_hash,
     )
     channel_new_state_change2 = ContractReceiveChannelNew(
         transaction_hash=factories.make_transaction_hash(),
         token_network_identifier=token_network_state.address,
         channel_state=channel_state2,
         block_number=open_block_number,
-        block_hash=open_block_hash,
     )
 
     channel_new_iteration1 = token_network.state_transition(
@@ -79,7 +75,6 @@ def create_square_network_topology(
         state_change=channel_new_state_change1,
         pseudo_random_generator=pseudo_random_generator,
         block_number=open_block_number,
-        block_hash=open_block_hash,
     )
 
     channel_new_iteration2 = token_network.state_transition(
@@ -88,7 +83,6 @@ def create_square_network_topology(
         state_change=channel_new_state_change2,
         pseudo_random_generator=pseudo_random_generator,
         block_number=open_block_number,
-        block_hash=open_block_hash,
     )
 
     graph_state = channel_new_iteration2.new_state.network_graph
@@ -103,7 +97,6 @@ def create_square_network_topology(
         participant1=address2,
         participant2=address3,
         block_number=open_block_number,
-        block_hash=open_block_hash,
     )
 
     channel_new_iteration3 = token_network.state_transition(
@@ -112,7 +105,6 @@ def create_square_network_topology(
         state_change=channel_new_state_change3,
         pseudo_random_generator=pseudo_random_generator,
         block_number=open_block_number + 10,
-        block_hash=factories.make_block_hash(),
     )
 
     graph_state = channel_new_iteration3.new_state.network_graph
@@ -126,7 +118,6 @@ def create_square_network_topology(
         participant1=address3,
         participant2=address1,
         block_number=open_block_number,
-        block_hash=open_block_hash,
     )
     channel_new_iteration4 = token_network.state_transition(
         payment_network_identifier=payment_network_state.address,
@@ -134,7 +125,6 @@ def create_square_network_topology(
         state_change=channel_new_state_change4,
         pseudo_random_generator=pseudo_random_generator,
         block_number=open_block_number + 10,
-        block_hash=factories.make_block_hash(),
     )
 
     graph_state = channel_new_iteration4.new_state.network_graph
@@ -146,44 +136,6 @@ def create_square_network_topology(
         [address1, address2, address3],
         (channel_state1, channel_state2),
     )
-
-
-def test_get_pfs_info_success():
-    json_data = {
-        'price_info': 0,
-        'network_info': {
-            'chain_id': 1,
-            'registry_address': "0xB9633dd9a9a71F22C933bF121d7a22008f66B908",
-        },
-        'message': "This is your favorite pathfinding service",
-        'operator': "John Doe",
-        'version': "0.0.1",
-    }
-
-    response = Mock()
-    response.configure_mock(status_code=200)
-    response.json = Mock(return_value=json_data)
-
-    with patch.object(requests, 'get', return_value=response):
-        pathfinding_service_info = get_pfs_info("url")
-
-        req_registry_address = '0xB9633dd9a9a71F22C933bF121d7a22008f66B908'
-        assert pathfinding_service_info['price_info'] == 0
-        assert pathfinding_service_info['network_info']['chain_id'] == 1
-        assert pathfinding_service_info['network_info']['registry_address'] == req_registry_address
-        assert pathfinding_service_info['message'] == 'This is your favorite pathfinding service'
-        assert pathfinding_service_info['operator'] == 'John Doe'
-        assert pathfinding_service_info['version'] == '0.0.1'
-
-
-def test_get_pfs_info_request_error():
-    response = Mock()
-    response.configure_mock(status_code=400)
-
-    with patch.object(requests, 'get', side_effect=requests.RequestException()):
-        pathfinding_service_info = get_pfs_info("url")
-
-    assert pathfinding_service_info is False
 
 
 def test_routing_mocked_pfs_happy_path(
@@ -225,7 +177,7 @@ def test_routing_mocked_pfs_happy_path(
     response.configure_mock(status_code=200)
     response.json = Mock(return_value=json_data)
 
-    with patch.object(requests, 'post', return_value=response):
+    with patch.object(requests, 'get', return_value=response):
         routes = get_best_routes(
             chain_state=chain_state,
             token_network_id=token_network_state.address,
@@ -267,7 +219,7 @@ def test_routing_mocked_pfs_request_error(
         address3: NODE_NETWORK_REACHABLE,
     }
 
-    with patch.object(requests, 'post', side_effect=requests.RequestException()):
+    with patch.object(requests, 'get', side_effect=requests.RequestException()):
         routes = get_best_routes(
             chain_state=chain_state,
             token_network_id=token_network_state.address,
@@ -327,7 +279,7 @@ def test_routing_mocked_pfs_bad_http_code(
     response.configure_mock(status_code=400)
     response.json = Mock(return_value=json_data)
 
-    with patch.object(requests, 'post', return_value=response):
+    with patch.object(requests, 'get', return_value=response):
         routes = get_best_routes(
             chain_state=chain_state,
             token_network_id=token_network_state.address,
@@ -373,7 +325,7 @@ def test_routing_mocked_pfs_invalid_json(
     response.configure_mock(status_code=400)
     response.json = Mock(side_effect=ValueError())
 
-    with patch.object(requests, 'post', return_value=response):
+    with patch.object(requests, 'get', return_value=response):
         routes = get_best_routes(
             chain_state=chain_state,
             token_network_id=token_network_state.address,
@@ -419,7 +371,7 @@ def test_routing_mocked_pfs_invalid_json_structure(
     response.configure_mock(status_code=400)
     response.json = Mock(return_value={})
 
-    with patch.object(requests, 'post', return_value=response):
+    with patch.object(requests, 'get', return_value=response):
         routes = get_best_routes(
             chain_state=chain_state,
             token_network_id=token_network_state.address,
@@ -452,7 +404,7 @@ def test_routing_mocked_pfs_unavailabe_peer(
         our_address=our_address,
     )
     address1, address2, address3 = addresses
-    _, channel_state2 = channel_states
+    channel_state1, _ = channel_states
 
     # test routing with all nodes available
     chain_state.nodeaddresses_to_networkstates = {
@@ -486,7 +438,7 @@ def test_routing_mocked_pfs_unavailabe_peer(
     response.configure_mock(status_code=200)
     response.json = Mock(return_value=json_data)
 
-    with patch.object(requests, 'post', return_value=response):
+    with patch.object(requests, 'get', return_value=response):
         routes = get_best_routes(
             chain_state=chain_state,
             token_network_id=token_network_state.address,
@@ -501,5 +453,5 @@ def test_routing_mocked_pfs_unavailabe_peer(
                 },
             },
         )
-        assert routes[0].node_address == address2
-        assert routes[0].channel_identifier == channel_state2.identifier
+        assert routes[0].node_address == address1
+        assert routes[0].channel_identifier == channel_state1.identifier

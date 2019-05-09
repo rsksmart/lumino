@@ -29,7 +29,6 @@ from raiden.transfer.state import (
 from raiden.transfer.state_change import Block, ContractReceiveSecretReveal, StateChange
 from raiden.transfer.utils import is_valid_secret_reveal
 from raiden.utils.typing import (
-    MYPY_ANNOTATION,
     Address,
     BlockExpiration,
     BlockNumber,
@@ -88,7 +87,7 @@ def handle_block(
         state_change: Block,
         channel_state: NettingChannelState,
         pseudo_random_generator: random.Random,
-) -> TransitionResult[Optional[InitiatorTransferState]]:
+) -> TransitionResult:
     """ Checks if the lock has expired, and if it has sends a remove expired
     lock and emits the failing events.
     """
@@ -216,7 +215,7 @@ def try_new_route(
         transfer_description: TransferDescriptionWithSecretState,
         pseudo_random_generator: random.Random,
         block_number: BlockNumber,
-) -> TransitionResult[Optional[InitiatorTransferState]]:
+) -> TransitionResult:
 
     channel_state = next_channel_from_routes(
         available_routes,
@@ -298,7 +297,7 @@ def handle_secretrequest(
         state_change: ReceiveSecretRequest,
         channel_state: NettingChannelState,
         pseudo_random_generator: random.Random,
-) -> TransitionResult[InitiatorTransferState]:
+) -> TransitionResult:
 
     is_message_from_target = (
         state_change.sender == initiator_state.transfer_description.target and
@@ -359,7 +358,7 @@ def handle_offchain_secretreveal(
         state_change: ReceiveSecretReveal,
         channel_state: NettingChannelState,
         pseudo_random_generator: random.Random,
-) -> TransitionResult[Optional[InitiatorTransferState]]:
+) -> TransitionResult:
     """ Once the next hop proves it knows the secret, the initiator can unlock
     the mediated transfer.
 
@@ -396,7 +395,7 @@ def handle_onchain_secretreveal(
         state_change: ContractReceiveSecretReveal,
         channel_state: NettingChannelState,
         pseudo_random_generator: random.Random,
-) -> TransitionResult[Optional[InitiatorTransferState]]:
+) -> TransitionResult:
     """ When a secret is revealed on-chain all nodes learn the secret.
 
     This check the on-chain secret corresponds to the one used by the
@@ -449,9 +448,8 @@ def state_transition(
         channel_state: NettingChannelState,
         pseudo_random_generator: random.Random,
         block_number: BlockNumber,
-) -> TransitionResult[Optional[InitiatorTransferState]]:
+) -> TransitionResult:
     if type(state_change) == Block:
-        assert isinstance(state_change, Block), MYPY_ANNOTATION
         iteration = handle_block(
             initiator_state,
             state_change,
@@ -459,7 +457,6 @@ def state_transition(
             pseudo_random_generator,
         )
     elif type(state_change) == ReceiveSecretRequest:
-        assert isinstance(state_change, ReceiveSecretRequest), MYPY_ANNOTATION
         iteration = handle_secretrequest(
             initiator_state,
             state_change,
@@ -467,7 +464,6 @@ def state_transition(
             pseudo_random_generator,
         )
     elif type(state_change) == ReceiveSecretReveal:
-        assert isinstance(state_change, ReceiveSecretReveal), MYPY_ANNOTATION
         iteration = handle_offchain_secretreveal(
             initiator_state,
             state_change,
@@ -475,7 +471,6 @@ def state_transition(
             pseudo_random_generator,
         )
     elif type(state_change) == ContractReceiveSecretReveal:
-        assert isinstance(state_change, ContractReceiveSecretReveal), MYPY_ANNOTATION
         iteration = handle_onchain_secretreveal(
             initiator_state,
             state_change,
@@ -484,5 +479,4 @@ def state_transition(
         )
     else:
         iteration = TransitionResult(initiator_state, list())
-
     return iteration

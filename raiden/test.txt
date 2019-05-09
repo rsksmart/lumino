@@ -1,0 +1,8 @@
+const backendUrl='http://localhost:5001'const nodeAdddress = '0x4E7eA0919a88f9103e6eE5323D24A1073d79fb0D';const rnsDomain = 'marcos.rsk.co';
+window.addEventListener('load', () => {
+    window.luminoUrl = backendUrl;
+    window.nodeAdddress= nodeAdddress;
+    window.rnsDomain = rnsDomain
+});
+
+

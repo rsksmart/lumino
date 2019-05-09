@@ -15,11 +15,11 @@ from raiden.transfer.mediated_transfer.state import (
 from raiden.transfer.mediated_transfer.state_change import ReceiveLockExpired
 from raiden.transfer.merkle_tree import MERKLEROOT, compute_layers
 from raiden.transfer.state import (
+    EMPTY_MERKLE_TREE,
     HashTimeLockState,
     MerkleTreeState,
     NettingChannelState,
     balanceproof_from_envelope,
-    make_empty_merkle_tree,
 )
 from raiden.utils import sha3
 from raiden.utils.signer import LocalSigner, Signer
@@ -53,13 +53,13 @@ def transfer(initiator_app, target_app, token, amount, identifier):
         payment_network_identifier,
         token,
     )
-    payment_status = initiator_app.raiden.mediated_transfer_async(
+    async_result = initiator_app.raiden.mediated_transfer_async(
         token_network_identifier,
         amount,
         target_app.raiden.address,
         identifier,
     )
-    assert payment_status.payment_done.wait()
+    assert async_result.wait()
 
 
 def mediated_transfer(
@@ -75,13 +75,13 @@ def mediated_transfer(
     The secret will be revealed and the apps will be synchronized."""
     # pylint: disable=too-many-arguments
 
-    payment_status = initiator_app.raiden.mediated_transfer_async(
+    async_result = initiator_app.raiden.mediated_transfer_async(
         token_network_identifier,
         amount,
         target_app.raiden.address,
         identifier,
     )
-    assert payment_status.payment_done.wait(timeout), f'timeout for transfer id={identifier}'
+    assert async_result.wait(timeout), f'timeout for transfer id={identifier}'
     gevent.sleep(0.3)  # let the other nodes synch
 
 
@@ -176,7 +176,7 @@ def assert_locked(from_channel, pending_locks):
         layers = compute_layers(leaves)
         tree = MerkleTreeState(layers)
     else:
-        tree = make_empty_merkle_tree()
+        tree = EMPTY_MERKLE_TREE
 
     assert from_channel.our_state.merkletree == tree
 
@@ -344,7 +344,7 @@ def make_receive_expired_lock(
         raise ValueError('Private key does not match any of the participants.')
 
     if merkletree_leaves is None:
-        layers = make_empty_merkle_tree().layers
+        layers = EMPTY_MERKLE_TREE.layers
     else:
         assert lock.lockhash not in merkletree_leaves
         layers = compute_layers(merkletree_leaves)

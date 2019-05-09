@@ -12,7 +12,7 @@ def test_secret_registry(secret_registry_proxy):
     #  register secret
     secret = make_secret()
     event_filter = secret_registry_proxy.secret_registered_filter()
-    secret_registry_proxy.register_secret(secret=secret, given_block_identifier='latest')
+    secret_registry_proxy.register_secret(secret)
 
     # check if event is raised
     logs = event_filter.get_all_entries()
@@ -21,18 +21,11 @@ def test_secret_registry(secret_registry_proxy):
     data = keccak(secret)
     assert decoded_event['args']['secrethash'] == data
     # check if registration block matches
-    block = secret_registry_proxy.get_register_block_for_secrethash(
-        secrethash=data,
-        block_identifier='latest',
-    )
+    block = secret_registry_proxy.get_register_block_for_secrethash(data)
     assert logs[0]['blockNumber'] == block
 
     #  test non-existing secret
-    block = secret_registry_proxy.get_register_block_for_secrethash(
-        secrethash=b'\x11' * 32,
-        block_identifier='latest',
-    )
-    assert 0 == block
+    assert 0 == secret_registry_proxy.get_register_block_for_secrethash(b'\x11' * 32)
 
 
 def test_secret_registry_register_batch(secret_registry_proxy):
@@ -40,18 +33,12 @@ def test_secret_registry_register_batch(secret_registry_proxy):
     secrethashes = [keccak(secret) for secret in secrets]
 
     event_filter = secret_registry_proxy.secret_registered_filter()
-    secret_registry_proxy.register_secret_batch(
-        secrets=secrets,
-        given_block_identifier='latest',
-    )
+    secret_registry_proxy.register_secret_batch(secrets)
 
     logs = event_filter.get_all_entries()
     assert len(logs) == 4
 
-    block = secret_registry_proxy.get_register_block_for_secrethash(
-        secrethash=secrethashes[0],
-        block_identifier='latest',
-    )
+    block = secret_registry_proxy.get_register_block_for_secrethash(secrethashes[0])
     decoded_events = [secret_registry_proxy.proxy.decode_event(log) for log in logs]
     assert all(event['blockNumber'] == block for event in decoded_events)
 
@@ -73,7 +60,7 @@ def secret_registry_proxy_patched(secret_registry_proxy, contract_manager):
         for secret in secrets:
             assert secret not in self.trigger
             self.trigger[secret] = True
-        return register_secret_batch(secrets=secrets, given_block_identifier='latest')
+        return register_secret_batch(secrets)
 
     secret_registry_patched._register_secret_batch = types.MethodType(
         register_secret_batch_patched,
@@ -99,7 +86,6 @@ def test_concurrent_access(
         gevent.spawn(
             secret_registry_proxy_patched.register_secret,
             secret,
-            'latest',
         )
         for _ in range(0, 40)
     ]

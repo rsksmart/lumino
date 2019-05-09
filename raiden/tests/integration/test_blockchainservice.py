@@ -24,9 +24,8 @@ def test_channel_with_self(raiden_network, settle_timeout, token_addresses):
 
     with pytest.raises(SamePeerAddress) as excinfo:
         token_network0.new_netting_channel(
-            partner=app0.raiden.address,
-            settle_timeout=settle_timeout,
-            given_block_identifier='latest',
+            app0.raiden.address,
+            settle_timeout,
         )
 
     assert 'The other peer must not have the same address as the client.' in str(excinfo.value)
