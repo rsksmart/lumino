@@ -1,0 +1,3 @@
+dependencies:
+  - data_volume
+  - traefik
