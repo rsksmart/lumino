@@ -59,6 +59,8 @@ from raiden.transfer.state_change import (
     ReceiveUnlock,
 )
 from raiden.utils.typing import (
+    MYPY_ANNOTATION,
+    BlockHash,
     BlockNumber,
     ChannelID,
     List,
@@ -111,17 +113,18 @@ def subdispatch_to_all_channels(
         chain_state: ChainState,
         state_change: StateChange,
         block_number: BlockNumber,
-) -> TransitionResult:
+        block_hash: BlockHash,
+) -> TransitionResult[ChainState]:
     events = list()
 
     for payment_network in chain_state.identifiers_to_paymentnetworks.values():
         for token_network_state in payment_network.tokenidentifiers_to_tokennetworks.values():
             for channel_state in token_network_state.channelidentifiers_to_channels.values():
                 result = channel.state_transition(
-                    channel_state,
-                    state_change,
-                    chain_state.pseudo_random_generator,
-                    block_number,
+                    channel_state=channel_state,
+                    state_change=state_change,
+                    block_number=block_number,
+                    block_hash=block_hash,
                 )
                 events.extend(result.events)
 
@@ -131,7 +134,7 @@ def subdispatch_to_all_channels(
 def subdispatch_to_all_lockedtransfers(
         chain_state: ChainState,
         state_change: StateChange,
-) -> TransitionResult:
+) -> TransitionResult[ChainState]:
     events = list()
 
     for secrethash in list(chain_state.payment_mapping.secrethashes_to_task.keys()):
@@ -145,10 +148,11 @@ def subdispatch_to_paymenttask(
         chain_state: ChainState,
         state_change: StateChange,
         secrethash: SecretHash,
-) -> TransitionResult:
+) -> TransitionResult[ChainState]:
     block_number = chain_state.block_number
+    block_hash = chain_state.block_hash
     sub_task = chain_state.payment_mapping.secrethashes_to_task.get(secrethash)
-    events = list()
+    events: List[Event] = list()
     sub_iteration = None
 
     if sub_task:
@@ -178,12 +182,15 @@ def subdispatch_to_paymenttask(
             )
 
             if token_network_state:
+                channelids_to_channels = token_network_state.channelidentifiers_to_channels
                 sub_iteration = mediator.state_transition(
-                    sub_task.mediator_state,
-                    state_change,
-                    token_network_state.channelidentifiers_to_channels,
-                    pseudo_random_generator,
-                    block_number,
+                    mediator_state=sub_task.mediator_state,
+                    state_change=state_change,
+                    channelidentifiers_to_channels=channelids_to_channels,
+                    nodeaddresses_to_networkstates=chain_state.nodeaddresses_to_networkstates,
+                    pseudo_random_generator=pseudo_random_generator,
+                    block_number=block_number,
+                    block_hash=block_hash,
                 )
                 events = sub_iteration.events
 
@@ -218,7 +225,7 @@ def subdispatch_initiatortask(
         state_change: StateChange,
         token_network_identifier: TokenNetworkID,
         secrethash: SecretHash,
-) -> TransitionResult:
+) -> TransitionResult[ChainState]:
 
     block_number = chain_state.block_number
     sub_task = chain_state.payment_mapping.secrethashes_to_task.get(secrethash)
@@ -269,9 +276,10 @@ def subdispatch_mediatortask(
         state_change: StateChange,
         token_network_identifier: TokenNetworkID,
         secrethash: SecretHash,
-) -> TransitionResult:
+) -> TransitionResult[ChainState]:
 
     block_number = chain_state.block_number
+    block_hash = chain_state.block_hash
     sub_task = chain_state.payment_mapping.secrethashes_to_task.get(secrethash)
 
     if not sub_task:
@@ -286,7 +294,7 @@ def subdispatch_mediatortask(
     else:
         is_valid_subtask = False
 
-    events = list()
+    events: List[Event] = list()
     if is_valid_subtask:
         token_network_state = views.get_token_network_by_identifier(
             chain_state,
@@ -295,11 +303,13 @@ def subdispatch_mediatortask(
 
         pseudo_random_generator = chain_state.pseudo_random_generator
         iteration = mediator.state_transition(
-            mediator_state,
-            state_change,
-            token_network_state.channelidentifiers_to_channels,
-            pseudo_random_generator,
-            block_number,
+            mediator_state=mediator_state,
+            state_change=state_change,
+            channelidentifiers_to_channels=token_network_state.channelidentifiers_to_channels,
+            nodeaddresses_to_networkstates=chain_state.nodeaddresses_to_networkstates,
+            pseudo_random_generator=pseudo_random_generator,
+            block_number=block_number,
+            block_hash=block_hash,
         )
         events = iteration.events
 
@@ -321,7 +331,7 @@ def subdispatch_targettask(
         token_network_identifier: TokenNetworkID,
         channel_identifier: ChannelID,
         secrethash: SecretHash,
-) -> TransitionResult:
+) -> TransitionResult[ChainState]:
 
     block_number = chain_state.block_number
     sub_task = chain_state.payment_mapping.secrethashes_to_task.get(secrethash)
@@ -403,7 +413,7 @@ def maybe_add_tokennetwork(
         addresses_to_ids[token_address] = token_network_identifier
 
 
-def sanity_check(iteration: TransitionResult):
+def sanity_check(iteration: TransitionResult[ChainState]):
     assert isinstance(iteration.new_state, ChainState)
 
 
@@ -445,15 +455,17 @@ def inplace_delete_message(
 def handle_block(
         chain_state: ChainState,
         state_change: Block,
-) -> TransitionResult:
+) -> TransitionResult[ChainState]:
     block_number = state_change.block_number
     chain_state.block_number = block_number
+    chain_state.block_hash = state_change.block_hash
 
     # Subdispatch Block state change
     channels_result = subdispatch_to_all_channels(
-        chain_state,
-        state_change,
-        block_number,
+        chain_state=chain_state,
+        state_change=state_change,
+        block_number=block_number,
+        block_hash=chain_state.block_hash,
     )
     transfers_result = subdispatch_to_all_lockedtransfers(
         chain_state,
@@ -466,22 +478,23 @@ def handle_block(
 def handle_chain_init(
         chain_state: ChainState,
         state_change: ActionInitChain,
-) -> TransitionResult:
+) -> TransitionResult[ChainState]:
     if chain_state is None:
         chain_state = ChainState(
-            state_change.pseudo_random_generator,
-            state_change.block_number,
-            state_change.our_address,
-            state_change.chain_id,
+            pseudo_random_generator=state_change.pseudo_random_generator,
+            block_number=state_change.block_number,
+            block_hash=state_change.block_hash,
+            our_address=state_change.our_address,
+            chain_id=state_change.chain_id,
         )
-    events = list()
+    events: List[Event] = list()
     return TransitionResult(chain_state, events)
 
 
 def handle_token_network_action(
         chain_state: ChainState,
         state_change: StateChange,
-) -> TransitionResult:
+) -> TransitionResult[ChainState]:
     token_network_state = views.get_token_network_by_identifier(
         chain_state,
         state_change.token_network_identifier,
@@ -493,15 +506,16 @@ def handle_token_network_action(
     assert payment_network_state, 'We should always get a payment_network_state'
     payment_network_id = payment_network_state.address
 
-    events = list()
+    events: List[Event] = list()
     if token_network_state:
         pseudo_random_generator = chain_state.pseudo_random_generator
         iteration = token_network.state_transition(
-            payment_network_id,
-            token_network_state,
-            state_change,
-            pseudo_random_generator,
-            chain_state.block_number,
+            payment_network_identifier=PaymentNetworkID(payment_network_id),
+            token_network_state=token_network_state,
+            state_change=state_change,
+            pseudo_random_generator=pseudo_random_generator,
+            block_number=chain_state.block_number,
+            block_hash=chain_state.block_hash,
         )
         assert iteration.new_state, 'No token network state transition leads to None'
 
@@ -512,8 +526,8 @@ def handle_token_network_action(
 
 def handle_contract_receive_channel_closed(
         chain_state: ChainState,
-        state_change: StateChange,
-) -> TransitionResult:
+        state_change: ContractReceiveChannelClosed,
+) -> TransitionResult[ChainState]:
     # cleanup queue for channel
     channel_state = views.get_channelstate_by_token_network_identifier(
         chain_state=chain_state,
@@ -531,7 +545,10 @@ def handle_contract_receive_channel_closed(
     return handle_token_network_action(chain_state=chain_state, state_change=state_change)
 
 
-def handle_delivered(chain_state: ChainState, state_change: ReceiveDelivered) -> TransitionResult:
+def handle_delivered(
+        chain_state: ChainState,
+        state_change: ReceiveDelivered,
+) -> TransitionResult[ChainState]:
     """ Check if the "Delivered" message exists in the global queue and delete if found."""
     queueid = QueueIdentifier(state_change.sender, CHANNEL_IDENTIFIER_GLOBAL_QUEUE)
     inplace_delete_message_queue(chain_state, state_change, queueid)
@@ -541,7 +558,7 @@ def handle_delivered(chain_state: ChainState, state_change: ReceiveDelivered) ->
 def handle_new_token_network(
         chain_state: ChainState,
         state_change: ActionNewTokenNetwork,
-) -> TransitionResult:
+) -> TransitionResult[ChainState]:
     token_network_state = state_change.token_network
     payment_network_identifier = state_change.payment_network_identifier
 
@@ -551,24 +568,33 @@ def handle_new_token_network(
         token_network_state,
     )
 
-    events = list()
+    events: List[Event] = list()
     return TransitionResult(chain_state, events)
 
 
 def handle_node_change_network_state(
         chain_state: ChainState,
         state_change: ActionChangeNodeNetworkState,
-) -> TransitionResult:
-    events = list()
+) -> TransitionResult[ChainState]:
+    events: List[Event] = list()
 
     node_address = state_change.node_address
     network_state = state_change.network_state
     chain_state.nodeaddresses_to_networkstates[node_address] = network_state
 
+    for secrethash, subtask in chain_state.payment_mapping.secrethashes_to_task.items():
+        result = subdispatch_mediatortask(
+            chain_state=chain_state,
+            state_change=state_change,
+            secrethash=secrethash,
+            token_network_identifier=subtask.token_network_identifier,
+        )
+        events.extend(result.events)
+
     return TransitionResult(chain_state, events)
 
 
-def handle_leave_all_networks(chain_state: ChainState) -> TransitionResult:
+def handle_leave_all_networks(chain_state: ChainState) -> TransitionResult[ChainState]:
     events = list()
 
     for payment_network_state in chain_state.identifiers_to_paymentnetworks.values():
@@ -582,8 +608,8 @@ def handle_leave_all_networks(chain_state: ChainState) -> TransitionResult:
 def handle_new_payment_network(
         chain_state: ChainState,
         state_change: ContractReceiveNewPaymentNetwork,
-) -> TransitionResult:
-    events = list()
+) -> TransitionResult[ChainState]:
+    events: List[Event] = list()
 
     payment_network = state_change.payment_network
     payment_network_identifier = payment_network.address
@@ -596,8 +622,8 @@ def handle_new_payment_network(
 def handle_tokenadded(
         chain_state: ChainState,
         state_change: ContractReceiveNewTokenNetwork,
-) -> TransitionResult:
-    events = list()
+) -> TransitionResult[ChainState]:
+    events: List[Event] = list()
     maybe_add_tokennetwork(
         chain_state,
         state_change.payment_network_identifier,
@@ -609,8 +635,19 @@ def handle_tokenadded(
 
 def handle_secret_reveal(
         chain_state: ChainState,
+        state_change: ReceiveSecretReveal,
+) -> TransitionResult[ChainState]:
+    return subdispatch_to_paymenttask(
+        chain_state,
+        state_change,
+        state_change.secrethash,
+    )
+
+
+def handle_contract_secret_reveal(
+        chain_state: ChainState,
         state_change: ContractReceiveSecretReveal,
-) -> TransitionResult:
+) -> TransitionResult[ChainState]:
     return subdispatch_to_paymenttask(
         chain_state,
         state_change,
@@ -621,7 +658,7 @@ def handle_secret_reveal(
 def handle_init_initiator(
         chain_state: ChainState,
         state_change: ActionInitInitiator,
-) -> TransitionResult:
+) -> TransitionResult[ChainState]:
     transfer = state_change.transfer
     secrethash = transfer.secrethash
 
@@ -636,7 +673,7 @@ def handle_init_initiator(
 def handle_init_mediator(
         chain_state: ChainState,
         state_change: ActionInitMediator,
-) -> TransitionResult:
+) -> TransitionResult[ChainState]:
     transfer = state_change.from_transfer
     secrethash = transfer.lock.secrethash
     token_network_identifier = transfer.balance_proof.token_network_identifier
@@ -644,7 +681,7 @@ def handle_init_mediator(
     return subdispatch_mediatortask(
         chain_state,
         state_change,
-        token_network_identifier,
+        TokenNetworkID(token_network_identifier),
         secrethash,
     )
 
@@ -652,7 +689,7 @@ def handle_init_mediator(
 def handle_init_target(
         chain_state: ChainState,
         state_change: ActionInitTarget,
-) -> TransitionResult:
+) -> TransitionResult[ChainState]:
     transfer = state_change.transfer
     secrethash = transfer.lock.secrethash
     channel_identifier = transfer.balance_proof.channel_identifier
@@ -661,7 +698,7 @@ def handle_init_target(
     return subdispatch_targettask(
         chain_state,
         state_change,
-        token_network_identifier,
+        TokenNetworkID(token_network_identifier),
         channel_identifier,
         secrethash,
     )
@@ -670,7 +707,7 @@ def handle_init_target(
 def handle_receive_lock_expired(
         chain_state: ChainState,
         state_change: ReceiveLockExpired,
-) -> TransitionResult:
+) -> TransitionResult[ChainState]:
     return subdispatch_to_paymenttask(
         chain_state,
         state_change,
@@ -681,7 +718,7 @@ def handle_receive_lock_expired(
 def handle_receive_transfer_refund(
         chain_state: ChainState,
         state_change: ReceiveTransferRefund,
-) -> TransitionResult:
+) -> TransitionResult[ChainState]:
     return subdispatch_to_paymenttask(
         chain_state,
         state_change,
@@ -692,7 +729,7 @@ def handle_receive_transfer_refund(
 def handle_receive_transfer_refund_cancel_route(
         chain_state: ChainState,
         state_change: ReceiveTransferRefundCancelRoute,
-) -> TransitionResult:
+) -> TransitionResult[ChainState]:
     return subdispatch_to_paymenttask(
         chain_state,
         state_change,
@@ -703,7 +740,7 @@ def handle_receive_transfer_refund_cancel_route(
 def handle_receive_secret_request(
         chain_state: ChainState,
         state_change: ReceiveSecretRequest,
-) -> TransitionResult:
+) -> TransitionResult[ChainState]:
     secrethash = state_change.secrethash
     return subdispatch_to_paymenttask(chain_state, state_change, secrethash)
 
@@ -711,8 +748,8 @@ def handle_receive_secret_request(
 def handle_processed(
         chain_state: ChainState,
         state_change: ReceiveProcessed,
-) -> TransitionResult:
-    events = list()
+) -> TransitionResult[ChainState]:
+    events: List[Event] = list()
     # Clean up message queue
     for queueid in list(chain_state.queueids_to_queues.keys()):
         inplace_delete_message_queue(chain_state, state_change, queueid)
@@ -723,7 +760,7 @@ def handle_processed(
 def handle_receive_unlock(
         chain_state: ChainState,
         state_change: ReceiveUnlock,
-) -> TransitionResult:
+) -> TransitionResult[ChainState]:
     secrethash = state_change.secrethash
     return subdispatch_to_paymenttask(chain_state, state_change, secrethash)
 
@@ -731,157 +768,192 @@ def handle_receive_unlock(
 def handle_update_transport_authdata(
         chain_state: ChainState,
         state_change: ActionUpdateTransportAuthData,
-) -> TransitionResult:
+) -> TransitionResult[ChainState]:
+    assert chain_state is not None, 'chain_state must be set'
     chain_state.last_transport_authdata = state_change.auth_data
     return TransitionResult(chain_state, list())
 
 
-def handle_state_change(chain_state: ChainState, state_change: StateChange) -> TransitionResult:
+def handle_state_change(
+        chain_state: ChainState,
+        state_change: StateChange,
+) -> TransitionResult[ChainState]:
     if type(state_change) == Block:
+        assert isinstance(state_change, Block), MYPY_ANNOTATION
         iteration = handle_block(
             chain_state,
             state_change,
         )
     elif type(state_change) == ActionInitChain:
+        assert isinstance(state_change, ActionInitChain), MYPY_ANNOTATION
         iteration = handle_chain_init(
             chain_state,
             state_change,
         )
+        chain_state = iteration.new_state
     elif type(state_change) == ActionNewTokenNetwork:
+        assert isinstance(state_change, ActionNewTokenNetwork), MYPY_ANNOTATION
         iteration = handle_new_token_network(
             chain_state,
             state_change,
         )
     elif type(state_change) == ActionChannelClose:
+        assert isinstance(state_change, ActionChannelClose), MYPY_ANNOTATION
         iteration = handle_token_network_action(
             chain_state,
             state_change,
         )
     elif type(state_change) == ActionChangeNodeNetworkState:
+        assert isinstance(state_change, ActionChangeNodeNetworkState), MYPY_ANNOTATION
         iteration = handle_node_change_network_state(
             chain_state,
             state_change,
         )
     elif type(state_change) == ActionLeaveAllNetworks:
+        assert isinstance(state_change, ActionLeaveAllNetworks), MYPY_ANNOTATION
         iteration = handle_leave_all_networks(
             chain_state,
         )
     elif type(state_change) == ActionInitInitiator:
+        assert isinstance(state_change, ActionInitInitiator), MYPY_ANNOTATION
         iteration = handle_init_initiator(
             chain_state,
             state_change,
         )
     elif type(state_change) == ActionInitMediator:
+        assert isinstance(state_change, ActionInitMediator), MYPY_ANNOTATION
         iteration = handle_init_mediator(
             chain_state,
             state_change,
         )
     elif type(state_change) == ActionInitTarget:
+        assert isinstance(state_change, ActionInitTarget), MYPY_ANNOTATION
         iteration = handle_init_target(
             chain_state,
             state_change,
         )
     elif type(state_change) == ActionUpdateTransportAuthData:
+        assert isinstance(state_change, ActionUpdateTransportAuthData), MYPY_ANNOTATION
         iteration = handle_update_transport_authdata(
             chain_state,
             state_change,
         )
     elif type(state_change) == ContractReceiveNewPaymentNetwork:
+        assert isinstance(state_change, ContractReceiveNewPaymentNetwork), MYPY_ANNOTATION
         iteration = handle_new_payment_network(
             chain_state,
             state_change,
         )
     elif type(state_change) == ContractReceiveNewTokenNetwork:
+        assert isinstance(state_change, ContractReceiveNewTokenNetwork), MYPY_ANNOTATION
         iteration = handle_tokenadded(
             chain_state,
             state_change,
         )
     elif type(state_change) == ContractReceiveChannelBatchUnlock:
+        assert isinstance(state_change, ContractReceiveChannelBatchUnlock), MYPY_ANNOTATION
         iteration = handle_token_network_action(
             chain_state,
             state_change,
         )
     elif type(state_change) == ContractReceiveChannelNew:
+        assert isinstance(state_change, ContractReceiveChannelNew), MYPY_ANNOTATION
         iteration = handle_token_network_action(
             chain_state,
             state_change,
         )
     elif type(state_change) == ContractReceiveChannelClosed:
+        assert isinstance(state_change, ContractReceiveChannelClosed), MYPY_ANNOTATION
         iteration = handle_contract_receive_channel_closed(
             chain_state,
             state_change,
         )
     elif type(state_change) == ContractReceiveChannelNewBalance:
+        assert isinstance(state_change, ContractReceiveChannelNewBalance), MYPY_ANNOTATION
         iteration = handle_token_network_action(
             chain_state,
             state_change,
         )
     elif type(state_change) == ContractReceiveChannelSettled:
+        assert isinstance(state_change, ContractReceiveChannelSettled), MYPY_ANNOTATION
         iteration = handle_token_network_action(
             chain_state,
             state_change,
         )
     elif type(state_change) == ContractReceiveRouteNew:
+        assert isinstance(state_change, ContractReceiveRouteNew), MYPY_ANNOTATION
         iteration = handle_token_network_action(
             chain_state,
             state_change,
         )
     elif type(state_change) == ContractReceiveRouteClosed:
+        assert isinstance(state_change, ContractReceiveRouteClosed), MYPY_ANNOTATION
         iteration = handle_token_network_action(
             chain_state,
             state_change,
         )
     elif type(state_change) == ContractReceiveSecretReveal:
-        iteration = handle_secret_reveal(
+        assert isinstance(state_change, ContractReceiveSecretReveal), MYPY_ANNOTATION
+        iteration = handle_contract_secret_reveal(
             chain_state,
             state_change,
         )
     elif type(state_change) == ContractReceiveUpdateTransfer:
+        assert isinstance(state_change, ContractReceiveUpdateTransfer), MYPY_ANNOTATION
         iteration = handle_token_network_action(
             chain_state,
             state_change,
         )
     elif type(state_change) == ReceiveDelivered:
+        assert isinstance(state_change, ReceiveDelivered), MYPY_ANNOTATION
         iteration = handle_delivered(
             chain_state,
             state_change,
         )
     elif type(state_change) == ReceiveSecretReveal:
+        assert isinstance(state_change, ReceiveSecretReveal), MYPY_ANNOTATION
         iteration = handle_secret_reveal(
             chain_state,
             state_change,
         )
     elif type(state_change) == ReceiveTransferRefundCancelRoute:
+        assert isinstance(state_change, ReceiveTransferRefundCancelRoute), MYPY_ANNOTATION
         iteration = handle_receive_transfer_refund_cancel_route(
             chain_state,
             state_change,
         )
     elif type(state_change) == ReceiveTransferRefund:
+        assert isinstance(state_change, ReceiveTransferRefund), MYPY_ANNOTATION
         iteration = handle_receive_transfer_refund(
             chain_state,
             state_change,
         )
     elif type(state_change) == ReceiveSecretRequest:
+        assert isinstance(state_change, ReceiveSecretRequest), MYPY_ANNOTATION
         iteration = handle_receive_secret_request(
             chain_state,
             state_change,
         )
     elif type(state_change) == ReceiveProcessed:
+        assert isinstance(state_change, ReceiveProcessed), MYPY_ANNOTATION
         iteration = handle_processed(
             chain_state,
             state_change,
         )
     elif type(state_change) == ReceiveUnlock:
+        assert isinstance(state_change, ReceiveUnlock), MYPY_ANNOTATION
         iteration = handle_receive_unlock(
             chain_state,
             state_change,
         )
     elif type(state_change) == ReceiveLockExpired:
+        assert isinstance(state_change, ReceiveLockExpired), MYPY_ANNOTATION
         iteration = handle_receive_lock_expired(
             chain_state,
             state_change,
         )
 
+    assert chain_state is not None, 'chain_state must be set'
     return iteration
 
 
@@ -993,6 +1065,9 @@ def is_transaction_effect_satisfied(
         isinstance(transaction, ContractSendChannelBatchUnlock)
     )
     if is_batch_unlock:
+        assert isinstance(state_change, ContractReceiveChannelBatchUnlock), MYPY_ANNOTATION
+        assert isinstance(transaction, ContractSendChannelBatchUnlock), MYPY_ANNOTATION
+
         our_address = chain_state.our_address
 
         # Don't assume that because we sent the transaction, we are a
@@ -1110,8 +1185,9 @@ def is_transaction_pending(chain_state, transaction, state_change):
     )
 
 
-def update_queues(iteration: TransitionResult, state_change: StateChange) -> None:
+def update_queues(iteration: TransitionResult[ChainState], state_change: StateChange) -> None:
     chain_state = iteration.new_state
+    assert chain_state is not None, 'chain_state must be set'
 
     if isinstance(state_change, ContractReceiveStateChange):
         pending_transactions = [
@@ -1130,7 +1206,10 @@ def update_queues(iteration: TransitionResult, state_change: StateChange) -> Non
             chain_state.pending_transactions.append(event)
 
 
-def state_transition(chain_state: ChainState, state_change: StateChange) -> TransitionResult:
+def state_transition(
+        chain_state: ChainState,
+        state_change: StateChange,
+) -> TransitionResult[ChainState]:
     # pylint: disable=too-many-branches,unidiomatic-typecheck
 
     iteration = handle_state_change(chain_state, state_change)
@@ -1157,7 +1236,8 @@ def _get_channels_close_events(
         )
         for channel_state in filtered_channel_states:
             events.extend(channel.events_for_close(
-                channel_state,
-                chain_state.block_number,
+                channel_state=channel_state,
+                block_number=chain_state.block_number,
+                block_hash=chain_state.block_hash,
             ))
     return events

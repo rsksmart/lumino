@@ -1,6 +1,8 @@
 import gevent
 import structlog
 
+from web3 import Web3
+
 from raiden.transfer import channel, views
 from raiden.transfer.events import EventPaymentReceivedSuccess
 from raiden.transfer.state import (
@@ -21,14 +23,17 @@ def wait_for_block(
         block_number: typing.BlockNumber,
         retry_timeout: float,
 ) -> None:
-    current_block_number = views.block_number(
-        views.state_from_raiden(raiden),
-    )
-    while current_block_number < block_number:
+    while raiden.get_block_number() < block_number:
         gevent.sleep(retry_timeout)
-        current_block_number = views.block_number(
-            views.state_from_raiden(raiden),
-        )
+
+
+def wait_for_block_using_web3(
+        web3: Web3,
+        block_number: typing.BlockNumber,
+        retry_timout: float,
+) -> None:
+    while web3.eth.blockNumber < block_number:
+        gevent.sleep(retry_timout)
 
 
 def wait_for_newchannel(
@@ -107,7 +112,7 @@ def wait_for_payment_balance(
         target_balance: typing.TokenAmount,
         retry_timeout: float,
 ) -> None:
-    """Wait until a given channels balance exceeds the target balance.
+    """Wait until a given channel's balance exceeds the target balance.
 
     Note:
         This does not time out, use gevent.Timeout.

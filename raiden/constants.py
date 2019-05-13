@@ -1,7 +1,11 @@
 import math
 from enum import Enum
 
-from eth_utils import keccak, to_checksum_address
+from eth_utils import keccak, to_checksum_address, to_hex
+
+LATEST = 'https://api.github.com/repos/raiden-network/raiden/releases/latest'
+RELEASE_PAGE = 'https://github.com/raiden-network/raiden/releases'
+SECURITY_EXPRESSION = r'\[CRITICAL UPDATE.*?\]'
 
 SQLITE_MIN_REQUIRED_VERSION = (3, 9, 0)
 PROTOCOL_VERSION = 1
@@ -19,6 +23,10 @@ NULL_ADDRESS = to_checksum_address(NULL_ADDRESS_BYTES)
 EMPTY_HASH = bytes(32)
 EMPTY_HASH_KECCAK = keccak(EMPTY_HASH)
 EMPTY_SIGNATURE = bytes(65)
+EMPTY_MERKLE_ROOT = bytes(32)
+
+SECRET_HASH_HEXSTRING_LENGTH = len(to_hex(EMPTY_HASH))
+SECRET_HEXSTRING_LENGTH = SECRET_HASH_HEXSTRING_LENGTH
 
 
 class EthClient(Enum):
@@ -59,4 +67,12 @@ GAS_REQUIRED_FOR_CREATE_ERC20_TOKEN_NETWORK = 3_234_716
 GAS_REQUIRED_PER_SECRET_IN_BATCH = math.ceil(UNLOCK_TX_GAS_LIMIT / MAXIMUM_PENDING_TRANSFERS)
 GAS_LIMIT_FOR_TOKEN_CONTRACT_CALL = 100_000
 
+CHECK_GAS_RESERVE_INTERVAL = 5 * 60
+CHECK_VERSION_INTERVAL = 3 * 60 * 60
+CHECK_NETWORK_ID_INTERVAL = 5 * 60
+
 DEFAULT_HTTP_REQUEST_TIMEOUT = 1.0  # seconds
+
+DISCOVERY_DEFAULT_ROOM = 'discovery'
+MONITORING_BROADCASTING_ROOM = 'monitoring'
+PATH_FINDING_BROADCASTING_ROOM = 'path_finding'

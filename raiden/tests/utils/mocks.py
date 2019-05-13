@@ -1,7 +1,7 @@
 import random
 
 from raiden.storage.serialize import JSONSerializer
-from raiden.storage.sqlite import SQLiteStorage
+from raiden.storage.sqlite import SerializedSQLiteStorage
 from raiden.storage.wal import WriteAheadLog
 from raiden.tests.utils import factories
 from raiden.transfer import node
@@ -12,8 +12,8 @@ from raiden.utils.signer import LocalSigner
 
 class MockTokenNetwork:
 
+    @staticmethod
     def detail_participants(
-            self,
             participant1,
             participant2,
             block_identifier,
@@ -53,14 +53,15 @@ class MockRaidenService:
 
         serializer = JSONSerializer
         state_manager = StateManager(state_transition, None)
-        storage = SQLiteStorage(':memory:', serializer)
+        storage = SerializedSQLiteStorage(':memory:', serializer)
         self.wal = WriteAheadLog(state_manager, storage)
 
         state_change = ActionInitChain(
-            random.Random(),
-            0,
-            self.chain.node_address,
-            self.chain.network_id,
+            pseudo_random_generator=random.Random(),
+            block_number=0,
+            block_hash=factories.make_block_hash(),
+            our_address=self.chain.node_address,
+            chain_id=self.chain.network_id,
         )
 
         self.wal.log_and_dispatch(state_change)
@@ -68,6 +69,9 @@ class MockRaidenService:
     def on_message(self, message):
         if self.message_handler:
             self.message_handler.on_message(self, message)
+
+    def handle_and_track_state_change(self, state_change):
+        pass
 
     def handle_state_change(self, state_change):
         pass

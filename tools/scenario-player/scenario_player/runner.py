@@ -9,6 +9,7 @@ import gevent
 import structlog
 import yaml
 from eth_utils import to_checksum_address
+from raiden_contracts.contract_manager import ContractManager, contracts_precompiled_path
 from requests import RequestException, Session
 from web3 import HTTPProvider, Web3
 
@@ -34,6 +35,7 @@ NODE_ACCOUNT_BALANCE_FUND = 3 * 10 ** 17  # := 0.3 Eth
 TIMEOUT = 200
 API_URL_ADDRESS = "{protocol}://{target_host}/api/v1/address"
 API_URL_TOKENS = "{protocol}://{target_host}/api/v1/tokens"
+API_URL_TOKEN_NETWORK_ADDRESS = "{protocol}://{target_host}/api/v1/tokens/{token_address}"
 SUPPORTED_SCENARIO_VERSIONS = {1, 2}
 
 
@@ -142,6 +144,7 @@ class ScenarioRunner(object):
         )
 
         self.chain_id = self.client.web3.net.version
+        self.contract_manager = ContractManager(contracts_precompiled_path())
 
         balance = self.client.balance(account.address)
         if balance < OWN_ACCOUNT_BALANCE_MIN:
@@ -159,6 +162,7 @@ class ScenarioRunner(object):
 
         self._node_to_address = None
         self.token_address = None
+        self.token_deployment_block = 0
 
         scenario_config = self.scenario.get('scenario')
         if not scenario_config:
@@ -210,8 +214,9 @@ class ScenarioRunner(object):
                     f"Raiden nodes unreachable: {','.join(unreachable_nodes)}",
                 )
 
-        token_ctr = get_or_deploy_token(self)
+        token_ctr, token_block = get_or_deploy_token(self)
         token_address = self.token_address = to_checksum_address(token_ctr.contract_address)
+        self.token_deployment_block = token_block
         first_node = self.get_node_baseurl(0)
 
         token_settings = self.scenario.get('token') or {}
@@ -255,6 +260,17 @@ class ScenarioRunner(object):
             if not 199 < code < 300:
                 log.error("Couldn't register token with network", code=code, message=msg)
                 raise TokenRegistrationError(msg)
+
+        # The nodes need some time to find the token, see
+        # https://github.com/raiden-network/raiden/issues/3544
+        log.info('Waiting till new network is found by nodes')
+        gevent.sleep(10)
+
+        self.token_network_address = self.session.get(API_URL_TOKEN_NETWORK_ADDRESS.format(
+            protocol=self.protocol,
+            target_host=first_node,
+            token_address=self.token_address,
+        )).json()
 
         # Start root task
         root_task_greenlet = gevent.spawn(self.root_task)

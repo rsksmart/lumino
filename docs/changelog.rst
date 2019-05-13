@@ -2,10 +2,23 @@
 Changelog
 =========
 
+* :bug:`3567` Properly check handling offline partners
+* :feature:`2436` Add an API endpoint to list pending transfers
+* :bug:`3475` Properly check async_result in rest api payments
+* :feature:`3318` allow secret and/or hash with payment request
+* :feature:`3425` Update raiden-contracts package to version 0.9.0
+
+* :release:`0.100.2 <2019-02-21>`
+* :bug:`3528` Do not crash raiden if a LockExpired message with invalid channel identifier is received.
+* :bug:`3529` Do not crash raiden if a SecretRequest message with invalid channel identifier is received.
+
+* :release:`0.100.2-rc4 <2019-02-04>`
 * :feature:`3317` Return the secretHash and the Secret as part of payment response
 * :bug:`3380` Connection manager no longer attempts deposit if per partner funds are zero.
 * :bug:`3369` Fix high CPU usage when the raiden node is idle.
 * :feature:`-` Set python 3.7 as a minimum python version requirement to run Raiden.
+* :bug:`2974` Alarm task is not longer blocking until transactions are mined.
+* :feature:`2793` Faster restarts, transactions are sent in parallel on restarts.
 
 * :release:`0.100.2-rc3 <2019-01-25>`
 * :feature:`-` Update WebUI to version 0.8.0 https://github.com/raiden-network/webui/releases/tag/v0.8.0

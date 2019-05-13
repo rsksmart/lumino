@@ -1,9 +1,11 @@
+import contextlib
 import os
 import shutil
 import sys
 import tempfile
 import traceback
 from http import HTTPStatus
+from typing import IO
 
 import click
 import requests
@@ -24,13 +26,13 @@ from raiden.network.rpc.client import JSONRPCClient
 from raiden.network.utils import get_free_port
 from raiden.raiden_service import RaidenService
 from raiden.tests.fixtures.variables import DEFAULT_PASSPHRASE
-from raiden.tests.utils.geth import (
-    GethNodeDescription,
-    geth_node_config,
-    geth_node_config_set_bootnodes,
-    geth_node_to_datadir,
-    geth_run_nodes,
-    geth_wait_and_check,
+from raiden.tests.utils.eth_node import (
+    EthNodeDescription,
+    eth_node_config,
+    eth_node_config_set_bootnodes,
+    eth_node_to_datadir,
+    eth_run_nodes,
+    eth_wait_and_check,
 )
 from raiden.tests.utils.smartcontracts import deploy_contract_web3, deploy_token
 from raiden.transfer import channel, views
@@ -90,6 +92,7 @@ def run_smoketests(
         transport: str,
         token_addresses,
         discovery_address,
+        orig_stdout: IO[str],
         debug: bool = False,
 ):
     """ Test that the assembled raiden_service correctly reflects the configuration from the
@@ -111,7 +114,7 @@ def run_smoketests(
             discovery = chain.address_to_discovery[discovery_addresses[0]]
             assert discovery.endpoint_by_address(raiden_service.address) != TEST_ENDPOINT
 
-        token_networks = views.get_token_network_addresses_for(
+        token_networks = views.get_token_identifiers(
             views.state_from_raiden(raiden_service),
             raiden_service.default_registry.address,
         )
@@ -137,8 +140,9 @@ def run_smoketests(
     except:  # NOQA pylint: disable=bare-except
         error = traceback.format_exc()
         if debug:
-            import pdb
-            pdb.post_mortem()  # pylint: disable=no-member
+            with contextlib.redirect_stdout(orig_stdout):
+                import pdb
+                pdb.post_mortem()  # pylint: disable=no-member
         return error
 
     return None
@@ -192,6 +196,16 @@ def get_private_key(keystore):
 
 
 def setup_testchain_and_raiden(transport, matrix_server, print_step, contracts_version):
+    return setup_raiden(
+        transport,
+        matrix_server,
+        print_step,
+        contracts_version,
+        setup_testchain(print_step),
+    )
+
+
+def setup_testchain(print_step):
     print_step('Starting Ethereum node')
 
     ensure_executable('geth')
@@ -201,7 +215,7 @@ def setup_testchain_and_raiden(transport, matrix_server, print_step, contracts_v
     p2p_port = next(free_port)
     base_datadir = os.environ['RST_DATADIR']
 
-    description = GethNodeDescription(
+    description = EthNodeDescription(
         private_key=TEST_PRIVKEY,
         rpc_port=rpc_port,
         p2p_port=p2p_port,
@@ -212,7 +226,7 @@ def setup_testchain_and_raiden(transport, matrix_server, print_step, contracts_v
     web3 = Web3(HTTPProvider(endpoint_uri=eth_rpc_endpoint))
     web3.middleware_stack.inject(geth_poa_middleware, layer=0)
 
-    config = geth_node_config(
+    config = eth_node_config(
         description.private_key,
         description.p2p_port,
         description.rpc_port,
@@ -225,13 +239,13 @@ def setup_testchain_and_raiden(transport, matrix_server, print_step, contracts_v
     })
 
     nodes_configuration = [config]
-    geth_node_config_set_bootnodes(nodes_configuration)
-    keystore = os.path.join(geth_node_to_datadir(config, base_datadir), 'keystore')
+    eth_node_config_set_bootnodes(nodes_configuration)
+    keystore = os.path.join(eth_node_to_datadir(config, base_datadir), 'keystore')
 
     logdir = os.path.join(base_datadir, 'logs')
 
-    processes_list = geth_run_nodes(
-        geth_nodes=[description],
+    processes_list = eth_run_nodes(
+        eth_nodes=[description],
         nodes_configuration=nodes_configuration,
         base_datadir=base_datadir,
         genesis_file=os.path.join(get_project_root(), 'smoketest_genesis.json'),
@@ -243,7 +257,7 @@ def setup_testchain_and_raiden(transport, matrix_server, print_step, contracts_v
     try:
         # the marker is hardcoded in the genesis file
         random_marker = remove_0x_prefix(encode_hex(b'raiden'))
-        geth_wait_and_check(
+        eth_wait_and_check(
             web3=web3,
             accounts_addresses=[],
             random_marker=random_marker,
@@ -256,9 +270,25 @@ def setup_testchain_and_raiden(transport, matrix_server, print_step, contracts_v
             process.terminate()
         raise e
 
+    return dict(
+        base_datadir=base_datadir,
+        eth_rpc_endpoint=eth_rpc_endpoint,
+        keystore=keystore,
+        processes_list=processes_list,
+        web3=web3,
+    )
+
+
+def setup_raiden(
+        transport,
+        matrix_server,
+        print_step,
+        contracts_version,
+        testchain_setup,
+):
     print_step('Deploying Raiden contracts')
 
-    client = JSONRPCClient(web3, get_private_key(keystore))
+    client = JSONRPCClient(testchain_setup['web3'], get_private_key(testchain_setup['keystore']))
     contract_manager = ContractManager(
         contracts_precompiled_path(contracts_version),
     )
@@ -281,7 +311,10 @@ def setup_testchain_and_raiden(transport, matrix_server, print_step, contracts_v
         registry_address=contract_addresses[CONTRACT_TOKEN_NETWORK_REGISTRY],
         contract_manager=contract_manager,
     )
-    registry.add_token(to_canonical_address(token.contract.address))
+    registry.add_token(
+        token_address=to_canonical_address(token.contract.address),
+        given_block_identifier='latest',
+    )
 
     print_step('Setting up Raiden')
 
@@ -297,20 +330,20 @@ def setup_testchain_and_raiden(transport, matrix_server, print_step, contracts_v
     return {
         'args': {
             'address': to_checksum_address(TEST_ACCOUNT_ADDRESS),
-            'datadir': keystore,
+            'datadir': testchain_setup['keystore'],
             'endpoint_registry_contract_address': endpoint_registry_contract_address,
-            'eth_rpc_endpoint': eth_rpc_endpoint,
+            'eth_rpc_endpoint': testchain_setup['eth_rpc_endpoint'],
             'gas_price': 'fast',
-            'keystore_path': keystore,
+            'keystore_path': testchain_setup['keystore'],
             'matrix_server': matrix_server,
             'network_id': str(NETWORKNAME_TO_ID['smoketest']),
-            'password_file': click.File()(os.path.join(base_datadir, 'pw')),
+            'password_file': click.File()(os.path.join(testchain_setup['base_datadir'], 'pw')),
             'tokennetwork_registry_contract_address': tokennetwork_registry_contract_address,
             'secret_registry_contract_address': secret_registry_contract_address,
             'sync_check': False,
             'transport': transport,
         },
         'contract_addresses': contract_addresses,
-        'ethereum': processes_list,
+        'ethereum': testchain_setup['processes_list'],
         'token': token,
     }

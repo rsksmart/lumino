@@ -44,12 +44,21 @@ from raiden.utils.typing import (
     ABI,
     Address,
     AddressHex,
+    BlockHash,
     BlockSpecification,
     Nonce,
     TransactionHash,
 )
 
 log = structlog.get_logger(__name__)  # pylint: disable=invalid-name
+
+
+def logs_blocks_sanity_check(from_block: BlockSpecification, to_block: BlockSpecification) -> None:
+    """Checks that the from/to blocks passed onto log calls contain only appropriate types"""
+    is_valid_from = isinstance(from_block, int) or isinstance(from_block, str)
+    assert is_valid_from, 'event log from block can be integer or latest,pending, earliest'
+    is_valid_to = isinstance(to_block, int) or isinstance(to_block, str)
+    assert is_valid_to, 'event log to block can be integer or latest,pending, earliest'
 
 
 def geth_assert_rpc_interfaces(web3: Web3):
@@ -369,6 +378,7 @@ class JSONRPCClient:
             web3: Web3,
             privkey: bytes,
             gas_price_strategy: Callable = rpc_gas_price_strategy,
+            gas_estimate_correction: Callable = lambda gas: gas,
             block_num_confirmations: int = 0,
             uses_infura=False,
     ):
@@ -431,6 +441,7 @@ class JSONRPCClient:
 
         self._available_nonce = available_nonce
         self._nonce_lock = Semaphore()
+        self._gas_estimate_correction = gas_estimate_correction
 
         log.debug(
             'JSONRPCClient created',
@@ -446,13 +457,17 @@ class JSONRPCClient:
         """ Return the most recent block. """
         return self.web3.eth.blockNumber
 
+    def blockhash_from_blocknumber(self, block_number: BlockSpecification) -> BlockHash:
+        """Given a block number, query the chain to get its corresponding block hash"""
+        return bytes(self.web3.eth.getBlock(block_number)['hash'])
+
     def balance(self, account: Address):
         """ Return the balance of the account of the given address. """
         return self.web3.eth.getBalance(to_checksum_address(account), 'pending')
 
     def parity_get_pending_transaction_hash_by_nonce(
             self,
-            checksummed_address: AddressHex,
+            address: AddressHex,
             nonce: Nonce,
     ) -> Optional[TransactionHash]:
         """Queries the local parity transaction pool and searches for a transaction.
@@ -465,7 +480,7 @@ class JSONRPCClient:
         transactions = self.web3.manager.request_blocking('parity_allTransactions', [])
         log.debug('RETURNED TRANSACTIONS', transactions=transactions)
         for tx in transactions:
-            address_match = to_checksum_address(tx['from']) == checksummed_address
+            address_match = to_checksum_address(tx['from']) == address
             if address_match and int(tx['nonce'], 16) == nonce:
                 return tx['hash']
         return None
@@ -617,7 +632,7 @@ class JSONRPCClient:
         transaction_hash = self.send_transaction(
             to=Address(b''),
             data=contract_transaction['data'],
-            startgas=contract_transaction['gas'],
+            startgas=self._gas_estimate_correction(contract_transaction['gas']),
         )
 
         self.poll(transaction_hash)
@@ -633,10 +648,7 @@ class JSONRPCClient:
                 ),
             )
 
-        return self.new_contract_proxy(
-            contract_interface,
-            contract_address,
-        )
+        return self.new_contract_proxy(contract_interface, contract_address), receipt
 
     def send_transaction(
             self,
@@ -750,6 +762,7 @@ class JSONRPCClient:
             to_block: BlockSpecification = 'latest',
     ) -> StatelessFilter:
         """ Create a filter in the ethereum node. """
+        logs_blocks_sanity_check(from_block, to_block)
         return StatelessFilter(
             self.web3,
             {
@@ -768,6 +781,7 @@ class JSONRPCClient:
             to_block: BlockSpecification = 'latest',
     ) -> List[Dict]:
         """ Get events for the given query. """
+        logs_blocks_sanity_check(from_block, to_block)
         return self.web3.eth.getLogs({
             'fromBlock': from_block,
             'toBlock': to_block,

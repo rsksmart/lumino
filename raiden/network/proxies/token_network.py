@@ -28,7 +28,7 @@ from raiden.network.proxies.utils import compare_contract_versions
 from raiden.network.rpc.client import StatelessFilter, check_address_has_code
 from raiden.network.rpc.transactions import check_transaction_threw
 from raiden.transfer.balance_proof import pack_balance_proof
-from raiden.utils import pex, safe_gas_limit
+from raiden.utils import CanonicalIdentifier, pex, safe_gas_limit
 from raiden.utils.signer import recover
 from raiden.utils.typing import (
     AdditionalHash,
@@ -46,7 +46,6 @@ from raiden.utils.typing import (
     T_ChannelState,
     TokenAmount,
     TokenNetworkAddress,
-    TokenNetworkID,
 )
 from raiden_contracts.constants import (
     CONTRACT_TOKEN_NETWORK,
@@ -201,18 +200,21 @@ class TokenNetwork:
             self,
             partner: Address,
             settle_timeout: int,
+            given_block_identifier: BlockSpecification,
     ) -> ChannelID:
         """ Creates a new channel in the TokenNetwork contract.
 
         Args:
             partner: The peer to open the channel with.
             settle_timeout: The settle timeout to use for this channel.
+            given_block_identifier: The block identifier of the state change that
+                                    prompted this proxy action
 
         Returns:
             The ChannelID of the new netting channel.
         """
         checking_block = self.client.get_checking_block()
-        self._new_channel_preconditions(partner, settle_timeout, checking_block)
+        self._new_channel_preconditions(partner, settle_timeout, given_block_identifier)
         log_details = {
             'peer1': pex(self.node_address),
             'peer2': pex(partner),
@@ -490,15 +492,15 @@ class TokenNetwork:
             self,
             participant1: Address,
             participant2: Address,
+            block_identifier: BlockSpecification,
             channel_identifier: ChannelID,
     ) -> bool:
         """ Returns true if the channel is in an open state, false otherwise. """
-        checking_block = self.client.get_checking_block()
         try:
             channel_state = self._get_channel_state(
                 participant1=participant1,
                 participant2=participant2,
-                block_identifier=checking_block,
+                block_identifier=block_identifier,
                 channel_identifier=channel_identifier,
             )
         except RaidenRecoverableError:
@@ -509,15 +511,15 @@ class TokenNetwork:
             self,
             participant1: Address,
             participant2: Address,
+            block_identifier: BlockSpecification,
             channel_identifier: ChannelID,
     ) -> bool:
         """ Returns true if the channel is in a closed state, false otherwise. """
-        checking_block = self.client.get_checking_block()
         try:
             channel_state = self._get_channel_state(
                 participant1=participant1,
                 participant2=participant2,
-                block_identifier=checking_block,
+                block_identifier=block_identifier,
                 channel_identifier=channel_identifier,
             )
         except RaidenRecoverableError:
@@ -547,7 +549,7 @@ class TokenNetwork:
             self,
             participant1: Address,
             participant2: Address,
-            block_identifier: BlockSpecification = 'latest',
+            block_identifier: BlockSpecification,
             channel_identifier: ChannelID = None,
     ) -> Optional[Address]:
         """ Returns the address of the closer, if the channel is closed and not settled. None
@@ -584,6 +586,7 @@ class TokenNetwork:
             self,
             participant1: Address,
             participant2: Address,
+            block_identifier: BlockSpecification,
             channel_identifier: ChannelID,
     ) -> bool:
         """ Returns True if the channel is opened and the node has deposit in
@@ -591,7 +594,12 @@ class TokenNetwork:
 
         Note: Having a deposit does not imply having a balance for off-chain
         transfers. """
-        opened = self.channel_is_opened(participant1, participant2, channel_identifier)
+        opened = self.channel_is_opened(
+            participant1=participant1,
+            participant2=participant2,
+            block_identifier=block_identifier,
+            channel_identifier=channel_identifier,
+        )
 
         if opened is False:
             return False
@@ -600,7 +608,7 @@ class TokenNetwork:
             channel_identifier=channel_identifier,
             participant=participant1,
             partner=participant2,
-            block_identifier='latest',
+            block_identifier=block_identifier,
         ).deposit
         return deposit > 0
 
@@ -710,12 +718,17 @@ class TokenNetwork:
         # in which case  the second `approve` will overwrite the first,
         # and the first `setTotalDeposit` will consume the allowance,
         #  making the second deposit fail.
-        token.approve(Address(self.address), amount_to_deposit)
+        token.approve(
+            allowed_address=Address(self.address),
+            allowance=amount_to_deposit,
+            given_block_identifier=block_identifier,
+        )
 
         return amount_to_deposit, log_details
 
     def set_total_deposit(
             self,
+            given_block_identifier: BlockSpecification,
             channel_identifier: ChannelID,
             total_deposit: TokenAmount,
             partner: Address,
@@ -740,7 +753,7 @@ class TokenNetwork:
                 total_deposit=total_deposit,
                 partner=partner,
                 token=token,
-                block_identifier=checking_block,
+                block_identifier=given_block_identifier,
             )
 
             gas_limit = self.proxy.estimate_gas(
@@ -822,7 +835,12 @@ class TokenNetwork:
             block_identifier=block_identifier,
         ).deposit
 
-        if token.allowance(self.node_address, self.address, block_identifier) < amount_to_deposit:
+        allowance = token.allowance(
+            owner=self.node_address,
+            spender=Address(self.address),
+            block_identifier=block_identifier,
+        )
+        if allowance < amount_to_deposit:
             msg = (
                 'The allowance is insufficient. Check concurrent deposits '
                 'for the same token network but different proxies.'
@@ -892,6 +910,7 @@ class TokenNetwork:
             nonce: Nonce,
             additional_hash: AdditionalHash,
             signature: Signature,
+            given_block_identifier: BlockSpecification,
     ):
         """ Close the channel using the provided balance proof.
 
@@ -921,7 +940,7 @@ class TokenNetwork:
         self._close_preconditions(
             channel_identifier,
             partner=partner,
-            block_identifier=checking_block,
+            block_identifier=given_block_identifier,
         )
 
         error_prefix = 'closeChannel call will fail'
@@ -998,9 +1017,11 @@ class TokenNetwork:
             nonce=nonce,
             balance_hash=balance_hash,
             additional_hash=additional_hash,
-            channel_identifier=channel_identifier,
-            token_network_identifier=TokenNetworkID(self.address),
-            chain_id=self.proxy.contract.functions.chain_id().call(),
+            canonical_identifier=CanonicalIdentifier(
+                chain_identifier=self.proxy.contract.functions.chain_id().call(),
+                token_network_address=self.address,
+                channel_identifier=channel_identifier,
+            ),
         )
 
         try:
@@ -1062,6 +1083,7 @@ class TokenNetwork:
             additional_hash: AdditionalHash,
             closing_signature: Signature,
             non_closing_signature: Signature,
+            given_block_identifier: BlockSpecification,
     ):
         log_details = {
             'token_network': pex(self.address),
@@ -1083,7 +1105,7 @@ class TokenNetwork:
             nonce=nonce,
             additional_hash=additional_hash,
             closing_signature=closing_signature,
-            block_identifier=checking_block,
+            block_identifier=given_block_identifier,
         )
 
         error_prefix = 'updateNonClosingBalanceProof call will fail'
@@ -1181,7 +1203,10 @@ class TokenNetwork:
             channel_identifier: ChannelID,
             partner: Address,
             merkle_tree_leaves: MerkleTreeLeaves,
+            given_block_identifier: BlockSpecification,
     ):
+        # Note: given_block_identifier
+        # is unused at the moment here
         log_details = {
             'token_network': pex(self.address),
             'node': pex(self.node_address),
@@ -1241,6 +1266,7 @@ class TokenNetwork:
                 block_identifier=block,
                 channel_identifier=channel_identifier,
             )
+            msg = ''
             if channel_settled is False:
                 msg = 'Channel is not in a settled state'
 
@@ -1309,6 +1335,7 @@ class TokenNetwork:
             partner_transferred_amount: TokenAmount,
             partner_locked_amount: TokenAmount,
             partner_locksroot: Locksroot,
+            given_block_identifier: BlockSpecification,
     ):
         """ Settle the channel. """
         log_details = {
@@ -1335,7 +1362,7 @@ class TokenNetwork:
             partner_transferred_amount=partner_transferred_amount,
             partner_locked_amount=partner_locked_amount,
             partner_locksroot=partner_locksroot,
-            block_identifier=checking_block,
+            block_identifier=given_block_identifier,
         )
 
         with self.channel_operations_lock[partner]:

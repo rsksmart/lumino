@@ -3,7 +3,7 @@ import random
 import gevent
 import pytest
 
-from raiden.constants import UINT64_MAX
+from raiden.constants import EMPTY_MERKLE_ROOT, UINT64_MAX
 from raiden.messages import Lock, LockedTransfer, RevealSecret, Unlock
 from raiden.tests.fixtures.variables import TransportProtocol
 from raiden.tests.integration.fixtures.raiden_network import CHAIN, wait_for_channels
@@ -13,7 +13,6 @@ from raiden.tests.utils.network import payment_channel_open_and_deposit
 from raiden.tests.utils.transfer import get_channelstate
 from raiden.transfer import views
 from raiden.transfer.mediated_transfer.events import SendSecretReveal
-from raiden.transfer.state import EMPTY_MERKLE_ROOT
 from raiden.utils import sha3
 
 # pylint: disable=too-many-locals
@@ -75,13 +74,13 @@ def test_regression_unfiltered_routes(
         payment_network_identifier,
         token,
     )
-    transfer = app0.raiden.mediated_transfer_async(
+    payment_status = app0.raiden.mediated_transfer_async(
         token_network_identifier=token_network_identifier,
         amount=1,
         target=app4.raiden.address,
         identifier=1,
     )
-    assert transfer.wait()
+    assert payment_status.payment_done.wait()
 
 
 @pytest.mark.parametrize('number_of_nodes', [3])
@@ -100,13 +99,13 @@ def test_regression_revealsecret_after_secret(raiden_network, token_addresses, t
         payment_network_identifier,
         token,
     )
-    transfer = app0.raiden.mediated_transfer_async(
+    payment_status = app0.raiden.mediated_transfer_async(
         token_network_identifier,
         amount=1,
         target=app2.raiden.address,
         identifier=identifier,
     )
-    assert transfer.wait()
+    assert payment_status.payment_done.wait()
 
     event = search_for_item(
         app1.raiden.wal.storage.get_events(),
@@ -117,8 +116,8 @@ def test_regression_revealsecret_after_secret(raiden_network, token_addresses, t
 
     message_identifier = random.randint(0, UINT64_MAX)
     reveal_secret = RevealSecret(
-        message_identifier,
-        event.secret,
+        message_identifier=message_identifier,
+        secret=event.secret,
     )
     app2.raiden.sign(reveal_secret)
 
@@ -167,9 +166,9 @@ def test_regression_multiple_revealsecret(raiden_network, token_addresses, trans
     expiration = app0.raiden.get_block_number() + 100
     lock_amount = 10
     lock = Lock(
-        lock_amount,
-        expiration,
-        secrethash,
+        amount=lock_amount,
+        expiration=expiration,
+        secrethash=secrethash,
     )
 
     nonce = 1
@@ -202,8 +201,8 @@ def test_regression_multiple_revealsecret(raiden_network, token_addresses, trans
         raise TypeError('Unknown TransportProtocol')
 
     reveal_secret = RevealSecret(
-        random.randint(0, UINT64_MAX),
-        secret,
+        message_identifier=random.randint(0, UINT64_MAX),
+        secret=secret,
     )
     app0.raiden.sign(reveal_secret)
 
@@ -259,18 +258,18 @@ def test_regression_multiple_revealsecret(raiden_network, token_addresses, trans
 
 
 def test_regression_register_secret_once(secret_registry_address, deploy_service):
-    """Register secret transaction must not sent if the secret is already registered"""
+    """Register secret transaction must not be sent if the secret is already registered"""
     # pylint: disable=protected-access
 
     secret_registry = deploy_service.secret_registry(secret_registry_address)
 
     secret = sha3(b'test_regression_register_secret_once')
-    secret_registry.register_secret(secret)
+    secret_registry.register_secret(secret=secret, given_block_identifier='latest')
 
     previous_nonce = deploy_service.client._available_nonce
-    secret_registry.register_secret(secret)
+    secret_registry.register_secret(secret=secret, given_block_identifier='latest')
     assert previous_nonce == deploy_service.client._available_nonce
 
     previous_nonce = deploy_service.client._available_nonce
-    secret_registry.register_secret_batch([secret])
+    secret_registry.register_secret_batch(secrets=[secret], given_block_identifier='latest')
     assert previous_nonce == deploy_service.client._available_nonce

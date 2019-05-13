@@ -1,10 +1,5 @@
 #!/usr/bin/env python
-import distutils.log
-import os
-import subprocess
-from distutils.spawn import find_executable
-
-from setuptools import Command, find_packages, setup
+from setuptools import find_packages, setup
 from setuptools.command.test import test as TestCommand
 
 
@@ -39,7 +34,7 @@ with open('constraints.txt') as req_file:
 test_requirements = []
 
 # Do not edit: this is maintained by bumpversion (see .bumpversion_client.cfg)
-version = '0.100.2-rc3'
+version = '0.100.2'
 
 setup(
     name='raiden',
@@ -71,7 +66,7 @@ setup(
     python_requires='>=3.7',
     entry_points={
         'console_scripts': [
-            'lumino = raiden.__main__:main',
+            'raiden = raiden.__main__:main',
         ],
     },
 )

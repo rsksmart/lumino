@@ -22,6 +22,11 @@ class HashLengthNot32(RaidenError):
     pass
 
 
+class UnknownEventType(RaidenError):
+    """Raised if decoding of an event failed."""
+    pass
+
+
 # Exceptions raised due to user interaction (the user may be another software)
 
 class ChannelNotFound(RaidenError):
@@ -67,6 +72,11 @@ class DepositMismatch(RaidenRecoverableError):
 
 class InvalidAddress(RaidenError):
     """ Raised when the user provided value is not a valid address. """
+    pass
+
+
+class InvalidSecretOrSecretHash(RaidenError):
+    """ Raised when the user provided value is not a valid secret. """
     pass
 
 
@@ -212,7 +222,3 @@ class ChannelOutdatedError(RaidenError):
 class InsufficientGasReserve(RaidenError):
     """ Raised when an action cannot be done because the available balance
     is not sufficient for the lifecycles of all active channels. """
-
-
-class RaidenDBUpgradeError(RaidenError):
-    """ Raised when executing upgrades fails. """

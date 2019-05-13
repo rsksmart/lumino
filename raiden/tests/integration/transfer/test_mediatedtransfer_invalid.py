@@ -41,15 +41,15 @@ def test_failsfast_lockedtransfer_exceeding_distributable(
         payment_network_identifier,
         token_address,
     )
-    result = app0.raiden.mediated_transfer_async(
+    payment_status = app0.raiden.mediated_transfer_async(
         token_network_identifier,
         deposit * 2,
         app1.raiden.address,
         identifier=1,
     )
 
-    assert result.successful()
-    assert result.get_nowait() is False
+    assert payment_status.payment_done.get(timeout=5) is False
+    assert payment_status.payment_done.successful()
 
     assert_synced_channel_state(
         token_network_identifier,
@@ -72,13 +72,13 @@ def test_failfast_lockedtransfer_nochannel(raiden_network, token_addresses):
         payment_network_identifier,
         token_address,
     )
-    async_result = app0.raiden.mediated_transfer_async(
+    payment_status = app0.raiden.mediated_transfer_async(
         token_network_identifier,
         amount,
         app1.raiden.address,
         identifier=1,
     )
-    assert async_result.wait() is False
+    assert payment_status.payment_done.wait() is False
 
 
 @pytest.mark.parametrize('number_of_nodes', [3])
@@ -126,7 +126,7 @@ def test_receive_lockedtransfer_invalidnonce(
         locked_amount=amount,
         recipient=app1.raiden.address,
         locksroot=UNIT_SECRETHASH,
-        lock=Lock(amount, expiration, UNIT_SECRETHASH),
+        lock=Lock(amount=amount, expiration=expiration, secrethash=UNIT_SECRETHASH),
         target=app2.raiden.address,
         initiator=app0.raiden.address,
         fee=0,
@@ -180,7 +180,7 @@ def test_receive_lockedtransfer_invalidsender(
         locked_amount=lock_amount,
         recipient=app0.raiden.address,
         locksroot=UNIT_SECRETHASH,
-        lock=Lock(lock_amount, expiration, UNIT_SECRETHASH),
+        lock=Lock(amount=lock_amount, expiration=expiration, secrethash=UNIT_SECRETHASH),
         target=app0.raiden.address,
         initiator=other_address,
         fee=0,
@@ -233,7 +233,7 @@ def test_receive_lockedtransfer_invalidrecipient(
         locked_amount=lock_amount,
         recipient=invalid_recipient,
         locksroot=UNIT_SECRETHASH,
-        lock=Lock(lock_amount, expiration, UNIT_SECRETHASH),
+        lock=Lock(amount=lock_amount, expiration=expiration, secrethash=UNIT_SECRETHASH),
         target=app1.raiden.address,
         initiator=app0.raiden.address,
         fee=0,
@@ -298,7 +298,7 @@ def test_received_lockedtransfer_closedchannel(
         locked_amount=lock_amount,
         recipient=app1.raiden.address,
         locksroot=UNIT_SECRETHASH,
-        lock=Lock(lock_amount, expiration, UNIT_SECRETHASH),
+        lock=Lock(amount=lock_amount, expiration=expiration, secrethash=UNIT_SECRETHASH),
         target=app1.raiden.address,
         initiator=app0.raiden.address,
         fee=0,

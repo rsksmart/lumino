@@ -6,10 +6,10 @@ from raiden.exceptions import ChannelOutdatedError
 from raiden.network.blockchain_service import BlockChainService
 from raiden.network.proxies import PaymentChannel, TokenNetwork
 from raiden.network.rpc.client import JSONRPCClient
+from raiden.tests.integration.contracts import BalanceProof
 from raiden.utils import privatekey_to_address
 from raiden.utils.signer import LocalSigner
 from raiden_contracts.constants import TEST_SETTLE_TIMEOUT_MIN
-from raiden_libs.messages import BalanceProof
 
 
 def test_payment_channel_proxy_basics(
@@ -19,11 +19,15 @@ def test_payment_channel_proxy_basics(
         chain_id,
         web3,
         contract_manager,
+        skip_if_parity,
 ):
     token_network_address = to_canonical_address(token_network_proxy.proxy.contract.address)
 
     c1_client = JSONRPCClient(web3, private_keys[1])
-    c1_chain = BlockChainService(c1_client)
+    c1_chain = BlockChainService(
+        jsonrpc_client=c1_client,
+        contract_manager=contract_manager,
+    )
     c2_client = JSONRPCClient(web3, private_keys[2])
     c1_token_network_proxy = TokenNetwork(
         jsonrpc_client=c1_client,
@@ -40,8 +44,9 @@ def test_payment_channel_proxy_basics(
 
     # create a channel
     channel_identifier = c1_token_network_proxy.new_netting_channel(
-        c2_client.address,
-        TEST_SETTLE_TIMEOUT_MIN,
+        partner=c2_client.address,
+        settle_timeout=TEST_SETTLE_TIMEOUT_MIN,
+        given_block_identifier='latest',
     )
     assert channel_identifier is not None
 
@@ -65,8 +70,8 @@ def test_payment_channel_proxy_basics(
     assert channel_proxy_1.channel_identifier == channel_identifier
     assert channel_proxy_2.channel_identifier == channel_identifier
 
-    assert channel_proxy_1.opened() is True
-    assert channel_proxy_2.opened() is True
+    assert channel_proxy_1.opened('latest') is True
+    assert channel_proxy_2.opened('latest') is True
 
     # check the settlement timeouts
     assert channel_proxy_1.settle_timeout() == channel_proxy_2.settle_timeout()
@@ -77,14 +82,14 @@ def test_payment_channel_proxy_basics(
 
     # test deposits
     initial_token_balance = 100
-    token_proxy.transfer(c1_client.address, initial_token_balance)
+    token_proxy.transfer(c1_client.address, initial_token_balance, 'latest')
     initial_balance_c1 = token_proxy.balance_of(c1_client.address)
     assert initial_balance_c1 == initial_token_balance
     initial_balance_c2 = token_proxy.balance_of(c2_client.address)
     assert initial_balance_c2 == 0
 
     # actual deposit
-    channel_proxy_1.set_total_deposit(10)
+    channel_proxy_1.set_total_deposit(total_deposit=10, block_identifier='latest')
 
     events = channel_filter.get_all_entries()
     assert len(events) == 2  # ChannelOpened, ChannelNewDeposit
@@ -111,9 +116,10 @@ def test_payment_channel_proxy_basics(
         nonce=balance_proof.nonce,
         additional_hash=decode_hex(balance_proof.additional_hash),
         signature=decode_hex(balance_proof.signature),
+        given_block_identifier='latest',
     )
-    assert channel_proxy_1.closed() is True
-    assert channel_proxy_2.closed() is True
+    assert channel_proxy_1.closed('latest') is True
+    assert channel_proxy_2.closed('latest') is True
 
     events = channel_filter.get_all_entries()
     assert len(events) == 3  # ChannelOpened, ChannelNewDeposit, ChannelClosed
@@ -136,9 +142,10 @@ def test_payment_channel_proxy_basics(
         partner_transferred_amount=transferred_amount,
         partner_locked_amount=0,
         partner_locksroot=EMPTY_HASH,
+        given_block_identifier='latest',
     )
-    assert channel_proxy_1.settled() is True
-    assert channel_proxy_2.settled() is True
+    assert channel_proxy_1.settled('latest') is True
+    assert channel_proxy_2.settled('latest') is True
 
     events = channel_filter.get_all_entries()
 
@@ -151,13 +158,17 @@ def test_payment_channel_outdated_channel_close(
         chain_id,
         web3,
         contract_manager,
+        skip_if_parity,
 ):
     token_network_address = to_canonical_address(token_network_proxy.proxy.contract.address)
 
     partner = privatekey_to_address(private_keys[0])
 
     client = JSONRPCClient(web3, private_keys[1])
-    chain = BlockChainService(client)
+    chain = BlockChainService(
+        jsonrpc_client=client,
+        contract_manager=contract_manager,
+    )
     token_network_proxy = TokenNetwork(
         jsonrpc_client=client,
         token_network_address=token_network_address,
@@ -167,8 +178,9 @@ def test_payment_channel_outdated_channel_close(
 
     # create a channel
     channel_identifier = token_network_proxy.new_netting_channel(
-        partner,
-        TEST_SETTLE_TIMEOUT_MIN,
+        partner=partner,
+        settle_timeout=TEST_SETTLE_TIMEOUT_MIN,
+        given_block_identifier='latest',
     )
     assert channel_identifier is not None
 
@@ -186,7 +198,7 @@ def test_payment_channel_outdated_channel_close(
 
     assert channel_proxy_1.channel_identifier == channel_identifier
 
-    assert channel_proxy_1.opened() is True
+    assert channel_proxy_1.opened('latest') is True
 
     # balance proof by c1
     balance_proof = BalanceProof(
@@ -209,8 +221,9 @@ def test_payment_channel_outdated_channel_close(
         nonce=balance_proof.nonce,
         additional_hash=bytes(32),
         signature=decode_hex(balance_proof.signature),
+        given_block_identifier='latest',
     )
-    assert channel_proxy_1.closed() is True
+    assert channel_proxy_1.closed('latest') is True
 
     events = channel_filter.get_all_entries()
     assert len(events) == 2  # ChannelOpened, ChannelClosed
@@ -230,8 +243,9 @@ def test_payment_channel_outdated_channel_close(
         partner_transferred_amount=0,
         partner_locked_amount=0,
         partner_locksroot=EMPTY_HASH,
+        given_block_identifier='latest',
     )
-    assert channel_proxy_1.settled() is True
+    assert channel_proxy_1.settled('latest') is True
 
     events = channel_filter.get_all_entries()
 
@@ -240,8 +254,9 @@ def test_payment_channel_outdated_channel_close(
     # Create a new channel with a different identifier
     # create a channel
     new_channel_identifier = token_network_proxy.new_netting_channel(
-        partner,
-        TEST_SETTLE_TIMEOUT_MIN,
+        partner=partner,
+        settle_timeout=TEST_SETTLE_TIMEOUT_MIN,
+        given_block_identifier='latest',
     )
     assert new_channel_identifier is not None
     # create channel proxies
@@ -252,7 +267,7 @@ def test_payment_channel_outdated_channel_close(
     )
 
     assert channel_proxy_2.channel_identifier == new_channel_identifier
-    assert channel_proxy_2.opened() is True
+    assert channel_proxy_2.opened('latest') is True
 
     with pytest.raises(ChannelOutdatedError):
         token_network_proxy.close(
@@ -262,4 +277,5 @@ def test_payment_channel_outdated_channel_close(
             nonce=balance_proof.nonce,
             additional_hash=bytes(32),
             signature=decode_hex(balance_proof.signature),
+            given_block_identifier='latest',
         )

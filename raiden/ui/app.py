@@ -9,7 +9,7 @@ from eth_utils import to_canonical_address, to_checksum_address, to_normalized_a
 from requests.exceptions import ConnectTimeout
 from web3 import HTTPProvider, Web3
 
-from raiden.constants import SQLITE_MIN_REQUIRED_VERSION, Environment
+from raiden.constants import MONITORING_BROADCASTING_ROOM, SQLITE_MIN_REQUIRED_VERSION, Environment
 from raiden.exceptions import (
     AddressWithoutCode,
     AddressWrongContract,
@@ -21,6 +21,7 @@ from raiden.exceptions import (
 from raiden.message_handler import MessageHandler
 from raiden.network.blockchain_service import BlockChainService
 from raiden.network.discovery import ContractDiscovery
+from raiden.network.pathfinding import get_pfs_info
 from raiden.network.rpc.client import JSONRPCClient
 from raiden.network.throttle import TokenBucket
 from raiden.network.transport import MatrixTransport, UDPTransport
@@ -29,6 +30,8 @@ from raiden.settings import (
     DEFAULT_MATRIX_KNOWN_SERVERS,
     DEFAULT_NAT_KEEPALIVE_RETRIES,
     DEFAULT_NUMBER_OF_BLOCK_CONFIRMATIONS,
+    DEVELOPMENT_CONTRACT_VERSION,
+    RED_EYES_CONTRACT_VERSION,
 )
 from raiden.storage.sqlite import RAIDEN_DB_VERSION, assert_sqlite_version
 from raiden.utils import is_supported_client, pex, split_endpoint, typing
@@ -156,6 +159,10 @@ def _setup_matrix(config):
         log.debug('Fetching available matrix servers', available_servers=available_servers)
         config['transport']['matrix']['available_servers'] = available_servers
 
+    # Add monitoring service broadcast room if enabled
+    if config['services']['monitoring_enabled'] is True:
+        config['transport']['matrix']['global_rooms'].append(MONITORING_BROADCASTING_ROOM)
+
     try:
         transport = MatrixTransport(config['transport']['matrix'])
     except RaidenError as ex:
@@ -190,6 +197,7 @@ def run_app(
         unrecoverable_error_should_crash,
         pathfinding_service_address,
         pathfinding_max_paths,
+        enable_monitoring,
         config=None,
         extra_config=None,
         **kwargs,
@@ -232,31 +240,41 @@ def run_app(
     config['unrecoverable_error_should_crash'] = unrecoverable_error_should_crash
     config['services']['pathfinding_service_address'] = pathfinding_service_address
     config['services']['pathfinding_max_paths'] = pathfinding_max_paths
+    config['services']['monitoring_enabled'] = enable_monitoring
 
     parsed_eth_rpc_endpoint = urlparse(eth_rpc_endpoint)
     if not parsed_eth_rpc_endpoint.scheme:
         eth_rpc_endpoint = f'http://{eth_rpc_endpoint}'
 
     web3 = _setup_web3(eth_rpc_endpoint)
-
-    rpc_client = JSONRPCClient(
-        web3,
-        privatekey_bin,
-        gas_price_strategy=gas_price,
-        block_num_confirmations=DEFAULT_NUMBER_OF_BLOCK_CONFIRMATIONS,
-        uses_infura='infura.io' in eth_rpc_endpoint,
-    )
-
-    blockchain_service = BlockChainService(
-        jsonrpc_client=rpc_client,
-        # Not giving the contract manager here, but injecting it later
-        # since we first need blockchain service to calculate the network id
-    )
-
     given_network_id = network_id
-    node_network_id = blockchain_service.network_id
+    node_network_id = int(web3.version.network)  # pylint: disable=no-member
     known_given_network_id = given_network_id in ID_TO_NETWORKNAME
     known_node_network_id = node_network_id in ID_TO_NETWORKNAME
+
+    if config['services']['pathfinding_service_address'] is None:
+        click.secho(
+            "There is no pathfinding service defined, basic routing will be used",
+        )
+    else:
+        pathfinding_service_info = get_pfs_info(config['services']['pathfinding_service_address'])
+        if not pathfinding_service_info:
+            click.secho(
+                "There is a error with the pathfinding service "
+                f"'{config['services']['pathfinding_service_address']}' "
+                f"you defined."
+                "Raiden will shut down. Please update your settings.",
+            )
+            sys.exit(1)
+        else:
+            click.secho(
+                f"'{pathfinding_service_info['message']}'. "
+                f"You have chosen pathfinding operator '{pathfinding_service_info['operator']}' "
+                f"with the running version '{pathfinding_service_info['version']}' "
+                f"on chain_id: '{pathfinding_service_info['network_info']['chain_id']}."
+                f"Requesting a path will cost you: '{pathfinding_service_info['price_info']}",
+            )
+            log.info('Using PFS', pfs_info=pathfinding_service_info)
 
     if node_network_id != given_network_id:
         if known_given_network_id and known_node_network_id:
@@ -291,8 +309,12 @@ def run_app(
     chain_config = {}
     contract_addresses_known = False
     contracts = dict()
-    contracts_version = 'pre_limits' if environment_type == Environment.DEVELOPMENT else None
+    if environment_type == Environment.DEVELOPMENT:
+        contracts_version = DEVELOPMENT_CONTRACT_VERSION
+    else:
+        contracts_version = RED_EYES_CONTRACT_VERSION
     config['contracts_path'] = contracts_precompiled_path(contracts_version)
+
     if node_network_id in ID_TO_NETWORKNAME and ID_TO_NETWORKNAME[node_network_id] != 'smoketest':
         deployment_data = get_contracts_deployed(node_network_id, contracts_version)
         not_allowed = (  # for now we only disallow mainnet with test configuration
@@ -312,7 +334,18 @@ def run_app(
         contracts = deployment_data['contracts']
         contract_addresses_known = True
 
-    blockchain_service.inject_contract_manager(ContractManager(config['contracts_path']))
+    rpc_client = JSONRPCClient(
+        web3,
+        privatekey_bin,
+        gas_price_strategy=gas_price,
+        block_num_confirmations=DEFAULT_NUMBER_OF_BLOCK_CONFIRMATIONS,
+        uses_infura='infura.io' in eth_rpc_endpoint,
+    )
+
+    blockchain_service = BlockChainService(
+        jsonrpc_client=rpc_client,
+        contract_manager=ContractManager(config['contracts_path']),
+    )
 
     if sync_check:
         check_synced(blockchain_service, known_node_network_id)
@@ -391,6 +424,7 @@ def run_app(
         raise RuntimeError(f'Unknown transport type "{transport}" given')
 
     raiden_event_handler = RaidenEventHandler()
+
     message_handler = MessageHandler()
 
     try:

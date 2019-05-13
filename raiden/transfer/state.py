@@ -6,20 +6,23 @@ from functools import total_ordering
 import networkx
 from eth_utils import encode_hex, to_canonical_address, to_checksum_address
 
-from raiden.constants import UINT64_MAX, UINT256_MAX
+from raiden.constants import EMPTY_MERKLE_ROOT, UINT64_MAX, UINT256_MAX
 from raiden.encoding import messages
 from raiden.encoding.format import buffer_for
 from raiden.transfer.architecture import SendMessageEvent, State
 from raiden.transfer.merkle_tree import merkleroot
 from raiden.transfer.queue_identifier import QueueIdentifier
 from raiden.transfer.utils import hash_balance_data, pseudo_random_generator_from_json
-from raiden.utils import lpex, pex, serialization, sha3
+from raiden.utils import CanonicalIdentifier, lpex, pex, serialization, sha3
 from raiden.utils.serialization import map_dict, map_list, serialize_bytes
 from raiden.utils.typing import (
+    AdditionalHash,
     Address,
     Any,
     Balance,
+    BalanceHash,
     BlockExpiration,
+    BlockHash,
     BlockNumber,
     BlockTimeout,
     ChainID,
@@ -29,12 +32,14 @@ from raiden.utils.typing import (
     List,
     LockHash,
     Locksroot,
+    Nonce,
     Optional,
     PaymentNetworkID,
     Secret,
     SecretHash,
     Signature,
     T_Address,
+    T_BlockHash,
     T_BlockNumber,
     T_ChainID,
     T_ChannelID,
@@ -90,32 +95,37 @@ NODE_NETWORK_REACHABLE = 'reachable'
 
 def balanceproof_from_envelope(envelope_message):
     return BalanceProofSignedState(
-        envelope_message.nonce,
-        envelope_message.transferred_amount,
-        envelope_message.locked_amount,
-        envelope_message.locksroot,
-        envelope_message.token_network_address,
-        envelope_message.channel_identifier,
-        envelope_message.message_hash,
-        envelope_message.signature,
-        envelope_message.sender,
-        envelope_message.chain_id,
+        nonce=envelope_message.nonce,
+        transferred_amount=envelope_message.transferred_amount,
+        locked_amount=envelope_message.locked_amount,
+        locksroot=envelope_message.locksroot,
+        message_hash=envelope_message.message_hash,
+        signature=envelope_message.signature,
+        sender=envelope_message.sender,
+        canonical_identifier=CanonicalIdentifier(
+            chain_identifier=envelope_message.chain_id,
+            token_network_address=envelope_message.token_network_address,
+            channel_identifier=envelope_message.channel_identifier,
+        ),
     )
 
 
-def lockstate_from_lock(lock):
-    return HashTimeLockState(
-        lock.amount,
-        lock.expiration,
-        lock.secrethash,
-    )
+def make_empty_merkle_tree():
+    return MerkleTreeState([
+        [],                   # the leaves are empty
+        [EMPTY_MERKLE_ROOT],  # the root is the constant 0
+    ])
 
 
 def message_identifier_from_prng(prng):
     return prng.randint(0, UINT64_MAX)
 
 
-class InitiatorTask(State):
+class TransferTask(State):
+    pass
+
+
+class InitiatorTask(TransferTask):
     __slots__ = (
         'token_network_identifier',
         'manager_state',
@@ -159,7 +169,7 @@ class InitiatorTask(State):
         )
 
 
-class MediatorTask(State):
+class MediatorTask(TransferTask):
     __slots__ = (
         'token_network_identifier',
         'mediator_state',
@@ -205,7 +215,7 @@ class MediatorTask(State):
         return restored
 
 
-class TargetTask(State):
+class TargetTask(TransferTask):
     __slots__ = (
         'token_network_identifier',
         'channel_identifier',
@@ -268,6 +278,7 @@ class ChainState(State):
 
     __slots__ = (
         'block_number',
+        'block_hash',
         'chain_id',
         'identifiers_to_paymentnetworks',
         'nodeaddresses_to_networkstates',
@@ -283,16 +294,21 @@ class ChainState(State):
             self,
             pseudo_random_generator: random.Random,
             block_number: BlockNumber,
+            block_hash: BlockHash,
             our_address: Address,
             chain_id: ChainID,
     ):
         if not isinstance(block_number, T_BlockNumber):
             raise ValueError('block_number must be of BlockNumber type')
 
+        if not isinstance(block_hash, T_BlockHash):
+            raise ValueError('block_hash must be of BlockHash type')
+
         if not isinstance(chain_id, T_ChainID):
             raise ValueError('chain_id must be of ChainID type')
 
         self.block_number = block_number
+        self.block_hash = block_hash
         self.chain_id = chain_id
         self.identifiers_to_paymentnetworks = dict()
         self.nodeaddresses_to_networkstates = dict()
@@ -301,11 +317,15 @@ class ChainState(State):
         self.pending_transactions = list()
         self.pseudo_random_generator = pseudo_random_generator
         self.queueids_to_queues: QueueIdsToQueues = dict()
-        self.last_transport_authdata = None
+        self.last_transport_authdata: Optional[str] = None
 
     def __repr__(self):
-        return '<ChainState block:{} networks:{} qty_transfers:{} chain_id:{}>'.format(
+        return (
+            '<ChainState block_number:{} block_hash:{} networks:{} '
+            'qty_transfers:{} chain_id:{}>'
+        ).format(
             self.block_number,
+            pex(self.block_hash),
             lpex(self.identifiers_to_paymentnetworks.keys()),
             len(self.payment_mapping.secrethashes_to_task),
             self.chain_id,
@@ -315,6 +335,7 @@ class ChainState(State):
         return (
             isinstance(other, ChainState) and
             self.block_number == other.block_number and
+            self.block_hash == other.block_hash and
             self.pseudo_random_generator.getstate() == other.pseudo_random_generator.getstate() and
             self.queueids_to_queues == other.queueids_to_queues and
             self.identifiers_to_paymentnetworks == other.identifiers_to_paymentnetworks and
@@ -330,6 +351,7 @@ class ChainState(State):
     def to_dict(self) -> Dict[str, Any]:
         return {
             'block_number': str(self.block_number),
+            'block_hash': serialize_bytes(self.block_hash),
             'chain_id': self.chain_id,
             'pseudo_random_generator': self.pseudo_random_generator.getstate(),
             'identifiers_to_paymentnetworks': map_dict(
@@ -360,6 +382,7 @@ class ChainState(State):
             block_number=BlockNumber(
                 T_BlockNumber(data['block_number']),
             ),
+            block_hash=serialization.deserialize_bytes(data['block_hash']),
             our_address=to_canonical_address(data['our_address']),
             chain_id=data['chain_id'],
         )
@@ -469,7 +492,9 @@ class TokenNetworkState(State):
         self.network_graph = TokenNetworkGraphState(self.address)
 
         self.channelidentifiers_to_channels = dict()
-        self.partneraddresses_to_channelidentifiers = defaultdict(list)
+        self.partneraddresses_to_channelidentifiers: Dict[Address, List[ChannelID]] = defaultdict(
+            list,
+        )
 
     def __repr__(self):
         return '<TokenNetworkState id:{} token:{}>'.format(
@@ -528,7 +553,7 @@ class TokenNetworkState(State):
             serialization.identity,
             data['partneraddresses_to_channelidentifiers'],
         )
-        restored.partneraddresses_to_channelidentifiers = defaultdict(
+        restored.partneraddresses_to_channelidentifiers = defaultdict(  # type: ignore
             list,
             restored_partneraddresses_to_channelidentifiers,
         )
@@ -732,10 +757,11 @@ class BalanceProofUnsignedState(State):
             transferred_amount: TokenAmount,
             locked_amount: TokenAmount,
             locksroot: Locksroot,
-            token_network_identifier: TokenNetworkID,
-            channel_identifier: ChannelID,  # FIXME: is this used anywhere
-            chain_id: ChainID,
+            canonical_identifier: CanonicalIdentifier,
     ):
+        chain_id = canonical_identifier.chain_identifier
+        token_network_identifier = canonical_identifier.token_network_address
+        channel_identifier = canonical_identifier.channel_identifier
         if not isinstance(nonce, int):
             raise ValueError('nonce must be int')
 
@@ -839,9 +865,11 @@ class BalanceProofUnsignedState(State):
             transferred_amount=TokenAmount(int(data['transferred_amount'])),
             locked_amount=TokenAmount(int(data['locked_amount'])),
             locksroot=Locksroot(serialization.deserialize_bytes(data['locksroot'])),
-            token_network_identifier=to_canonical_address(data['token_network_identifier']),
-            channel_identifier=ChannelID(int(data['channel_identifier'])),
-            chain_id=data['chain_id'],
+            canonical_identifier=CanonicalIdentifier(
+                chain_identifier=data['chain_id'],
+                token_network_address=to_canonical_address(data['token_network_identifier']),
+                channel_identifier=ChannelID(int(data['channel_identifier'])),
+            ),
         )
 
         return restored
@@ -863,21 +891,24 @@ class BalanceProofSignedState(State):
         'signature',
         'sender',
         'chain_id',
+        'canonical_identifier',
     )
 
     def __init__(
             self,
-            nonce: int,
+            nonce: Nonce,
             transferred_amount: TokenAmount,
             locked_amount: TokenAmount,
             locksroot: Locksroot,
-            token_network_identifier: TokenNetworkID,
-            channel_identifier: ChannelID,
-            message_hash: Keccak256,
+            message_hash: AdditionalHash,
             signature: Signature,
             sender: Address,
-            chain_id: ChainID,
+            canonical_identifier: CanonicalIdentifier,
     ):
+        chain_id = canonical_identifier.chain_identifier
+        token_network_identifier = canonical_identifier.token_network_address
+        channel_identifier = canonical_identifier.channel_identifier
+
         if not isinstance(nonce, int):
             raise ValueError('nonce must be int')
 
@@ -982,7 +1013,7 @@ class BalanceProofSignedState(State):
         return not self.__eq__(other)
 
     @property
-    def balance_hash(self):
+    def balance_hash(self) -> BalanceHash:
         return hash_balance_data(
             transferred_amount=self.transferred_amount,
             locked_amount=self.locked_amount,
@@ -1012,12 +1043,14 @@ class BalanceProofSignedState(State):
             transferred_amount=TokenAmount(int(data['transferred_amount'])),
             locked_amount=TokenAmount(int(data['locked_amount'])),
             locksroot=Locksroot(serialization.deserialize_bytes(data['locksroot'])),
-            token_network_identifier=to_canonical_address(data['token_network_identifier']),
-            channel_identifier=ChannelID(int(data['channel_identifier'])),
-            message_hash=Keccak256(serialization.deserialize_bytes(data['message_hash'])),
+            message_hash=AdditionalHash(serialization.deserialize_bytes(data['message_hash'])),
             signature=Signature(serialization.deserialize_bytes(data['signature'])),
             sender=to_canonical_address(data['sender']),
-            chain_id=data['chain_id'],
+            canonical_identifier=CanonicalIdentifier(
+                chain_identifier=data['chain_id'],
+                token_network_address=to_canonical_address(data['token_network_identifier']),
+                channel_identifier=ChannelID(int(data['channel_identifier'])),
+            ),
         )
 
         return restored
@@ -1377,7 +1410,7 @@ class NettingChannelEndState(State):
         #: unlocked off chain yet, and the secret has been registered onchain
         #: before the lock has expired.
         self.secrethashes_to_onchain_unlockedlocks: SecretHashToPartialUnlockProof = dict()
-        self.merkletree = EMPTY_MERKLE_TREE
+        self.merkletree = make_empty_merkle_tree()
         self.balance_proof: OptionalBalanceProofState = None
 
     def __repr__(self):
@@ -1777,10 +1810,3 @@ class TransactionOrder(State):
         )
 
         return restored
-
-
-EMPTY_MERKLE_ROOT: Locksroot = bytes(32)
-EMPTY_MERKLE_TREE = MerkleTreeState([
-    [],                   # the leaves are empty
-    [EMPTY_MERKLE_ROOT],  # the root is the constant 0
-])

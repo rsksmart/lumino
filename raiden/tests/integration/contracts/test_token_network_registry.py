@@ -11,8 +11,16 @@ from raiden_contracts.constants import TEST_SETTLE_TIMEOUT_MAX, TEST_SETTLE_TIME
 def test_token_network_registry(
         deploy_client,
         contract_manager,
-        token_network_registry_proxy: TokenNetworkRegistry,
+        token_network_registry_address,
+        skip_if_parity,
 ):
+    registry_address = to_canonical_address(token_network_registry_address)
+
+    token_network_registry_proxy = TokenNetworkRegistry(
+        jsonrpc_client=deploy_client,
+        registry_address=registry_address,
+        contract_manager=contract_manager,
+    )
 
     assert token_network_registry_proxy.settlement_timeout_min() == TEST_SETTLE_TIMEOUT_MIN
     assert token_network_registry_proxy.settlement_timeout_max() == TEST_SETTLE_TIMEOUT_MAX
@@ -20,7 +28,7 @@ def test_token_network_registry(
     bad_token_address = make_address()
     # try to register non-existing token network
     with pytest.raises(RaidenUnrecoverableError):
-        token_network_registry_proxy.add_token(bad_token_address)
+        token_network_registry_proxy.add_token(bad_token_address, 'latest')
     # create token network & register it
     test_token = deploy_token(
         deploy_client=deploy_client,
@@ -33,12 +41,14 @@ def test_token_network_registry(
     test_token_address = to_canonical_address(test_token.contract.address)
     event_filter = token_network_registry_proxy.tokenadded_filter()
     token_network_address = token_network_registry_proxy.add_token(
-        test_token_address,
+        token_address=test_token_address,
+        given_block_identifier='latest',
     )
 
     with pytest.raises(RaidenRecoverableError) as exc:
         token_network_address = token_network_registry_proxy.add_token(
-            test_token_address,
+            token_address=test_token_address,
+            given_block_identifier='latest',
         )
 
         assert 'Token already registered' in str(exc)

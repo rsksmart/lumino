@@ -3,9 +3,9 @@ from typing import TYPE_CHECKING
 
 from eth_utils import encode_hex, to_canonical_address, to_checksum_address
 
+from raiden.constants import EMPTY_MERKLE_ROOT
 from raiden.transfer.architecture import State
 from raiden.transfer.state import (
-    EMPTY_MERKLE_ROOT,
     BalanceProofSignedState,
     BalanceProofUnsignedState,
     HashTimeLockState,
@@ -24,6 +24,7 @@ from raiden.utils.typing import (
     List,
     MessageID,
     Optional,
+    PaymentAmount,
     PaymentID,
     PaymentNetworkID,
     Secret,
@@ -31,7 +32,6 @@ from raiden.utils.typing import (
     T_Address,
     TargetAddress,
     TokenAddress,
-    TokenAmount,
     TokenNetworkID,
 )
 
@@ -259,13 +259,19 @@ class MediatorTransferState(State):
         'secret',
         'transfers_pair',
         'waiting_transfer',
+        'routes',
     )
 
-    def __init__(self, secrethash: SecretHash):
+    def __init__(
+            self,
+            secrethash: SecretHash,
+            routes: List[RouteState],
+    ):
         self.secrethash = secrethash
         self.secret: Secret = None
         self.transfers_pair: List[MediationPairState] = list()
         self.waiting_transfer: WaitingTransferState = None
+        self.routes = routes
 
     def __repr__(self):
         return '<MediatorTransferState secrethash:{} qtd_transfers:{}>'.format(
@@ -279,7 +285,8 @@ class MediatorTransferState(State):
             self.secrethash == other.secrethash and
             self.secret == other.secret and
             self.transfers_pair == other.transfers_pair and
-            self.waiting_transfer == other.waiting_transfer
+            self.waiting_transfer == other.waiting_transfer and
+            self.routes == other.routes
         )
 
     def __ne__(self, other):
@@ -290,6 +297,7 @@ class MediatorTransferState(State):
             'secrethash': serialization.serialize_bytes(self.secrethash),
             'transfers_pair': self.transfers_pair,
             'waiting_transfer': self.waiting_transfer,
+            'routes': self.routes,
         }
 
         if self.secret is not None:
@@ -301,6 +309,7 @@ class MediatorTransferState(State):
     def from_dict(cls, data: Dict[str, Any]) -> 'MediatorTransferState':
         restored = cls(
             secrethash=serialization.deserialize_bytes(data['secrethash']),
+            routes=data['routes'],
         )
         restored.transfers_pair = data['transfers_pair']
         restored.waiting_transfer = data['waiting_transfer']
@@ -393,7 +402,11 @@ class TargetTransferState(State):
         return restored
 
 
-class LockedTransferUnsignedState(State):
+class LockedTransferState(State):
+    pass
+
+
+class LockedTransferUnsignedState(LockedTransferState):
     """ State for a transfer created by the local node which contains a hash
     time lock and may be sent.
     """
@@ -486,7 +499,7 @@ class LockedTransferUnsignedState(State):
         return restored
 
 
-class LockedTransferSignedState(State):
+class LockedTransferSignedState(LockedTransferState):
     """ State for a received transfer which contains a hash time lock and a
     signed balance proof.
     """
@@ -609,7 +622,7 @@ class TransferDescriptionWithSecretState(State):
             self,
             payment_network_identifier: PaymentNetworkID,
             payment_identifier: PaymentID,
-            amount: TokenAmount,
+            amount: PaymentAmount,
             token_network_identifier: TokenNetworkID,
             initiator: InitiatorAddress,
             target: TargetAddress,

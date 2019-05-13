@@ -1,4 +1,5 @@
-from raiden.tests.utils.factories import EMPTY_MERKLE_ROOT, HOP1, HOP2, UNIT_SECRETHASH
+from raiden.constants import EMPTY_MERKLE_ROOT
+from raiden.tests.utils.factories import HOP1, HOP2, UNIT_SECRETHASH, make_block_hash
 from raiden.transfer.events import ContractSendChannelBatchUnlock
 from raiden.transfer.node import is_transaction_effect_satisfied
 from raiden.transfer.state_change import ContractReceiveChannelBatchUnlock
@@ -15,6 +16,7 @@ def test_is_transaction_effect_satisfied(
         token_network_identifier=token_network_id,
         channel_identifier=netting_channel_state.identifier,
         participant=HOP2,
+        triggered_by_block_hash=make_block_hash(),
     )
     state_change = ContractReceiveChannelBatchUnlock(
         transaction_hash=UNIT_SECRETHASH,
@@ -25,6 +27,7 @@ def test_is_transaction_effect_satisfied(
         unlocked_amount=0,
         returned_tokens=0,
         block_number=1,
+        block_hash=make_block_hash(),
     )
     # unlock for a channel in which this node is not a participant must return False
     assert not is_transaction_effect_satisfied(chain_state, transaction, state_change)

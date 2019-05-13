@@ -8,7 +8,7 @@ from collections import defaultdict, deque
 from datetime import datetime
 from itertools import islice
 from pathlib import Path
-from typing import Dict, Union
+from typing import Dict, Union, Tuple
 
 import click
 import mirakuru
@@ -26,7 +26,6 @@ from raiden.accounts import Account
 from raiden.network.rpc.client import JSONRPCClient, check_address_has_code
 from raiden.network.rpc.smartcontract_proxy import ContractProxy
 from raiden_contracts.constants import CONTRACT_CUSTOM_TOKEN
-from raiden_contracts.contract_manager import ContractManager, contracts_precompiled_path
 from scenario_player.exceptions import ScenarioError, ScenarioTxError
 
 RECLAIM_MIN_BALANCE = 10 ** 12  # 1 µEth (a.k.a. Twei, szabo)
@@ -66,6 +65,11 @@ class LogBuffer:
         else:
             slice_ = islice(self.buffer, start)
         return reversed(list(slice_))
+
+
+class ConcatenableNone:
+    def __radd__(self, other):
+        return other
 
 
 class DummyStream:
@@ -182,23 +186,25 @@ def wait_for_txs(client_or_web3, txhashes, timeout=360):
         )
 
 
-def get_or_deploy_token(runner) -> ContractProxy:
+def get_or_deploy_token(runner) -> Tuple[ContractProxy, int]:
     """ Deploy or reuse  """
-    contract_manager = ContractManager(contracts_precompiled_path())
-    token_contract = contract_manager.get_contract(CONTRACT_CUSTOM_TOKEN)
+    token_contract = runner.contract_manager.get_contract(CONTRACT_CUSTOM_TOKEN)
 
     token_config = runner.scenario.get('token', {})
     if not token_config:
         token_config = {}
     address = token_config.get('address')
+    block = token_config.get('block', 0)
     reuse = token_config.get('reuse', False)
 
-    token_address_file = runner.data_path.joinpath('token.addr')
+    token_address_file = runner.data_path.joinpath('token.infos')
     if reuse:
         if address:
             raise ScenarioError('Token settings "address" and "reuse" are mutually exclusive.')
         if token_address_file.exists():
-            address = token_address_file.read_text()
+            token_data = json.loads(token_address_file.read_text())
+            address = token_data['address']
+            block = token_data['block']
     if address:
         check_address_has_code(runner.client, address, 'Token')
         token_ctr = runner.client.new_contract_proxy(token_contract['abi'], address)
@@ -209,7 +215,7 @@ def get_or_deploy_token(runner) -> ContractProxy:
             name=token_ctr.contract.functions.name().call(),
             symbol=token_ctr.contract.functions.symbol().call(),
         )
-        return token_ctr
+        return token_ctr, block
 
     token_id = uuid.uuid4()
     now = datetime.now()
@@ -219,14 +225,18 @@ def get_or_deploy_token(runner) -> ContractProxy:
 
     log.debug("Deploying token", name=name, symbol=symbol, decimals=decimals)
 
-    token_ctr = runner.client.deploy_solidity_contract(
+    token_ctr, receipt = runner.client.deploy_solidity_contract(
         'CustomToken',
-        contract_manager.contracts,
+        runner.contract_manager.contracts,
         constructor_parameters=(0, decimals, name, symbol),
     )
+    contract_deployment_block = receipt['blockNumber']
     contract_checksum_address = to_checksum_address(token_ctr.contract_address)
     if reuse:
-        token_address_file.write_text(contract_checksum_address)
+        token_address_file.write_text(json.dumps({
+            'address': contract_checksum_address,
+            'block': contract_deployment_block,
+        }))
 
     log.info(
         "Deployed token",
@@ -234,7 +244,7 @@ def get_or_deploy_token(runner) -> ContractProxy:
         name=name,
         symbol=symbol,
     )
-    return token_ctr
+    return token_ctr, contract_deployment_block
 
 
 def send_notification_mail(target_mail, subject, message, api_key):
