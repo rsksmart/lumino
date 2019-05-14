@@ -8,7 +8,7 @@
 
 RIF Lumino Network is an off-chain solution for RSK thats enables near-isntant, low-fee and scalable payments.
 
-RIF Lumino uses a fork of Raiden Network implementation to achieve this.
+RIF Lumino uses a fork of [Raiden Network](https://github.com/raiden-network/raiden) implementation to achieve this.
 
 ## Pre requisites
 
@@ -245,3 +245,6 @@ Install psycopg2 running:
 
 * [RIF Lumino Network](https://www.rifos.org/rif-lumino-network/)
 * [RIF Lumino Explorer](http://explorer.lumino.rifos.org/)
+* [RIF Lumino Contracts](https://github.com/rsksmart/lumino-contracts) 
+* [RIF Lumino Web](https://github.com/rsksmart/lumino-web) 
+* [RIF Lumino Explorer](https://github.com/rsksmart/lumino-explorer) 
