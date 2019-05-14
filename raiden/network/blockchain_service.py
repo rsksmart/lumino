@@ -1,6 +1,9 @@
 import gevent
+from cachetools.func import ttl_cache
 from eth_utils import is_binary_address
 from gevent.lock import Semaphore
+from raiden.network.rpc.smartcontract_proxy import ContractProxy
+from raiden.rns_constants import RNS_RESOLVER_ADDRESS, RNS_RESOLVER_ABI
 
 from raiden.network.proxies import (
     Discovery,
@@ -11,10 +14,9 @@ from raiden.network.proxies import (
     TokenNetworkRegistry,
 )
 from raiden.network.rpc.client import JSONRPCClient
+from raiden.utils.namehash.namehash import namehash
 from raiden.utils.typing import (
     Address,
-    BlockHash,
-    BlockNumber,
     ChannelID,
     PaymentNetworkID,
     T_ChannelID,
@@ -30,7 +32,7 @@ class BlockChainService:
     def __init__(
             self,
             jsonrpc_client: JSONRPCClient,
-            contract_manager: ContractManager,
+            contract_manager: ContractManager = None,
     ):
         self.address_to_discovery = dict()
         self.address_to_secret_registry = dict()
@@ -41,9 +43,6 @@ class BlockChainService:
 
         self.client = jsonrpc_client
         self.contract_manager = contract_manager
-
-        # Ask for the network id only once and store it here
-        self.network_id = int(self.client.web3.version.network)
 
         self._token_creation_lock = Semaphore()
         self._discovery_creation_lock = Semaphore()
@@ -56,14 +55,14 @@ class BlockChainService:
     def node_address(self) -> Address:
         return self.client.address
 
-    def block_number(self) -> BlockNumber:
+    def block_number(self) -> int:
         return self.client.block_number()
-
-    def block_hash(self) -> BlockHash:
-        return self.client.blockhash_from_blocknumber('latest')
 
     def get_block(self, block_identifier):
         return self.client.web3.eth.getBlock(block_identifier=block_identifier)
+
+    def inject_contract_manager(self, contract_manager: ContractManager):
+        self.contract_manager = contract_manager
 
     def is_synced(self) -> bool:
         result = self.client.web3.eth.syncing
@@ -190,6 +189,13 @@ class BlockChainService:
 
         return self.address_to_secret_registry[address]
 
+    def get_address_from_rns(self, address=None) -> str:
+        contract = self.client.new_contract(RNS_RESOLVER_ABI, RNS_RESOLVER_ADDRESS)
+        proxy = ContractProxy(self.client, contract)
+        eip137hash = namehash(address)
+        resolved_address = proxy.contract.functions.addr(eip137hash).call()
+        return resolved_address
+
     def payment_channel(
             self,
             token_network_address: TokenNetworkAddress,
@@ -214,3 +220,10 @@ class BlockChainService:
                 )
 
         return self.identifier_to_payment_channel[dict_key]
+
+    @property
+    @ttl_cache(ttl=30)
+    def network_id(self) -> int:
+        return int(self.client.web3.version.network)
+
+

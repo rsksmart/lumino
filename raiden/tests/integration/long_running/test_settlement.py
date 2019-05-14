@@ -6,7 +6,6 @@ import pytest
 from raiden import message_handler, waiting
 from raiden.api.python import RaidenAPI
 from raiden.constants import UINT64_MAX
-from raiden.exceptions import RaidenUnrecoverableError
 from raiden.messages import LockedTransfer, LockExpired, RevealSecret
 from raiden.storage.restore import channel_state_until_state_change
 from raiden.tests.utils import factories
@@ -246,13 +245,7 @@ def test_lock_expiry(raiden_network, token_addresses, deposit):
 
 
 @pytest.mark.parametrize('number_of_nodes', [2])
-def test_batch_unlock(
-        raiden_network,
-        token_addresses,
-        secret_registry_address,
-        deposit,
-        blockchain_type,
-):
+def test_batch_unlock(raiden_network, token_addresses, secret_registry_address, deposit):
     """Batch unlock can be called after the channel is settled."""
     alice_app, bob_app = raiden_network
     registry_address = alice_app.raiden.default_registry.address
@@ -347,7 +340,7 @@ def test_batch_unlock(
     secret_registry_proxy = alice_app.raiden.chain.secret_registry(
         secret_registry_address,
     )
-    secret_registry_proxy.register_secret(secret=secret, given_block_identifier='latest')
+    secret_registry_proxy.register_secret(secret)
 
     assert lock, 'the lock must still be part of the node state'
     msg = 'the secret must be registered before the lock expires'
@@ -372,8 +365,7 @@ def test_batch_unlock(
     ]
 
     # wait for the node to call batch unlock
-    timeout = 30 if blockchain_type == 'parity' else 10
-    with gevent.Timeout(timeout):
+    with gevent.Timeout(10):
         wait_for_batch_unlock(
             bob_app,
             token_network_identifier,
@@ -399,7 +391,7 @@ def test_batch_unlock(
 
 @pytest.mark.parametrize('number_of_nodes', [2])
 @pytest.mark.parametrize('channels_per_node', [CHAIN])
-def test_settled_lock(token_addresses, raiden_network, deposit, skip_if_parity):
+def test_settled_lock(token_addresses, raiden_network, deposit):
     """ Any transfer following a secret reveal must update the locksroot, so
     that an attacker cannot reuse a secret to double claim a lock.
     """
@@ -481,10 +473,10 @@ def test_settled_lock(token_addresses, raiden_network, deposit, skip_if_parity):
 
     # The transfer locksroot must not contain the unlocked lock, the
     # unlock must fail.
-    with pytest.raises(RaidenUnrecoverableError):
+    with pytest.raises(Exception):
         netting_channel.unlock(
-            merkle_tree_leaves=batch_unlock,
-            block_identifier='latest',
+            channelstate_0_1.partner_state.address,
+            batch_unlock,
         )
 
     expected_balance0 = initial_balance0 + deposit0 - amount * 2
@@ -531,8 +523,8 @@ def test_automatic_secret_registration(raiden_chain, token_addresses):
     app0.raiden.transport.stop()
 
     reveal_secret = RevealSecret(
-        message_identifier=random.randint(0, UINT64_MAX),
-        secret=secret,
+        random.randint(0, UINT64_MAX),
+        secret,
     )
     app0.raiden.sign(reveal_secret)
     message_handler.MessageHandler().on_message(app1.raiden, reveal_secret)
@@ -544,10 +536,7 @@ def test_automatic_secret_registration(raiden_chain, token_addresses):
     lock_expiration = target_task.target_state.transfer.lock.expiration
     app1.raiden.chain.wait_until_block(target_block_number=lock_expiration)
 
-    assert app1.raiden.default_secret_registry.check_registered(
-        secrethash=secrethash,
-        block_identifier='latest',
-    )
+    assert app1.raiden.default_secret_registry.check_registered(secrethash)
 
 
 @pytest.mark.xfail(reason='test incomplete')

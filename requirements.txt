@@ -12,7 +12,6 @@ gevent
 ipython<5.0.0
 marshmallow
 marshmallow_polyfield
-matrix-client
 miniupnpc
 mirakuru
 netifaces
@@ -25,7 +24,13 @@ pystun-patched-for-raiden
 pytest
 pytoml
 raiden-contracts
+raiden-libs
 raiden-webui
 requests
 structlog
 webargs
+
+#Web3 RSK compatible
+
+git+git://github.com/infuy/web3.py@rsk-4.8.2#egg=web3
+

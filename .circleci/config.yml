@@ -1,0 +1,809 @@
+version: 2.1
+
+
+templates:
+  filter-tag-templates: &only-tagged-version-filter
+    tags:
+      only: /^v\d+\.\d+\.\d+(\-rc\d+)?$/
+    branches:
+      ignore: /.*/
+
+  parameter-templates: &parameter-templates
+    py-version: &py-version-template
+      description: "python version to be used in the executor"
+      default: "3.7"
+      type: string
+    resource:
+      description: "resource type for underlying VM"
+      default: "medium"
+      type: enum
+      enum: ["small", "medium", "medium+", "large", "xlarge"]
+    transport-layer:
+      description: "transmission protocol used, udp or matrix"
+      default: "udp"
+      type: enum
+      enum: ["udp", "matrix"]
+    additional-args:
+      description: "additional arguments to run smoketest if needed"
+      default: ""
+      type: string
+
+  default-environment: &default-environment
+    GETH_URL_LINUX: 'https://gethstore.blob.core.windows.net/builds/geth-linux-amd64-1.8.20-24d727b6.tar.gz'
+    GETH_URL_MACOS: 'https://gethstore.blob.core.windows.net/builds/geth-darwin-amd64-1.8.20-24d727b6.tar.gz'
+    GETH_VERSION: '1.8.20'
+    SOLC_URL_LINUX: 'https://github.com/ethereum/solidity/releases/download/v0.4.23/solc-static-linux'
+    SOLC_URL_MACOS: 'https://www.dropbox.com/s/4amq3on2ds1dq36/solc_0.4.23?dl=0'
+    SOLC_VERSION: 'v0.4.23'
+
+
+executors:
+  docker:
+    parameters:
+      py-version:
+        <<: *py-version-template
+      resource:
+        description: "resource type for underlying VM"
+        default: "medium"
+        type: enum
+        enum: ["small", "medium", "medium+", "large", "xlarge"]
+    working_directory: ~/raiden
+    docker:
+      - image: circleci/python:<< parameters.py-version >>
+    resource_class: << parameters.resource >>
+    environment:
+      <<: *default-environment
+      PYTHON_VERSION_SHORT: << parameters.py-version >>
+
+  macos:
+    macos:
+      xcode: "10.1.0"
+    # The macos builder doesn't support different python versions but we define the parameter
+    # anyway to be compatible with the shared step definitions
+    parameters:
+      py-version:
+        <<: *py-version-template
+    working_directory: ~/raiden
+    environment:
+      <<: *default-environment
+
+
+commands:
+  conditional-skip:
+    description: "Check commit message for skip tag and skip job if found"
+    steps:
+      - run:
+          name: Skip Tag Check
+          command: source .circleci/conditional_skip.sh
+
+  config-path:
+    description: "set environment variables and change path to use venv"
+    steps:
+      - run:
+          name: Configuring PATH
+          command: |
+            echo 'export PATH=~/venv-${PYTHON_VERSION_SHORT}/bin:~/.local/bin:${PATH}' >> ${BASH_ENV}
+            echo 'export RAIDEN_VERSION=$(python setup.py --version)' >> ${BASH_ENV}
+
+  prepare-system:
+    steps:
+      - run:
+          name: Preparing environment
+          command: |
+            echo "export OS_NAME=$(uname -s | sed s/Darwin/macos/ | tr '[:lower:]' '[:upper:]')" >> ${BASH_ENV}
+            echo ${GETH_VERSION} > /tmp/geth-version
+            echo ${SOLC_VERSION} > /tmp/solc-version
+            echo "SHA: ${CIRCLE_SHA1}"
+            echo "TAG: ${CIRCLE_TAG}"
+
+      - checkout
+
+      # This needs to be done here in order for the .egg-info directory to be included in the
+      # workspace. Luckily we don't need a virtualenv for this step.
+      - run:
+          name: Generate .egg-info
+          command: python setup.py egg_info
+
+      - restore_cache:
+          key: system-deps-geth-{{ checksum "/tmp/geth-version" }}-solc-{{ checksum "/tmp/solc-version" }}
+
+      - run:
+          name: Installing System Dependencies
+          command: .circleci/fetch_geth_solc.sh
+      - save_cache:
+          key: system-deps-geth-{{ checksum "/tmp/geth-version" }}-solc-{{ checksum "/tmp/solc-version" }}
+          paths:
+          - "~/.local"
+      - run:
+          name: Fetch PR Base Commit
+          command: source .circleci/fetch_pr_base_commit.sh
+      - persist_to_workspace:
+          root: "~"
+          paths:
+          - .local
+          - raiden
+
+  prepare-python:
+    parameters:
+      py-version:
+        <<: *py-version-template
+    steps:
+      - attach_workspace:
+          at: "~"
+      - conditional-skip
+      - config-path
+      - restore_cache:
+          key: pip-cache-<< parameters.py-version >>
+      - restore_cache:
+          keys:
+          - 'python-deps-<< parameters.py-version >>-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}'
+          - 'python-deps-<< parameters.py-version >>-'
+      - run:
+          name: Creating virtualenv
+          command: |
+            if [ ! -x ~/venv-<< parameters.py-version >>/bin/python ]; then
+              python -m venv ~/venv-<< parameters.py-version >>
+            fi
+            echo 'export VENV_PATH="$HOME/venv-<< parameters.py-version >>"' >> ${BASH_ENV}
+      - run:
+          name: Installing dependencies
+          command: |
+            . ${VENV_PATH}/bin/activate
+            pip install -U 'pip<19.0.0' wheel
+            pip install -c constraints.txt readme_renderer pyinstaller s3cmd
+            pip install -c constraints.txt -r requirements-dev.txt -e .
+      - save_cache:
+          key: python-deps-<< parameters.py-version >>-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}
+          paths:
+          - "~/venv-<< parameters.py-version >>"
+      - save_cache:
+          key: pip-cache-<< parameters.py-version >>
+          paths:
+          - "~/.cache/pip"
+      - persist_to_workspace:
+          root: "~"
+          paths:
+          - venv-<< parameters.py-version >>
+
+jobs:
+  prepare-system-linux:
+    executor: docker
+    steps:
+      - prepare-system
+
+  prepare-system-macos:
+    executor: macos
+    steps:
+      - prepare-system
+
+  prepare-python-linux:
+    parameters:
+      py-version:
+        <<: *py-version-template
+
+    executor:
+      name: docker
+      py-version: << parameters.py-version >>
+
+    steps:
+      - prepare-python:
+          py-version: << parameters.py-version >>
+
+  prepare-python-macos:
+    parameters:
+      py-version:
+        <<: *py-version-template
+
+    executor: macos
+
+    steps:
+      - prepare-python
+
+  lint:
+    parameters:
+      py-version:
+        <<: *py-version-template
+
+    executor:
+      name: docker
+      py-version: << parameters.py-version >>
+
+    steps:
+    - attach_workspace:
+        at: "~"
+    - conditional-skip
+    - config-path
+    - run:
+        name: Validate CircleCI Config
+        command: python tools/check_circleci_config.py
+    - run:
+        name: Run Lint
+        command: make lint
+
+  mypy:
+    parameters:
+      py-version:
+        <<: *py-version-template
+
+    executor:
+      name: docker
+      py-version: << parameters.py-version >>
+
+    steps:
+    - attach_workspace:
+        at: "~"
+    - conditional-skip
+    - config-path
+    - run:
+        name: mypy test
+        command: make mypy
+
+  smoketest:
+    parameters:
+      <<: *parameter-templates
+
+    executor:
+      name: docker
+      py-version: << parameters.py-version >>
+
+    steps:
+    - attach_workspace:
+        at: "~"
+    - conditional-skip
+    - config-path
+    - run:
+        name: Set Options
+        command: |
+          set -e
+          set -x
+    - run:
+        name: Running Raiden Smoketest with << parameters.transport-layer >>
+        command: raiden --transport=<< parameters.transport-layer >> smoketest << parameters.additional-args >>
+
+  test:
+    parameters:
+      <<: *parameter-templates
+      test-type:
+        description: "type of test"
+        type: enum
+        enum: ["integration", "unit", "fuzz"]
+      blockchain-type:
+        description: "blockchain type client passed to test run if needed"
+        default: "geth"
+        type: string
+      parallelism:
+        description: "number of containers to be used in parallel for this test"
+        default: 1
+        type: integer
+    executor:
+      name: docker
+      py-version: << parameters.py-version >>
+      resource: << parameters.resource >>
+
+    environment:
+      RAIDEN_TESTS_SYNAPSE_BASE_DIR: /home/circleci/.cache/synapse
+      RAIDEN_TESTS_SYNAPSE_LOGS_DIR: /tmp/synapse-logs
+      RAIDEN_TESTS_GETH_DATADIR: /tmp/geth
+      COVERAGE_DIR: /home/circleci/raiden/coverage
+
+    parallelism: << parameters.parallelism >>
+
+    steps:
+    - attach_workspace:
+        at: "~"
+    - conditional-skip
+    - config-path
+    - restore_cache:
+        key: ethash-{{ checksum "~/.local/bin/geth" }}
+    - restore_cache:
+        keys:
+          - synapse-keys-v1
+          - synapse-keys-
+    # Remove any existing .coverage files so we don't persist them again, causing a conflict.
+    - run:
+        name: Prepare coverage
+        command: |
+          mkdir -p ${COVERAGE_DIR}
+          rm ${COVERAGE_DIR}/.coverage* || true
+    - run:
+        name: Select tests
+        command: |
+          pytest \
+            raiden/tests/<< parameters.test-type >> \
+            --collect-only \
+            --quiet \
+            --blockchain-type=<< parameters.blockchain-type >> \
+            --transport=<< parameters.transport-layer >> \
+            << parameters.additional-args >> \
+            | \
+          grep '::' | \
+          circleci tests split --split-by=timings --timings-type=testname | \
+          grep '::' > selected-tests.txt
+
+          cat selected-tests.txt
+
+    - run:
+        name: Run tests
+        command: |
+          mkdir -p test-reports/test-<< parameters.test-type >>-<< parameters.transport-layer >>-<< parameters.py-version >>
+          coverage run \
+            --include="~/raiden/**/*" \
+            --parallel-mode \
+            --module pytest \
+            raiden/tests \
+            -vvvvvv \
+            --log-config='raiden:DEBUG' \
+            --random \
+            --junit-xml=test-reports/test-<< parameters.test-type >>-<< parameters.transport-layer >>-<< parameters.py-version >>/results.xml \
+            --blockchain-type=<< parameters.blockchain-type >> \
+            --transport=<< parameters.transport-layer >> \
+            --select-fail-on-missing \
+            --select-from-file selected-tests.txt \
+            << parameters.additional-args >>
+
+    - run:
+        name: Store coverage
+        command: |
+          mv .coverage* ${COVERAGE_DIR}
+
+    - persist_to_workspace:
+        root: "~"
+        paths:
+          - "./raiden/coverage"
+
+    - save_cache:
+        key: ethash-{{ checksum "~/.local/bin/geth" }}
+        paths:
+        - "~/.ethash"
+
+    - save_cache:
+        key: synapse-keys-v1
+        paths:
+          - "~/.cache/synapse"
+
+    - store_test_results:
+        path: test-reports
+
+    - store_artifacts:
+        path: test-reports
+        destination: test-reports
+
+    - store_artifacts:
+        path: /tmp/synapse-logs
+        destination: synapse-logs
+
+    - store_artifacts:
+        path: /tmp/geth/logs
+        destination: geth-logs
+
+  finalize:
+    executor:
+      name: docker
+      py-version: "3.7"
+    steps:
+      - attach_workspace:
+          at: "~"
+      - conditional-skip
+      - config-path
+      - run:
+          name: Report to Codecov
+          command: |
+            pip install codecov
+            cd ~/raiden
+            coverage combine coverage
+            codecov
+
+  build-binary-linux:
+    executor:
+      name: docker
+      py-version: "3.7"
+
+    steps:
+      - attach_workspace:
+          at: "~"
+      - conditional-skip
+      - config-path
+      - setup_remote_docker:
+          docker_layer_caching: true
+      - run:
+          name: Build Linux Binary
+          command: |
+            source .circleci/get_archive_tag.sh
+            make bundle-docker
+            echo raiden-${ARCHIVE_TAG}-linux.tar.gz > dist/archive/_LATEST-linux.txt
+      - persist_to_workspace:
+          root: "~"
+          paths:
+            - raiden/dist/archive
+
+  build-binary-macos:
+    executor:
+      name: macos
+      py-version: "3.7"
+
+    steps:
+      - attach_workspace:
+          at: "~"
+      - conditional-skip
+      - config-path
+      - run:
+          name: Prepare build
+          command: |
+            pip uninstall -y pdbpp
+            python setup.py build
+            mkdir -p dist/archive
+            source .circleci/get_archive_tag.sh
+      - run:
+          name: Build macOS Binary
+          command: |
+            pyinstaller --noconfirm --clean raiden.spec
+            zip -9 --junk-paths dist/archive/raiden-${ARCHIVE_TAG}-macOS.zip dist/raiden-${ARCHIVE_TAG}-macOS
+            echo raiden-${ARCHIVE_TAG}-macOS.zip > dist/archive/_LATEST-macOS.txt
+
+  deploy-homebrew:
+    executor:
+      name: docker
+      py-version: "3.7"
+
+    steps:
+      - add_ssh_keys:
+          fingerprints:
+            - "46:b3:a5:c3:d8:21:63:cd:de:6d:07:5d:0c:5d:ba:73"
+      - attach_workspace:
+          at: "~"
+      - conditional-skip
+      - config-path
+      - run:
+          name: Configure Git
+          command: |
+            git config --global user.email "contact@raiden.network"
+            git config --global user.name "Raiden Network"
+      - run:
+          name: Checkout homebrew-raiden
+          command: |
+            git clone git@github.com:raiden-network/homebrew-raiden
+      - run:
+          name: Update Formula
+          command: |
+            source .circleci/get_archive_tag.sh
+            UPDATED_SHA256=$(openssl dgst -sha256 dist/archive/raiden-${ARCHIVE_TAG}-macOS.zip)
+            FORMULA_FILE="homebrew-raiden/raiden.rb"
+            sed -i .bak -E "s/[0-9]+\.[0-9]+\.[0-9]+/${ARCHIVE_TAG/v/}/g" ${FORMULA_FILE}
+            sed -i .bak -E "s/sha256 \"[a-f0-9]\{64\}\"/sha256 \"${UPDATED_SHA256: -64}\"/g" ${FORMULA_FILE}
+            rm $FORMULA_FILE.bak
+      - run:
+          name: Commit and Push Updated Formula
+          command: |
+            pushd homebrew-raiden
+            git add raiden.rb
+            git commit -m "Update formula to ${TRAVIS_TAG}"
+            git tag -a "${TRAVIS_TAG}" -m "${TRAVIS_TAG}"
+            git push --follow-tags
+            popd
+
+
+  deploy-digitalocean:
+    executor:
+      name: docker
+      py-version: "3.7"
+
+    steps:
+      - attach_workspace:
+          at: "~"
+      - conditional-skip
+      - config-path
+      - run:
+          name: upload-to-digitalocean
+          command: .circleci/upload_to_s3.sh $DO_S3_ACCESS_KEY $DO_S3_SECRET_KEY dist/archive/ $DO_S3_BUCKET_NAME ams3.digitaloceanspaces.com
+
+  deploy-github-release:
+    working_directory: ~/raiden
+    docker:
+      - image: cibuilds/github:0.10
+    steps:
+      - attach_workspace:
+          at: "~"
+      - conditional-skip
+      - when:
+          condition: ${CIRCLE_TAG} && ${GITHUB_TOKEN}
+          steps:
+            - run:
+                name: "Publish Release on GitHub"
+                command: |
+                  echo "TAG: ${CIRCLE_TAG}"
+                  RAIDEN_VERSION=${CIRCLE_TAG}
+                  ghr -t ${GITHUB_TOKEN} -u ${CIRCLE_PROJECT_USERNAME} -r ${CIRCLE_PROJECT_REPONAME} -c ${CIRCLE_SHA1} -replace ${RAIDEN_VERSION} build/archive/
+
+  deploy-pypi:
+    executor:
+      name: docker
+      py-version: "3.7"
+
+    steps:
+      - attach_workspace:
+          at: "~"
+      - conditional-skip
+      - config-path
+      - run:
+          name: "install twine"
+          command: pip install twine
+
+      - run:
+          name: "create packages"
+          command: |
+            echo $(python setup.py --version)
+            python setup.py sdist
+            python setup.py bdist_wheel
+      - run:
+          name: "upload to pypi"
+          command: |
+            twine upload -u $PYPI_USER -p $PYPI_PASSWORD dist/*.{tar.gz,whl}
+
+workflows:
+  raiden-default:
+    jobs:
+      - prepare-system-linux
+
+      - prepare-python-linux:
+          name: prepare-python-linux-3.7
+          py-version: '3.7'
+          requires:
+            - prepare-system-linux
+
+      - lint:
+          name: lint-3.7
+          py-version: "3.7"
+          requires:
+            - prepare-python-linux-3.7
+
+      - mypy:
+          name: mypy-3.7
+          py-version: "3.7"
+          requires:
+            - prepare-python-linux-3.7
+
+      - smoketest:
+          name: smoketest-udp-3.7
+          py-version: "3.7"
+          transport-layer: "udp"
+          requires:
+            - prepare-python-linux-3.7
+
+      - smoketest:
+          name: smoketest-matrix-3.7
+          py-version: "3.7"
+          transport-layer: "matrix"
+          requires:
+            - prepare-python-linux-3.7
+
+      - test:
+          name: test-unit-3.7
+          py-version: "3.7"
+          test-type: "unit"
+          blockchain-type: "geth"
+          requires:
+            - prepare-python-linux-3.7
+
+      - test:
+          name: test-fuzz-3.7
+          py-version: "3.7"
+          test-type: "fuzz"
+          blockchain-type: "geth"
+          additional-args: "--hypothesis-show-statistics"
+          requires:
+            - prepare-python-linux-3.7
+
+      - test:
+          name: test-integration-udp-3.7
+          py-version: "3.7"
+          resource: "medium+"
+          test-type: "integration"
+          blockchain-type: "geth"
+          transport-layer: "udp"
+          parallelism: 25
+          requires:
+            - smoketest-udp-3.7
+            - test-unit-3.7
+            - test-fuzz-3.7
+
+      - test:
+          name: test-integration-matrix-3.7
+          py-version: "3.7"
+          resource: "medium+"
+          test-type: "integration"
+          blockchain-type: "geth"
+          transport-layer: "matrix"
+          parallelism: 25
+          requires:
+            - smoketest-matrix-3.7
+            - test-unit-3.7
+            - test-fuzz-3.7
+
+      - finalize:
+          requires:
+            - lint-3.7
+            - mypy-3.7
+            - test-integration-udp-3.7
+            - test-integration-matrix-3.7
+
+  deploy-release:
+    jobs:
+      - prepare-system-linux:
+          filters:
+            <<: *only-tagged-version-filter
+
+      - prepare-system-macos:
+          filters:
+            <<: *only-tagged-version-filter
+
+      - prepare-python-linux:
+          py-version: '3.7'
+          requires:
+            - prepare-system-linux
+          filters:
+            <<: *only-tagged-version-filter
+
+      - prepare-python-macos:
+          py-version: '3.7'
+          requires:
+            - prepare-system-macos
+          filters:
+            <<: *only-tagged-version-filter
+
+      - build-binary-linux:
+          requires:
+            - prepare-python-linux
+          filters:
+            <<: *only-tagged-version-filter
+
+      - build-binary-macos:
+          requires:
+            - prepare-python-macos
+          filters:
+            <<: *only-tagged-version-filter
+
+      - deploy-homebrew:
+          requires:
+            - build-binary-macos
+          filters:
+            <<: *only-tagged-version-filter
+
+      - deploy-digitalocean:
+          context: "Raiden Context"
+          requires:
+            - build-binary-linux
+            - build-binary-macos
+          filters:
+            <<: *only-tagged-version-filter
+
+      - deploy-github-release:
+          context: "Raiden Context"
+          requires:
+            - build-binary-linux
+            - build-binary-macos
+          filters:
+            <<: *only-tagged-version-filter
+
+      - deploy-pypi:
+          context: "Raiden Context"
+          requires:
+            - prepare-python-linux
+          filters:
+            <<: *only-tagged-version-filter
+
+  nightly:
+    jobs:
+      - prepare-system-linux
+
+      - prepare-python-linux:
+          name: prepare-python-linux-3.7
+          py-version: '3.7'
+          requires:
+          - prepare-system-linux
+
+      - lint:
+          name: lint-3.7
+          py-version: "3.7"
+          requires:
+          - prepare-python-linux-3.7
+
+      - mypy:
+          name: mypy-3.7
+          py-version: "3.7"
+          requires:
+          - prepare-python-linux-3.7
+
+      - smoketest:
+          name: smoketest-udp-3.7
+          py-version: "3.7"
+          transport-layer: "udp"
+          requires:
+          - prepare-python-linux-3.7
+
+      - smoketest:
+          name: smoketest-matrix-3.7
+          py-version: "3.7"
+          transport-layer: "matrix"
+          requires:
+          - prepare-python-linux-3.7
+
+      - test:
+          name: test-unit-3.7
+          py-version: "3.7"
+          test-type: "unit"
+          blockchain-type: "geth"
+          requires:
+          - prepare-python-linux-3.7
+
+      - test:
+          name: test-fuzz-3.7
+          py-version: "3.7"
+          test-type: "fuzz"
+          blockchain-type: "geth"
+          additional-args: "--hypothesis-show-statistics"
+          requires:
+          - prepare-python-linux-3.7
+
+      - test:
+          name: test-integration-udp-3.7
+          py-version: "3.7"
+          resource: "medium+"
+          test-type: "integration"
+          blockchain-type: "geth"
+          transport-layer: "udp"
+          parallelism: 25
+          requires:
+          - smoketest-udp-3.7
+          - test-unit-3.7
+          - test-fuzz-3.7
+
+      - test:
+          name: test-integration-matrix-3.7
+          py-version: "3.7"
+          resource: "medium+"
+          test-type: "integration"
+          blockchain-type: "geth"
+          transport-layer: "matrix"
+          parallelism: 25
+          requires:
+          - smoketest-matrix-3.7
+          - test-unit-3.7
+          - test-fuzz-3.7
+
+      - finalize:
+          requires:
+          - lint-3.7
+          - mypy-3.7
+          - test-integration-udp-3.7
+          - test-integration-matrix-3.7
+
+      - build-binary-linux:
+            requires:
+              - finalize
+
+      - prepare-system-macos
+
+      - prepare-python-macos:
+          name: prepare-python-macos-3.7
+          py-version: '3.7'
+          requires:
+            - prepare-system-macos
+
+      - build-binary-macos:
+          requires:
+            - finalize
+            - prepare-python-macos-3.7
+
+      - deploy-digitalocean:
+          context: "Raiden Context"
+          requires:
+            - build-binary-linux
+            - build-binary-macos
+
+    triggers:
+      - schedule:
+          cron: "0 0 * * *"
+          filters:
+            branches:
+              only:
+                - master

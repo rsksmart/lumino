@@ -24,7 +24,6 @@ from gevent import Greenlet
 from gevent.pool import Group, Pool
 from mirakuru import ProcessExitedWithError
 
-from raiden.ui.cli import run as cli_run
 from scenario_player.exceptions import ScenarioError
 from scenario_player.runner import ScenarioRunner
 from scenario_player.utils import HTTPExecutor
@@ -65,10 +64,6 @@ MANAGED_CONFIG_OPTIONS_OVERRIDABLE = {
     'tokennetwork-registry-contract-address',
     'secret-registry-contract-address',
 }
-
-
-KNOWN_OPTIONS = {param.name.replace('_', '-') for param in cli_run.params}
-FLAG_OPTIONS = {param.name.replace('_', '-') for param in cli_run.params if param.is_flag}
 
 
 class NodeState(Enum):
@@ -290,6 +285,7 @@ class NodeRunner:
             (
                 ':info,'
                 'raiden:debug,'
+                'raiden_libs:debug,'
                 'raiden_contracts:debug,'
                 'raiden.api.rest.pywsgi:warning'
             ),
@@ -310,16 +306,8 @@ class NodeRunner:
             if option_name in self._options:
                 cmd.extend([f'--{option_name}', self._options[option_name]])
 
-        remaining_option_candidates = (
-            KNOWN_OPTIONS -
-            MANAGED_CONFIG_OPTIONS -
-            MANAGED_CONFIG_OPTIONS_OVERRIDABLE
-        )
-        for option_name in remaining_option_candidates:
-            if option_name in self._options:
-                cmd.append(f'--{option_name}')
-                if option_name not in FLAG_OPTIONS:
-                    cmd.append(self._options[option_name])
+        if 'environment-type' in self._options:
+            cmd.extend(['--environment-type', self._options['environment-type']])
 
         # Ensure path instances are converted to strings
         cmd = [str(c) for c in cmd]
@@ -388,11 +376,6 @@ class NodeRunner:
                     option_name=option_name,
                     option_value=option_value,
                     node=self._index,
-                )
-
-            if option_name not in KNOWN_OPTIONS:
-                raise ScenarioError(
-                    f'Unknown option "{option_name}" supplied.',
                 )
 
 

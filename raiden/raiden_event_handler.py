@@ -1,9 +1,9 @@
 import structlog
-from eth_utils import to_canonical_address, to_checksum_address, to_hex
+from eth_utils import to_checksum_address, to_hex
 
-from raiden.constants import EMPTY_HASH, EMPTY_SIGNATURE, PATH_FINDING_BROADCASTING_ROOM
+from raiden.constants import EMPTY_HASH, EMPTY_SIGNATURE
 from raiden.exceptions import ChannelOutdatedError, RaidenUnrecoverableError
-from raiden.messages import UpdatePFS, message_from_sendevent
+from raiden.messages import message_from_sendevent
 from raiden.network.proxies import PaymentChannel, TokenNetwork
 from raiden.storage.restore import channel_state_until_state_change
 from raiden.transfer.architecture import Event
@@ -42,8 +42,7 @@ from raiden.transfer.utils import (
     get_state_change_with_balance_proof_by_balance_hash,
     get_state_change_with_balance_proof_by_locksroot,
 )
-from raiden.transfer.views import get_channelstate_by_token_network_and_partner, state_from_raiden
-from raiden.utils import CanonicalIdentifier, pex
+from raiden.utils import pex
 
 # type alias to avoid both circular dependencies and flake8 errors
 RaidenService = 'RaidenService'
@@ -60,20 +59,12 @@ UNEVENTFUL_EVENTS = (
     EventInvalidReceivedUnlock,
 )
 
-SEND_BALANCE_PROOF_EVENTS = (
-    SendBalanceProof,
-    SendLockedTransfer,
-    SendLockExpired,
-    SendRefundTransfer,
-)
-
 
 class RaidenEventHandler:
+    # pylint: disable=no-self-use
 
     def on_raiden_event(self, raiden: RaidenService, event: Event):
         # pylint: disable=too-many-branches
-        if type(event) in SEND_BALANCE_PROOF_EVENTS:
-            self.update_pfs(raiden, event)
 
         if type(event) == SendLockExpired:
             self.handle_send_lockexpired(raiden, event)
@@ -114,8 +105,8 @@ class RaidenEventHandler:
                 node=pex(raiden.address),
             )
 
-    @staticmethod
     def handle_send_lockexpired(
+            self,
             raiden: RaidenService,
             send_lock_expired: SendLockExpired,
     ):
@@ -126,8 +117,8 @@ class RaidenEventHandler:
             lock_expired_message,
         )
 
-    @staticmethod
     def handle_send_lockedtransfer(
+            self,
             raiden: RaidenService,
             send_locked_transfer: SendLockedTransfer,
     ):
@@ -138,8 +129,8 @@ class RaidenEventHandler:
             mediated_transfer_message,
         )
 
-    @staticmethod
     def handle_send_secretreveal(
+            self,
             raiden: RaidenService,
             reveal_secret_event: SendSecretReveal,
     ):
@@ -150,8 +141,8 @@ class RaidenEventHandler:
             reveal_secret_message,
         )
 
-    @staticmethod
     def handle_send_balanceproof(
+            self,
             raiden: RaidenService,
             balance_proof_event: SendBalanceProof,
     ):
@@ -162,8 +153,8 @@ class RaidenEventHandler:
             unlock_message,
         )
 
-    @staticmethod
     def handle_send_secretrequest(
+            self,
             raiden: RaidenService,
             secret_request_event: SendSecretRequest,
     ):
@@ -174,8 +165,8 @@ class RaidenEventHandler:
             secret_request_message,
         )
 
-    @staticmethod
     def handle_send_refundtransfer(
+            self,
             raiden: RaidenService,
             refund_transfer_event: SendRefundTransfer,
     ):
@@ -186,8 +177,8 @@ class RaidenEventHandler:
             refund_transfer_message,
         )
 
-    @staticmethod
     def handle_send_processed(
+            self,
             raiden: RaidenService,
             processed_event: SendProcessed,
     ):
@@ -198,8 +189,8 @@ class RaidenEventHandler:
             processed_message,
         )
 
-    @staticmethod
     def handle_paymentsentsuccess(
+            self,
             raiden: RaidenService,
             payment_sent_success_event: EventPaymentSentSuccess,
     ):
@@ -210,10 +201,13 @@ class RaidenEventHandler:
         # With the introduction of the lock we should always get
         # here only once per identifier so payment_status should always exist
         # see: https://github.com/raiden-network/raiden/pull/3191
-        payment_status.payment_done.set(True)
+        payment_status.payment_done.set({
+            'secret': payment_status.secret,
+            'secret_hash': payment_status.secret_hash,
+        })
 
-    @staticmethod
     def handle_paymentsentfailed(
+            self,
             raiden: RaidenService,
             payment_sent_failed_event: EventPaymentSentFailed,
     ):
@@ -229,8 +223,8 @@ class RaidenEventHandler:
         if payment_status:
             payment_status.payment_done.set(False)
 
-    @staticmethod
     def handle_unlockfailed(
+            self,
             raiden: RaidenService,
             unlock_failed_event: EventUnlockFailed,
     ):
@@ -242,18 +236,15 @@ class RaidenEventHandler:
             node=pex(raiden.address),
         )
 
-    @staticmethod
     def handle_contract_send_secretreveal(
+            self,
             raiden: RaidenService,
             channel_reveal_secret_event: ContractSendSecretReveal,
     ):
-        raiden.default_secret_registry.register_secret(
-            secret=channel_reveal_secret_event.secret,
-            given_block_identifier=channel_reveal_secret_event.triggered_by_block_hash,
-        )
+        raiden.default_secret_registry.register_secret(channel_reveal_secret_event.secret)
 
-    @staticmethod
     def handle_contract_send_channelclose(
+            self,
             raiden: RaidenService,
             channel_close_event: ContractSendChannelClose,
     ):
@@ -277,15 +268,14 @@ class RaidenEventHandler:
         )
 
         channel_proxy.close(
-            nonce=nonce,
-            balance_hash=balance_hash,
-            additional_hash=message_hash,
-            signature=signature,
-            block_identifier=channel_close_event.triggered_by_block_hash,
+            nonce,
+            balance_hash,
+            message_hash,
+            signature,
         )
 
-    @staticmethod
     def handle_contract_send_channelupdate(
+            self,
             raiden: RaidenService,
             channel_update_event: ContractSendChannelUpdateTransfer,
     ):
@@ -301,11 +291,9 @@ class RaidenEventHandler:
                 nonce=balance_proof.nonce,
                 balance_hash=balance_proof.balance_hash,
                 additional_hash=balance_proof.message_hash,
-                canonical_identifier=CanonicalIdentifier(
-                    chain_identifier=balance_proof.chain_id,
-                    token_network_address=balance_proof.token_network_identifier,
-                    channel_identifier=balance_proof.channel_identifier,
-                ),
+                channel_identifier=balance_proof.channel_identifier,
+                token_network_identifier=balance_proof.token_network_identifier,
+                chain_id=balance_proof.chain_id,
                 partner_signature=balance_proof.signature,
             )
             our_signature = raiden.signer.sign(data=non_closing_data)
@@ -317,7 +305,6 @@ class RaidenEventHandler:
                     additional_hash=balance_proof.message_hash,
                     partner_signature=balance_proof.signature,
                     signature=our_signature,
-                    block_identifier=channel_update_event.triggered_by_block_hash,
                 )
             except ChannelOutdatedError as e:
                 log.error(
@@ -325,8 +312,8 @@ class RaidenEventHandler:
                     node=pex(raiden.address),
                 )
 
-    @staticmethod
     def handle_contract_send_channelunlock(
+            self,
             raiden: RaidenService,
             channel_unlock_event: ContractSendChannelBatchUnlock,
     ):
@@ -334,7 +321,6 @@ class RaidenEventHandler:
         channel_identifier = channel_unlock_event.channel_identifier
         participant = channel_unlock_event.participant
         token_address = channel_unlock_event.token_address
-        triggered_by_block_hash = channel_unlock_event.triggered_by_block_hash
 
         payment_channel: PaymentChannel = raiden.chain.payment_channel(
             token_network_address=token_network_identifier,
@@ -345,7 +331,7 @@ class RaidenEventHandler:
         participants_details = token_network.detail_participants(
             participant1=raiden.address,
             participant2=participant,
-            block_identifier=triggered_by_block_hash,
+            block_identifier='latest',
             channel_identifier=channel_identifier,
         )
 
@@ -427,25 +413,21 @@ class RaidenEventHandler:
             merkle_tree_leaves = get_batch_unlock(our_state)
 
         try:
-            payment_channel.unlock(
-                merkle_tree_leaves=merkle_tree_leaves,
-                block_identifier=triggered_by_block_hash,
-            )
+            payment_channel.unlock(merkle_tree_leaves)
         except ChannelOutdatedError as e:
             log.error(
                 str(e),
                 node=pex(raiden.address),
             )
 
-    @staticmethod
     def handle_contract_send_channelsettle(
+            self,
             raiden: RaidenService,
             channel_settle_event: ContractSendChannelSettle,
     ):
         chain_id = raiden.chain.network_id
         token_network_identifier = channel_settle_event.token_network_identifier
         channel_identifier = channel_settle_event.channel_identifier
-        triggered_by_block_hash = channel_settle_event.triggered_by_block_hash
 
         payment_channel: PaymentChannel = raiden.chain.payment_channel(
             token_network_address=channel_settle_event.token_network_identifier,
@@ -456,7 +438,7 @@ class RaidenEventHandler:
         participants_details = token_network_proxy.detail_participants(
             participant1=payment_channel.participant1,
             participant2=payment_channel.participant2,
-            block_identifier=triggered_by_block_hash,
+            block_identifier='latest',
             channel_identifier=channel_settle_event.channel_identifier,
         )
 
@@ -540,37 +522,10 @@ class RaidenEventHandler:
             partner_locksroot = EMPTY_HASH
 
         payment_channel.settle(
-            transferred_amount=our_transferred_amount,
-            locked_amount=our_locked_amount,
-            locksroot=our_locksroot,
-            partner_transferred_amount=partner_transferred_amount,
-            partner_locked_amount=partner_locked_amount,
-            partner_locksroot=partner_locksroot,
-            block_identifier=triggered_by_block_hash,
-        )
-
-    @staticmethod
-    def update_pfs(raiden: RaidenService, event: Event):
-        channel_state = get_channelstate_by_token_network_and_partner(
-            chain_state=state_from_raiden(raiden),
-            token_network_id=to_canonical_address(
-                event.balance_proof.token_network_identifier,
-            ),
-            partner_address=to_canonical_address(event.recipient),
-        )
-        error_msg = 'tried to send a balance proof in non-existant channel '
-        f'token_network_address: {pex(event.balance_proof.token_network_identifier)} '
-        f'recipient: {pex(event.recipient)}'
-        assert channel_state is not None, error_msg
-
-        msg = UpdatePFS.from_balance_proof(
-            balance_proof=event.balance_proof,
-            reveal_timeout=channel_state.reveal_timeout,
-        )
-        msg.sign(raiden.signer)
-        raiden.transport.send_global(PATH_FINDING_BROADCASTING_ROOM, msg)
-        log.debug(
-            'sent a PFS Update',
-            balance_proof=event.balance_proof,
-            recipient=event.recipient,
+            our_transferred_amount,
+            our_locked_amount,
+            our_locksroot,
+            partner_transferred_amount,
+            partner_locked_amount,
+            partner_locksroot,
         )

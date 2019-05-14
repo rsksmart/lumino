@@ -8,10 +8,67 @@ from eth_utils import to_canonical_address, to_checksum_address
 
 from raiden.constants import DEFAULT_HTTP_REQUEST_TIMEOUT
 from raiden.transfer import channel, views
-from raiden.transfer.state import CHANNEL_STATE_OPENED, ChainState, RouteState
+from raiden.transfer.state import (
+    CHANNEL_STATE_OPENED,
+    NODE_NETWORK_REACHABLE,
+    NODE_NETWORK_UNKNOWN,
+    ChainState,
+    NettingChannelState,
+    RouteState,
+)
 from raiden.utils import pex, typing
 
 log = structlog.get_logger(__name__)  # pylint: disable=invalid-name
+
+
+def check_channel_constraints(
+        channel_state: NettingChannelState,
+        from_address: typing.InitiatorAddress,
+        partner_address: typing.Address,
+        amount: int,
+        network_statuses: Dict[typing.Address, str],
+        routing_module: str,
+) -> bool:
+    # check channel state
+    if channel.get_status(channel_state) != CHANNEL_STATE_OPENED:
+        log.info(
+            'Channel is not opened, ignoring',
+            from_address=pex(from_address),
+            partner_address=pex(partner_address),
+            routing_source=routing_module,
+        )
+        return False
+
+    # check channel distributable
+    distributable = channel.get_distributable(
+        channel_state.our_state,
+        channel_state.partner_state,
+    )
+
+    if amount > distributable:
+        log.info(
+            'Channel doesnt have enough funds, ignoring',
+            from_address=pex(from_address),
+            partner_address=pex(partner_address),
+            amount=amount,
+            distributable=distributable,
+            routing_source=routing_module,
+        )
+        return False
+
+    # check channel partner reachability
+    network_state = network_statuses.get(partner_address, NODE_NETWORK_UNKNOWN)
+    if network_state != NODE_NETWORK_REACHABLE:
+        log.info(
+            'Partner for channel isn\'t reachable, ignoring',
+            from_address=pex(from_address),
+            partner_address=pex(partner_address),
+            status=network_state,
+            routing_source=routing_module,
+        )
+        return False
+
+    return True
 
 
 def get_best_routes(
@@ -37,10 +94,6 @@ def get_best_routes(
         )
 
         if pfs_answer_ok:
-            log.info(
-                'Received route(s) from PFS',
-                routes=pfs_routes,
-            )
             return pfs_routes
         else:
             log.warning(
@@ -82,6 +135,8 @@ def get_best_routes_internal(
         token_network_id,
     )
 
+    network_statuses = views.get_networkstatuses(chain_state)
+
     neighbors_heap = list()
     try:
         all_neighbors = networkx.all_neighbors(token_network.network_graph.network, from_address)
@@ -101,13 +156,15 @@ def get_best_routes_internal(
             partner_address,
         )
 
-        if channel.get_status(channel_state) != CHANNEL_STATE_OPENED:
-            log.info(
-                'Channel is not opened, ignoring',
-                from_address=pex(from_address),
-                partner_address=pex(partner_address),
-                routing_source='Internal Routing',
-            )
+        channel_constraints_fulfilled = check_channel_constraints(
+            channel_state=channel_state,
+            from_address=from_address,
+            partner_address=partner_address,
+            amount=amount,
+            network_statuses=network_statuses,
+            routing_module='Internal Routing',
+        )
+        if not channel_constraints_fulfilled:
             continue
 
         nonrefundable = amount > channel.get_distributable(
@@ -165,7 +222,7 @@ def get_best_routes_pfs(
 
     # check that the response is successful
     try:
-        response = requests.post(pfs_path, data=payload, timeout=DEFAULT_HTTP_REQUEST_TIMEOUT)
+        response = requests.get(pfs_path, params=payload, timeout=DEFAULT_HTTP_REQUEST_TIMEOUT)
     except requests.RequestException:
         log.warning(
             'Could not connect to Pathfinding Service',
@@ -209,6 +266,7 @@ def get_best_routes_pfs(
         return False, []
 
     paths = []
+    network_statuses = views.get_networkstatuses(chain_state)
     for path_object in response_json['result']:
         path = path_object['path']
 
@@ -226,14 +284,15 @@ def get_best_routes_pfs(
             partner_address=partner_address,
         )
 
-        # check channel state
-        if channel.get_status(channel_state) != CHANNEL_STATE_OPENED:
-            log.info(
-                'Channel is not opened, ignoring',
-                from_address=pex(from_address),
-                partner_address=pex(partner_address),
-                routing_source='Pathfinding Service',
-            )
+        channel_constraints_fulfilled = check_channel_constraints(
+            channel_state=channel_state,
+            from_address=from_address,
+            partner_address=partner_address,
+            amount=amount,
+            network_statuses=network_statuses,
+            routing_module='Pathfinding Service',
+        )
+        if not channel_constraints_fulfilled:
             continue
 
         paths.append(RouteState(

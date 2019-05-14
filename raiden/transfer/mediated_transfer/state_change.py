@@ -73,7 +73,7 @@ class ActionInitInitiator(StateChange):
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'ActionInitInitiator':
+    def from_dict(cls, data) -> 'ActionInitInitiator':
         return cls(
             transfer_description=data['transfer'],
             routes=data['routes'],
@@ -233,11 +233,11 @@ class ReceiveLockExpired(BalanceProofStateChange):
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'ReceiveLockExpired':
+    def from_dict(cls, data) -> 'ReceiveLockExpired':
         return cls(
             balance_proof=data['balance_proof'],
-            secrethash=SecretHash(deserialize_bytes(data['secrethash'])),
-            message_identifier=MessageID(int(data['message_identifier'])),
+            secrethash=deserialize_bytes(data['secrethash']),
+            message_identifier=int(data['message_identifier']),
         )
 
 
@@ -292,12 +292,12 @@ class ReceiveSecretRequest(AuthenticatedSenderStateChange):
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'ReceiveSecretRequest':
+    def from_dict(cls, data) -> 'ReceiveSecretRequest':
         instance = cls(
-            payment_identifier=PaymentID(int(data['payment_identifier'])),
-            amount=PaymentAmount(int(data['amount'])),
-            expiration=BlockExpiration(int(data['expiration'])),
-            secrethash=SecretHash(deserialize_bytes(data['secrethash'])),
+            payment_identifier=int(data['payment_identifier']),
+            amount=int(data['amount']),
+            expiration=int(data['expiration']),
+            secrethash=deserialize_bytes(data['secrethash']),
             sender=to_canonical_address(data['sender']),
         )
         instance.revealsecret = data['revealsecret']
@@ -343,9 +343,9 @@ class ReceiveSecretReveal(AuthenticatedSenderStateChange):
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'ReceiveSecretReveal':
+    def from_dict(cls, data) -> 'ReceiveSecretReveal':
         instance = cls(
-            secret=Secret(deserialize_bytes(data['secret'])),
+            secret=deserialize_bytes(data['secret']),
             sender=to_canonical_address(data['sender']),
         )
         instance.secrethash = deserialize_bytes(data['secrethash'])
@@ -403,11 +403,11 @@ class ReceiveTransferRefundCancelRoute(BalanceProofStateChange):
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'ReceiveTransferRefundCancelRoute':
+    def from_dict(cls, data) -> 'ReceiveTransferRefundCancelRoute':
         instance = cls(
             routes=data['routes'],
             transfer=data['transfer'],
-            secret=Secret(deserialize_bytes(data['secret'])),
+            secret=deserialize_bytes(data['secret']),
         )
         return instance
 
@@ -452,7 +452,7 @@ class ReceiveTransferRefund(BalanceProofStateChange):
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'ReceiveTransferRefund':
+    def from_dict(cls, data) -> 'ReceiveTransferRefund':
         instance = cls(
             routes=data['routes'],
             transfer=data['transfer'],

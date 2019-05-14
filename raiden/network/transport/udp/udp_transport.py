@@ -23,16 +23,15 @@ from raiden.settings import CACHE_TTL
 from raiden.transfer.mediated_transfer.events import CHANNEL_IDENTIFIER_GLOBAL_QUEUE
 from raiden.transfer.queue_identifier import QueueIdentifier
 from raiden.transfer.state_change import ActionChangeNodeNetworkState
-from raiden.utils import pex
+from raiden.utils import pex, typing
 from raiden.utils.notifying_queue import NotifyingQueue
 from raiden.utils.runnable import Runnable
-from raiden.utils.typing import MYPY_ANNOTATION, Address, Dict, List, MessageID, Tuple
 
 log = structlog.get_logger(__name__)  # pylint: disable=invalid-name
 log_healthcheck = structlog.get_logger(__name__ + '.healthcheck')  # pylint: disable=invalid-name
 
-QueueItem_T = Tuple[bytes, int]
-Queue_T = List[QueueItem_T]
+QueueItem_T = typing.Tuple[bytes, int]
+Queue_T = typing.List[QueueItem_T]
 
 # GOALS:
 # - Each netting channel must have the messages processed in-order, the
@@ -47,7 +46,7 @@ Queue_T = List[QueueItem_T]
 
 def single_queue_send(
         transport: 'UDPTransport',
-        recipient: Address,
+        recipient: typing.Address,
         queue: Queue_T,
         queue_identifier: QueueIdentifier,
         event_stop: Event,
@@ -162,7 +161,7 @@ class UDPTransport(Runnable):
     def __init__(self, address, discovery, udpsocket, throttle_policy, config):
         super().__init__()
         # these values are initialized by the start method
-        self.queueids_to_queues: Dict = dict()
+        self.queueids_to_queues: typing.Dict = dict()
         self.raiden: RaidenService
         self.message_handler: MessageHandler
 
@@ -207,7 +206,7 @@ class UDPTransport(Runnable):
             self,
             raiden_service: RaidenService,
             message_handler: MessageHandler,
-            prev_auth_data: str,  # pylint: disable=unused-argument
+            prev_auth_data: str,
     ):
         if not self.event_stop.ready():
             raise RuntimeError('UDPTransport started while running')
@@ -230,7 +229,7 @@ class UDPTransport(Runnable):
 
         log.debug('UDP transport started')
 
-    def _run(self):  # pylint: disable=method-hidden
+    def _run(self):
         """ Runnable main method, perform wait on long-running subtasks """
         try:
             self.event_stop.wait()
@@ -286,7 +285,7 @@ class UDPTransport(Runnable):
 
         return self.addresses_events[recipient]
 
-    def whitelist(self, address: Address):  # pylint: disable=no-self-use,unused-argument
+    def whitelist(self, address: typing.Address):
         """Whitelist peer address to receive communications from
 
         This may be called before transport is started, to ensure events generated during
@@ -334,8 +333,8 @@ class UDPTransport(Runnable):
     def init_queue_for(
             self,
             queue_identifier: QueueIdentifier,
-            items: List[QueueItem_T],
-    ) -> NotifyingQueue:
+            items: typing.List[QueueItem_T],
+    ) -> Queue_T:
         """ Create the queue identified by the queue_identifier
         and initialize it with `items`.
         """
@@ -383,7 +382,7 @@ class UDPTransport(Runnable):
     def get_queue_for(
             self,
             queue_identifier: QueueIdentifier,
-    ) -> NotifyingQueue:
+    ) -> Queue_T:
         """ Return the queue identified by the given queue identifier.
 
         If the queue doesn't exist it will be instantiated.
@@ -391,7 +390,7 @@ class UDPTransport(Runnable):
         queue = self.queueids_to_queues.get(queue_identifier)
 
         if queue is None:
-            items: List[QueueItem_T] = list()
+            items = ()
             queue = self.init_queue_for(queue_identifier, items)
 
         return queue
@@ -437,15 +436,7 @@ class UDPTransport(Runnable):
                 message=message,
             )
 
-    def send_global(  # pylint: disable=unused-argument
-            self,
-            room: str,
-            message: Message,
-    ) -> None:
-        """ This method exists only for interface compatibility with MatrixTransport """
-        self.log.warning('UDP is unable to send global messages. Ignoring')
-
-    def maybe_send(self, recipient: Address, message: Message):
+    def maybe_send(self, recipient: typing.Address, message: Message):
         """ Send message to recipient if the transport is running. """
 
         if not is_binary_address(recipient):
@@ -458,9 +449,9 @@ class UDPTransport(Runnable):
 
     def maybe_sendraw_with_result(
             self,
-            recipient: Address,
+            recipient: typing.Address,
             messagedata: bytes,
-            message_id: MessageID,
+            message_id: typing.MessageID,
     ) -> AsyncResult:
         """ Send message to recipient if the transport is running.
 
@@ -479,7 +470,7 @@ class UDPTransport(Runnable):
 
         return async_result
 
-    def maybe_sendraw(self, host_port: Tuple[int, int], messagedata: bytes):
+    def maybe_sendraw(self, host_port: typing.Tuple[int, int], messagedata: bytes):
         """ Send message to recipient if the transport is running. """
 
         # Don't sleep if timeout is zero, otherwise a context-switch is done
@@ -499,7 +490,7 @@ class UDPTransport(Runnable):
     def receive(
             self,
             messagedata: bytes,
-            host_port: Tuple[str, int],  # pylint: disable=unused-argument
+            host_port: typing.Tuple[str, int],  # pylint: disable=unused-argument
     ) -> bool:
         """ Handle an UDP packet. """
         # pylint: disable=unidiomatic-typecheck
@@ -523,13 +514,10 @@ class UDPTransport(Runnable):
             return False
 
         if type(message) == Pong:
-            assert isinstance(message, Pong), MYPY_ANNOTATION
             self.receive_pong(message)
         elif type(message) == Ping:
-            assert isinstance(message, Ping), MYPY_ANNOTATION
             self.receive_ping(message)
         elif type(message) == Delivered:
-            assert isinstance(message, Delivered), MYPY_ANNOTATION
             self.receive_delivered(message)
         elif message is not None:
             self.receive_message(message)
@@ -563,7 +551,7 @@ class UDPTransport(Runnable):
         #   state change
         # - Decode it, save to the WAL, and process it (the current
         #   implementation)
-        delivered_message = Delivered(delivered_message_identifier=message.message_identifier)
+        delivered_message = Delivered(message.message_identifier)
         self.raiden.sign(delivered_message)
 
         self.maybe_send(
@@ -607,7 +595,7 @@ class UDPTransport(Runnable):
             sender=pex(ping.sender),
         )
 
-        pong = Pong(nonce=ping.nonce)
+        pong = Pong(ping.nonce)
         self.raiden.sign(pong)
 
         try:
@@ -651,6 +639,6 @@ class UDPTransport(Runnable):
 
         return message_data
 
-    def set_node_network_state(self, node_address: Address, node_state):
+    def set_node_network_state(self, node_address: typing.Address, node_state):
         state_change = ActionChangeNodeNetworkState(node_address, node_state)
-        self.raiden.handle_and_track_state_change(state_change)
+        self.raiden.handle_state_change(state_change)

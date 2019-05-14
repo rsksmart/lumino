@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 from raiden.messages import Lock
 from raiden.storage.serialize import JSONSerializer
-from raiden.storage.sqlite import SerializedSQLiteStorage
+from raiden.storage.sqlite import SQLiteStorage
 from raiden.tests.utils import factories
 from raiden.transfer.mediated_transfer.events import (
     SendBalanceProof,
@@ -25,7 +25,7 @@ from raiden.transfer.utils import (
     get_event_with_balance_proof_by_balance_hash,
     get_state_change_with_balance_proof_by_balance_hash,
 )
-from raiden.utils import CanonicalIdentifier, sha3
+from raiden.utils import sha3
 
 
 def make_signed_balance_proof_from_counter(counter):
@@ -55,11 +55,9 @@ def make_balance_proof_from_counter(counter) -> BalanceProofUnsignedState:
         transferred_amount=next(counter),
         locked_amount=next(counter),
         locksroot=sha3(next(counter).to_bytes(1, 'big')),
-        canonical_identifier=CanonicalIdentifier(
-            chain_identifier=next(counter),
-            token_network_address=factories.make_address(),
-            channel_identifier=next(counter),
-        ),
+        token_network_identifier=factories.make_address(),
+        channel_identifier=next(counter),
+        chain_id=next(counter),
     )
 
 
@@ -80,7 +78,7 @@ def make_signed_transfer_from_counter(counter):
         secrethash=sha3(factories.make_secret(next(counter))),
     )
 
-    signed_transfer = factories.make_signed_transfer_state(
+    signed_transfer = factories.make_signed_transfer(
         amount=next(counter),
         initiator=factories.make_address(),
         target=factories.make_address(),
@@ -141,7 +139,7 @@ def test_get_state_change_with_balance_proof():
     querying the database.
     """
     serializer = JSONSerializer
-    storage = SerializedSQLiteStorage(':memory:', serializer)
+    storage = SQLiteStorage(':memory:', serializer)
     counter = itertools.count()
 
     lock_expired = ReceiveLockExpired(
@@ -220,7 +218,7 @@ def test_get_event_with_balance_proof():
     querying the database.
     """
     serializer = JSONSerializer
-    storage = SerializedSQLiteStorage(':memory:', serializer)
+    storage = SQLiteStorage(':memory:', serializer)
     counter = itertools.count()
 
     lock_expired = SendLockExpired(
@@ -288,7 +286,7 @@ def test_get_event_with_balance_proof():
 def test_log_run():
     with patch('raiden.storage.sqlite.get_system_spec') as get_speck_mock:
         get_speck_mock.return_value = dict(raiden='1.2.3')
-        store = SerializedSQLiteStorage(':memory:', None)
+        store = SQLiteStorage(':memory:', None)
         store.log_run()
     cursor = store.conn.cursor()
     cursor.execute('SELECT started_at, raiden_version FROM runs')

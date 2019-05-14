@@ -7,7 +7,6 @@ import traceback
 from copy import deepcopy
 from io import StringIO
 from tempfile import mktemp
-from typing import Any, Dict, List, Tuple
 
 import click
 import structlog
@@ -23,11 +22,7 @@ from raiden.exceptions import ReplacementTransactionUnderpriced, TransactionAlre
 from raiden.log_config import configure_logging
 from raiden.network.sockfactory import SocketFactory
 from raiden.network.utils import get_free_port
-from raiden.settings import (
-    DEFAULT_NUMBER_OF_BLOCK_CONFIRMATIONS,
-    DEVELOPMENT_CONTRACT_VERSION,
-    INITIAL_PORT,
-)
+from raiden.settings import INITIAL_PORT
 from raiden.tests.utils.transport import make_requests_insecure, matrix_server_starter
 from raiden.utils import get_system_spec, merge_dict, split_endpoint
 from raiden.utils.cli import (
@@ -43,26 +38,13 @@ from raiden.utils.cli import (
     group,
     option,
     option_group,
-    validate_option_dependencies,
 )
-from raiden.waiting import wait_for_block
 from raiden_contracts.constants import CONTRACT_ENDPOINT_REGISTRY, CONTRACT_TOKEN_NETWORK_REGISTRY
 
 from .app import run_app
 from .runners import EchoNodeRunner, MatrixRunner, UDPRunner
 
 log = structlog.get_logger(__name__)
-
-
-OPTION_DEPENDENCIES: Dict[str, List[Tuple[str, Any]]] = {
-    'pathfinding-service-address': [('transport', 'matrix')],
-    'enable-monitoring': [('transport', 'matrix')],
-    'matrix-server': [('transport', 'matrix')],
-    'listen-address': [('transport', 'udp')],
-    'max-unresponsive-time': [('transport', 'udp')],
-    'send-ping-time': [('transport', 'udp')],
-    'nat': [('transport', 'udp')],
-}
 
 
 def options(func):
@@ -74,7 +56,7 @@ def options(func):
         option(
             '--datadir',
             help='Directory for storing raiden data.',
-            default=lambda: os.path.join(os.path.expanduser('~'), '.raiden'),
+            default=os.path.join(os.path.expanduser('~'), '.raiden'),
             type=click.Path(
                 exists=False,
                 dir_okay=True,
@@ -223,29 +205,18 @@ def options(func):
                 type=str,
                 show_default=True,
             ),
-        ),
-        option_group(
-            'Raiden Services Options',
             option(
                 '--pathfinding-service-address',
-                help=(
-                    'URL to the Raiden path finding service to request paths from.\n'
-                    'Example: https://pfs-ropsten.services-dev.raiden.network'
-                ),
+                help='"host:port" for the raiden pathfinding service to request paths.',
                 type=str,
                 show_default=True,
             ),
             option(
                 '--pathfinding-max-paths',
-                help='Set maximum number of paths to be requested from the path finding service.',
+                help='sets maximum paths to be requested from the pathfinding service.',
                 default=3,
                 type=int,
                 show_default=True,
-            ),
-            option(
-                '--enable-monitoring',
-                help='Enable broadcasting of balance proofs to the monitoring services.',
-                is_flag=True,
             ),
         ),
         option_group(
@@ -375,6 +346,24 @@ def options(func):
             ),
         ),
         option_group(
+            'RNS  options',
+            option(
+                '--rnsdomain',
+                help='Node RNS domain name.',
+                type=str,
+                show_default=True,
+            ),
+        ),
+        option_group(
+            'Lumino explorer options',
+            option(
+                '--discoverable',
+                help='If specified then the node will be registered on Lumino Explorer.',
+                is_flag=True,
+                default=False,
+            ),
+        ),
+        option_group(
             'Debugging options',
             option(
                 '--unrecoverable-error-should-crash',
@@ -403,13 +392,12 @@ def run(ctx, **kwargs):
     if kwargs['config_file']:
         apply_config_file(run, kwargs, ctx)
 
-    validate_option_dependencies(run, ctx, kwargs, OPTION_DEPENDENCIES)
-
     if ctx.invoked_subcommand is not None:
         # Pass parsed args on to subcommands.
         ctx.obj = kwargs
         return
 
+    runner = None
     if kwargs['transport'] == 'udp':
         runner = UDPRunner(kwargs, ctx)
     elif kwargs['transport'] == 'matrix':
@@ -422,43 +410,39 @@ def run(ctx, **kwargs):
     click.secho(
         textwrap.dedent(
             '''\
-            ----------------------------------------------------------------------
-            | This is an Alpha version of experimental open source software      |
-            | released as a test version under an MIT license and may contain    |
-            | errors and/or bugs. No guarantee or representations whatsoever is  |
-            | made regarding its suitability (or its use) for any purpose or     |
-            | regarding its compliance with any applicable laws and regulations. |
-            | Use of the software is at your own risk and discretion and by      |
-            | using the software you acknowledge that you have read this         |
-            | disclaimer, understand its contents, assume all risk related       |
-            | thereto and hereby release, waive, discharge and covenant not to   |
-            | sue Brainbot Labs Establishment or any officers, employees or      |
-            | affiliates from and for any direct or indirect liability resulting |
-            | from the use of the software as permissible by applicable laws and |
-            | regulations.                                                       |
-            |                                                                    |
-            | Privacy Warning: Please be aware, that by using the Raiden Client, |
-            | among others, your Ethereum address, channels, channel deposits,   |
-            | settlements and the Ethereum address of your channel counterparty  |
-            | will be stored on the Ethereum chain, i.e. on servers of Ethereum  |
-            | node operators and ergo are to a certain extent publicly available.|
-            | The same might also be stored on systems of parties running Raiden |
-            | nodes connected to the same token network. Data present in the     |
-            | Ethereum chain is very unlikely to be able to be changed, removed  |
-            | or deleted from the public arena.                                  |
-            |                                                                    |
-            | Also be aware, that data on individual Raiden token transfers will |
-            | be made available via the Matrix protocol to the recipient,        |
-            | intermediating nodes of a specific transfer as well as to the      |
-            | Matrix server operators.                                           |
-            ----------------------------------------------------------------------''',
+            ---------------------------------------------------------------------------------------------------------------
+            | This is an Alpha version of experimental open source software released under the MIT license. By using the  |
+            | RIF Lumino Payments Protocol (the “Software”), you acknowledge that this is a test version of the Software  |
+            | and assume the risk that the Software may contain errors and/or bugs. RIF Labs Limited (“RIF Labs”) makes   |
+            | no guarantees or representations  whatsoever, including as to the suitability or use of the Software for    |
+            | any  purpose or regarding its compliance with any applicable laws or regulations. By using the Software,    |
+            | you acknowledge that you have read this disclosure agreement, understand its contents, and assume all risks |
+            | related to the use of of the software; further, by answering yes below and accepting the terms of this      | 
+            | Agreement, you release and discharge RIF Labs, its officers, employees, or affiliates from, waive  any      | 
+            | claims you might have against RIF Labs, its officers, employees, or affiliates in connection with, and      | 
+            | agree not to sue RIF Labs or any of its officers, employees, or affiliates for any direct or indirect       | 
+            | liability arising from the use of this Software.                                                            |
+            |                                                                                                             |  
+            |                                                                                                             |  
+            | Privacy Warning:                                                                                            |  
+            |                                                                                                             |  
+            | By using the RIF Lumino Payments Protocol, you acknowledge that your RSK address, channels, channel deposits| 
+            | settlements, and the RSK address of your channel counterparty will be stored on the RSK blockchain—that is, |
+            | on servers of RSK node operators—and therefore will be publicly available. The parties running nodes on the |
+            | RIF Lumino network may also download and store this same or related information or data, and information or |
+            | data stored on Lumino nodes and  network channels will be publicly visible, including on a RIF Lumino block |
+            | explorer. By using the Software and by answering yes below, you acknowledge that information or data stored | 
+            | on the Lumino network is extremely difficult to alter, remove, or delete; you further acknowledge that      |
+            | information or data related to individual tokens transfers will be made available via  the Lumino Payments  |
+            | Protocol to the recipient intermediating nodes of a specific transfer as well as to the Lumino server       |
+            | operators.                                                                                                  |
+            ---------------------------------------------------------------------------------------------------------------''',
         ),
         fg='yellow',
     )
     if not kwargs['accept_disclaimer']:
         click.confirm(
-            '\nHave you read, understood and hereby accept the above '
-            'disclaimer and privacy warning?',
+            'Have you read and understood and do you accept the RIF Lumino Disclosure Agreement and Privacy Warning?',
             abort=True,
         )
 
@@ -538,8 +522,6 @@ def smoketest(ctx, debug):
         step_count = 8
     step = 0
 
-    stdout = sys.stdout
-
     def print_step(description, error=False):
         nonlocal step
         step += 1
@@ -548,7 +530,6 @@ def smoketest(ctx, debug):
                 click.style(f'[{step}/{step_count}]', fg='blue'),
                 click.style(description, fg='green' if not error else 'red'),
             ),
-            file=stdout,
         )
 
     print_step('Getting smoketest configuration')
@@ -557,8 +538,7 @@ def smoketest(ctx, debug):
         ctx.parent.params['transport'],
         ctx.parent.params['matrix_server'],
         print_step,
-        # smoke test should work with pre-limits contract version
-        DEVELOPMENT_CONTRACT_VERSION,
+        'pre_limits',  # smoke test should work with pre-limits contract version
     )
     args = result['args']
     contract_addresses = result['contract_addresses']
@@ -586,24 +566,15 @@ def smoketest(ctx, debug):
 
         raiden_stdout = StringIO()
         with contextlib.redirect_stdout(raiden_stdout):
-            app = run_app(**args)
-
             try:
+                # invoke the raiden app
+                app = run_app(**args)
+
                 raiden_api = RaidenAPI(app.raiden)
                 rest_api = RestAPI(raiden_api)
                 (api_host, api_port) = split_endpoint(args['api_address'])
                 api_server = APIServer(rest_api, config={'host': api_host, 'port': api_port})
                 api_server.start()
-
-                block = app.raiden.get_block_number() + DEFAULT_NUMBER_OF_BLOCK_CONFIRMATIONS
-                # Proxies now use the confirmed block hash to query the chain for
-                # prerequisite checks. Wait a bit here to make sure that the confirmed
-                # block hash contains the deployed token network or else things break
-                wait_for_block(
-                    raiden=app.raiden,
-                    block_number=block,
-                    retry_timeout=1.0,
-                )
 
                 raiden_api.channel_open(
                     registry_address=contract_addresses[CONTRACT_TOKEN_NETWORK_REGISTRY],
@@ -626,7 +597,6 @@ def smoketest(ctx, debug):
                     token_addresses,
                     contract_addresses[CONTRACT_ENDPOINT_REGISTRY],
                     debug=debug,
-                    orig_stdout=stdout,
                 )
                 if error is not None:
                     append_report('Smoketest assertion error', error)

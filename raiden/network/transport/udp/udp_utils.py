@@ -1,13 +1,13 @@
 import random
-from typing import TYPE_CHECKING
 
 import gevent
 import structlog
 from gevent.event import Event, _AbstractLinkable
 
-from raiden.utils import pex
-from raiden.utils.typing import Address, Iterable, Iterator, UDPMessageID
+from raiden.utils import pex, typing
 
+# type alias to avoid both circular dependencies and flake8 errors
+UDPTransport = 'UDPTransport'
 log = structlog.get_logger(__name__)  # pylint: disable=invalid-name
 
 
@@ -32,7 +32,7 @@ def timeout_exponential_backoff(
         retries: int,
         timeout: int,
         maximum: int,
-) -> Iterator[int]:
+) -> typing.Generator[int, None, None]:
     """ Timeouts generator with an exponential backoff strategy.
 
     Timeouts start spaced by `timeout`, after `retries` exponentially increase
@@ -57,7 +57,7 @@ def timeout_two_stage(
         retries: int,
         timeout1: int,
         timeout2: int,
-) -> Iterable[int]:
+) -> int:
     """ Timeouts generator with a two stage strategy
 
     Timeouts start spaced by `timeout1`, after `retries` increase
@@ -70,12 +70,12 @@ def timeout_two_stage(
 
 
 def retry(
-        transport: 'UDPTransport',
+        transport: UDPTransport,
         messagedata: bytes,
-        message_id: UDPMessageID,
-        recipient: Address,
+        message_id: typing.UDPMessageID,
+        recipient: typing.Address,
         stop_event: Event,
-        timeout_backoff: Iterable[int],
+        timeout_backoff: typing.Generator[int, None, None],
 ) -> bool:
     """ Send messagedata until it's acknowledged.
 
@@ -136,14 +136,14 @@ def wait_recovery(stop_event: Event, event_healthy: Event):
 
 
 def retry_with_recovery(
-        transport: 'UDPTransport',
+        transport: UDPTransport,
         messagedata: bytes,
-        message_id: UDPMessageID,
-        recipient: Address,
+        message_id: typing.UDPMessageID,
+        recipient: typing.Address,
         stop_event: Event,
         event_healthy: Event,
         event_unhealthy: Event,
-        backoff: Iterable[int],
+        backoff: typing.Generator[int, None, None],
 ) -> bool:
     """ Send messagedata while the node is healthy until it's acknowledged.
 
@@ -200,7 +200,3 @@ def retry_with_recovery(
         )
 
     return acknowledged
-
-
-if TYPE_CHECKING:
-    from raiden.network.transport.udp.udp_transport import UDPTransport

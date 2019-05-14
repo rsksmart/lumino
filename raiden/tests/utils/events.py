@@ -1,6 +1,5 @@
-from collections import Mapping
-
 import gevent
+from web3.datastructures import AttributeDict
 
 from raiden.raiden_service import RaidenService
 from raiden.transfer.architecture import Event, StateChange
@@ -26,7 +25,7 @@ def check_dict_nested_attrs(item: Dict, dict_data: Dict) -> bool:
 
         item_value = item[key]
 
-        if isinstance(item_value, Mapping):
+        if isinstance(item_value, (AttributeDict, dict)):
             if not check_dict_nested_attrs(item_value, value):
                 return False
         elif item_value != value:
@@ -54,7 +53,7 @@ def check_nested_attrs(item: Any, attributes: Dict) -> bool:
     for name, value in attributes.items():
         item_value = getattr(item, name, NOVALUE)
 
-        if isinstance(value, Mapping):
+        if isinstance(value, dict):
             if not check_nested_attrs(item_value, value):
                 return False
 
@@ -113,7 +112,7 @@ def raiden_state_changes_search_for_item(
 
 def must_have_event(event_list: List, dict_data: Dict):
     for item in event_list:
-        if isinstance(item, Mapping) and check_dict_nested_attrs(item, dict_data):
+        if isinstance(item, dict) and check_dict_nested_attrs(item, dict_data):
             return item
     return None
 
