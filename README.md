@@ -149,6 +149,7 @@ The following are the addresses of the set of contracts for Lumino Network
 | `$SECRET_REGISTRY_CONTRACT_ADDRESS`       | 0xFd17D36EF2b3C5E71aBA059b3FC361644206213b | 0x4Dea623Ae7c5cb1F4aF9B46721D9a72d93C42BE9  |
 | `$ENDPOINT_REGISTRY_CONTRACT_ADDRESS`     | 0xb048Af6c0FBFBF1c0c01Ea9A302987011153dbB8 | 0x7d1E6f17baa2744B5213b697ae4C1D287bB10df0 |
 
+If you want to create your own RIF Lumino network, for development or custom use on private networks, please refer to [Lumino Contracts](https://github.com/rsksmart/lumino-contracts)
 
 ## Additional help
 
