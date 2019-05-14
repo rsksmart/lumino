@@ -1,4 +1,4 @@
-# Get your own RIF Lumino node up and running
+# RIF Lumino Network
 
 
 ![Lumino Network](Lumino.png?raw=true "RIF Lumino Network")
