@@ -24,7 +24,7 @@ RIF Lumino uses a fork of Raiden Network implementation to achieve this.
 
 ## Build RIF Lumino from code
 
-1. Get the [RELEASE.NUMBER] code from [GITHUB.URL]
+1. Git clone 
 2. Go to the path you downloaded or cloned Lumino's code (let's call this path `$RIF_LUMINO_PATH`)
 3. Create python virtual env for RIF Lumino (this has to be made one time)
 
