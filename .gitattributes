@@ -1,2 +1,4 @@
 *.py linguist-language=Python
 
+*.3 linguist-documentation
+*.1 linguist-documentation 
