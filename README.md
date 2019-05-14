@@ -244,7 +244,7 @@ Install psycopg2 running:
 ## Useful Links
 
 * [RIF Lumino Network](https://www.rifos.org/rif-lumino-network/)
-* [RIF Lumino Explorer](http://explorer.lumino.rifos.org/)
+* [http://explorer.lumino.rifos.org/]()
 * [RIF Lumino Contracts](https://github.com/rsksmart/lumino-contracts) 
 * [RIF Lumino Web](https://github.com/rsksmart/lumino-web) 
 * [RIF Lumino Explorer](https://github.com/rsksmart/lumino-explorer) 
