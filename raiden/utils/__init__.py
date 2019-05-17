@@ -5,7 +5,7 @@ import re
 import sys
 import time
 from itertools import zip_longest
-from typing import Iterable, List, Optional, Tuple, Union, NamedTuple
+from typing import Any, Callable
 
 import gevent
 from eth_keys import keys
@@ -18,98 +18,77 @@ from eth_utils import (
     remove_0x_prefix,
     to_checksum_address,
 )
+from web3 import Web3
 
 import raiden
 from raiden import constants
 from raiden.exceptions import InvalidAddress
-from raiden.utils import typing
 from raiden.utils.signing import sha3  # noqa
+from raiden.utils.typing import (
+    Address,
+    BlockNumber,
+    BlockSpecification,
+    Dict,
+    Host,
+    HostPort,
+    Iterable,
+    List,
+    Optional,
+    Port,
+    PrivateKey,
+    PublicKey,
+    Secret,
+    T_BlockHash,
+    T_BlockNumber,
+    TokenAddress,
+    Tuple,
+    Union,
+)
 
 
-class CanonicalIdentifier(NamedTuple):
-    chain_identifier: typing.ChainID
-    # introducing the type as Union, to avoid casting for now. Should be only `..Address` later
-    token_network_address: Union[typing.TokenNetworkAddress, typing.TokenNetworkID]
-    channel_identifier: typing.ChannelID
-
-
-def random_secret():
+def random_secret() -> Secret:
     """ Return a random 32 byte secret except the 0 secret since it's not accepted in the contracts
     """
     while True:
-        secret = os.urandom(32)
+        secret = os.urandom(constants.SECRET_LENGTH)
         if secret != constants.EMPTY_HASH:
-            return secret
+            return Secret(secret)
 
 
 def ishash(data: bytes) -> bool:
     return isinstance(data, bytes) and len(data) == 32
 
 
-def is_minified_address(addr):
-    return re.compile('(0x)?[a-f0-9]{6,8}').match(addr)
-
-
-def is_supported_client(
-        client_version: str,
-) -> typing.Tuple[bool, typing.Optional[constants.EthClient]]:
-    if client_version.startswith('Parity'):
-        matches = re.search(r'//v(\d+)\.(\d+)\.(\d+)', client_version)
-        if matches is None:
-            return False, None
-        major, minor, patch = [
-            int(x) for x in matches.groups()
-        ]
-        if (major, minor, patch) >= (1, 7, 6):
-            return True, constants.EthClient.PARITY
-    elif client_version.startswith('Geth'):
-        matches = re.search(r'/v(\d+)\.(\d+)\.(\d+)', client_version)
-        if matches is None:
-            return False, None
-        major, minor, patch = [
-            int(x) for x in matches.groups()
-        ]
-        if (major, minor, patch) >= (1, 7, 2):
-            return True, constants.EthClient.GETH
-    elif client_version.startswith('RskJ'):
-        return True, constants.EthClient.GETH
-
-    return False, None
-
-
-def address_checksum_and_decode(addr: str) -> typing.Address:
+def address_checksum_and_decode(addr: str) -> Address:
     """ Accepts a string address and turns it into binary.
 
         Makes sure that the string address provided starts is 0x prefixed and
         checksummed according to EIP55 specification
     """
     if not is_0x_prefixed(addr):
-        raise InvalidAddress('Address must be 0x prefixed')
+        raise InvalidAddress("Address must be 0x prefixed")
 
     if not is_checksum_address(addr):
-        raise InvalidAddress('Address must be EIP55 checksummed')
+        raise InvalidAddress("Address must be EIP55 checksummed")
 
     addr_bytes = decode_hex(addr)
     assert len(addr_bytes) in (20, 0)
-    return typing.Address(addr_bytes)
+    return Address(addr_bytes)
 
 
 def data_encoder(data: bytes, length: int = 0) -> str:
     data = remove_0x_prefix(encode_hex(data))
-    return add_0x_prefix(
-        data.rjust(length * 2, b'0').decode(),
-    )
+    return add_0x_prefix(data.rjust(length * 2, b"0").decode())
 
 
 def data_decoder(data: str) -> bytes:
     assert is_0x_prefixed(data)
-    data = decode_hex(data)
-    return data
+    return decode_hex(data)
 
 
 def quantity_encoder(i: int) -> str:
     """Encode integer quantity `data`."""
-    return hex(i).rstrip('L')
+    return hex(i).rstrip("L")
 
 
 def pex(data: bytes) -> str:
@@ -121,27 +100,28 @@ def lpex(lst: Iterable[bytes]) -> List[str]:
 
 
 def host_port_to_endpoint(host: str, port: int) -> str:
-    return '{}:{}'.format(host, port)
+    return "{}:{}".format(host, port)
 
 
-def split_endpoint(endpoint: str) -> Tuple[str, Union[str, int]]:
-    match = re.match(r'(?:[a-z0-9]*:?//)?([^:/]+)(?::(\d+))?', endpoint, re.I)
+def split_endpoint(endpoint: str) -> HostPort:
+    match = re.match(r"(?:[a-z0-9]*:?//)?([^:/]+)(?::(\d+))?", endpoint, re.I)
     if not match:
-        raise ValueError('Invalid endpoint', endpoint)
+        raise ValueError("Invalid endpoint", endpoint)
     host, port = match.groups()
+    returned_port = None
     if port:
-        port = int(port)
-    return host, port
+        returned_port = Port(int(port))
+    return Host(host), returned_port
 
 
-def privatekey_to_publickey(private_key_bin: bytes) -> bytes:
+def privatekey_to_publickey(private_key_bin: PrivateKey) -> PublicKey:
     """ Returns public key in bitcoins 'bin' encoding. """
     if not ishash(private_key_bin):
-        raise ValueError('private_key_bin format mismatch. maybe hex encoded?')
+        raise ValueError("private_key_bin format mismatch. maybe hex encoded?")
     return keys.PrivateKey(private_key_bin).public_key.to_bytes()
 
 
-def privatekey_to_address(private_key_bin: bytes) -> typing.Address:
+def privatekey_to_address(private_key_bin: bytes) -> Address:
     return keys.PrivateKey(private_key_bin).public_key.to_canonical_address()
 
 
@@ -149,60 +129,54 @@ def get_project_root() -> str:
     return os.path.dirname(raiden.__file__)
 
 
-def get_relative_path(file_name) -> str:
-    prefix = os.path.commonprefix([
-        os.path.realpath('.'),
-        os.path.realpath(file_name),
-    ])
-    return file_name.replace(prefix + '/', '')
+def get_relative_path(file_name: str) -> str:
+    prefix = os.path.commonprefix([os.path.realpath("."), os.path.realpath(file_name)])
+    return file_name.replace(prefix + "/", "")
 
 
-def get_system_spec() -> typing.Dict[str, str]:
+def get_system_spec() -> Dict[str, str]:
     """Collect information about the system and installation.
     """
     import pkg_resources
     import platform
 
-    if sys.platform == 'darwin':
-        system_info = 'macOS {} {}'.format(
-            platform.mac_ver()[0],
-            platform.architecture()[0],
-        )
+    if sys.platform == "darwin":
+        system_info = "macOS {} {}".format(platform.mac_ver()[0], platform.architecture()[0])
     else:
-        system_info = '{} {} {} {}'.format(
+        system_info = "{} {} {}".format(
             platform.system(),
-            '_'.join(platform.architecture()),
+            "_".join(part for part in platform.architecture() if part),
             platform.release(),
-            platform.machine(),
         )
 
     try:
         version = pkg_resources.require(raiden.__name__)[0].version
-    except (pkg_resources.ContextualVersionConflict, pkg_resources.DistributionNotFound):
+    except (pkg_resources.VersionConflict, pkg_resources.DistributionNotFound):
         raise RuntimeError(
-            'Cannot detect Raiden version. Did you do python setup.py?  '
-            'Refer to https://raiden-network.readthedocs.io/en/latest/'
-            'overview_and_guide.html#for-developers',
+            "Cannot detect Raiden version. Did you do python setup.py?  "
+            "Refer to https://raiden-network.readthedocs.io/en/latest/"
+            "overview_and_guide.html#for-developers"
         )
 
     system_spec = {
-        'raiden': version,
-        'python_implementation': platform.python_implementation(),
-        'python_version': platform.python_version(),
-        'system': system_info,
-        'distribution': 'bundled' if getattr(sys, 'frozen', False) else 'source',
+        "raiden": version,
+        "python_implementation": platform.python_implementation(),
+        "python_version": platform.python_version(),
+        "system": system_info,
+        "architecture": platform.machine(),
+        "distribution": "bundled" if getattr(sys, "frozen", False) else "source",
     }
     return system_spec
 
 
-def wait_until(func, wait_for=None, sleep_for=0.5):
+def wait_until(func: Callable, wait_for: float = None, sleep_for: float = 0.5) -> Any:
     """Test for a function and wait for it to return a truth value or to timeout.
     Returns the value or None if a timeout is given and the function didn't return
     inside time timeout
     Args:
-        func (callable): a function to be evaluated, use lambda if parameters are required
-        wait_for (float, integer, None): the maximum time to wait, or None for an infinite loop
-        sleep_for (float, integer): how much to gevent.sleep between calls
+        func: a function to be evaluated, use lambda if parameters are required
+        wait_for: the maximum time to wait, or None for an infinite loop
+        sleep_for: how much to gevent.sleep between calls
     Returns:
         func(): result of func, if truth value, or None"""
     res = func()
@@ -224,8 +198,8 @@ def wait_until(func, wait_for=None, sleep_for=0.5):
     return res
 
 
-def is_frozen():
-    return getattr(sys, 'frozen', False)
+def is_frozen() -> bool:
+    return getattr(sys, "frozen", False)
 
 
 def split_in_pairs(arg: Iterable) -> Iterable[Tuple]:
@@ -239,17 +213,16 @@ def split_in_pairs(arg: Iterable) -> Iterable[Tuple]:
     return zip_longest(iterator, iterator)
 
 
-def create_default_identifier():
+def create_default_identifier() -> int:
     """ Generates a random identifier. """
     return random.randint(0, constants.UINT64_MAX)
 
 
-def merge_dict(to_update: dict, other_dict: dict):
+def merge_dict(to_update: dict, other_dict: dict) -> None:
     """ merges b into a """
     for key, value in other_dict.items():
-        has_map = (
-            isinstance(value, collections.Mapping) and
-            isinstance(to_update.get(key, None), collections.Mapping)
+        has_map = isinstance(value, collections.Mapping) and isinstance(
+            to_update.get(key, None), collections.Mapping
         )
 
         if has_map:
@@ -259,8 +232,8 @@ def merge_dict(to_update: dict, other_dict: dict):
 
 
 def optional_address_to_string(
-        address: Optional[Union[typing.Address, typing.TokenAddress]] = None,
-) -> typing.Optional[str]:
+    address: Optional[Union[Address, TokenAddress]] = None,
+) -> Optional[str]:
     if address is None:
         return None
 
@@ -271,6 +244,28 @@ def safe_gas_limit(*estimates: int) -> int:
     """ Calculates a safe gas limit for a number of gas estimates
     including a security margin
     """
-    assert None not in estimates, 'if estimateGas returned None it should not reach here'
+    assert None not in estimates, "if estimateGas returned None it should not reach here"
     calculated_limit = max(estimates)
     return int(calculated_limit * constants.GAS_FACTOR)
+
+
+def to_rdn(rei: int) -> float:
+    """ Convert REI value to RDN. """
+    return rei / 10 ** 18
+
+
+def block_specification_to_number(block: BlockSpecification, web3: Web3) -> BlockNumber:
+    """ Converts a block specification to an actual block number """
+    if isinstance(block, str):
+        msg = f"string block specification can't contain {block}"
+        assert block in ("latest", "pending"), msg
+        number = web3.eth.getBlock(block)["number"]
+    elif isinstance(block, T_BlockHash):
+        number = web3.eth.getBlock(block)["number"]
+    elif isinstance(block, T_BlockNumber):
+        number = block
+    else:
+        if __debug__:
+            raise AssertionError(f"Unknown type {type(block)} given for block specification")
+
+    return BlockNumber(number)

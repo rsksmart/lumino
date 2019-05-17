@@ -6,35 +6,44 @@ from raiden.app import App
 from raiden.message_handler import MessageHandler
 from raiden.network.transport import MatrixTransport
 from raiden.raiden_event_handler import RaidenEventHandler
+from raiden.tests.utils.detect_failure import raise_on_failure
 from raiden.tests.utils.events import raiden_events_search_for_item
 from raiden.tests.utils.network import CHAIN
-from raiden.tests.utils.protocol import HoldRaidenEvent, dont_handle_node_change_network_state
+from raiden.tests.utils.protocol import (
+    HoldRaidenEventHandler,
+    dont_handle_node_change_network_state,
+)
 from raiden.tests.utils.transfer import assert_synced_channel_state
 from raiden.transfer import views
 from raiden.transfer.events import EventPaymentSentSuccess
 from raiden.transfer.mediated_transfer.events import SendSecretReveal
+from raiden.utils import BlockNumber
 
 
-@pytest.mark.parametrize('deposit', [10])
-@pytest.mark.parametrize('channels_per_node', [CHAIN])
-@pytest.mark.parametrize('number_of_nodes', [2])
-def test_send_queued_messages(
-        raiden_network,
-        number_of_nodes,
-        deposit,
-        token_addresses,
-        network_wait,
-        skip_if_not_matrix,
+@pytest.mark.parametrize("deposit", [10])
+@pytest.mark.parametrize("channels_per_node", [CHAIN])
+@pytest.mark.parametrize("number_of_nodes", [2])
+def test_send_queued_messages(  # pylint: disable=unused-argument
+    raiden_network, deposit, token_addresses, network_wait, skip_if_not_matrix
 ):
     """Test re-sending of undelivered messages on node restart"""
+    raise_on_failure(
+        raiden_network,
+        run_test_send_queued_messages,
+        raiden_network=raiden_network,
+        deposit=deposit,
+        token_addresses=token_addresses,
+        network_wait=network_wait,
+    )
+
+
+def run_test_send_queued_messages(raiden_network, deposit, token_addresses, network_wait):
     app0, app1 = raiden_network
     token_address = token_addresses[0]
     chain_state = views.state_from_app(app0)
     payment_network_id = app0.raiden.default_registry.address
     token_network_identifier = views.get_token_network_identifier_by_token_address(
-        chain_state,
-        payment_network_id,
-        token_address,
+        chain_state, payment_network_id, token_address
     )
 
     with dont_handle_node_change_network_state():
@@ -57,9 +66,7 @@ def test_send_queued_messages(
     # restart app0
     app0.raiden.stop()
 
-    new_transport = MatrixTransport(
-        app0.raiden.config['transport']['matrix'],
-    )
+    new_transport = MatrixTransport(app0.raiden.config["transport"]["matrix"])
 
     raiden_event_handler = RaidenEventHandler()
     message_handler = MessageHandler()
@@ -70,6 +77,8 @@ def test_send_queued_messages(
         query_start_block=0,
         default_registry=app0.raiden.default_registry,
         default_secret_registry=app0.raiden.default_secret_registry,
+        default_service_registry=app0.raiden.default_service_registry,
+        default_one_to_n_address=app0.raiden.default_one_to_n_address,
         transport=new_transport,
         raiden_event_handler=raiden_event_handler,
         message_handler=message_handler,
@@ -82,18 +91,10 @@ def test_send_queued_messages(
 
     app0_restart.start()
 
-    waiting.wait_for_healthy(
-        app0_restart.raiden,
-        app1.raiden.address,
-        network_wait,
-    )
-    waiting.wait_for_healthy(
-        app1.raiden,
-        app0_restart.raiden.address,
-        network_wait,
-    )
+    waiting.wait_for_healthy(app0_restart.raiden, app1.raiden.address, network_wait)
+    waiting.wait_for_healthy(app1.raiden, app0_restart.raiden.address, network_wait)
 
-    exception = RuntimeError('Timeout while waiting for new channel')
+    exception = RuntimeError("Timeout while waiting for new channel")
     with gevent.Timeout(5, exception=exception):
         waiting.wait_for_newchannel(
             raiden=app0_restart.raiden,
@@ -102,7 +103,7 @@ def test_send_queued_messages(
             partner_address=app1.raiden.address,
             retry_timeout=network_wait,
         )
-    exception = RuntimeError('Timeout while waiting for balance update for app0')
+    exception = RuntimeError("Timeout while waiting for balance update for app0")
     with gevent.Timeout(30, exception=exception):
         waiting.wait_for_payment_balance(
             raiden=app0_restart.raiden,
@@ -126,20 +127,20 @@ def test_send_queued_messages(
 
     assert_synced_channel_state(
         token_network_identifier,
-        app0_restart, deposit - spent_amount, [],
-        app1, deposit + spent_amount, [],
+        app0_restart,
+        deposit - spent_amount,
+        [],
+        app1,
+        deposit + spent_amount,
+        [],
     )
 
 
-@pytest.mark.parametrize('number_of_nodes', [2])
-@pytest.mark.parametrize('channels_per_node', [1])
-@pytest.mark.parametrize('number_of_tokens', [1])
-def test_payment_statuses_are_restored(
-        raiden_network,
-        number_of_nodes,
-        token_addresses,
-        network_wait,
-        skip_if_not_matrix,
+@pytest.mark.parametrize("number_of_nodes", [2])
+@pytest.mark.parametrize("channels_per_node", [1])
+@pytest.mark.parametrize("number_of_tokens", [1])
+def test_payment_statuses_are_restored(  # pylint: disable=unused-argument
+    raiden_network, token_addresses, network_wait, skip_if_not_matrix
 ):
     """ Test that when the Raiden is restarted, the dictionary of
     `targets_to_identifiers_to_statuses` is populated before the transport
@@ -152,24 +153,32 @@ def test_payment_statuses_are_restored(
     started the transfers.
     Related issue: https://github.com/raiden-network/raiden/issues/3432
     """
+    raise_on_failure(
+        raiden_network,
+        run_test_payment_statuses_are_restored,
+        raiden_network=raiden_network,
+        token_addresses=token_addresses,
+        network_wait=network_wait,
+    )
+
+
+def run_test_payment_statuses_are_restored(raiden_network, token_addresses, network_wait):
     app0, app1 = raiden_network
 
     token_address = token_addresses[0]
     chain_state = views.state_from_app(app0)
     payment_network_id = app0.raiden.default_registry.address
     token_network_identifier = views.get_token_network_identifier_by_token_address(
-        chain_state,
-        payment_network_id,
-        token_address,
+        chain_state, payment_network_id, token_address
     )
 
-    app0.event_handler = HoldRaidenEvent()
+    raiden_event_handler = RaidenEventHandler()
+    app0.event_handler = HoldRaidenEventHandler(raiden_event_handler)
     app0.event_handler.hold(SendSecretReveal, {})
 
     # make a few transfers from app0 to app1
     amount = 1
     spent_amount = 7
-    identifier = 1
 
     for identifier in range(spent_amount):
         identifier = identifier + 1
@@ -187,12 +196,12 @@ def test_payment_statuses_are_restored(
     app0_restart = App(
         config=app0.config,
         chain=app0.raiden.chain,
-        query_start_block=0,
+        query_start_block=BlockNumber(0),
         default_registry=app0.raiden.default_registry,
         default_secret_registry=app0.raiden.default_secret_registry,
-        transport=MatrixTransport(
-            app0.raiden.config['transport']['matrix'],
-        ),
+        default_service_registry=app0.raiden.default_service_registry,
+        default_one_to_n_address=app0.raiden.default_one_to_n_address,
+        transport=MatrixTransport(app0.raiden.config["transport"]["matrix"]),
         raiden_event_handler=raiden_event_handler,
         message_handler=message_handler,
         discovery=app0.raiden.discovery,
@@ -213,11 +222,7 @@ def test_payment_statuses_are_restored(
         assert status.token_network_identifier == token_network_identifier
 
     app1.start()  # now that our checks are done start app1 again
-    waiting.wait_for_healthy(
-        app0_restart.raiden,
-        app1.raiden.address,
-        network_wait,
-    )
+    waiting.wait_for_healthy(app0_restart.raiden, app1.raiden.address, network_wait)
 
     waiting.wait_for_payment_balance(
         raiden=app1.raiden,
@@ -234,5 +239,5 @@ def test_payment_statuses_are_restored(
         assert raiden_events_search_for_item(
             app0_restart.raiden,
             EventPaymentSentSuccess,
-            {'identifier': identifier + 1, 'amount': 1},
+            {"identifier": identifier + 1, "amount": 1},
         )

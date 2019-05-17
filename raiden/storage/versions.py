@@ -1,32 +1,43 @@
-import os
+import os.path
 import re
-from glob import glob
 
-from raiden.utils import typing
+from raiden.utils.typing import List, Optional
 
-from .sqlite import RAIDEN_DB_VERSION
-
-VERSION_RE = re.compile(r'^v(\d+).*')
+VERSION_RE = re.compile(r"^v(\d+)_log[.]db$")
 
 
-def older_db_file(database_base_path: str) -> typing.Optional[str]:
-    """ Returns the path to a database file that belong to the previous version
-    of the schema.
+def latest_db_file(paths: List[str]) -> Optional[str]:
+    """Returns the path with the highest `version` number.
+
+    Raises:
+        AssertionError: If any of the `paths` in the list is an invalid name.
+
+    Args:
+        paths: A list of file names.
     """
-    database_base_path = os.path.expanduser(database_base_path)
-    db_files = glob(f'{database_base_path}/**/*_log.db', recursive=True)
-    for db_file in sorted(db_files, reverse=True):
-        expanded_name = os.path.basename(db_file)
-        matches = VERSION_RE.search(expanded_name)
-        if not matches:
-            continue
+    dbs = {}
+    for db_path in paths:
+        matches = VERSION_RE.match(os.path.basename(db_path))
+        assert matches, f"Invalid path name {db_path}"
+
         try:
             version = int(matches.group(1))
         except ValueError:
             continue
 
-        if version < RAIDEN_DB_VERSION:
-            old_db_filename = f'{database_base_path}/{expanded_name}'
-            return old_db_filename
+        dbs[version] = db_path
+
+    if dbs:
+        highest_version = sorted(dbs)[-1]
+        return dbs[highest_version]
 
     return None
+
+
+def filter_db_names(paths: List[str]) -> List[str]:
+    """Returns a filtered list of `paths`, where every name matches our format.
+
+    Args:
+        paths: A list of file names.
+    """
+    return [db_path for db_path in paths if VERSION_RE.match(os.path.basename(db_path))]

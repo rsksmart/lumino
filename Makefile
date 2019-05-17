@@ -39,32 +39,32 @@ clean-test:
 	rm -f .coverage
 	rm -fr htmlcov/
 
-ISORT_PARAMS = --ignore-whitespace --settings-path ./ --recursive raiden/ -sg */node_modules/*
+LINT_PATHS = raiden/ tools/
+ISORT_PARAMS = --ignore-whitespace --settings-path ./ --skip-glob '*/node_modules/*' --recursive $(LINT_PATHS)
+BLACK_PATHS = raiden/ tools/ setup.py
 
-lint:
+lint: mypy mypy-all
 	flake8 raiden/ tools/
 	isort $(ISORT_PARAMS) --diff --check-only
-	pylint --rcfile .pylint.rc raiden/
+	black --check --diff $(BLACK_PATHS)
+	pylint $(LINT_PATHS)
 	python setup.py check --restructuredtext --strict
-
-mypy:
-	# We are starting small with a few files and directories here,
-	# but mypy should run on the whole codebase soon.
-	mypy raiden/transfer raiden/api raiden/messages.py raiden/blockchain \
-	raiden/encoding raiden/storage raiden/network \
-	--ignore-missing-imports | grep error > mypy-out.txt || true
-	# Expecting status code 1 from `grep`, which indicates no match.
-	# Again, we are starting small, detecting only errors related to
-	# 'BlockNumber', 'Address', 'ChannelID' etc, but all mypy errors should be
-	# detected soon.
-	grep BlockNumber mypy-out.txt; [ $$? -eq 1 ]
-	grep Address mypy-out.txt; [ $$? -eq 1 ]
-	grep ChannelID mypy-out.txt; [ $$? -eq 1 ]
-	grep BalanceProof mypy-out.txt; [ $$? -eq 1 ]
-	grep SendSecret mypy-out.txt; [ $$? -eq 1 ]
 
 isort:
 	isort $(ISORT_PARAMS)
+
+mypy:
+	mypy raiden
+
+mypy-all:
+	# Be aware, that we currently ignore all mypy errors in `raiden.tests.*` through `setup.cfg`.
+	# Remaining errors in tests:
+	mypy --config-file /dev/null raiden --ignore-missing-imports | grep error | wc -l
+
+black:
+	black $(BLACK_PATHS)
+
+format: isort black
 
 test:
 	python setup.py test
@@ -121,8 +121,11 @@ dist: clean
 	python setup.py bdist_wheel
 	ls -l dist
 
-install: clean
-	python setup.py install
+install: clean-pyc
+	pip install -c constraints.txt -r requirements.txt .
+
+install-dev: clean-pyc
+	pip install -c constraints-dev.txt -r requirements-dev.txt -e .
 
 logging_settings = :info,contracts:debug
 mkfile_root := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))
