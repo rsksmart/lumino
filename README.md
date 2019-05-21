@@ -6,13 +6,13 @@
 
 ## Technical overview
 
-RIF Lumino Network is an off-chain solution for RSK thats enables near-isntant, low-fee and scalable payments.
+RIF Lumino Network is an off-chain solution for RSK thats enables near-instant, low-fee, scalable payments.
 
 RIF Lumino uses a fork of [Raiden Network](https://github.com/raiden-network/raiden) implementation to achieve this.
 
 ## Pre requisites
 
-1. Access to a synched RSK node. You can do this in a variety of ways:
+1. Access to a synchronized RSK node. You can do this in a variety of ways:
    * Run your own node on TestNet or MainNet, see [https://github.com/rsksmart/rskj/wiki/Install-RskJ-and-join-the-RSK-Orchid-Mainnet-Beta]()
    * Compile and run a RSK node locally, see [https://github.com/rsksmart/rskj/wiki/Compile-and-run-a-RSK-node-locally]()
 2. RSK account with RBTC balance
@@ -125,13 +125,13 @@ Have you read and understood and do you accept the RIF Lumino Disclosure Agreeme
 ```
 
 
-5.  After you accepted, you will be asked to select the account you want to use for your node. Select the account, and enter your passphrase to continue
+5.  After you've accepted, you will be asked to select the account you want to use for your node. Select the account and enter your passphrase to continue.
 
-If start up succeeds you will see the following message:
+If start up succeeds then you will see the following message:
 ```
 The Lumino API RPC server is now running at http://localhost:5001/.
 ```
-After that you can start interacting with your Lumino nodein any of the two possible ways, both using the REST API and through the UI.
+Next you can start interacting with your Lumino node using both the REST API and through the UI.
 
 To start using the Lumino Web UI just open your browser at `localhost:5001`.
 
@@ -149,7 +149,7 @@ The following are the addresses of the set of contracts for Lumino Network
 | `$SECRET_REGISTRY_CONTRACT_ADDRESS`       | 0xFd17D36EF2b3C5E71aBA059b3FC361644206213b | 0x4Dea623Ae7c5cb1F4aF9B46721D9a72d93C42BE9  |
 | `$ENDPOINT_REGISTRY_CONTRACT_ADDRESS`     | 0xb048Af6c0FBFBF1c0c01Ea9A302987011153dbB8 | 0x7d1E6f17baa2744B5213b697ae4C1D287bB10df0 |
 
-If you want to create your own RIF Lumino network, for development or custom use on private networks, please refer to [Lumino Contracts](https://github.com/rsksmart/lumino-contracts)
+If you want to create your own RIF Lumino network for development or custom use on private networks, please refer to [Lumino Contracts](https://github.com/rsksmart/lumino-contracts)
 
 ## Additional help
 
@@ -194,7 +194,7 @@ Install virtualenv:
 
 ### Error when we try to create python virtualenv
 
-If you get an error, when you run the `virtualenv -p ...` command, similar to the following one:
+If you get an error when you run the `virtualenv -p ...` command, similar to the following one:
 
 ```
 Original exception was:
@@ -221,7 +221,7 @@ export LC_CTYPE="en_US.UTF-8"
 
 ### Error installing requirements
 
-If you receive an error, when you're installing Lumino requirements, try this procedure:
+If you receive an error when installing Lumino requirements, try this procedure:
 
 1. Exit the virtual environment using `deactivate` command
 2. Remove clientEnv folder: `rm -rf clientEnv`
