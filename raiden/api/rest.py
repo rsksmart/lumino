@@ -9,8 +9,10 @@ import gevent
 import gevent.pool
 import structlog
 from eth_utils import encode_hex, to_checksum_address
-from flask import Flask, make_response, send_from_directory, url_for
+from flask import Flask, make_response, send_from_directory, url_for, session
 from flask_cors import CORS
+from flask_wtf import CSRFProtect
+from flask_wtf.csrf import generate_csrf
 from flask_restful import Api, abort
 from gevent.pywsgi import WSGIServer
 from hexbytes import HexBytes
@@ -345,10 +347,11 @@ class APIServer(Runnable):
         self._api_prefix = f"/api/v{rest_api.version}"
 
         flask_app = Flask(__name__)
+        flask_app.secret_key = 'pepe'
         flask_app.static_url_path = ''
         flask_app.static_folder = flask_app.root_path + '/webui/static'
-        if cors_domain_list:
-            CORS(flask_app, origins=cors_domain_list)
+
+        self._configure_security(flask_app, cors_domain_list)
 
         if eth_rpc_endpoint:
             if not eth_rpc_endpoint.startswith("http"):
@@ -400,6 +403,31 @@ class APIServer(Runnable):
                 )
 
         self._is_raiden_running()
+
+    def _configure_security(self, flask_app, cors_domain_list):
+        """Security application configuration:
+        - setup a crsf protection
+        - register cookie csrf in the app session'
+        - register default localhost domain  in Cors
+        - register functions to run on before/after request
+        """
+
+
+        CSRFProtect(flask_app)
+
+        if cors_domain_list:
+            CORS(flask_app, origins=cors_domain_list)
+
+        @flask_app.before_request
+        def enable_session_timeout():
+            session.permanent = True  # set session to use PERMANENT_SESSION_LIFETIME
+            session.modified = True  # reset the session timer on every request
+
+        @flask_app.after_request
+        def set_csrf_cookie(response):
+            if response:
+                response.set_cookie('csrf_token', generate_csrf())
+            return response
 
     def _set_ui_endpoint(self):
         # Overrides the backend url in the ui bundle
