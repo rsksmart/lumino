@@ -379,13 +379,6 @@ def options(func):
                 show_default=True,
             ),
             option(
-                "--rpccorsdomain",
-                help="Comma separated list of domains to accept cross origin requests.",
-                default="http://localhost:*/*",
-                type=str,
-                show_default=True,
-            ),
-            option(
                 "--api-address",
                 help='"host:port" for the RPC server to listen on.',
                 default="127.0.0.1:5001",
