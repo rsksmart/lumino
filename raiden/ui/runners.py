@@ -111,7 +111,7 @@ class NodeRunner:
 
         tasks = [app_.raiden]  # RaidenService takes care of Transport and AlarmTask
 
-        domain_list = ['http://localhost:*/*']
+        domain_list = ['http://localhost:*/*', 'http://localhost.lumino:*/*']
 
         self._raiden_api = RaidenAPI(app_.raiden)
 

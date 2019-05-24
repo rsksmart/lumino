@@ -6,14 +6,16 @@ from http import HTTPStatus
 from typing import Dict
 
 import gevent
+import os
 import gevent.pool
 import structlog
 from eth_utils import encode_hex, to_checksum_address
-from flask import Flask, make_response, send_from_directory, url_for, session
+from flask import Flask, make_response, send_from_directory, url_for, session, request
 from flask_cors import CORS
 from flask_wtf import CSRFProtect
-from flask_wtf.csrf import generate_csrf
+from flask_wtf.csrf import generate_csrf, safe_str_cmp
 from flask_restful import Api, abort
+from itsdangerous import BadData, SignatureExpired, URLSafeTimedSerializer
 from gevent.pywsgi import WSGIServer
 from hexbytes import HexBytes
 from raiden_webui import RAIDEN_WEBUI_PATH
@@ -23,7 +25,6 @@ from webargs.flaskparser import parser
 from raiden.api.objects import DashboardGraphItem
 from raiden.api.objects import DashboardTableItem
 from raiden.api.objects import DashboardGeneralItem
-
 
 from raiden.api.objects import AddressList, PartnersPerTokenList
 from raiden.api.v1.encoding import (
@@ -347,8 +348,9 @@ class APIServer(Runnable):
         self._api_prefix = f"/api/v{rest_api.version}"
 
         flask_app = Flask(__name__)
-        flask_app.secret_key = 'pepe'
+
         flask_app.static_url_path = ''
+
         flask_app.static_folder = flask_app.root_path + '/webui/static'
 
         self._configure_security(flask_app, cors_domain_list)
@@ -360,7 +362,6 @@ class APIServer(Runnable):
 
         blueprint = create_blueprint()
         flask_api_context = Api(blueprint, prefix=self._api_prefix)
-
 
         restapi_setup_type_converters(
             flask_app,
@@ -412,6 +413,12 @@ class APIServer(Runnable):
         - register functions to run on before/after request
         """
 
+        flask_app.secret_key = os.urandom(24)
+
+        flask_app.config.update(
+            SERVER_NAME='localhost.lumino:5001'
+        )
+        flask_app.subdomain_matching = True
 
         CSRFProtect(flask_app)
 
