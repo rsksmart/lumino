@@ -421,6 +421,7 @@ class EventPaymentSentFailedSchema(BaseSchema):
     log_time = fields.String()
 
     class Meta:
+<<<<<<< HEAD
         fields = ('block_number', 'event', 'reason', 'target', 'log_time', 'token_network_identifier', 'token_address')
         strict = True
         decoding_class = dict
@@ -473,6 +474,9 @@ class DashboardDataResponseGeneralItemSchema(BaseSchema):
 
     class Meta:
         fields = ('event_type_code', 'event_type_class_name', 'quantity')
+=======
+        fields = ("block_number", "event", "reason", "target", "log_time")
+>>>>>>> b/master
         strict = True
         decoding_class = dict
 
@@ -488,6 +492,7 @@ class EventPaymentSentSuccessSchema(BaseSchema):
     log_time = fields.String()
 
     class Meta:
+<<<<<<< HEAD
         fields = ('block_number',
                   'event',
                   'amount',
@@ -496,6 +501,9 @@ class EventPaymentSentSuccessSchema(BaseSchema):
                   'log_time',
                   'token_network_identifier',
                   'token_address')
+=======
+        fields = ("block_number", "event", "amount", "target", "identifier", "log_time")
+>>>>>>> b/master
         strict = True
         decoding_class = dict
 
@@ -511,6 +519,7 @@ class EventPaymentReceivedSuccessSchema(BaseSchema):
     log_time = fields.String()
 
     class Meta:
+<<<<<<< HEAD
         fields = ('token_network_identifier',
                   'token_address',
                   'block_number',
@@ -520,5 +529,8 @@ class EventPaymentReceivedSuccessSchema(BaseSchema):
                   'initiator',
                   'log_time'
                   )
+=======
+        fields = ("block_number", "event", "amount", "initiator", "identifier", "log_time")
+>>>>>>> b/master
         strict = True
         decoding_class = dict

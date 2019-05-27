@@ -28,7 +28,6 @@ from raiden.log_config import configure_logging
 from raiden.network.sockfactory import SocketFactory
 from raiden.tasks import check_gas_reserve, check_network_id, check_rdn_deposits, check_version
 from raiden.rns_constants import RNS_ADDRESS_ZERO
-from raiden.tasks import check_gas_reserve, check_version
 from raiden.utils import get_system_spec, merge_dict, split_endpoint, typing
 from raiden.utils.echo_node import EchoNode
 from raiden.utils.runnable import Runnable
@@ -175,6 +174,7 @@ class NodeRunner:
                     api_host,
                     api_port,
                 ),
+
             )
             tasks.append(api_server)
 

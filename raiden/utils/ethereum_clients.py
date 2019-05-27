@@ -21,5 +21,4 @@ def is_supported_client(client_version: str,) -> Tuple[bool, Optional[EthClient]
             return True, EthClient.GETH
     elif client_version.startswith('RskJ'):
         return True, EthClient.GETH
-
     return False, None

@@ -90,7 +90,6 @@ def event_filter_for_payments(
     partner_address: Address = None,
 ) -> bool:
     """Filters out non payment history related events
-
     - If no other args are given, all payment related events match
     - If a token network identifier is given then only payment events for that match
     - If a partner is also given then if the event is a payment sent event and the
@@ -219,7 +218,6 @@ class RaidenAPI:
         """Register the `token_address` in the blockchain. If the address is already
            registered but the event has not been processed this function will block
            until the next block to make sure the event is processed.
-
         Raises:
             InvalidAddress: If the registry_address or token_address is not a valid address.
             AlreadyRegisteredTokenAddress: If the token is already registered.
@@ -276,7 +274,6 @@ class RaidenAPI:
         joinable_funds_target: float = 0.4,
     ) -> None:
         """ Automatically maintain channels open for the given token network.
-
         Args:
             token_address: the ERC20 token network to connect to.
             funds: the amount of funds that can be used by the ConnectionMananger.
@@ -532,7 +529,6 @@ class RaidenAPI:
     ):
         """ Set the `total_deposit` in the channel with the peer at `partner_address` and the
         given `token_address` in order to be able to do transfers.
-
         Raises:
             InvalidAddress: If either token_address or partner_address is not
                 20 bytes long.
@@ -642,7 +638,6 @@ class RaidenAPI:
     ):
         """Close a channel opened with `partner_address` for the given
         `token_address`.
-
         Race condition, this can fail if channel was closed externally.
         """
         self.channel_batch_close(
@@ -661,7 +656,6 @@ class RaidenAPI:
     ):
         """Close a channel opened with `partner_address` for the given
         `token_address`.
-
         Race condition, this can fail if channel was closed externally.
         """
 
@@ -713,15 +707,12 @@ class RaidenAPI:
     ) -> List[NettingChannelState]:
         """Returns a list of channels associated with the optionally given
            `token_address` and/or `partner_address`.
-
         Args:
             token_address: an optionally provided token address
             partner_address: an optionally provided partner address
-
         Return:
             A list containing all channels the node participates. Optionally
             filtered by a token address and/or partner address.
-
         Raises:
             KeyError: An error occurred when the token address is unknown to the node.
         """
@@ -772,13 +763,10 @@ class RaidenAPI:
     ) -> typing.List[NettingChannelState]:
         """Returns a list of channels associated with the mandatory given
            `token_addresses`.
-
         Args:
             token_addresses: an mandatory provided token list addresses
-
         Return:
             A list containing all channels the node participates, filtered by a token address
-
         Raises:
             KeyError: An error occurred when the token address is unknown to the node.
         """

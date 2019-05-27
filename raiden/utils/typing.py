@@ -27,12 +27,6 @@ ABI = DeployedContract
 T_Address = bytes
 Address = NewType("Address", T_Address)
 
-T_RnsAddress = str
-RnsAddress = NewType('RnsAddress', T_RnsAddress)
-
-T_LogTime = bytes
-LogTime = NewType('LogTime', T_LogTime)
-
 T_AddressHex = str
 AddressHex = NewType("AddressHex", T_AddressHex)
 
