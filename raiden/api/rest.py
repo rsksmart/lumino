@@ -997,6 +997,62 @@ class RestAPI:
         except (InvalidBlockNumberInput, InvalidAddress) as e:
             return api_error(str(e), status_code=HTTPStatus.CONFLICT)
 
+    def get_raiden_events_payment_history_with_timestamps_v2(
+        self,
+        token_network_identifier: typing.Address = None,
+        initiator_address: typing.Address = None,
+        target_address: typing.Address = None,
+        from_date: typing.LogTime = None,
+        to_date: typing.LogTime = None,
+        event_type: int = None,
+        limit: int = None,
+        offset: int = None,
+    ):
+        log.info(
+            'Getting payment history',
+            node=pex(self.raiden_api.address),
+            token_network_identifier=optional_address_to_string(token_network_identifier),
+            initiator_address=optional_address_to_string(initiator_address),
+            target_address=optional_address_to_string(target_address),
+            from_date=from_date,
+            to_date=to_date,
+            event_type=event_type,
+            limit=limit,
+            offset=offset,
+        )
+        try:
+            service_result = self.raiden_api.get_raiden_events_payment_history_with_timestamps_v2(
+                token_network_identifier=token_network_identifier,
+                initiator_address=initiator_address,
+                target_address=target_address,
+                from_date=from_date,
+                to_date=to_date,
+                event_type=event_type,
+                limit=limit,
+                offset=offset,
+            )
+        except (InvalidNumberInput, InvalidAddress) as e:
+            return api_error(str(e), status_code=HTTPStatus.CONFLICT)
+
+        result = []
+        for event in service_result:
+            if isinstance(event.wrapped_event, EventPaymentSentSuccess):
+                serialized_event = self.sent_success_payment_schema.dump(event)
+            elif isinstance(event.wrapped_event, EventPaymentSentFailed):
+                serialized_event = self.failed_payment_schema.dump(event)
+            elif isinstance(event.wrapped_event, EventPaymentReceivedSuccess):
+                serialized_event = self.received_success_payment_schema.dump(event)
+            else:
+                log.warning(
+                    'Unexpected event',
+                    node=pex(self.raiden_api.address),
+                    unexpected_event=event.wrapped_event,
+                )
+
+            result.append(serialized_event.data)
+
+        return api_response(result=result)
+
     def get_raiden_events_payment_history_with_timestamps(
         self,
         token_address: typing.TokenAddress = None,

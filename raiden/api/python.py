@@ -938,6 +938,43 @@ class RaidenAPI:
         )
         return payment_status
 
+    def get_raiden_events_payment_history_with_timestamps_v2(
+        self,
+        token_network_identifier: typing.Address = None,
+        initiator_address: typing.TokenAddress = None,
+        target_address: typing.Address = None,
+        from_date: typing.LogTime = None,
+        to_date: typing.LogTime = None,
+        event_type: int = None,
+        limit: int = None,
+        offset: int = None,
+    ):
+
+        events = [
+            event
+            for event in self.raiden.wal.storage.get_payment_events(
+                token_network_identifier=token_network_identifier,
+                our_address=to_normalized_address(self.raiden.address),
+                initiator_address=initiator_address,
+                target_address=target_address,
+                from_date=from_date,
+                to_date=to_date,
+                event_type=event_type,
+                limit=limit,
+                offset=offset,
+            )
+        ]
+
+        for event in events:
+            chain_state = views.state_from_raiden(self.raiden)
+            for payment_network in chain_state.identifiers_to_paymentnetworks.values():
+                for token_network in payment_network.tokenidentifiers_to_tokennetworks.values():
+                    if token_network.address == event.wrapped_event.token_network_identifier:
+                        setattr(event.wrapped_event, 'token_address',
+                                to_normalized_address(token_network.token_address))
+
+        return events
+
     def get_raiden_events_payment_history_with_timestamps(
         self,
         token_address: TokenAddress = None,
