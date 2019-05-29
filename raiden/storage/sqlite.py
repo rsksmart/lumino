@@ -76,8 +76,9 @@ class SQLiteStorage:
         # References:
         # https://sqlite.org/atomiccommit.html#_exclusive_access_mode
         # https://sqlite.org/pragma.html#pragma_locking_mode
-        conn.execute("PRAGMA locking_mode=EXCLUSIVE")
 
+        conn.execute("PRAGMA locking_mode=EXCLUSIVE")
+        
         # Keep the journal around and skip inode updates.
         # References:
         # https://sqlite.org/atomiccommit.html#_persistent_rollback_journals
@@ -163,6 +164,29 @@ class SQLiteStorage:
             last_id = cursor.lastrowid
 
         return last_id
+
+    def write_token_action(self, token_data):
+        with self.write_lock, self.conn:
+            cursor = self.conn.execute(
+                "INSERT INTO token_action(identifier, token, expires_at, action_request) VALUES(null, ?, ?, ?)",
+                (token_data['token'], token_data['expires_at'], token_data['action_request']),
+            )
+            last_id = cursor.lastrowid
+
+        return last_id
+
+    def query_token_action(self, token):
+        cursor = self.conn.cursor()
+
+        cursor.execute(
+            """
+            SELECT identifier, token, expires_at, action_request
+                FROM token_action WHERE token = ?;
+            """,
+            (token,)
+        )
+
+        return cursor.fetchone()
 
     def write_events(self, events):
         """ Save events.

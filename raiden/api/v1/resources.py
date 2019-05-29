@@ -15,6 +15,8 @@ from raiden.api.v1.encoding import (
     DashboardLuminoSchema,
     RaidenEventsRequestSchemaV2,
     SearchLuminoRequestSchema,
+    TokenActionSchema,
+    TokenActionRequestSchema
 )
 from raiden.utils import typing
 
@@ -341,3 +343,23 @@ class SearchLuminoResource(BaseResource):
             only_receivers=only_receivers
         )
 
+
+class TokenActionResource(BaseResource):
+    get_schema = TokenActionRequestSchema()
+    post_schema = TokenActionSchema()
+
+    @use_kwargs(get_schema, locations=("query",))
+    def get(
+        self,
+        token: typing.ByteString = None
+    ):
+        return self.rest_api.get_token_action(
+            token=token
+        )
+
+    @use_kwargs(post_schema, locations=("json",))
+    def post(
+        self,
+        action: typing.ByteString,
+    ):
+        return self.rest_api.write_token_action(action)

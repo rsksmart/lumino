@@ -239,6 +239,14 @@ class InvalidNumberInput(RaidenError):
     """Raised when the user provided an invalid number"""
 
 
+class TokenAppNotFound(RaidenError):
+    """Raised when the token app is not found"""
+
+
+class TokenAppExpired(RaidenError):
+    """Raised when the token app is not found"""
+
+
 class TransportError(RaidenError):
     """ Raised when a transport encounters an unexpected error """
 

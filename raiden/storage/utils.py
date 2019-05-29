@@ -47,10 +47,19 @@ CREATE TABLE IF NOT EXISTS runs (
 );
 """
 
+DB_CREATE_TOKEN_ACTION = """
+CREATE TABLE IF NOT EXISTS token_action (
+    identifier INTEGER PRIMARY KEY AUTOINCREMENT,
+    token TEXT,
+    expires_at TEXT,
+    action_request TEXT
+);
+"""
+
 DB_SCRIPT_CREATE_TABLES = """
 PRAGMA foreign_keys=off;
 BEGIN TRANSACTION;
-{}{}{}{}{}
+{}{}{}{}{}{}
 COMMIT;
 PRAGMA foreign_keys=on;
 """.format(
@@ -59,4 +68,5 @@ PRAGMA foreign_keys=on;
     DB_CREATE_SNAPSHOT,
     DB_CREATE_STATE_EVENTS,
     DB_CREATE_RUNS,
+    DB_CREATE_TOKEN_ACTION
 )

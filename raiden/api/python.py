@@ -1,6 +1,12 @@
 import gevent
 import structlog
 from gevent import Greenlet
+import random
+import string
+import hashlib
+import dateutil.parser
+from datetime import datetime
+from dateutil.relativedelta import relativedelta
 from eth_utils import is_binary_address, to_checksum_address, to_canonical_address, to_normalized_address
 
 import raiden.blockchain.events as blockchain_events
@@ -24,6 +30,8 @@ from raiden.exceptions import (
     InvalidSecret,
     InvalidSecretHash,
     InvalidSettleTimeout,
+    TokenAppNotFound,
+    TokenAppExpired,
     RaidenRecoverableError,
     TokenNotRegistered,
     UnknownTokenAddress,
@@ -207,6 +215,27 @@ class RaidenAPI:
             )
 
         return channel_list[0]
+
+
+    def validate_token_app(self, token_app):
+        token_result = self.get_token_action(token_app)
+        result = {}
+        if token_result is None:
+            raise TokenAppNotFound("Token app not found")
+        if isinstance(token_result, tuple):
+            result['identifier'] = token_result[0]
+            result['token'] = token_result[1]
+            result['expires_at'] = token_result[2]
+            result['action_request'] = token_result[3]
+
+        expires_at = dateutil.parser.parse(result['expires_at'])
+        utc_now= datetime.utcnow()
+
+        diff = utc_now - expires_at
+        diff_minutes = diff.total_seconds()/60
+        time_elapsed = diff_minutes - 30
+        if time_elapsed > 30:
+            raise TokenAppExpired("Token app expired")
 
     def token_network_register(
         self,
@@ -1150,6 +1179,30 @@ class RaidenAPI:
             token_network_id=token_network_address
         )
         return token_network_state.network_graph
+
+    def write_token_action(self, action):
+
+        # Generate a expiration date with 30 minutes in the future
+        expires_at = datetime.utcnow() - relativedelta(minutes=30)
+
+        expires_at_iso_format = expires_at.isoformat()
+
+        # Generate a random string of letters, digits and timeStamp
+        letters_and_digits = string.ascii_letters + string.digits
+        random_characters = ''.join(random.choice(letters_and_digits) for i in range(30))
+
+        hash_result = hashlib.new("sha1", str(expires_at.timestamp()).encode('utf-8') + str(random_characters).encode('utf-8'))
+
+        token_data = {"token": hash_result.hexdigest(), "expires_at": expires_at_iso_format, "action_request": action}
+
+        # Save this information
+        self.raiden.wal.storage.write_token_action(token_data)
+
+        return token_data
+
+    def get_token_action(self, token):
+        token_data = self.raiden.wal.storage.query_token_action(token)
+        return token_data
 
     def search_lumino(self, registry_address: typing.PaymentNetworkID, query, only_receivers):
 

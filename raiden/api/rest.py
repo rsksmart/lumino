@@ -2,20 +2,16 @@ import errno
 import json
 import logging
 import socket
+
 from http import HTTPStatus
 from typing import Dict
 
 import gevent
-import os
 import gevent.pool
 import structlog
 from eth_utils import encode_hex, to_checksum_address
 from flask import Flask, make_response, send_from_directory, url_for, session, request
-from flask_cors import CORS
-from flask_wtf import CSRFProtect
-from flask_wtf.csrf import generate_csrf, safe_str_cmp
 from flask_restful import Api, abort
-from itsdangerous import BadData, SignatureExpired, URLSafeTimedSerializer
 from gevent.pywsgi import WSGIServer
 from hexbytes import HexBytes
 from raiden_webui import RAIDEN_WEBUI_PATH
@@ -25,6 +21,7 @@ from webargs.flaskparser import parser
 from raiden.api.objects import DashboardGraphItem
 from raiden.api.objects import DashboardTableItem
 from raiden.api.objects import DashboardGeneralItem
+
 
 from raiden.api.objects import AddressList, PartnersPerTokenList
 from raiden.api.v1.encoding import (
@@ -64,7 +61,8 @@ from raiden.api.v1.resources import (
     DashboardResource,
     create_blueprint,
     NetworkResource, PaymentResourceLumino,
-    SearchLuminoResource)
+    SearchLuminoResource,
+    TokenActionResource)
 
 from raiden.constants import GENESIS_BLOCK_NUMBER, UINT256_MAX, Environment
 
@@ -192,9 +190,12 @@ URLS_V1 = [
         '/searchLumino',
         SearchLuminoResource,
     ),
+    (
+        '/tokenAction',
+        TokenActionResource,
+    ),
 
 ]
-
 
 
 def api_response(result, status_code=HTTPStatus.OK):
@@ -353,8 +354,6 @@ class APIServer(Runnable):
 
         flask_app.static_folder = flask_app.root_path + '/webui/static'
 
-        self._configure_security(flask_app, cors_domain_list)
-
         if eth_rpc_endpoint:
             if not eth_rpc_endpoint.startswith("http"):
                 eth_rpc_endpoint = "http://{}".format(eth_rpc_endpoint)
@@ -396,6 +395,20 @@ class APIServer(Runnable):
         # or else, it'll replace it with a E500 response
         self.flask_app.config["PROPAGATE_EXCEPTIONS"] = True
 
+        @flask_app.before_request
+        def validate_request():
+            if request:
+                request_headers = request.headers
+                if 'HTTP_COOKIE' in request_headers.environ:
+                    cookies = request_headers.environ['HTTP_COOKIE']
+
+                    cookies = cookies.split('; ')
+
+                    for cookie in cookies:
+                        cookie = cookie.split('=')
+                        if cookie[0] == "token" and request.method != 'GET' and request.path != '/api/v1/tokenAction':
+                            self.rest_api.raiden_api.validate_token_app(cookie[1])
+
         if web_ui:
             self._set_ui_endpoint()
             for route in ('/ui/<path:file_name>', '/ui', '/ui/', '/index.html', '/', '/dashboard', '/tokens', '/payments', '/channels'):
@@ -405,36 +418,7 @@ class APIServer(Runnable):
 
         self._is_raiden_running()
 
-    def _configure_security(self, flask_app, cors_domain_list):
-        """Security application configuration:
-        - setup a crsf protection
-        - register cookie csrf in the app session'
-        - register default localhost domain  in Cors
-        - register functions to run on before/after request
-        """
 
-        flask_app.secret_key = os.urandom(24)
-
-        flask_app.config.update(
-            SERVER_NAME='localhost.lumino:5001'
-        )
-        flask_app.subdomain_matching = True
-
-        CSRFProtect(flask_app)
-
-        if cors_domain_list:
-            CORS(flask_app, origins=cors_domain_list)
-
-        @flask_app.before_request
-        def enable_session_timeout():
-            session.permanent = True  # set session to use PERMANENT_SESSION_LIFETIME
-            session.modified = True  # reset the session timer on every request
-
-        @flask_app.after_request
-        def set_csrf_cookie(response):
-            if response:
-                response.set_cookie('csrf_token', generate_csrf())
-            return response
 
     def _set_ui_endpoint(self):
         # Overrides the backend url in the ui bundle
@@ -1552,6 +1536,30 @@ class RestAPI:
                 status_code=HTTPStatus.INTERNAL_SERVER_ERROR,
             )
         return api_response(result=network_graph.to_dict())
+
+    def write_token_action(self, action):
+
+        new_token = self.raiden_api.write_token_action(action)
+
+        if new_token is None:
+            return api_error(
+                errors="Internal server error getting get_token.",
+                status_code=HTTPStatus.INTERNAL_SERVER_ERROR,
+            )
+        return api_response(new_token)
+
+    def get_token_action(self, token):
+        token_data = self.raiden_api.get_token_action(token)
+        if token_data is None:
+            result = {}
+        if isinstance(token_data, tuple):
+            result = {}
+            result['identifier'] = token_data[0]
+            result['token'] = token_data[1]
+            result['expires_at'] = token_data[2]
+            result['action_request'] = token_data[3]
+
+        return api_response(result)
 
     def search_lumino(self, registry_address: typing.PaymentNetworkID, query=None, only_receivers=None):
         if query is None:
