@@ -1,15 +1,10 @@
 
-# RIF Lumino Network
+
 
 
 ![Lumino Network](Lumino.png?raw=true "RIF Lumino Network")
 
-
-## Technical overview
-
-RIF Lumino Network is an off-chain solution for RSK thats enables near-isntant, low-fee and scalable payments.
-
-RIF Lumino uses a fork of [Raiden Network](https://github.com/raiden-network/raiden) implementation to achieve this.
+# RIF Get your own RIF Lumino node up and running
 
 ## Pre requisites
 
