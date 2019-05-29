@@ -1,4 +1,5 @@
-# Get your own RIF Lumino node up and running
+
+# RIF Lumino Network
 
 
 ![Lumino Network](Lumino.png?raw=true "RIF Lumino Network")
@@ -8,7 +9,7 @@
 
 RIF Lumino Network is an off-chain solution for RSK thats enables near-isntant, low-fee and scalable payments.
 
-RIF Lumino uses a fork of Raiden Network implementation to achieve this.
+RIF Lumino uses a fork of [Raiden Network](https://github.com/raiden-network/raiden) implementation to achieve this.
 
 ## Pre requisites
 
@@ -24,14 +25,14 @@ RIF Lumino uses a fork of Raiden Network implementation to achieve this.
 
 ## Build RIF Lumino from code
 
-1. Get the [RELEASE.NUMBER] code from [GITHUB.URL]
+1. Git clone 
 2. Go to the path you downloaded or cloned Lumino's code (let's call this path `$RIF_LUMINO_PATH`)
 3. Create python virtual env for RIF Lumino (this has to be made one time)
 
-```virtualenv -p <PATH_TO_PYTHON3.6> clientEnv```
+```virtualenv -p <PATH_TO_PYTHON3.7> clientEnv```
 
 **Note 1:**
-Replace `<PATH_TO_PYTHON3.6>` for the path where Python3.6 is installed in your system, in the case of Ubuntu this usually is on path `/usr/bin/python3.6`
+Replace `<PATH_TO_PYTHON3.7>` for the path where Python3.6 is installed in your system, in the case of Ubuntu this usually is on path `/usr/bin/python3.7`
 
 **Note 2:**
 If you receive an error, please check ***Additional Help*** section.
@@ -46,17 +47,14 @@ Run:
 
 ```python --version```
 
-This command should output version 3.6.x
+This command should output version 3.7.x
 
 6. Install RIF Lumino requirements
 
 Inside the virtual environment run the following command:
 
-```pip install -c constraints.txt --upgrade -r requirements-dev.txt ```
+```pip install -r requirements.txt -c constraints.txt -e . ```
 
-7.  Run Lumino setup
-
-```python setup.py develop```
 
 ## Start your RIF Lumino Node
 
@@ -65,6 +63,7 @@ Inside the virtual environment run the following command:
 3. Run the following command:
 
 ```
+
 lumino
     --keystore-path $KEYSTORE_PATH
     --network-id 31
@@ -149,45 +148,27 @@ The following are the addresses of the set of contracts for Lumino Network
 | `$SECRET_REGISTRY_CONTRACT_ADDRESS`       | 0xFd17D36EF2b3C5E71aBA059b3FC361644206213b | 0x4Dea623Ae7c5cb1F4aF9B46721D9a72d93C42BE9  |
 | `$ENDPOINT_REGISTRY_CONTRACT_ADDRESS`     | 0xb048Af6c0FBFBF1c0c01Ea9A302987011153dbB8 | 0x7d1E6f17baa2744B5213b697ae4C1D287bB10df0 |
 
+If you want to create your own RIF Lumino network, for development or custom use on private networks, please refer to [Lumino Contracts](https://github.com/rsksmart/lumino-contracts)
 
 ## Additional help
 
 The following sections are created using an Ubuntu 16.04.6
 
 
-### Install Python 3.6
 
+### Install Python 3.7
 
-
-Add a new repository to your APT:
-
-```sudo add-apt-repository ppa:jonathonf/python-3.6```
-
-Update your local APT repository:
-
-```sudo apt-get update```
-
-Install Python 3.6:
-
-```sudo apt-get install python3.6```
+Download it from https://www.python.org/downloads/
 
 ### Install PIP3
 
-If you didn't, update your local APT repository:
-
 ```sudo apt update```
-
-Install pip3:
 
 ```sudo apt-get install python3-pip```
 
 ### Install virtualenv
 
-If you didn't, update your local APT repository:
-
 ```sudo apt update```
-
-Install virtualenv:
 
 ```sudo apt-get install virtualenv```
 
@@ -244,4 +225,7 @@ Install psycopg2 running:
 ## Useful Links
 
 * [RIF Lumino Network](https://www.rifos.org/rif-lumino-network/)
-* [RIF Lumino Explorer](http://explorer.lumino.rifos.org/)
+* [http://explorer.lumino.rifos.org/](https://explorer.lumino.rifos.org/)
+* [RIF Lumino Contracts](https://github.com/rsksmart/lumino-contracts) 
+* [RIF Lumino Web](https://github.com/rsksmart/lumino-web) 
+* [RIF Lumino Explorer](https://github.com/rsksmart/lumino-explorer) 
