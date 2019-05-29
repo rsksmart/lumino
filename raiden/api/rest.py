@@ -22,6 +22,7 @@ from webargs.flaskparser import parser
 from raiden.api.objects import DashboardGraphItem
 from raiden.api.objects import DashboardTableItem
 from raiden.api.objects import DashboardGeneralItem
+from flask_cors import CORS
 
 
 from raiden.api.objects import AddressList, PartnersPerTokenList
@@ -352,6 +353,9 @@ class APIServer(Runnable):
 
         flask_app = Flask(__name__)
 
+        if cors_domain_list:
+            CORS(flask_app, origins=cors_domain_list)
+
         flask_app.static_url_path = ''
 
         flask_app.static_folder = flask_app.root_path + '/webui/static'
@@ -377,7 +381,6 @@ class APIServer(Runnable):
             rest_api,
             URLS_V1
         )
-
 
         self.config = config
         self.rest_api = rest_api
