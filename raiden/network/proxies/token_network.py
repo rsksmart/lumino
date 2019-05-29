@@ -797,8 +797,7 @@ class TokenNetwork:
         elif token.balance_of(self.node_address, block_identifier) < amount_to_deposit:
             msg = "The address doesnt have enough tokens"
         elif transaction_executed and latest_deposit < total_deposit:
-
-            msg = 'The tokens were not transferred. Please check that the transferFrom function is accessible'
+            msg = "The tokens were not transferred"
         else:
             participant_details = self.detail_participants(
                 participant1=self.node_address,

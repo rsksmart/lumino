@@ -10,7 +10,8 @@ import gevent
 import gevent.pool
 import structlog
 from eth_utils import encode_hex, to_checksum_address
-from flask import Flask, make_response, send_from_directory, url_for, session, request
+from flask import Flask, make_response, send_from_directory, url_for, request
+
 from flask_restful import Api, abort
 from gevent.pywsgi import WSGIServer
 from hexbytes import HexBytes
@@ -65,6 +66,7 @@ from raiden.api.v1.resources import (
     TokenActionResource)
 
 from raiden.constants import GENESIS_BLOCK_NUMBER, UINT256_MAX, Environment
+
 
 from raiden.exceptions import (
     AddressWithoutCode,
@@ -376,6 +378,7 @@ class APIServer(Runnable):
             URLS_V1
         )
 
+
         self.config = config
         self.rest_api = rest_api
         self.flask_app = flask_app
@@ -676,12 +679,12 @@ class RestAPI:
         return api_response(result=result.data, status_code=HTTPStatus.CREATED)
 
     def open_lumino(
-            self,
-            registry_address: typing.PaymentNetworkID,
-            partner_rns_address: typing.RnsAddress,
-            token_address: typing.TokenAddress,
-            settle_timeout: typing.BlockTimeout = None,
-            total_deposit: typing.TokenAmount = None,
+        self,
+        registry_address: typing.PaymentNetworkID,
+        partner_rns_address: typing.RnsAddress,
+        token_address: typing.TokenAddress,
+        settle_timeout: typing.BlockTimeout = None,
+        total_deposit: typing.TokenAmount = None,
     ):
         log.debug(
             'Opening channel',
@@ -1122,7 +1125,7 @@ class RestAPI:
                                        graph_item[6])
             result.append(graph_item_obj)
 
-        items_group_by_months = self._get_items_group_by_month(result)            
+        items_group_by_months = self._get_items_group_by_month(result)
         return items_group_by_months
 
     def _get_items_group_by_month(self, data):
@@ -1146,17 +1149,16 @@ class RestAPI:
     def _get_events_group_by_month(self, month, data):
         return [dashboardItem for dashboardItem in data if dashboardItem.month_of_year_label == month]
 
-
     def get_raiden_events_payment_history_with_timestamps_v2(
-            self,
-            token_network_identifier: typing.Address = None,
-            initiator_address: typing.Address = None,
-            target_address: typing.Address = None,
-            from_date: typing.LogTime = None,
-            to_date: typing.LogTime = None,
-            event_type: int = None,
-            limit: int = None,
-            offset: int = None,
+        self,
+        token_network_identifier: typing.Address = None,
+        initiator_address: typing.Address = None,
+        target_address: typing.Address = None,
+        from_date: typing.LogTime = None,
+        to_date: typing.LogTime = None,
+        event_type: int = None,
+        limit: int = None,
+        offset: int = None,
     ):
         log.info(
             'Getting payment history',
@@ -1408,7 +1410,6 @@ class RestAPI:
             return api_error(errors=str(e), status_code=HTTPStatus.CONFLICT)
         except DepositMismatch as e:
             return api_error(errors=str(e), status_code=HTTPStatus.CONFLICT)
-
 
         updated_channel_state = self.raiden_api.get_channel(
             registry_address, channel_state.token_address, channel_state.partner_state.address

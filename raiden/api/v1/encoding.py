@@ -514,6 +514,7 @@ class EventPaymentSentSuccessSchema(BaseSchema):
                   'log_time',
                   'token_network_identifier',
                   'token_address')
+
         strict = True
         decoding_class = dict
 

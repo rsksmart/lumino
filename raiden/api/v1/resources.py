@@ -73,11 +73,11 @@ class ChannelsResourceLumino(BaseResource):
             token_addresses=token_addresses
         )
 
-    @use_kwargs(put_schema, locations=('json',))
+    @use_kwargs(put_schema, locations=("json",))
     def put(self, **kwargs):
         return self.rest_api.open_lumino(
             registry_address=self.rest_api.raiden_api.raiden.default_registry.address,
-            **kwargs,
+            **kwargs
         )
 
 

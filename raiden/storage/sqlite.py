@@ -2,8 +2,7 @@ import sqlite3
 import threading
 from contextlib import contextmanager
 import datetime
-import ast
-import json
+
 
 from raiden.constants import RAIDEN_DB_VERSION, SQLITE_MIN_REQUIRED_VERSION
 from raiden.exceptions import InvalidDBData, InvalidNumberInput
@@ -190,7 +189,6 @@ class SQLiteStorage:
 
     def write_events(self, events):
         """ Save events.
-
         Args:
             state_change_identifier: Id of the state change that generate these events.
             events: List of Event objects.
@@ -205,7 +203,6 @@ class SQLiteStorage:
 
     def delete_state_changes(self, state_changes_to_delete: List[int]) -> None:
         """ Delete state changes.
-
         Args:
             state_changes_to_delete: List of ids to delete.
         """
@@ -370,9 +367,7 @@ class SQLiteStorage:
         logical_and: bool = True,
     ) -> List[StateChangeRecord]:
         """ Return a batch of state change records (identifier and data)
-
         The batch size can be tweaked with the `limit` and `offset` arguments.
-
         Additionally the returned state changes can be optionally filtered with
         the `filters` parameter to search for specific data in the state change data.
         """
@@ -391,7 +386,6 @@ class SQLiteStorage:
         self, batch_size: int, filters: List[Tuple[str, Any]] = None, logical_and: bool = True
     ) -> Iterator[List[StateChangeRecord]]:
         """Batch query state change records with a given batch size and an optional filter
-
         This is a generator function returning each batch to the caller to work with.
         """
         limit = batch_size
@@ -466,9 +460,7 @@ class SQLiteStorage:
         logical_and: bool = True,
     ) -> List[EventRecord]:
         """ Return a batch of event records
-
         The batch size can be tweaked with the `limit` and `offset` arguments.
-
         Additionally the returned events can be optionally filtered with
         the `filters` parameter to search for specific data in the event data.
         """
@@ -490,7 +482,6 @@ class SQLiteStorage:
         self, batch_size: int, filters: List[Tuple[str, Any]] = None, logical_and: bool = True
     ) -> Iterator[List[EventRecord]]:
         """Batch query event records with a given batch size and an optional filter
-
         This is a generator function returning each batch to the caller to work with.
         """
         limit = batch_size
@@ -596,7 +587,7 @@ class SQLiteStorage:
                                offset):
 
         query = """ 
-            
+
             SELECT
                 data, 
                 log_time
@@ -606,7 +597,7 @@ class SQLiteStorage:
                 json_extract(state_events.data,
                         '$._type') IN ({}) {} {} {} {} 
             LIMIT ? OFFSET ?
-            
+
                     """
 
         target_query = ""
@@ -745,7 +736,6 @@ class SQLiteStorage:
 
     def update_snapshots(self, snapshots_data: List[Tuple[str, int]]):
         """Given a list of snapshot data, update them in the DB
-
         The snapshots_data should be a list of tuples of snapshots data
         and identifiers in that order.
         """
@@ -771,7 +761,7 @@ class SQLiteStorage:
         finally:
             self.in_transaction = False
 
-    def get_dashboard_data(self, graph_from_date:int = None, graph_to_date:int = None, table_limit:int = None):
+    def get_dashboard_data(self, graph_from_date: int = None, graph_to_date: int = None, table_limit: int = None):
         data_graph = self._get_graph_data(graph_from_date, graph_to_date)
         data_table = self._get_table_data(table_limit)
         data_general_payments = self._get_general_data_payments()
@@ -785,7 +775,6 @@ class SQLiteStorage:
     def _get_general_data_payments(self):
 
         query = """ 
-
             SELECT
                 CASE
                     {}
@@ -798,7 +787,6 @@ class SQLiteStorage:
                 json_extract(state_events.data,'$._type') IN ({})
             GROUP BY                
                 json_extract(state_events.data,'$._type')          
-
         """
 
         event_type_result = self._get_event_type_query()
@@ -815,23 +803,23 @@ class SQLiteStorage:
 
     def _get_sql_case_type_event_payment(self):
         case_type_event = """
-        
+
         json_extract(state_events.data,'$._type')
                     WHEN 'raiden.transfer.events.EventPaymentReceivedSuccess' THEN '1'
                     WHEN 'raiden.transfer.events.EventPaymentSentFailed' THEN '2'
                     WHEN 'raiden.transfer.events.EventPaymentSentSuccess' THEN '3' 
-                    
+
         """
         return case_type_event
 
     def _get_sql_case_type_label_event_type(self):
         case_event_type_label = """        
-        
+
         json_extract(state_events.data,'$._type')
                     WHEN 'raiden.transfer.events.EventPaymentReceivedSuccess' THEN 'Payment Received'
                     WHEN 'raiden.transfer.events.EventPaymentSentFailed' THEN 'Payment Sent Failed'
                     WHEN 'raiden.transfer.events.EventPaymentSentSuccess' THEN 'Payment Sent Success'
-                    
+
         """
         return case_event_type_label
 
@@ -858,7 +846,7 @@ class SQLiteStorage:
         limit = -1 if limit is None else limit
 
         base_query = '''
-            
+
             SELECT
                 log_time, 
                 data
@@ -868,7 +856,7 @@ class SQLiteStorage:
                 json_extract(state_events.data,
                 '$._type') IN ({})	
             LIMIT ?	
-        
+
         '''
 
         payments_received = self._get_payments_event(base_query, limit, 1)
@@ -881,7 +869,7 @@ class SQLiteStorage:
 
         return result
 
-    def _get_payments_event(self, base_query, limit:int = None, event_type:int = None):
+    def _get_payments_event(self, base_query, limit: int = None, event_type: int = None):
         cursor = self.conn.cursor()
         query = base_query
 
@@ -903,7 +891,7 @@ class SQLiteStorage:
         cursor = self.conn.cursor()
 
         query = """
-        
+
         SELECT
             CASE
 		        {}
@@ -937,8 +925,8 @@ class SQLiteStorage:
 	        '$._type') IN ({})
 	    AND log_time BETWEEN ? AND ?
         GROUP BY STRFTIME("%m", log_time), json_extract(state_events.data,'$._type')
-        
-        
+
+
         """
         event_type_result = self._get_event_type_query()
         case_type_event = self._get_sql_case_type_event_payment()
@@ -985,7 +973,6 @@ class SerializedSQLiteStorage(SQLiteStorage):
 
     def write_events(self, state_change_identifier, events, log_time):
         """ Save events.
-
         Args:
             state_change_identifier: Id of the state change that generate these events.
             events: List of Event objects.

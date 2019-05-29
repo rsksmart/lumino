@@ -45,7 +45,6 @@ from .runners import EchoNodeRunner, MatrixRunner, UDPRunner
 
 log = structlog.get_logger(__name__)
 
-
 OPTION_DEPENDENCIES: Dict[str, List[Tuple[str, Any]]] = {
     "pathfinding-service-address": [("transport", "matrix"), ("routing-mode", RoutingMode.PFS)],
     "pathfinding-max-paths": [("transport", "matrix"), ("routing-mode", RoutingMode.PFS)],
@@ -348,7 +347,7 @@ def options(func):
             option(
                 "--log-config",
                 help="Log level configuration.\n"
-                "Format: [<logger-name-1>]:<level>[,<logger-name-2>:level][,...]",
+                     "Format: [<logger-name-1>]:<level>[,<logger-name-2>:level][,...]",
                 type=LOG_LEVEL_CONFIG_TYPE,
                 default=":info",
                 show_default=True,

@@ -158,7 +158,7 @@ def constraint_removed_duplicated_values(obj: Dict[str, Any]) -> None:
             assert key not in obj
 
 
-def contraint_has_canonical_identifier(obj: Dict[str, Any]) -> None:
+def constraint_has_canonical_identifier(obj: Dict[str, Any]) -> None:
     _type = obj.get("_type")
     if _type in ALL_MIGRATING and _type not in ALL_REMOVE_MIGRATIONS:
         canonical_identifier = obj.get("canonical_identifier")
@@ -170,7 +170,7 @@ def contraint_has_canonical_identifier(obj: Dict[str, Any]) -> None:
 
 def constraint_has_canonical_identifier_or_values_removed(obj: Dict[str, Any]) -> None:
     constraint_removed_duplicated_values(obj)
-    contraint_has_canonical_identifier(obj)
+    constraint_has_canonical_identifier(obj)
 
 
 def walk_dicts(obj: Union[List, Dict], callback: Callable) -> None:
@@ -225,7 +225,7 @@ def _add_canonical_identifier_to_statechanges(
 
     for state_change_batch in storage.batch_query_state_changes(batch_size=500):
         updated_state_changes: List[Tuple[str, int]] = list()
-        delete_state_changes: List[int] = list()
+        delete_state_changes: List[Tuple[int]] = list()
 
         for state_change_record in state_change_batch:
             state_change_obj = json.loads(state_change_record.data)
@@ -236,7 +236,7 @@ def _add_canonical_identifier_to_statechanges(
             )
 
             if should_delete:
-                delete_state_changes.append(state_change_record.state_change_identifier)
+                delete_state_changes.append((state_change_record.state_change_identifier,))
             else:
                 channel_id: Optional[int] = None
                 if is_unlock:
@@ -248,10 +248,10 @@ def _add_canonical_identifier_to_statechanges(
                     lambda obj, channel_id_=channel_id: upgrade_object(obj, chain_id, channel_id_),
                 )
 
-            walk_dicts(state_change_obj, constraint_has_canonical_identifier_or_values_removed)
-            updated_state_changes.append(
-                (json.dumps(state_change_obj), state_change_record.state_change_identifier)
-            )
+                walk_dicts(state_change_obj, constraint_has_canonical_identifier_or_values_removed)
+                updated_state_changes.append(
+                    (json.dumps(state_change_obj), state_change_record.state_change_identifier)
+                )
 
         storage.update_state_changes(updated_state_changes)
         storage.delete_state_changes(delete_state_changes)
