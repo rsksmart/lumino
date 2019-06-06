@@ -12,8 +12,6 @@ from raiden.utils import get_system_spec
 from raiden.utils.typing import Any, Dict, Iterator, List, NamedTuple, Optional, Tuple, Union
 from dateutil.relativedelta import relativedelta
 
-# The latest DB version
-RAIDEN_DB_VERSION = 17
 
 
 class EventRecord(NamedTuple):
