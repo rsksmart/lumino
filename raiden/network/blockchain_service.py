@@ -26,6 +26,8 @@ from raiden.utils.typing import (
 )
 from raiden_contracts.contract_manager import ContractManager
 from raiden.utils.namehash.namehash import namehash
+from raiden.network.rpc.smartcontract_proxy import ContractProxy
+from raiden.rns_constants import RNS_RESOLVER_ADDRESS, RNS_RESOLVER_ABI
 
 
 class BlockChainService:
