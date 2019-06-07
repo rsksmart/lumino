@@ -414,6 +414,10 @@ class APIServer(Runnable):
                         cookie = cookie.split('=')
                         if cookie[0] == "token" and request.method != 'GET' and request.path != '/api/v1/tokenAction':
                             self.rest_api.raiden_api.validate_token_app(cookie[1])
+                elif 'HTTP_TOKEN' in request_headers.environ:
+                    self.rest_api.raiden_api.validate_token_app(request_headers.environ['HTTP_TOKEN'])
+                else:
+                    print("Error")
 
         if web_ui:
             self._set_ui_endpoint()
@@ -423,8 +427,6 @@ class APIServer(Runnable):
                 )
 
         self._is_raiden_running()
-
-
 
     def _set_ui_endpoint(self):
         # Overrides the backend url in the ui bundle
@@ -752,14 +754,14 @@ class RestAPI:
                 node=pex(self.raiden_api.address),
                 registry_address=to_checksum_address(registry_address),
                 token_address=to_checksum_address(token_address),
-                partner_rns_address=partner_rns_address,
+                partner_rns_address=rns_resolved_address,
                 total_deposit=total_deposit,
             )
             try:
                 self.raiden_api.set_total_channel_deposit(
                     registry_address=registry_address,
                     token_address=token_address,
-                    partner_rns_address=to_canonical_address(partner_rns_address),
+                    partner_address=to_canonical_address(rns_resolved_address),
                     total_deposit=total_deposit,
                 )
             except InsufficientFunds as e:
@@ -1598,9 +1600,7 @@ class RestAPI:
         return api_response(result=network_graph.to_dict())
 
     def write_token_action(self, action):
-
         new_token = self.raiden_api.write_token_action(action)
-
         if new_token is None:
             return api_error(
                 errors="Internal server error getting get_token.",
