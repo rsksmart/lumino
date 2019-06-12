@@ -415,7 +415,7 @@ def options(func):
                 '--explorer-endpoint',
                 help='The url to register node and indicate alive signal to the explorer api',
                 type=str,
-                default=None,
+                default="https://api.lumino.rifos.org/lumino-explorer-1.0/",
             ),
         ),
         option_group(
