@@ -1,3 +1,4 @@
+
 # RIF Lumino Network
 
 
@@ -6,18 +7,17 @@
 
 ## Technical overview
 
-RIF Lumino Network is an off-chain solution for RSK thats enables near-instant, low-fee, scalable payments.
+RIF Lumino Network is an off-chain solution for RSK thats enables near-isntant, low-fee and scalable payments.
 
 RIF Lumino uses a fork of [Raiden Network](https://github.com/raiden-network/raiden) implementation to achieve this.
 
 ## Pre requisites
 
-1. Access to a synchronized RSK node. You can do this in a variety of ways:
+1. Access to a synched RSK node. You can do this in a variety of ways:
    * Run your own node on TestNet or MainNet, see [https://github.com/rsksmart/rskj/wiki/Install-RskJ-and-join-the-RSK-Orchid-Mainnet-Beta]()
    * Compile and run a RSK node locally, see [https://github.com/rsksmart/rskj/wiki/Compile-and-run-a-RSK-node-locally]()
 2. RSK account with RBTC balance
-3. Linux OS
-4. Python 3.6
+4. Python 3.7
 5. Pip
 6. Virtualenv
 
@@ -28,10 +28,10 @@ RIF Lumino uses a fork of [Raiden Network](https://github.com/raiden-network/rai
 2. Go to the path you downloaded or cloned Lumino's code (let's call this path `$RIF_LUMINO_PATH`)
 3. Create python virtual env for RIF Lumino (this has to be made one time)
 
-```virtualenv -p <PATH_TO_PYTHON3.6> clientEnv```
+```virtualenv -p <PATH_TO_PYTHON3.7> clientEnv```
 
 **Note 1:**
-Replace `<PATH_TO_PYTHON3.6>` for the path where Python3.6 is installed in your system, in the case of Ubuntu this usually is on path `/usr/bin/python3.6`
+Replace `<PATH_TO_PYTHON3.7>` for the path where Python3.7 is installed in your system, in the case of Ubuntu this usually is on path `/usr/bin/python3.7`
 
 **Note 2:**
 If you receive an error, please check ***Additional Help*** section.
@@ -46,17 +46,14 @@ Run:
 
 ```python --version```
 
-This command should output version 3.6.x
+This command should output version 3.7.x
 
 6. Install RIF Lumino requirements
 
 Inside the virtual environment run the following command:
 
-```pip install -c constraints.txt --upgrade -r requirements-dev.txt ```
+```pip install -r requirements.txt -c constraints.txt -e . ```
 
-7.  Run Lumino setup
-
-```python setup.py develop```
 
 ## Start your RIF Lumino Node
 
@@ -65,6 +62,7 @@ Inside the virtual environment run the following command:
 3. Run the following command:
 
 ```
+
 lumino
     --keystore-path $KEYSTORE_PATH
     --network-id 31
@@ -125,13 +123,13 @@ Have you read and understood and do you accept the RIF Lumino Disclosure Agreeme
 ```
 
 
-5.  After you've accepted, you will be asked to select the account you want to use for your node. Select the account and enter your passphrase to continue.
+5.  After you accepted, you will be asked to select the account you want to use for your node. Select the account, and enter your passphrase to continue
 
-If start up succeeds then you will see the following message:
+If start up succeeds you will see the following message:
 ```
 The Lumino API RPC server is now running at http://localhost:5001/.
 ```
-Next you can start interacting with your Lumino node using both the REST API and through the UI.
+After that you can start interacting with your Lumino nodein any of the two possible ways, both using the REST API and through the UI.
 
 To start using the Lumino Web UI just open your browser at `localhost:5001`.
 
@@ -139,9 +137,12 @@ In order to interact using the REST API, you can use the following Postman colle
 
 
 
-### Lumino Contracts
+### Contract addresses table for each environment
 
-The following are the addresses of the set of contracts for Lumino Network
+In the table below you can find the addresses of the contracts that you should use in order to
+connect to the RIF Lumino netowork for each environment.
+You should replace these addresses in the executing of the command described in the
+previous section.
 
 | Contract                                | TestNet                                    | MainNet        |
 |-----------------------------------------|--------------------------------------------|----------------|
@@ -149,52 +150,32 @@ The following are the addresses of the set of contracts for Lumino Network
 | `$SECRET_REGISTRY_CONTRACT_ADDRESS`       | 0xFd17D36EF2b3C5E71aBA059b3FC361644206213b | 0x4Dea623Ae7c5cb1F4aF9B46721D9a72d93C42BE9  |
 | `$ENDPOINT_REGISTRY_CONTRACT_ADDRESS`     | 0xb048Af6c0FBFBF1c0c01Ea9A302987011153dbB8 | 0x7d1E6f17baa2744B5213b697ae4C1D287bB10df0 |
 
-If you want to create your own RIF Lumino network for development or custom use on private networks, please refer to [Lumino Contracts](https://github.com/rsksmart/lumino-contracts)
+If you want to create your own RIF Lumino network, for development or custom use on private networks, please refer to [Lumino Contracts](https://github.com/rsksmart/lumino-contracts)
 
 ## Additional help
 
-The following sections are created using an Ubuntu 16.04.6
+The following sections present how to install a variety of packages on a machine running Ubuntu 16.04.6 OS
 
 
-### Install Python 3.6
+### Install Python 3.7
 
-
-
-Add a new repository to your APT:
-
-```sudo add-apt-repository ppa:jonathonf/python-3.6```
-
-Update your local APT repository:
-
-```sudo apt-get update```
-
-Install Python 3.6:
-
-```sudo apt-get install python3.6```
+Download it from https://www.python.org/downloads/
 
 ### Install PIP3
 
-If you didn't, update your local APT repository:
-
 ```sudo apt update```
-
-Install pip3:
 
 ```sudo apt-get install python3-pip```
 
 ### Install virtualenv
 
-If you didn't, update your local APT repository:
-
 ```sudo apt update```
-
-Install virtualenv:
 
 ```sudo apt-get install virtualenv```
 
 ### Error when we try to create python virtualenv
 
-If you get an error when you run the `virtualenv -p ...` command, similar to the following one:
+If you get an error, when you run the `virtualenv -p ...` command, similar to the following one:
 
 ```
 Original exception was:
@@ -209,7 +190,7 @@ Traceback (most recent call last):
     call_subprocess(cmd, show_stdout=False, extra_env=env, stdin=SCRIPT)
   File "/usr/lib/python3/dist-packages/virtualenv.py", line 812, in call_subprocess
     % (cmd_desc, proc.returncode))
-OSError: Command /root/lumino/clientEnv/bin/python3.6 - setuptools pkg_resources pip wheel failed with error code 1
+OSError: Command /root/lumino/clientEnv/bin/python3.7 - setuptools pkg_resources pip wheel failed with error code 1
 ```
 
 You can solve it executing:
@@ -221,7 +202,7 @@ export LC_CTYPE="en_US.UTF-8"
 
 ### Error installing requirements
 
-If you receive an error when installing Lumino requirements, try this procedure:
+If you receive an error, when you're installing Lumino requirements, try this procedure:
 
 1. Exit the virtual environment using `deactivate` command
 2. Remove clientEnv folder: `rm -rf clientEnv`
@@ -230,9 +211,9 @@ Install the package you need, and restart from the step 3 of the main process.
 
 **If you receive the error: `Command "python setup.py egg_info" failed with error code 1 in /tmp/pip-install-3qvhi58l/psycopg2/`**
 
-Install python3.6-dev package and try again. To install that package you should run:
+Install python3.7-dev package and try again. To install that package you should run:
 
-```sudo apt-get install libpq-dev python3.6-dev```
+```sudo apt-get install libpq-dev python3.7-dev```
 
 
 **If you receive the error: `Command "python setup.py egg_info" failed with error code 1 in /tmp/pip-install-4ceg89vs/psycopg2/`**
@@ -241,6 +222,12 @@ Install psycopg2 running:
 
 ```pip3 install psycopg2```
 
+
+## Conclusion
+After you follow all the previous steps you should have your RIF Lumino Node up and
+running, and you should be part of the RIF Lumino Network.
+From this point you should be able to create payment channels with any registered token on
+RSK and start to make fast, cheap and reliable payments.
 
 ## Useful Links
 

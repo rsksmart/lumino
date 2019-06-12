@@ -1,0 +1,3 @@
+[console_scripts]
+lumino = raiden.__main__:main
+

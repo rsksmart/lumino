@@ -1,19 +1,33 @@
+from raiden.settings import MEDIATION_FEE
+from raiden.transfer.identifiers import CanonicalIdentifier
 from raiden.transfer.state import (
     NettingChannelEndState,
     NettingChannelState,
     TransactionExecutionStatus,
 )
+from raiden.utils.typing import (
+    BlockNumber,
+    BlockTimeout,
+    Optional,
+    PaymentNetworkID,
+    TokenAddress,
+    TokenNetworkAddress,
+)
 
 
 def get_channel_state(
-        token_address,
-        payment_network_identifier,
-        token_network_address,
-        reveal_timeout,
-        payment_channel_proxy,
-        opened_block_number,
+    token_address: TokenAddress,
+    payment_network_identifier: PaymentNetworkID,
+    token_network_address: TokenNetworkAddress,
+    reveal_timeout: BlockTimeout,
+    payment_channel_proxy,
+    opened_block_number: BlockNumber,
 ):
-    channel_details = payment_channel_proxy.detail()
+    # Here we have to query the latest state because if we query with an older block
+    # state (e.g. opened_block_number) the state may have been pruned which will
+    # lead to an error.
+    latest_block_hash = payment_channel_proxy.client.blockhash_from_blocknumber("latest")
+    channel_details = payment_channel_proxy.detail(latest_block_hash)
 
     our_state = NettingChannelEndState(
         channel_details.participants_data.our_details.address,
@@ -33,32 +47,30 @@ def get_channel_state(
         return None
 
     open_transaction = TransactionExecutionStatus(
-        None,
-        opened_block_number,
-        TransactionExecutionStatus.SUCCESS,
+        None, opened_block_number, TransactionExecutionStatus.SUCCESS
     )
 
+    close_transaction: Optional[TransactionExecutionStatus] = None
     if closed_block_number:
         close_transaction = TransactionExecutionStatus(
-            None,
-            closed_block_number,
-            TransactionExecutionStatus.SUCCESS,
+            None, closed_block_number, TransactionExecutionStatus.SUCCESS
         )
-    else:
-        close_transaction = None
 
     # For the current implementation the channel is a smart contract that
     # will be killed on settle.
     settle_transaction = None
 
     channel = NettingChannelState(
-        identifier=identifier,
-        chain_id=channel_details.chain_id,
+        canonical_identifier=CanonicalIdentifier(
+            chain_identifier=channel_details.chain_id,
+            token_network_address=token_network_address,
+            channel_identifier=identifier,
+        ),
         token_address=token_address,
         payment_network_identifier=payment_network_identifier,
-        token_network_identifier=token_network_address,
         reveal_timeout=reveal_timeout,
         settle_timeout=settle_timeout,
+        mediation_fee=MEDIATION_FEE,
         our_state=our_state,
         partner_state=partner_state,
         open_transaction=open_transaction,

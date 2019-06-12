@@ -1,8 +1,12 @@
+import binascii
+
 from eth_utils import (
     is_0x_prefixed,
     is_checksum_address,
+    to_bytes,
     to_canonical_address,
     to_checksum_address,
+    to_hex,
 )
 from marshmallow import Schema, SchemaOpts, fields, post_dump, post_load, pre_load
 from raiden.utils.rns import is_rns_address
@@ -11,6 +15,7 @@ from werkzeug.exceptions import NotFound
 from werkzeug.routing import BaseConverter
 
 from raiden.api.objects import Address, AddressList, PartnersPerToken, PartnersPerTokenList
+from raiden.constants import SECRET_LENGTH, SECRETHASH_LENGTH
 from raiden.settings import DEFAULT_INITIAL_CHANNEL_TARGET, DEFAULT_JOINABLE_FUNDS_TARGET
 from raiden.transfer import channel
 from raiden.transfer.state import CHANNEL_STATE_CLOSED, CHANNEL_STATE_OPENED, CHANNEL_STATE_SETTLED
@@ -25,21 +30,23 @@ class InvalidEndpoint(NotFound):
 
 
 class HexAddressConverter(BaseConverter):
-    def to_python(self, value):
+    @staticmethod
+    def to_python(value):
         if not is_0x_prefixed(value):
-            raise InvalidEndpoint('Not a valid hex address, 0x prefix missing.')
+            raise InvalidEndpoint("Not a valid hex address, 0x prefix missing.")
 
         if not is_checksum_address(value):
-            raise InvalidEndpoint('Not a valid EIP55 encoded address.')
+            raise InvalidEndpoint("Not a valid EIP55 encoded address.")
 
         try:
             value = to_canonical_address(value)
         except ValueError:
-            raise InvalidEndpoint('Could not decode hex.')
+            raise InvalidEndpoint("Could not decode hex.")
 
         return value
 
-    def to_url(self, value):
+    @staticmethod
+    def to_url(value):
         return to_checksum_address(value)
 
 
@@ -75,29 +82,96 @@ class AddressRnsField(fields.Field):
 
 class AddressField(fields.Field):
     default_error_messages = {
-        'missing_prefix': 'Not a valid hex encoded address, must be 0x prefixed.',
-        'invalid_checksum': 'Not a valid EIP55 encoded address',
-        'invalid_data': 'Not a valid hex encoded address, contains invalid characters.',
-        'invalid_size': 'Not a valid hex encoded address, decoded address is not 20 bytes long.',
+        "missing_prefix": "Not a valid hex encoded address, must be 0x prefixed.",
+        "invalid_checksum": "Not a valid EIP55 encoded address",
+        "invalid_data": "Not a valid hex encoded address, contains invalid characters.",
+        "invalid_size": "Not a valid hex encoded address, decoded address is not 20 bytes long.",
     }
 
-    def _serialize(self, value, attr, obj):
+    @staticmethod
+    def _serialize(value, attr, obj):  # pylint: disable=unused-argument
         return to_checksum_address(value)
 
-    def _deserialize(self, value, attr, data):
+    def _deserialize(self, value, attr, data):  # pylint: disable=unused-argument
         if not is_0x_prefixed(value):
-            self.fail('missing_prefix')
+            self.fail("missing_prefix")
 
         if not is_checksum_address(value):
-            self.fail('invalid_checksum')
+            self.fail("invalid_checksum")
 
         try:
             value = to_canonical_address(value)
         except ValueError:
-            self.fail('invalid_data')
+            self.fail("invalid_data")
 
         if len(value) != 20:
-            self.fail('invalid_size')
+            self.fail("invalid_size")
+
+        return value
+
+
+class DataField(fields.Field):
+    @staticmethod
+    def _serialize(value, attr, obj):  # pylint: disable=unused-argument
+        return data_encoder(value)
+
+    @staticmethod
+    def _deserialize(value, attr, data):  # pylint: disable=unused-argument
+        return data_decoder(value)
+
+
+class SecretField(fields.Field):
+    default_error_messages = {
+        "missing_prefix": "Not a valid hex encoded value, must be 0x prefixed.",
+        "invalid_data": "Not a valid hex formated string, contains invalid characters.",
+        "invalid_size": (
+            f"Not a valid hex encoded secret, it is not {SECRET_LENGTH} characters long."
+        ),
+    }
+
+    @staticmethod
+    def _serialize(value, attr, obj):  # pylint: disable=unused-argument
+        return to_hex(value)
+
+    def _deserialize(self, value, attr, data):  # pylint: disable=unused-argument
+        if not is_0x_prefixed(value):
+            self.fail("missing_prefix")
+
+        try:
+            value = to_bytes(hexstr=value)
+        except binascii.Error:
+            self.fail("invalid_data")
+
+        if len(value) != SECRET_LENGTH:
+            self.fail("invalid_size")
+
+        return value
+
+
+class SecretHashField(fields.Field):
+    default_error_messages = {
+        "missing_prefix": "Not a valid hex encoded value, must be 0x prefixed.",
+        "invalid_data": "Not a valid hex formated string, contains invalid characters.",
+        "invalid_size": (
+            f"Not a valid secrethash, decoded value is not {SECRETHASH_LENGTH} " f"bytes long."
+        ),
+    }
+
+    @staticmethod
+    def _serialize(value, attr, obj):  # pylint: disable=unused-argument
+        return to_hex(value)
+
+    def _deserialize(self, value, attr, data):  # pylint: disable=unused-argument
+        if not is_0x_prefixed(value):
+            self.fail("missing_prefix")
+
+        try:
+            value = to_bytes(hexstr=value)
+        except binascii.Error:
+            self.fail("invalid_data")
+
+        if len(value) != SECRETHASH_LENGTH:
+            self.fail("invalid_size")
 
         return value
 
@@ -109,7 +183,7 @@ class BaseOpts(SchemaOpts):
 
     def __init__(self, meta):
         SchemaOpts.__init__(self, meta)
-        self.decoding_class = getattr(meta, 'decoding_class', None)
+        self.decoding_class = getattr(meta, "decoding_class", None)
 
 
 class BaseSchema(Schema):
@@ -136,12 +210,12 @@ class BaseListSchema(Schema):
 
     @post_dump
     def unwrap_data_envelope(self, data):  # pylint: disable=no-self-use
-        return data['data']
+        return data["data"]
 
     @post_load
     def make_object(self, data):
         decoding_class = self.opts.decoding_class  # pylint: disable=no-member
-        list_ = data['data']
+        list_ = data["data"]
         return decoding_class(list_)
 
 
@@ -225,29 +299,30 @@ class PartnersPerTokenListSchema(BaseListSchema):
 
 
 class ChannelStateSchema(BaseSchema):
-    channel_identifier = fields.Integer(attribute='identifier')
+    channel_identifier = fields.Integer(attribute="identifier")
     token_network_identifier = AddressField()
     token_address = AddressField()
-    partner_address = fields.Method('get_partner_address')
+    partner_address = fields.Method("get_partner_address")
     settle_timeout = fields.Integer()
     reveal_timeout = fields.Integer()
-    balance = fields.Method('get_balance')
-    state = fields.Method('get_state')
-    total_deposit = fields.Method('get_total_deposit')
+    balance = fields.Method("get_balance")
+    state = fields.Method("get_state")
+    total_deposit = fields.Method("get_total_deposit")
 
-    def get_partner_address(self, channel_state):  # pylint: disable=no-self-use
+    @staticmethod
+    def get_partner_address(channel_state):
         return to_checksum_address(channel_state.partner_state.address)
 
-    def get_balance(self, channel_state):  # pylint: disable=no-self-use
-        return channel.get_distributable(
-            channel_state.our_state,
-            channel_state.partner_state,
-        )
+    @staticmethod
+    def get_balance(channel_state):
+        return channel.get_distributable(channel_state.our_state, channel_state.partner_state)
 
-    def get_state(self, channel_state):
+    @staticmethod
+    def get_state(channel_state):
         return channel.get_status(channel_state)
 
-    def get_total_deposit(self, channel_state):
+    @staticmethod
+    def get_total_deposit(channel_state):
         """Return our total deposit in the contract for this channel"""
         return channel_state.our_total_deposit
 
@@ -288,16 +363,15 @@ class ChannelLuminoGetSchema(BaseSchema):
         # decoding to a dict is required by the @use_kwargs decorator from webargs:
         decoding_class = dict
 
+
 class ChannelPatchSchema(BaseSchema):
     total_deposit = fields.Integer(default=None, missing=None)
     state = fields.String(
         default=None,
         missing=None,
-        validate=validate.OneOf([
-            CHANNEL_STATE_CLOSED,
-            CHANNEL_STATE_OPENED,
-            CHANNEL_STATE_SETTLED,
-        ]),
+        validate=validate.OneOf(
+            [CHANNEL_STATE_CLOSED, CHANNEL_STATE_OPENED, CHANNEL_STATE_SETTLED]
+        ),
     )
 
     class Meta:
@@ -312,19 +386,35 @@ class PaymentSchema(BaseSchema):
     token_address = AddressField(missing=None)
     amount = fields.Integer(required=True)
     identifier = fields.Integer(missing=None)
-    secret = fields.String(missing=None)
-    secret_hash = fields.String(missing=None)
+    secret = SecretField(missing=None)
+    secret_hash = SecretHashField(missing=None)
 
     class Meta:
         strict = True
         decoding_class = dict
 
 
+class TokenActionSchema(BaseSchema):
+    action = fields.String(missing=None)
+
+    class Meta:
+        strict = True
+        # decoding to a dict is required by the @use_kwargs decorator from webargs
+        decoding_class = dict
+
+
+class TokenActionRequestSchema(BaseSchema):
+    token = fields.String(missing=None)
+
+    class Meta:
+        strict = True
+        # decoding to a dict is required by the @use_kwargs decorator from webargs
+        decoding_class = dict
+
+
 class ConnectionsConnectSchema(BaseSchema):
     funds = fields.Integer(required=True)
-    initial_channel_target = fields.Integer(
-        missing=DEFAULT_INITIAL_CHANNEL_TARGET,
-    )
+    initial_channel_target = fields.Integer(missing=DEFAULT_INITIAL_CHANNEL_TARGET)
     joinable_funds_target = fields.Decimal(missing=DEFAULT_JOINABLE_FUNDS_TARGET)
 
     class Meta:
@@ -343,7 +433,7 @@ class EventPaymentSentFailedSchema(BaseSchema):
     token_address = AddressField()
     block_number = fields.Integer()
     identifier = fields.Integer()
-    event = fields.Constant('EventPaymentSentFailed')
+    event = fields.Constant("EventPaymentSentFailed")
     reason = fields.Str()
     target = AddressField()
     log_time = fields.String()
@@ -410,7 +500,7 @@ class EventPaymentSentSuccessSchema(BaseSchema):
     token_network_identifier = AddressField()
     token_address = AddressField()
     identifier = fields.Integer()
-    event = fields.Constant('EventPaymentSentSuccess')
+    event = fields.Constant("EventPaymentSentSuccess")
     amount = fields.Integer()
     target = AddressField()
     log_time = fields.String()
@@ -424,6 +514,7 @@ class EventPaymentSentSuccessSchema(BaseSchema):
                   'log_time',
                   'token_network_identifier',
                   'token_address')
+
         strict = True
         decoding_class = dict
 
@@ -433,7 +524,7 @@ class EventPaymentReceivedSuccessSchema(BaseSchema):
     token_address = AddressField()
     block_number = fields.Integer()
     identifier = fields.Integer()
-    event = fields.Constant('EventPaymentReceivedSuccess')
+    event = fields.Constant("EventPaymentReceivedSuccess")
     amount = fields.Integer()
     initiator = AddressField()
     log_time = fields.String()
