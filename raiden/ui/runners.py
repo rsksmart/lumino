@@ -135,7 +135,7 @@ class NodeRunner:
                 except BadFunctionCallOutput:
                     click.secho(
                         "Unable to interact with RNS Public Resolver. Your node will be registered without RNS domain.")
-            register(node_address, rns_domain)
+            register(self._options["explorer_endpoint"], node_address, rns_domain)
         else:
             if self._options['rnsdomain']:
                 try:
@@ -152,7 +152,7 @@ class NodeRunner:
             (api_host, api_port) = split_endpoint(self._options["api_address"])
             api_server = APIServer(
                 rest_api,
-                config={'host': api_host, 'port': api_port, 'rnsdomain': self._options['rnsdomain'], 'rskendpoint': self._options['eth_rpc_endpoint']},
+                config={'host': api_host, 'port': api_port, 'rnsdomain': self._options['rnsdomain'], 'rskendpoint': self._options['eth_rpc_endpoint'], 'explorerendpoint': self._options["explorer_endpoint"]},
                 cors_domain_list=domain_list,
                 web_ui=self._options["web_ui"],
                 eth_rpc_endpoint=self._options["eth_rpc_endpoint"],

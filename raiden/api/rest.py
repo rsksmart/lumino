@@ -23,6 +23,7 @@ from raiden.api.objects import DashboardGraphItem
 from raiden.api.objects import DashboardTableItem
 from raiden.api.objects import DashboardGeneralItem
 from flask_cors import CORS
+from raiden.schedulers.setup import setup_schedule_config
 
 
 from raiden.api.objects import AddressList, PartnersPerTokenList
@@ -426,6 +427,10 @@ class APIServer(Runnable):
                     route, route, view_func=self._serve_webui, methods=("GET",)
                 )
 
+        # Setup Schedule Config for background jobs
+        node_address = to_checksum_address(self.rest_api.raiden_api.address)
+        setup_schedule_config(self, config['explorerendpoint'], node_address)
+
         self._is_raiden_running()
 
     def _set_ui_endpoint(self):
@@ -452,7 +457,6 @@ class APIServer(Runnable):
         # while the node was offline.
         if not self.rest_api.raiden_api.raiden:
             raise RuntimeError("The RaidenService must be started before the API can be used")
-
 
     def _serve_webui(self, file_name='index.html'):  # pylint: disable=redefined-builtin
         return send_from_directory(self.flask_app.root_path + '/webui', 'index.html')
@@ -1206,7 +1210,6 @@ class RestAPI:
 
         return result
 
-
     def _get_events_group_by_month(self, month, data):
         return [dashboardItem for dashboardItem in data if dashboardItem.month_of_year_label == month]
 
@@ -1265,7 +1268,6 @@ class RestAPI:
             result.append(serialized_event.data)
 
         return api_response(result=result)
-
 
     def get_raiden_internal_events_with_timestamps(self, limit, offset):
         return [

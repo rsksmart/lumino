@@ -411,6 +411,12 @@ def options(func):
                 is_flag=True,
                 default=False,
             ),
+            option(
+                '--explorer-endpoint',
+                help='The url to register node and indicate alive signal to the explorer api',
+                type=str,
+                default=None,
+            ),
         ),
         option_group(
             'Debugging options',
