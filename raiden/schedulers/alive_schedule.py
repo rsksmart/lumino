@@ -26,7 +26,7 @@ def notice_explorer_to_be_alive(endpoint_explorer, node_address):
         if response.status_code == 200:
             log.info("Succesfully send alive signal to Lumino Explorer")
         else:
-            log.info("Warning: There was an error registering into Lumino Explorer. Status: " + str(response.status_code))
+            log.info("Warning: There was an error sending alive signal to Lumino Explorer. Status: " + str(response.status_code))
 
     except requests.exceptions.RequestException as e:
         log.info("Warning: Could not connect to Lumino Explorer. Your node will not send alive signal.")
