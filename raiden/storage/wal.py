@@ -3,54 +3,54 @@ from datetime import datetime
 import gevent.lock
 import structlog
 
-from raiden.storage.sqlite import SQLiteStorage
-from raiden.transfer.architecture import StateManager
-from raiden.utils import typing
+from raiden.storage.sqlite import SerializedSQLiteStorage
+from raiden.transfer.architecture import Event, State, StateChange, StateManager
+from raiden.utils.typing import Callable, Generic, List, Tuple, TypeVar
 
 log = structlog.get_logger(__name__)  # pylint: disable=invalid-name
 
 
 def restore_to_state_change(
-        transition_function: typing.Callable,
-        storage: SQLiteStorage,
-        state_change_identifier: int,
-) -> 'WriteAheadLog':
+    transition_function: Callable, storage: SerializedSQLiteStorage, state_change_identifier: int
+) -> "WriteAheadLog":
     msg = "state change identifier 'latest' or an integer greater than zero"
-    assert state_change_identifier == 'latest' or state_change_identifier > 0, msg
+    assert state_change_identifier == "latest" or state_change_identifier > 0, msg
 
     from_state_change_id, chain_state = storage.get_snapshot_closest_to_state_change(
-        state_change_identifier=state_change_identifier,
+        state_change_identifier=state_change_identifier
     )
 
     if chain_state is not None:
         log.debug(
-            'Restoring from snapshot',
+            "Restoring from snapshot",
             from_state_change_id=from_state_change_id,
             to_state_change_id=state_change_identifier,
         )
     else:
         log.debug(
-            'No snapshot found, replaying all state changes',
+            "No snapshot found, replaying all state changes",
             to_state_change_id=state_change_identifier,
         )
 
     unapplied_state_changes = storage.get_statechanges_by_identifier(
-        from_identifier=from_state_change_id,
-        to_identifier=state_change_identifier,
+        from_identifier=from_state_change_id, to_identifier=state_change_identifier
     )
 
     state_manager = StateManager(transition_function, chain_state)
     wal = WriteAheadLog(state_manager, storage)
 
-    log.debug('Replaying state changes', num_state_changes=len(unapplied_state_changes))
+    log.debug("Replaying state changes", num_state_changes=len(unapplied_state_changes))
     for state_change in unapplied_state_changes:
         wal.state_manager.dispatch(state_change)
 
     return wal
 
 
-class WriteAheadLog:
-    def __init__(self, state_manager, storage):
+ST = TypeVar("ST", bound=State)
+
+
+class WriteAheadLog(Generic[ST]):
+    def __init__(self, state_manager: StateManager[ST], storage: SerializedSQLiteStorage) -> None:
         self.state_manager = state_manager
         self.state_change_id = None
         self.storage = storage
@@ -61,7 +61,7 @@ class WriteAheadLog:
         # execution order.
         self._lock = gevent.lock.Semaphore()
 
-    def log_and_dispatch(self, state_change):
+    def log_and_dispatch(self, state_change: StateChange) -> Tuple[ST, List[Event]]:
         """ Log and apply a state change.
 
         This function will first write the state change to the write-ahead-log,
@@ -72,17 +72,17 @@ class WriteAheadLog:
         """
 
         with self._lock:
-            timestamp = datetime.utcnow().isoformat(timespec='milliseconds')
+            timestamp = datetime.utcnow().isoformat(timespec="milliseconds")
             state_change_id = self.storage.write_state_change(state_change, timestamp)
             self.state_change_id = state_change_id
 
-            events = self.state_manager.dispatch(state_change)
+            state, events = self.state_manager.dispatch(state_change)
 
             self.storage.write_events(state_change_id, events, timestamp)
 
-        return events
+        return state, events
 
-    def snapshot(self):
+    def snapshot(self) -> None:
         """ Snapshot the application state.
 
         Snapshots are used to restore the application state, either after a
