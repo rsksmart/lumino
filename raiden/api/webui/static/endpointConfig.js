@@ -1,6 +1,6 @@
-const backendUrl='http://localhost:5003'; 
-const nodeAddress = '0xfb1efeBeA740a9b4820d287d6DcC1cb30F1bA1c8'; 
-const rnsDomain = 'gaspar3.rsk.co';
+const backendUrl='http://0.0.0.0:5001';
+const nodeAddress = '0x3278deEd4eE3DE26Bb53fFb82f4Be82a6bB66D19';
+const rnsDomain = null
 const chainEndpoint = 'http://127.0.0.1:4444'; 
 
 window.luminoUrl = backendUrl;
