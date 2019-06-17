@@ -417,8 +417,6 @@ class APIServer(Runnable):
                             self.rest_api.raiden_api.validate_token_app(cookie[1])
                 elif 'HTTP_TOKEN' in request_headers.environ:
                     self.rest_api.raiden_api.validate_token_app(request_headers.environ['HTTP_TOKEN'])
-                else:
-                    print("Error")
 
         if web_ui:
             self._set_ui_endpoint()
@@ -429,7 +427,8 @@ class APIServer(Runnable):
 
         # Setup Schedule Config for background jobs
         node_address = to_checksum_address(self.rest_api.raiden_api.address)
-        setup_schedule_config(self, config['explorerendpoint'], node_address)
+
+        setup_schedule_config(self, config['explorerendpoint'], config['discoverable'] ,node_address, self.rest_api.raiden_api.raiden)
 
         self._is_raiden_running()
 

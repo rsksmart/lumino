@@ -129,7 +129,9 @@ class NodeRunner:
                         sys.exit(1)
                     elif rns_resolved_address != node_address:
                         click.secho(
-                            'Cannot register into the Lumino Explorer. Your RNS domain does not match with the node RSK address. The RNS domain is owned by ' + rns_resolved_address
+                            'Cannot register into the Lumino Explorer. '
+                            'Your RNS domain does not match with the node RSK address. '
+                            'The RNS domain is owned by ' + rns_resolved_address
                         )
                         sys.exit(1)
                 except BadFunctionCallOutput:
@@ -144,7 +146,8 @@ class NodeRunner:
 
                 except BadFunctionCallOutput:
                     click.secho(
-                        "Unable to interact with RNS Public Resolver. Please check youre interacting with the correct contract.")
+                        "Unable to interact with RNS Public Resolver. "
+                        "Please check youre interacting with the correct contract.")
                     sys.exit(1)
 
         if self._options["rpc"]:
@@ -152,7 +155,12 @@ class NodeRunner:
             (api_host, api_port) = split_endpoint(self._options["api_address"])
             api_server = APIServer(
                 rest_api,
-                config={'host': api_host, 'port': api_port, 'rnsdomain': self._options['rnsdomain'], 'rskendpoint': self._options['eth_rpc_endpoint'], 'explorerendpoint': self._options["explorer_endpoint"]},
+                config={'host': api_host,
+                        'port': api_port,
+                        'rnsdomain': self._options['rnsdomain'],
+                        'rskendpoint': self._options['eth_rpc_endpoint'],
+                        'explorerendpoint': self._options["explorer_endpoint"],
+                        'discoverable': self._options['discoverable']},
                 cors_domain_list=domain_list,
                 web_ui=self._options["web_ui"],
                 eth_rpc_endpoint=self._options["eth_rpc_endpoint"],

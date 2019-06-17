@@ -1,6 +1,5 @@
 import requests
 import structlog
-import json
 from datetime import datetime
 
 log = structlog.get_logger(__name__)
