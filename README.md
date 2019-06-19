@@ -13,8 +13,8 @@ RIF Lumino uses a fork of [Raiden Network](https://github.com/raiden-network/rai
 ## Pre requisites
 
 1. Access to a synchronized RSK node. You can do this in a variety of ways:
-   * Run your own node on TestNet or MainNet, see [https://github.com/rsksmart/rskj/wiki/Install-RskJ-and-join-the-RSK-Orchid-Mainnet-Beta]()
-   * Compile and run a RSK node locally, see [https://github.com/rsksmart/rskj/wiki/Compile-and-run-a-RSK-node-locally]()
+   * Run your own node on TestNet or MainNet, see [Install RskJ and join the RSK Orchid Mainnet Beta](https://github.com/rsksmart/rskj/wiki/Install-RskJ-and-join-the-RSK-Orchid-Mainnet-Beta)
+   * Compile and run a RSK node locally, see [Compile and run a RSK node locally](https://github.com/rsksmart/rskj/wiki/Compile-and-run-a-RSK-node-locally)
 2. RSK account with RBTC balance
 3. Linux OS
 4. Python 3.6
@@ -158,7 +158,7 @@ The following sections are created using an Ubuntu 16.04.6
 
 ### Install Python 3.6
 
-
+#### Ubuntu / Debian
 
 Add a new repository to your APT:
 
@@ -172,7 +172,7 @@ Install Python 3.6:
 
 ```sudo apt-get install python3.6```
 
-### Install PIP3
+### Install pip3
 
 If you didn't, update your local APT repository:
 
@@ -191,6 +191,38 @@ If you didn't, update your local APT repository:
 Install virtualenv:
 
 ```sudo apt-get install virtualenv```
+
+#### macOS
+
+### Install Homebrew
+
+```/usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"```
+
+### Install Python 3
+
+This will also install pip3
+
+```brew install python3```
+
+### Install virtualenv
+
+```pip3 install virtualenv```
+
+### Install libpq
+
+```brew install libpq```
+
+### Install postgresql
+
+```brew install postgresql```
+
+### Install Command Line Tools
+
+```xcode-select --install```
+
+### Install psycopg2
+
+```env LDFLAGS="-I/usr/local/opt/openssl/include -L/usr/local/opt/openssl/lib" pip install psycopg2```
 
 ### Error when we try to create python virtualenv
 
@@ -240,7 +272,6 @@ Install python3.6-dev package and try again. To install that package you should 
 Install psycopg2 running:
 
 ```pip3 install psycopg2```
-
 
 ## Useful Links
 
