@@ -101,12 +101,12 @@ press Y followed by Enter.
 5. After you accepted you will be asked to select the account you want to use. Select the account and enter your passphrase to continue.
 
 
-###Contract addresses table for each environment
+### Contract addresses table for each environment
 
 | Contract                                | TestNet                                    | MainNet                                    |
 |-----------------------------------------|--------------------------------------------|--------------------------------------------|
-| `$TOKENNETWORK_REGISTRY_CONTRACT_ADDRESS` | 0xa494fc762181ff78fe4cbb75d8609ccff1e63c1b | 0x59ec7ced1e1ee2e4ccc74f197fb680d8f9426b96 |
-| `$SECRET_REGISTRY_CONTRACT_ADDRESS`       | 0xfd17d36ef2b3c5e71aba059b3fc361644206213b | 0x4dea623ae7c5cb1f4af9b46721d9a72d93c42be9 |
-| `$ENDPOINT_REGISTRY_CONTRACT_ADDRESS`     | 0xb048af6c0fbfbf1c0c01ea9a302987011153dbb8 | 0x7d1e6f17baa2744b5213b697ae4c1d287bb10df0 |
+| Token Registry Contract | 0xa494fc762181ff78fe4cbb75d8609ccff1e63c1b | 0x59ec7ced1e1ee2e4ccc74f197fb680d8f9426b96 |
+| Secret Registry Contract       | 0xfd17d36ef2b3c5e71aba059b3fc361644206213b | 0x4dea623ae7c5cb1f4af9b46721d9a72d93c42be9 |
+| Endpoint Registry Contract     | 0xb048af6c0fbfbf1c0c01ea9a302987011153dbb8 | 0x7d1e6f17baa2744b5213b697ae4c1d287bb10df0 |
 
 
