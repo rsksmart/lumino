@@ -17,7 +17,7 @@ RIF Lumino uses a fork of [Raiden Network](https://github.com/raiden-network/rai
    * Compile and run a RSK node locally, see [Compile and run a RSK node locally](https://github.com/rsksmart/rskj/wiki/Compile-and-run-a-RSK-node-locally)
 2. RSK account with RBTC balance
 3. Linux OS
-4. Python 3.6
+4. Python 3.7
 5. Pip
 6. Virtualenv
 
@@ -28,10 +28,10 @@ RIF Lumino uses a fork of [Raiden Network](https://github.com/raiden-network/rai
 2. Go to the path you downloaded or cloned Lumino's code (let's call this path `$RIF_LUMINO_PATH`)
 3. Create python virtual env for RIF Lumino (this has to be made one time)
 
-```virtualenv -p <PATH_TO_PYTHON3.6> clientEnv```
+```virtualenv -p <PATH_TO_PYTHON3.7> clientEnv```
 
 **Note 1:**
-Replace `<PATH_TO_PYTHON3.6>` for the path where Python3.6 is installed in your system, in the case of Ubuntu this usually is on path `/usr/bin/python3.6`
+Replace `<PATH_TO_PYTHON3.7>` for the path where Python3.7 is installed in your system, in the case of Ubuntu this usually is on path `/usr/bin/python3.7`
 
 **Note 2:**
 If you receive an error, please check ***Additional Help*** section.
@@ -46,7 +46,7 @@ Run:
 
 ```python --version```
 
-This command should output version 3.6.x
+This command should output version 3.7.x
 
 6. Install RIF Lumino requirements
 
@@ -156,21 +156,21 @@ If you want to create your own RIF Lumino network for development or custom use 
 The following sections are created using an Ubuntu 16.04.6
 
 
-### Install Python 3.6
+### Install Python 3.7
 
 #### Ubuntu / Debian
 
 Add a new repository to your APT:
 
-```sudo add-apt-repository ppa:jonathonf/python-3.6```
+```sudo add-apt-repository ppa:jonathonf/python-3.7```
 
 Update your local APT repository:
 
 ```sudo apt-get update```
 
-Install Python 3.6:
+Install Python 3.7:
 
-```sudo apt-get install python3.6```
+```sudo apt-get install python3.7```
 
 ### Install pip3
 
@@ -241,7 +241,7 @@ Traceback (most recent call last):
     call_subprocess(cmd, show_stdout=False, extra_env=env, stdin=SCRIPT)
   File "/usr/lib/python3/dist-packages/virtualenv.py", line 812, in call_subprocess
     % (cmd_desc, proc.returncode))
-OSError: Command /root/lumino/clientEnv/bin/python3.6 - setuptools pkg_resources pip wheel failed with error code 1
+OSError: Command /root/lumino/clientEnv/bin/python3.7 - setuptools pkg_resources pip wheel failed with error code 1
 ```
 
 You can solve it executing:
@@ -262,9 +262,9 @@ Install the package you need, and restart from the step 3 of the main process.
 
 **If you receive the error: `Command "python setup.py egg_info" failed with error code 1 in /tmp/pip-install-3qvhi58l/psycopg2/`**
 
-Install python3.6-dev package and try again. To install that package you should run:
+Install python3.7-dev package and try again. To install that package you should run:
 
-```sudo apt-get install libpq-dev python3.6-dev```
+```sudo apt-get install libpq-dev python3.7-dev```
 
 
 **If you receive the error: `Command "python setup.py egg_info" failed with error code 1 in /tmp/pip-install-4ceg89vs/psycopg2/`**
