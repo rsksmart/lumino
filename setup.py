@@ -51,7 +51,7 @@ setup(
     packages=find_packages(),
     include_package_data=True,
     license='MIT',
-    zip_safe=False,
+    zip_safe=True,
     keywords='raiden',
     classifiers=[
         'Development Status :: 3 - Alpha',
@@ -64,8 +64,7 @@ setup(
     cmdclass={
         'test': PyTest,
     },
-    use_scm_version=True,
-    setup_requires=['setuptools_scm'],
+    use_scm_version=False,
     install_requires=install_requires,
     tests_require=test_requirements,
     python_requires='>=3.7',

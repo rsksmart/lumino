@@ -40,12 +40,7 @@ def _do_check_version(current_version: str):
         click.secho(security_message.group(0), fg='red')
         # comparing it to the user's application
     if current_version < latest_release:
-        msg = "You're running version {}. The latest version is {}".format(
-            current_version,
-            latest_release,
-        )
-        click.secho(msg, fg='red')
-        click.secho("It's time to update! Releases: {}".format(RELEASE_PAGE), fg='red')
+        # TODO handle latest_release properly.
         return False
     return True
 
