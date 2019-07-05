@@ -102,6 +102,9 @@ PaymentID = NewType("PaymentID", T_PaymentID)
 T_PaymentAmount = int
 PaymentAmount = NewType("PaymentAmount", T_PaymentAmount)
 
+T_InvoiceAmount = int
+InvoiceAmount = NewType("InvoiceAmount", T_InvoiceAmount)
+
 T_PrivateKey = bytes
 PrivateKey = NewType("PrivateKey", T_PrivateKey)
 

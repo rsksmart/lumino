@@ -9,6 +9,7 @@ from typing import Dict
 import gevent
 import gevent.pool
 import structlog
+from dateutil.relativedelta import relativedelta
 from eth_utils import encode_hex, to_checksum_address
 from flask import Flask, make_response, send_from_directory, url_for, request
 
@@ -24,7 +25,7 @@ from raiden.api.objects import DashboardTableItem
 from raiden.api.objects import DashboardGeneralItem
 from flask_cors import CORS
 from raiden.schedulers.setup import setup_schedule_config
-
+from datetime import datetime
 
 from raiden.api.objects import AddressList, PartnersPerTokenList
 from raiden.api.v1.encoding import (
@@ -65,7 +66,9 @@ from raiden.api.v1.resources import (
     create_blueprint,
     NetworkResource, PaymentResourceLumino,
     SearchLuminoResource,
-    TokenActionResource)
+    TokenActionResource,
+    InvoiceResource,
+    PaymentInvoiceResourceLumino)
 
 from raiden.constants import GENESIS_BLOCK_NUMBER, UINT256_MAX, Environment
 
@@ -115,6 +118,9 @@ from eth_utils import (
     to_canonical_address
 )
 
+from raiden.billing.invoices.constants.invoice_type import InvoiceType
+from raiden.billing.invoices.constants.invoice_status import InvoiceStatus
+
 
 log = structlog.get_logger(__name__)
 
@@ -138,6 +144,7 @@ URLS_V1 = [
     ),
     ("/connections/<hexaddress:token_address>", ConnectionsResource),
     ("/connections", ConnectionsInfoResource),
+    ("/paymentsLumino/invoice", PaymentInvoiceResourceLumino),
     ("/payments", PaymentResource),
     ("/payments/<luminoaddress:token_address>", PaymentResource, "token_paymentresource"),
     (
@@ -197,6 +204,10 @@ URLS_V1 = [
     (
         '/tokenAction',
         TokenActionResource,
+    ),
+    (
+        '/invoice',
+        InvoiceResource,
     ),
 
 ]
@@ -1362,6 +1373,54 @@ class RestAPI:
         result = self.partner_per_token_list_schema.dump(schema_list)
         return api_response(result=result.data)
 
+    def initiate_payment_with_invoice(
+        self,
+        registry_address: typing.PaymentNetworkID,
+        coded_invoice):
+
+        invoice_decoded = self.raiden_api.decode_invoice(registry_address, coded_invoice)
+
+        persistent_invoice = self.raiden_api.get_invoice(invoice_decoded.paymenthash.hex())
+
+        if persistent_invoice is None:
+
+            for tags in invoice_decoded.tags:
+                key = tags[0]
+                value = tags[1]
+                if key == 'x':
+                    expires = value
+
+            for unknown_tag in invoice_decoded.unknown_tags:
+                key = unknown_tag[0]
+                value = unknown_tag[1]
+                if key == 'n':
+                    value
+
+            expiration_date = datetime.utcfromtimestamp(invoice_decoded.date) + relativedelta(seconds=expires)
+
+            data = {"invoice_type": InvoiceType.RECEIVED.value,
+                    "invoice_status": InvoiceStatus.PENDING.value,
+                    "already_coded_invoice" : True,
+                    "payment_hash" : invoice_decoded.paymenthash,
+                    "encode" : coded_invoice,
+                    "expiration_date" : expiration_date.isoformat()
+                    }
+
+            # currency_symbol, token_address, partner_address, amount, description
+            new_invoice = self.raiden_api.create_invoice(data)
+
+            if new_invoice is not None:
+                # We make payment with data of invoice
+                self.initiate_payment(registry_address,
+                                      )
+
+        else:
+            return api_error(
+                errors="Payment couldn't be completed "
+                       "(You can not autopay an invoice).",
+                status_code=HTTPStatus.CONFLICT,
+            )
+
     def initiate_payment(
         self,
         registry_address: typing.PaymentNetworkID,
@@ -1637,4 +1696,24 @@ class RestAPI:
                 status_code=HTTPStatus.INTERNAL_SERVER_ERROR,
             )
         return api_response(result=search_result)
+
+    def create_invoice(self,
+                       currency_symbol,
+                       token_address,
+                       partner_address,
+                       amount,
+                       description):
+
+        data = {"currency_symbol": currency_symbol,
+                "token_address" : token_address,
+                "partner_address" : partner_address,
+                "amount" : amount,
+                "description" : description,
+                "invoice_type": InvoiceType.ISSUED.value,
+                "invoice_status": InvoiceStatus.PENDING.value,
+                "already_coded_invoice" : False}
+
+        invoice = self.raiden_api.create_invoice(data)
+
+        return api_response(invoice)
 

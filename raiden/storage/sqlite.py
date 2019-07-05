@@ -172,6 +172,29 @@ class SQLiteStorage:
 
         return last_id
 
+    def write_invoice(self, invoice_data):
+        with self.write_lock, self.conn:
+            cursor = self.conn.execute(
+                "INSERT INTO invoices(identifier, type, status, expiration_date, encode, payment_hash) VALUES(null, ?, ?, ?, ?, ?)",
+                (invoice_data['type'], invoice_data['status'], invoice_data['expiration_date'], invoice_data['encode'], invoice_data['payment_hash']),
+            )
+            last_id = cursor.lastrowid
+
+        return last_id
+
+    def query_invoice(self, payment_hash):
+        cursor = self.conn.cursor()
+
+        cursor.execute(
+            """
+            SELECT identifier, type, status, expiration_date, encode, payment_hash
+                FROM invoices WHERE payment_hash = ?;
+            """,
+            (payment_hash,)
+        )
+
+        return cursor.fetchone()
+
     def query_token_action(self, token):
         cursor = self.conn.cursor()
 

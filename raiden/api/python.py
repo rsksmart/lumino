@@ -83,6 +83,14 @@ from raiden.utils.typing import (
 from raiden.rns_constants import RNS_ADDRESS_ZERO
 from raiden.utils.rns import is_rns_address
 
+from raiden.billing.invoices.options_args import OptionsArgs
+from raiden.billing.invoices.util.time_util import get_utc_unix_time, get_utc_expiration_time
+from raiden.billing.invoices.util.encryption_util import encrypt_string_with_sha256
+from raiden.billing.invoices.util.random_util import random_string
+from raiden.billing.invoices.encoder.lumino_encoder import parse_options, encode_invoice
+from raiden.billing.invoices.decoder.lumino_decoder import decode_lumino_invoice
+
+
 log = structlog.get_logger(__name__)  # pylint: disable=invalid-name
 
 EVENTS_PAYMENT_HISTORY_RELATED = (
@@ -1039,6 +1047,12 @@ class RaidenAPI:
 
     transfer = transfer_and_wait
 
+    def get_invoice(self, payment_hash):
+        return self.raiden.wal.storage.query_invoice(payment_hash)
+
+    def decode_invoice(self, registry_address, coded_invoice):
+        return decode_lumino_invoice(coded_invoice)
+
     def get_blockchain_events_network(
         self,
         registry_address: PaymentNetworkID,
@@ -1193,6 +1207,58 @@ class RaidenAPI:
     def get_token_action(self, token):
         token_data = self.raiden.wal.storage.query_token_action(token)
         return token_data
+
+    def create_invoice(self, data):
+
+        if data['already_coded_invoice'] is False:
+            chain = self.raiden.chain
+            private_key = chain.client.privkey.hex()
+            timestamp = get_utc_unix_time()
+            currency = data['currency_symbol']
+            fallback = None
+            amount = data['amount']
+            payment_hash = encrypt_string_with_sha256(random_string(20))
+            description = data['description']
+            description_hashed = None
+            expires = 3600
+            route = []
+            beneficiary = "0x" + data['partner_address'].hex()
+            token = "0x" + data['token_address'].hex()
+
+            options_args = OptionsArgs(timestamp,
+                                       currency,
+                                       fallback,
+                                       amount,
+                                       payment_hash,
+                                       description,
+                                       description_hashed,
+                                       expires,
+                                       route,
+                                       private_key,
+                                       beneficiary,
+                                       token)
+
+            lumino_invoice_obj = parse_options(options_args)
+
+            lumino_invoice_encoded = encode_invoice(lumino_invoice_obj, options_args.privkey)
+
+            expiration_date = get_utc_expiration_time(expires)
+
+        else:
+            payment_hash = data['payment_hash'].hex()
+            expiration_date = data['expiration_date']
+            lumino_invoice_encoded = data['encode']
+
+        lumino_invoice_persist = {"type": data['invoice_type'],
+                                  "status": data['invoice_status'],
+                                  "expiration_date": expiration_date,
+                                  "encode": lumino_invoice_encoded,
+                                  "payment_hash" : payment_hash}
+
+        # Save this information
+        self.raiden.wal.storage.write_invoice(lumino_invoice_persist)
+
+        return lumino_invoice_persist
 
     def search_lumino(self, registry_address: typing.PaymentNetworkID, query, only_receivers):
 
