@@ -85,11 +85,11 @@ sudo apt-get install virtualenv
 3. Create python virtual env for RIF Lumino (this needs to be performed only once) and execute the following command:
 
 ```
-virtualenv -p <PATH_TO_PYTHON3.6> clientEnv
+virtualenv -p <PATH_TO_PYTHON3.7> clientEnv
 ```
 
 **Note:**
-Replace `<PATH_TO_PYTHON3.6>` with the path where Python3.6 is installed in your system. In the case of Ubuntu OS, this is usually `/usr/bin/python3.6`
+Replace `<PATH_TO_PYTHON3.7>` with the path where Python3.7 is installed in your system. In the case of Ubuntu OS, this is usually `/usr/bin/python3.7`
 
 4. Activate python virtual env, by executing the following command:
 
@@ -103,7 +103,7 @@ source clientEnv/bin/activate
 python --version
 ```
 
-This command should output version 3.6.x
+This command should output version 3.7.x
 
 6. Install RIF Lumino requirements. Inside the virtual environment run the following command (this could take a few minutes):
 
@@ -127,7 +127,7 @@ python setup.py develop
 lumino
 	 --rnsdomain=$RNS_DOMAIN_OF_YOUR_NODE_ADDRESS
 	 --keystore-path $KEYSTORE_PATH
-	 --network-id 31
+	 --network-id $NETWORK_ID
 	 --eth-rpc-endpoint $RSK_NODE_URL
 	 --environment-type development
 	 --tokennetwork-registry-contract-address=0x59ec7ced1e1ee2e4ccc74f197fb680d8f9426b96
@@ -143,6 +143,7 @@ The following list describes each field:
 | FIELD                                  | DESCRIPTION                                                                                                                |
 |----------------------------------------|----------------------------------------------------------------------------------------------------------------------------|
 | keystore-path                          | The path to your keystore                                                                                                  |
+| network-id                          | The network id (MainNet is 30)                                                                                                 |
 | eth-rpc-endpoint                       | URL of your RSK node (http://URL:PORT)                                                                                     |
 | tokennetwork-registry-contract-address | Address for the token registry contract deployed (view contracts table for the contract address of testnet and mainnet)    |
 | secret-registry-contract-address       | Address for the secret registry contract deployed (view contracts table for the contract address of testnet and mainnet)   |
@@ -190,13 +191,7 @@ press Y followed by Enter.
 5. After you accepted you will be asked to select the account you want to use. Select the account and enter your passphrase to continue.
 
 
-### Contract addresses table for each environment
+### Contract addresses on each environment
 
-| Contract                                | TestNet                                    | MainNet                                    |
-|-----------------------------------------|--------------------------------------------|--------------------------------------------|
-| Token Registry Contract | 0xa494fc762181ff78fe4cbb75d8609ccff1e63c1b | 0x59ec7ced1e1ee2e4ccc74f197fb680d8f9426b96 |
-| Secret Registry Contract       | 0xfd17d36ef2b3c5e71aba059b3fc361644206213b | 0x4dea623ae7c5cb1f4af9b46721d9a72d93c42be9 |
-| Endpoint Registry Contract     | 0xb048af6c0fbfbf1c0c01ea9a302987011153dbb8 | 0x7d1e6f17baa2744b5213b697ae4c1d287bb10df0 |
 
-```
-
+Go to [https://github.com/rsksmart/lumino](https://github.com/rsksmart/lumino) for the updated addresses of the contracts.
