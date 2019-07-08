@@ -58,7 +58,7 @@ Inside the virtual environment run the following command:
 ```
 lumino
     --keystore-path $KEYSTORE_PATH
-    --network-id 31
+    --network-id 30
     --eth-rpc-endpoint $RSK_NODE_URL
     --environment-type development
     --tokennetwork-registry-contract-address=$TOKENNETWORK_REGISTRY_CONTRACT_ADDRESS
@@ -127,20 +127,6 @@ Next you can start interacting with your Lumino node using both the REST API and
 To start using the Lumino Web UI just open your browser at `localhost:5001`.
 
 In order to interact using the REST API, you can use the following Postman collection: https://documenter.getpostman.com/view/5518834/S11PrGM6
-
-
-
-### Lumino Contracts
-
-The following are the addresses of the set of contracts for Lumino Network
-
-| Contract                                | TestNet                                    | MainNet        |
-|-----------------------------------------|--------------------------------------------|----------------|
-| `$TOKENNETWORK_REGISTRY_CONTRACT_ADDRESS` | 0xa494FC762181fF78Fe4CBB75D8609CCff1E63c1B | 0x59eC7Ced1e1ee2e4ccC74F197fB680D8f9426B96  |
-| `$SECRET_REGISTRY_CONTRACT_ADDRESS`       | 0xFd17D36EF2b3C5E71aBA059b3FC361644206213b | 0x4Dea623Ae7c5cb1F4aF9B46721D9a72d93C42BE9  |
-| `$ENDPOINT_REGISTRY_CONTRACT_ADDRESS`     | 0xb048Af6c0FBFBF1c0c01Ea9A302987011153dbB8 | 0x7d1E6f17baa2744B5213b697ae4C1D287bB10df0 |
-
-If you want to create your own RIF Lumino network for development or custom use on private networks, please refer to [Lumino Contracts](https://github.com/rsksmart/lumino-contracts)
 
 ## Additional help
 

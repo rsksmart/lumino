@@ -122,7 +122,7 @@ python setup.py develop
 lumino
 	 --rnsdomain=$RNS_DOMAIN_OF_YOUR_NODE_ADDRESS
 	 --keystore-path $KEYSTORE_PATH
-	 --network-id $NETWORK_ID
+	 --network-id 30
 	 --eth-rpc-endpoint $RSK_NODE_URL
 	 --environment-type development
 	 --tokennetwork-registry-contract-address=0x59ec7ced1e1ee2e4ccc74f197fb680d8f9426b96
