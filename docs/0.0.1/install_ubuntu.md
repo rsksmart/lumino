@@ -6,15 +6,17 @@
 	1. Run your own node on TestNet or MainNet, see [https://github.com/rsksmart/rskj/wiki/Install-RskJ-and-join-the-RSK-Orchid-Mainnet-Beta](https://github.com/rsksmart/rskj/wiki/Install-RskJ-and-join-the-RSK-Orchid-Mainnet-Beta)
 	2. Compile and run a RSK node locally, see [https://github.com/rsksmart/rskj/wiki/Compile-and-run-a-RSK-node-locally](https://github.com/rsksmart/rskj/wiki/Compile-and-run-a-RSK-node-locally)
 2. An RSK account with an RBTC balance NOT lower than 0.001 RBTC
-3. Python 3.6
-4. Pip
-5. Virtualenv
-6. Ubuntu 18.04
+3. Python 3.6 (if you need a guide about how to install it go to the "Additional Help" section of this document)
+4. Python 3.6-dev (if you need a guide about how to install it go to the "Additional Help" section of this document)
+4. Pip (if you need a guide about how to install it go to the "Additional Help" section of this document)
+5. Virtualenv (if you need a guide about how to install it go to the "Additional Help" section of this document)
+6. Ubuntu 18.04+
 
 ## Build RIF Lumino from code
 
 1. Get the code from [https://github.com/rsksmart/lumino/releases/tag/0.0.1](https://github.com/rsksmart/lumino/releases/tag/0.0.1)
-2. Go to the path you downloaded or cloned Lumino's code (lets call this path `$RIF_LUMINO_PATH`)
+2. Uncompress the downloaded file
+2. Go to the path you uncompressed the code in the previous step (lets call this path `$RIF_LUMINO_PATH`)
 3. Create python virtual env for RIF Lumino (this needs to be performed only once) and execute the following command:
 
 ```
@@ -38,7 +40,7 @@ python --version
 
 This command should output version 3.6.x
 
-6. Install RIF Lumino requirements. Inside the virtual environment run the following command:
+6. Install RIF Lumino requirements. Inside the virtual environment run the following command (this could take a few minutes):
 
 ```
 pip install -c constraints.txt --upgrade -r requirements-dev.txt
@@ -131,4 +133,64 @@ press Y followed by Enter.
 | Secret Registry Contract       | 0xfd17d36ef2b3c5e71aba059b3fc361644206213b | 0x4dea623ae7c5cb1f4af9b46721d9a72d93c42be9 |
 | Endpoint Registry Contract     | 0xb048af6c0fbfbf1c0c01ea9a302987011153dbb8 | 0x7d1e6f17baa2744b5213b697ae4c1d287bb10df0 |
 
+## Additional Help
+
+### Install Python 3.6
+
+(source: [http://ubuntuhandbook.org/index.php/2017/07/install-python-3-6-1-in-ubuntu-16-04-lts/](http://ubuntuhandbook.org/index.php/2017/07/install-python-3-6-1-in-ubuntu-16-04-lts/))
+
+Add a new repository to you apt:
+
+```
+sudo add-apt-repository ppa:jonathonf/python-3.6
+```
+
+Update your local APT repository:
+
+```
+sudo apt-get update
+```
+
+Install Python 3.6:
+
+```
+sudo apt-get install python3.6
+```
+
+### Install Python 3.6-dev
+
+To install python 3.6-dev run the following command:
+
+```
+sudo apt-get install libpq-dev python3.6-dev
+```
+
+### Install PIP
+
+
+If you didn't update your local APT repository:
+
+```
+sudo apt update
+```
+
+Install pip3:
+
+```
+sudo apt-get install python3-pip
+```
+
+### Install virtualenv
+
+If you didn't update your local APT repository:
+
+```
+sudo apt update
+```
+
+Install virtualenv:
+
+```
+sudo apt-get install virtualenv
+```
 
