@@ -6,11 +6,76 @@
 	1. Run your own node on TestNet or MainNet, see [https://github.com/rsksmart/rskj/wiki/Install-RskJ-and-join-the-RSK-Orchid-Mainnet-Beta](https://github.com/rsksmart/rskj/wiki/Install-RskJ-and-join-the-RSK-Orchid-Mainnet-Beta)
 	2. Compile and run a RSK node locally, see [https://github.com/rsksmart/rskj/wiki/Compile-and-run-a-RSK-node-locally](https://github.com/rsksmart/rskj/wiki/Compile-and-run-a-RSK-node-locally)
 2. An RSK account with an RBTC balance NOT lower than 0.001 RBTC
-3. Python 3.6 (if you need a guide about how to install it go to the "Additional Help" section of this document)
-4. Python 3.6-dev (if you need a guide about how to install it go to the "Additional Help" section of this document)
-4. Pip (if you need a guide about how to install it go to the "Additional Help" section of this document)
-5. Virtualenv (if you need a guide about how to install it go to the "Additional Help" section of this document)
-6. Ubuntu 18.04+
+3. Ubuntu 18.04+
+
+## Install required libraries/software
+
+### Install Python 3.7
+
+Update your packages and install pre-requisites:
+
+```
+sudo apt update
+sudo apt install software-properties-common
+```
+
+Add deadsnakes PPA to your sources list:
+
+```
+sudo add-apt-repository ppa:deadsnakes/ppa
+```
+
+Once the repository is enabled install Python 3.7:
+
+```
+sudo apt install python3.7
+```
+
+
+### Install Python 3.7-dev
+
+If you didn't update your local APT repository:
+
+```
+sudo apt update
+```
+
+To install python 3.7-dev run the following command:
+
+```
+sudo apt-get install libpq-dev python3.7-dev
+```
+
+### Install PIP
+
+
+If you didn't update your local APT repository:
+
+```
+sudo apt update
+```
+
+Install pip3:
+
+```
+sudo apt-get install python3-pip
+```
+
+### Install virtualenv
+
+If you didn't update your local APT repository:
+
+```
+sudo apt update
+```
+
+Install virtualenv:
+
+```
+sudo apt-get install virtualenv
+```
+
+
 
 ## Build RIF Lumino from code
 
