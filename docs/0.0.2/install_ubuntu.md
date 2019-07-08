@@ -117,7 +117,7 @@ pip install -c constraints.txt --upgrade -r requirements-dev.txt
 python setup.py develop
 ```
 
-##Start your RIF Lumino Node
+## Start your RIF Lumino Node
 
 1. Go to `$RIF_LUMINO_PATH`
 2. If you haven't execute it before, run: source ``clientEnv/bin/activate``
