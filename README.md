@@ -8,7 +8,6 @@
 
 * [Install on Ubuntu](docs/0.0.2/install_ubuntu.md)
 * [Install on MacOS](docs/0.0.2/install_macos.md)
-* [Install on other Linux distro](docs/0.0.2/install_generic.md)
 
 ## Lumino Contracts
 
