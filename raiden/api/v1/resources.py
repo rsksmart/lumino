@@ -1,7 +1,6 @@
 from flask import Blueprint
 from flask_restful import Resource
 from webargs.flaskparser import use_kwargs
-from raiden.utils import random_secret
 
 from raiden.api.v1.encoding import (
     BlockchainEventsRequestSchema,
@@ -22,6 +21,11 @@ from raiden.api.v1.encoding import (
     PaymentInvoiceSchema
 )
 from raiden.utils import typing
+from raiden.encoding.messages import DEFAULT_PAYMENT_INVOICE_HASH
+
+from eth_utils import (
+    decode_hex
+)
 
 
 def create_blueprint():
@@ -274,7 +278,7 @@ class PaymentResource(BaseResource):
             identifier=identifier,
             secret=secret,
             secret_hash=secret_hash,
-            payment_hash_invoice=random_secret()
+            payment_hash_invoice=decode_hex(DEFAULT_PAYMENT_INVOICE_HASH)
         )
 
 

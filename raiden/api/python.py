@@ -7,7 +7,7 @@ import hashlib
 import dateutil.parser
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
-from eth_utils import is_binary_address, to_checksum_address, to_canonical_address, to_normalized_address
+from eth_utils import is_binary_address, to_checksum_address, to_canonical_address, to_normalized_address, decode_hex, encode_hex
 
 import raiden.blockchain.events as blockchain_events
 from raiden import waiting
@@ -86,10 +86,9 @@ from raiden.utils.rns import is_rns_address
 
 from raiden.billing.invoices.options_args import OptionsArgs
 from raiden.billing.invoices.util.time_util import get_utc_unix_time, get_utc_expiration_time
-from raiden.billing.invoices.util.encryption_util import encrypt_string_with_sha256
-from raiden.billing.invoices.util.random_util import random_string
 from raiden.billing.invoices.encoder.lumino_encoder import parse_options, encode_invoice
 from raiden.billing.invoices.decoder.lumino_decoder import decode_lumino_invoice, get_tags_dict
+from raiden.utils import random_secret
 
 
 log = structlog.get_logger(__name__)  # pylint: disable=invalid-name
@@ -1237,7 +1236,7 @@ class RaidenAPI:
             currency = data['currency_symbol']
             fallback = None
             amount = data['amount']
-            payment_hash = encrypt_string_with_sha256(random_string(20))
+            payment_hash = encode_hex(random_secret())
             description = data['description']
             description_hashed = None
             expires = 3600
@@ -1265,7 +1264,7 @@ class RaidenAPI:
             expiration_date = get_utc_expiration_time(expires)
 
         else:
-            payment_hash = data['payment_hash'].hex()
+            payment_hash = data['payment_hash']
             expiration_date = data['expiration_date']
             lumino_invoice_encoded = data['encode']
 

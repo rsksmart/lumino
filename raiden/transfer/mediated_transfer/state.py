@@ -43,6 +43,8 @@ from raiden.utils.typing import (
     TokenNetworkID,
 )
 
+from raiden.encoding.messages import DEFAULT_PAYMENT_INVOICE_HASH
+
 if TYPE_CHECKING:
     # pylint: disable=unused-import
     from raiden.messages import LockedTransfer
@@ -439,7 +441,7 @@ class LockedTransferUnsignedState(LockedTransferState):
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "LockedTransferUnsignedState":
         if "payment_hash_invoice" not in data:
-            data["payment_hash_invoice"] = '0x0000000000000000000000000000000000000000000000000000000000000000'
+            data["payment_hash_invoice"] = DEFAULT_PAYMENT_INVOICE_HASH
 
         restored = cls(
             payment_identifier=PaymentID(int(data["payment_identifier"])),
@@ -650,7 +652,7 @@ class TransferDescriptionWithSecretState(State):
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "TransferDescriptionWithSecretState":
         if "payment_hash_invoice" not in data:
-            data["payment_hash_invoice"] = '0x0000000000000000000000000000000000000000000000000000000000000000'
+            data["payment_hash_invoice"] = DEFAULT_PAYMENT_INVOICE_HASH
 
         restored = cls(
             payment_network_identifier=to_canonical_address(data["payment_network_identifier"]),

@@ -66,6 +66,8 @@ from raiden.utils.typing import (
     Type,
 )
 
+from raiden.encoding.messages import DEFAULT_PAYMENT_INVOICE_HASH
+
 __all__ = (
     "Delivered",
     "EnvelopeMessage",
@@ -1272,7 +1274,7 @@ class LockedTransfer(LockedTransferBase):
     @classmethod
     def from_dict(cls, data):
         if "payment_hash_invoice" not in data:
-            data["payment_hash_invoice"] = '0x0000000000000000000000000000000000000000000000000000000000000000'
+            data["payment_hash_invoice"] = DEFAULT_PAYMENT_INVOICE_HASH
 
         message = cls(
             chain_id=data["chain_id"],

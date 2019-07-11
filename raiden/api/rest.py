@@ -1395,7 +1395,7 @@ class RestAPI:
             data = {"invoice_type": InvoiceType.RECEIVED.value,
                     "invoice_status": InvoiceStatus.PENDING.value,
                     "already_coded_invoice" : True,
-                    "payment_hash" : invoice_decoded.paymenthash,
+                    "payment_hash" : encode_hex(invoice_decoded.paymenthash),
                     "encode" : coded_invoice,
                     "expiration_date" : expiration_date.isoformat()
                     }
@@ -1427,10 +1427,10 @@ class RestAPI:
                                        None,
                                        None,
                                        None,
-                                       invoice_decoded.paymenthash.hex())
-        if result is not None:
+                                       invoice_decoded.paymenthash)
+        if result.status_code == HTTPStatus.OK:
             data = {"status": InvoiceStatus.PAID.value,
-                    "payment_hash": invoice_decoded.paymenthash.hex()}
+                    "payment_hash": encode_hex(invoice_decoded.paymenthash)}
             self.raiden_api.update_invoice(data)
 
         return result

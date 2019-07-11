@@ -3,6 +3,7 @@ from raiden.billing.invoices.util.bech32 import CHARSET, bech32_encode, bech32_d
 from binascii import unhexlify
 from raiden.billing.invoices.lumino_invoice import LuminoInvoice
 from raiden.billing.invoices.util.encoding_util import u5_to_bitarray, base58_prefix_map, bitarray_to_u5
+from eth_utils import decode_hex
 
 import bitstring
 import hashlib
@@ -21,7 +22,7 @@ def parse_options(options):
     if options.timestamp:
         lumino_invoice.date = int(options.timestamp)
 
-    lumino_invoice.paymenthash = unhexlify(options.paymenthash)
+    lumino_invoice.paymenthash = decode_hex(options.paymenthash)
 
     if options.description:
         lumino_invoice.tags.append(('d', options.description))
