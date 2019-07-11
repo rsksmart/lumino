@@ -70,6 +70,7 @@ from raiden.utils.typing import (
     Optional,
     PaymentID,
     PaymentNetworkID,
+    PaymentHashInvoice,
     Secret,
     SecretHash,
     Set,
@@ -88,7 +89,7 @@ from raiden.billing.invoices.util.time_util import get_utc_unix_time, get_utc_ex
 from raiden.billing.invoices.util.encryption_util import encrypt_string_with_sha256
 from raiden.billing.invoices.util.random_util import random_string
 from raiden.billing.invoices.encoder.lumino_encoder import parse_options, encode_invoice
-from raiden.billing.invoices.decoder.lumino_decoder import decode_lumino_invoice
+from raiden.billing.invoices.decoder.lumino_decoder import decode_lumino_invoice, get_tags_dict
 
 
 log = structlog.get_logger(__name__)  # pylint: disable=invalid-name
@@ -863,6 +864,7 @@ class RaidenAPI:
         transfer_timeout: int = None,
         secret: Secret = None,
         secrethash: SecretHash = None,
+        payment_hash_invoice: PaymentHashInvoice = None
     ):
         """ Do a transfer with `target` with the given `amount` of `token_address`. """
         # pylint: disable=too-many-arguments
@@ -875,6 +877,7 @@ class RaidenAPI:
             identifier=identifier,
             secret=secret,
             secrethash=secrethash,
+            payment_hash_invoice=payment_hash_invoice
         )
         payment_status.payment_done.wait(timeout=transfer_timeout)
         return payment_status
@@ -888,6 +891,7 @@ class RaidenAPI:
         identifier: PaymentID = None,
         secret: Secret = None,
         secrethash: SecretHash = None,
+        payment_hash_invoice: PaymentHashInvoice = None
     ):
         current_state = views.state_from_raiden(self.raiden)
         payment_network_identifier = self.raiden.default_registry.address
@@ -929,6 +933,7 @@ class RaidenAPI:
             token=pex(token_address),
             amount=amount,
             identifier=identifier,
+            payment_hash_invoice=payment_hash_invoice
         )
 
         token_network_identifier = views.get_token_network_identifier_by_token_address(
@@ -943,6 +948,7 @@ class RaidenAPI:
             identifier=identifier,
             secret=secret,
             secrethash=secrethash,
+            payment_hash_invoice=payment_hash_invoice
         )
         return payment_status
 
@@ -1048,7 +1054,17 @@ class RaidenAPI:
     transfer = transfer_and_wait
 
     def get_invoice(self, payment_hash):
-        return self.raiden.wal.storage.query_invoice(payment_hash)
+        invoice = self.raiden.wal.storage.query_invoice(payment_hash)
+        invoice_dict = None
+        if invoice is not None:
+            invoice_dict = {"identifier": invoice[0],
+                            "type": invoice[1],
+                            "status": invoice[2],
+                            "expiration_date": invoice[3],
+                            "encode": invoice[4],
+                            "payment_hash": invoice[5]}
+
+        return invoice_dict
 
     def decode_invoice(self, registry_address, coded_invoice):
         return decode_lumino_invoice(coded_invoice)
@@ -1207,6 +1223,10 @@ class RaidenAPI:
     def get_token_action(self, token):
         token_data = self.raiden.wal.storage.query_token_action(token)
         return token_data
+
+    def update_invoice(self, data):
+        # Update this information
+        self.raiden.wal.storage.update_invoice(data)
 
     def create_invoice(self, data):
 

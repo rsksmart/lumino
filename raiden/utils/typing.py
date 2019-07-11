@@ -98,6 +98,9 @@ NetworkTimeout = NewType("NetworkTimeout", T_NetworkTimeout)
 T_PaymentID = int
 PaymentID = NewType("PaymentID", T_PaymentID)
 
+T_PaymentHashInvoice = bytes
+PaymentHashInvoice = NewType("PaymentHashInvoice", T_PaymentHashInvoice)
+
 # PaymentAmount is for amounts of tokens paid end-to-end
 T_PaymentAmount = int
 PaymentAmount = NewType("PaymentAmount", T_PaymentAmount)

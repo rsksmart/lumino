@@ -52,6 +52,7 @@ from raiden.utils.typing import (
     Optional,
     PaymentAmount,
     PaymentID,
+    PaymentHashInvoice,
     PaymentWithFeeAmount,
     RaidenProtocolVersion,
     Secret,
@@ -977,6 +978,7 @@ class LockedTransferBase(EnvelopeMessage):
         chain_id: ChainID,
         message_identifier: MessageID,
         payment_identifier: PaymentID,
+        payment_hash_invoice: PaymentHashInvoice,
         nonce: Nonce,
         token_network_address: TokenNetworkAddress,
         token: TokenAddress,
@@ -1002,6 +1004,7 @@ class LockedTransferBase(EnvelopeMessage):
         assert_transfer_values(payment_identifier, token, recipient)
         self.message_identifier = message_identifier
         self.payment_identifier = payment_identifier
+        self.payment_hash_invoice = payment_hash_invoice
         self.token = token
         self.recipient = recipient
         self.lock = lock
@@ -1016,6 +1019,7 @@ class LockedTransferBase(EnvelopeMessage):
             chain_id=packed.chain_id,
             message_identifier=packed.message_identifier,
             payment_identifier=packed.payment_identifier,
+            payment_hash_invoice=packed.payment_hash_invoice,
             nonce=packed.nonce,
             token_network_address=packed.token_network_address,
             token=packed.token,
@@ -1033,6 +1037,10 @@ class LockedTransferBase(EnvelopeMessage):
         packed.chain_id = self.chain_id
         packed.message_identifier = self.message_identifier
         packed.payment_identifier = self.payment_identifier
+
+        if hasattr(self, 'payment_hash_invoice'):
+            packed.payment_hash_invoice = self.payment_hash_invoice
+
         packed.nonce = self.nonce
         packed.token_network_address = self.token_network_address
         packed.token = self.token
@@ -1078,6 +1086,7 @@ class LockedTransfer(LockedTransferBase):
         chain_id: ChainID,
         message_identifier: MessageID,
         payment_identifier: PaymentID,
+        payment_hash_invoice: PaymentHashInvoice,
         nonce: Nonce,
         token_network_address: TokenNetworkAddress,
         token: TokenAddress,
@@ -1106,6 +1115,7 @@ class LockedTransfer(LockedTransferBase):
             chain_id=chain_id,
             message_identifier=message_identifier,
             payment_identifier=payment_identifier,
+            payment_hash_invoice=payment_hash_invoice,
             nonce=nonce,
             token_network_address=token_network_address,
             token=token,
@@ -1158,6 +1168,7 @@ class LockedTransfer(LockedTransferBase):
             chain_id=packed.chain_id,
             message_identifier=packed.message_identifier,
             payment_identifier=packed.payment_identifier,
+            payment_hash_invoice=packed.payment_hash_invoice,
             nonce=packed.nonce,
             token_network_address=packed.token_network_address,
             token=packed.token,
@@ -1178,6 +1189,10 @@ class LockedTransfer(LockedTransferBase):
         packed.chain_id = self.chain_id
         packed.message_identifier = self.message_identifier
         packed.payment_identifier = self.payment_identifier
+
+        if hasattr(self, 'payment_hash_invoice') and self.payment_hash_invoice is not None:
+            packed.payment_hash_invoice = self.payment_hash_invoice
+
         packed.nonce = self.nonce
         packed.token_network_address = self.token_network_address
         packed.token = self.token
@@ -1208,10 +1223,11 @@ class LockedTransfer(LockedTransferBase):
         )
         fee = 0
 
-        return cls(
+        locked_transfer = cls(
             chain_id=balance_proof.chain_id,
             message_identifier=event.message_identifier,
             payment_identifier=transfer.payment_identifier,
+            payment_hash_invoice=transfer.payment_hash_invoice,
             nonce=balance_proof.nonce,
             token_network_address=TokenNetworkAddress(balance_proof.token_network_identifier),
             token=transfer.token,
@@ -1226,12 +1242,16 @@ class LockedTransfer(LockedTransferBase):
             fee=fee,
         )
 
+        return locked_transfer
+
     def to_dict(self):
-        return {
+
+        result = {
             "type": self.__class__.__name__,
             "chain_id": self.chain_id,
             "message_identifier": self.message_identifier,
             "payment_identifier": self.payment_identifier,
+            "payment_hash_invoice": encode_hex(self.payment_hash_invoice),
             "nonce": self.nonce,
             "token_network_address": to_normalized_address(self.token_network_address),
             "token": to_normalized_address(self.token),
@@ -1247,12 +1267,18 @@ class LockedTransfer(LockedTransferBase):
             "signature": encode_hex(self.signature),
         }
 
+        return result
+
     @classmethod
     def from_dict(cls, data):
+        if "payment_hash_invoice" not in data:
+            data["payment_hash_invoice"] = '0x0000000000000000000000000000000000000000000000000000000000000000'
+
         message = cls(
             chain_id=data["chain_id"],
             message_identifier=data["message_identifier"],
             payment_identifier=data["payment_identifier"],
+            payment_hash_invoice=decode_hex(data["payment_hash_invoice"]),
             nonce=data["nonce"],
             token_network_address=to_canonical_address(data["token_network_address"]),
             token=to_canonical_address(data["token"]),
@@ -1266,6 +1292,7 @@ class LockedTransfer(LockedTransferBase):
             initiator=to_canonical_address(data["initiator"]),
             fee=data["fee"],
         )
+
         message.signature = decode_hex(data["signature"])
         return message
 

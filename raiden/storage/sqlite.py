@@ -182,6 +182,20 @@ class SQLiteStorage:
 
         return last_id
 
+    def update_invoice(self, data):
+        if isinstance(data, (bytes, bytearray)):
+            payment_hash = data["payment_hash"].hex()
+        else:
+            payment_hash = data["payment_hash"]
+
+        with self.write_lock, self.conn:
+            cursor = self.conn.execute(
+                "UPDATE invoices SET status =? WHERE payment_hash=?", (data["status"], payment_hash)
+            )
+            last_id = cursor.lastrowid
+
+        return last_id
+
     def query_invoice(self, payment_hash):
         cursor = self.conn.cursor()
 

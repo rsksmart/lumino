@@ -99,6 +99,7 @@ from raiden.utils.typing import (
     Optional,
     PaymentAmount,
     PaymentID,
+    PaymentHashInvoice,
     PaymentWithFeeAmount,
     Secret,
     SecretHash,
@@ -1078,6 +1079,7 @@ def create_sendlockedtransfer(
     amount: PaymentWithFeeAmount,
     message_identifier: MessageID,
     payment_identifier: PaymentID,
+    payment_hash_invoice: PaymentHashInvoice,
     expiration: BlockExpiration,
     secrethash: SecretHash,
 ) -> Tuple[SendLockedTransfer, MerkleTreeState]:
@@ -1122,7 +1124,7 @@ def create_sendlockedtransfer(
     )
 
     locked_transfer = LockedTransferUnsignedState(
-        payment_identifier, token, balance_proof, lock, initiator, target
+        payment_identifier, payment_hash_invoice, token, balance_proof, lock, initiator, target
     )
 
     lockedtransfer = SendLockedTransfer(
@@ -1195,6 +1197,7 @@ def send_lockedtransfer(
     amount: PaymentWithFeeAmount,
     message_identifier: MessageID,
     payment_identifier: PaymentID,
+    payment_hash_invoice: PaymentHashInvoice,
     expiration: BlockExpiration,
     secrethash: SecretHash,
 ) -> SendLockedTransfer:
@@ -1205,6 +1208,7 @@ def send_lockedtransfer(
         amount,
         message_identifier,
         payment_identifier,
+        payment_hash_invoice,
         expiration,
         secrethash,
     )

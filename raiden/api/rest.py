@@ -26,6 +26,7 @@ from raiden.api.objects import DashboardGeneralItem
 from flask_cors import CORS
 from raiden.schedulers.setup import setup_schedule_config
 from datetime import datetime
+from web3 import Web3
 
 from raiden.api.objects import AddressList, PartnersPerTokenList
 from raiden.api.v1.encoding import (
@@ -120,6 +121,7 @@ from eth_utils import (
 
 from raiden.billing.invoices.constants.invoice_type import InvoiceType
 from raiden.billing.invoices.constants.invoice_status import InvoiceStatus
+from raiden.billing.invoices.decoder.lumino_decoder import get_tags_dict, get_unknown_tags_dict
 
 
 log = structlog.get_logger(__name__)
@@ -1382,21 +1384,13 @@ class RestAPI:
 
         persistent_invoice = self.raiden_api.get_invoice(invoice_decoded.paymenthash.hex())
 
+        tags_dict = get_tags_dict(invoice_decoded.tags)
+        unknown_tags_dict = get_unknown_tags_dict(invoice_decoded.unknown_tags)
+        wei_amount = Web3.toWei(invoice_decoded.amount, 'ether')
+
         if persistent_invoice is None:
-
-            for tags in invoice_decoded.tags:
-                key = tags[0]
-                value = tags[1]
-                if key == 'x':
-                    expires = value
-
-            for unknown_tag in invoice_decoded.unknown_tags:
-                key = unknown_tag[0]
-                value = unknown_tag[1]
-                if key == 'n':
-                    value
-
-            expiration_date = datetime.utcfromtimestamp(invoice_decoded.date) + relativedelta(seconds=expires)
+            expiration_date = datetime.utcfromtimestamp(invoice_decoded.date) \
+                              + relativedelta(seconds=tags_dict['expires'])
 
             data = {"invoice_type": InvoiceType.RECEIVED.value,
                     "invoice_status": InvoiceStatus.PENDING.value,
@@ -1410,9 +1404,10 @@ class RestAPI:
             new_invoice = self.raiden_api.create_invoice(data)
 
             if new_invoice is not None:
-                # We make payment with data of invoice
-                self.initiate_payment(registry_address,
-                                      )
+                result = self.make_payment_with_invoice(registry_address, unknown_tags_dict, wei_amount, invoice_decoded)
+
+        elif persistent_invoice["status"] == InvoiceStatus.PENDING.value:
+            result = self.make_payment_with_invoice(registry_address, unknown_tags_dict, wei_amount, invoice_decoded)
 
         else:
             return api_error(
@@ -1420,6 +1415,25 @@ class RestAPI:
                        "(You can not autopay an invoice).",
                 status_code=HTTPStatus.CONFLICT,
             )
+
+        return result
+
+    def make_payment_with_invoice(self, registry_address, unknown_tags_dict, wei_amount, invoice_decoded):
+        # We make payment with data of invoice
+        result = self.initiate_payment(registry_address,
+                                       to_canonical_address("0x" + unknown_tags_dict['token_address'].hex),
+                                       to_canonical_address("0x" + unknown_tags_dict['target_address'].hex),
+                                       wei_amount,
+                                       None,
+                                       None,
+                                       None,
+                                       invoice_decoded.paymenthash.hex())
+        if result is not None:
+            data = {"status": InvoiceStatus.PAID.value,
+                    "payment_hash": invoice_decoded.paymenthash.hex()}
+            self.raiden_api.update_invoice(data)
+
+        return result
 
     def initiate_payment(
         self,
@@ -1430,6 +1444,7 @@ class RestAPI:
         identifier: typing.PaymentID,
         secret: typing.Secret,
         secret_hash: typing.SecretHash,
+        payment_hash_invoice : typing.PaymentHashInvoice
     ):
         log.debug(
             "Initiating payment",
@@ -1463,6 +1478,7 @@ class RestAPI:
                 identifier=identifier,
                 secret=secret,
                 secrethash=secret_hash,
+                payment_hash_invoice=payment_hash_invoice
             )
         except (
             InvalidAmount,

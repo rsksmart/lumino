@@ -30,6 +30,9 @@ nonce = make_field("nonce", 8, "8s", integer(0, UINT64_MAX))
 updating_nonce = make_field("updating_nonce", 8, "8s", integer(0, UINT64_MAX))
 other_nonce = make_field("other_nonce", 8, "8s", integer(0, UINT64_MAX))
 payment_identifier = make_field("payment_identifier", 8, "8s", integer(0, UINT64_MAX))
+
+payment_hash_invoice = make_field("payment_hash_invoice", 32, "32s")
+
 chain_id = make_field("chain_id", 32, "32s", integer(0, UINT256_MAX))
 message_identifier = make_field("message_identifier", 8, "8s", integer(0, UINT64_MAX))
 current_protocol_version = make_field("current_protocol_version", 1, "1s", integer(0, 256))
@@ -121,6 +124,7 @@ LockedTransfer = namedbuffer(
         chain_id,
         message_identifier,
         payment_identifier,
+        payment_hash_invoice,
         expiration,
         token_network_address,
         token,
