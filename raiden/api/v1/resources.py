@@ -58,6 +58,25 @@ class ChannelsResource(BaseResource):
         )
 
 
+class ChannelsResourceLight(BaseResource):
+
+    put_schema = ChannelPutSchema
+
+    def get(self):
+        """
+        this translates to 'get all channels the node is connected with'
+        """
+        return self.rest_api.get_channel_list(
+            self.rest_api.raiden_api.raiden.default_registry.address
+        )
+
+    @use_kwargs(put_schema, locations=("json",))
+    def put(self, **kwargs):
+        return self.rest_api.open_light(
+            registry_address=self.rest_api.raiden_api.raiden.default_registry.address, **kwargs
+        )
+
+
 class ChannelsResourceLumino(BaseResource):
     get_schema = ChannelLuminoGetSchema
     put_schema = ChannelPutLuminoSchema

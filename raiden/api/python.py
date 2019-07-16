@@ -11,6 +11,7 @@ from eth_utils import is_binary_address, to_checksum_address, to_canonical_addre
 
 import raiden.blockchain.events as blockchain_events
 from raiden import waiting
+from raiden.api.validations.channel_validator import ChannelValidator
 from raiden.constants import (
     GENESIS_BLOCK_NUMBER,
     RED_EYES_PER_TOKEN_NETWORK_LIMIT,
@@ -382,41 +383,7 @@ class RaidenAPI:
         if settle_timeout is None:
             settle_timeout = self.raiden.config["settle_timeout"]
 
-        if settle_timeout < self.raiden.config["reveal_timeout"] * 2:
-            raise InvalidSettleTimeout(
-                "settle_timeout can not be smaller than double the reveal_timeout"
-            )
-
-        if not is_binary_address(registry_address):
-            raise InvalidAddress("Expected binary address format for registry in channel open")
-
-        if not is_binary_address(token_address):
-            raise InvalidAddress("Expected binary address format for token in channel open")
-
-        if not is_binary_address(partner_address):
-            raise InvalidAddress("Expected binary address format for partner in channel open")
-
-        chain_state = views.state_from_raiden(self.raiden)
-        channel_state = views.get_channelstate_for(
-            chain_state=chain_state,
-            payment_network_id=registry_address,
-            token_address=token_address,
-            partner_address=partner_address,
-        )
-
-        if channel_state:
-            raise DuplicatedChannelError("Channel with given partner address already exists")
-
-        registry = self.raiden.chain.token_network_registry(registry_address)
-        token_network_address = registry.get_token_network(token_address)
-
-        if token_network_address is None:
-            raise TokenNotRegistered(
-                "Token network for token %s does not exist" % to_checksum_address(token_address)
-            )
-
-        token_network = self.raiden.chain.token_network(registry.get_token_network(token_address))
-
+        token_network = ChannelValidator.can_channel_open(registry_address, token_address, partner_address, settle_timeout, self.raiden)
         with self.raiden.gas_reserve_lock:
             has_enough_reserve, estimated_required_reserve = has_enough_gas_reserve(
                 self.raiden, channels_to_open=1
@@ -483,9 +450,6 @@ class RaidenAPI:
 
         if not is_binary_address(token_address):
             raise InvalidAddress('Expected binary address format for token in channel open')
-
-        # if not is_binary_address(partner_address):
-        #     raise InvalidAddress('Expected binary address format for partner in channel open')
 
         chain_state = views.state_from_raiden(self.raiden)
         channel_state = views.get_channelstate_for(
