@@ -271,6 +271,7 @@ def subdispatch_to_paymenttask(
                     channel_state=channel_state,
                     pseudo_random_generator=pseudo_random_generator,
                     block_number=block_number,
+                    storage=None
                 )
                 events = sub_iteration.events
 
@@ -378,6 +379,7 @@ def subdispatch_targettask(
     token_network_identifier: TokenNetworkID,
     channel_identifier: ChannelID,
     secrethash: SecretHash,
+    storage
 ) -> TransitionResult[ChainState]:
 
     block_number = chain_state.block_number
@@ -414,6 +416,7 @@ def subdispatch_targettask(
             channel_state=channel_state,
             pseudo_random_generator=pseudo_random_generator,
             block_number=block_number,
+            storage=storage
         )
         events = iteration.events
 
@@ -686,7 +689,7 @@ def handle_init_mediator(
 
 
 def handle_init_target(
-    chain_state: ChainState, state_change: ActionInitTarget
+    chain_state: ChainState, state_change: ActionInitTarget, storage
 ) -> TransitionResult[ChainState]:
     transfer = state_change.transfer
     secrethash = transfer.lock.secrethash
@@ -699,6 +702,7 @@ def handle_init_target(
         TokenNetworkID(token_network_identifier),
         channel_identifier,
         secrethash,
+        storage
     )
 
 
@@ -758,7 +762,7 @@ def handle_update_transport_authdata(
 
 
 def handle_state_change(
-    chain_state: ChainState, state_change: StateChange
+    chain_state: ChainState, state_change: StateChange, storage
 ) -> TransitionResult[ChainState]:
     if type(state_change) == Block:
         assert isinstance(state_change, Block), MYPY_ANNOTATION
@@ -795,7 +799,7 @@ def handle_state_change(
         iteration = handle_init_mediator(chain_state, state_change)
     elif type(state_change) == ActionInitTarget:
         assert isinstance(state_change, ActionInitTarget), MYPY_ANNOTATION
-        iteration = handle_init_target(chain_state, state_change)
+        iteration = handle_init_target(chain_state, state_change, storage)
     elif type(state_change) == ActionUpdateTransportAuthData:
         assert isinstance(state_change, ActionUpdateTransportAuthData), MYPY_ANNOTATION
         iteration = handle_update_transport_authdata(chain_state, state_change)
@@ -1106,11 +1110,11 @@ def update_queues(iteration: TransitionResult[ChainState], state_change: StateCh
 
 
 def state_transition(
-    chain_state: ChainState, state_change: StateChange
+    chain_state: ChainState, state_change: StateChange, storage
 ) -> TransitionResult[ChainState]:
     # pylint: disable=too-many-branches,unidiomatic-typecheck
 
-    iteration = handle_state_change(chain_state, state_change)
+    iteration = handle_state_change(chain_state, state_change, storage)
 
     update_queues(iteration, state_change)
     sanity_check(iteration)

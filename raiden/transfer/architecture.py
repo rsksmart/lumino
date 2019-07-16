@@ -267,7 +267,7 @@ class StateManager(Generic[ST]):
         self.state_transition = state_transition
         self.current_state = current_state
 
-    def dispatch(self, state_change: StateChange) -> Tuple[ST, List[Event]]:
+    def dispatch(self, state_change: StateChange, storage) -> Tuple[ST, List[Event]]:
         """ Apply the `state_change` in the current machine and return the
         resulting events.
 
@@ -286,8 +286,11 @@ class StateManager(Generic[ST]):
         # current state and pass the copy to the state machine to be modified.
         next_state = deepcopy(self.current_state)
 
+        # storage.test()
+        # print(storage)
+
         # update the current state by applying the change
-        iteration = self.state_transition(next_state, state_change)
+        iteration = self.state_transition(next_state, state_change, storage)
 
         assert isinstance(iteration, TransitionResult)
 

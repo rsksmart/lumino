@@ -35,6 +35,7 @@ from raiden.exceptions import (
     RaidenRecoverableError,
     TokenNotRegistered,
     UnknownTokenAddress,
+    InvoiceCoding
 )
 from raiden.messages import RequestMonitoring
 from raiden.settings import DEFAULT_RETRY_TIMEOUT, DEVELOPMENT_CONTRACT_VERSION
@@ -90,6 +91,7 @@ from raiden.billing.invoices.encoder.lumino_encoder import parse_options, encode
 from raiden.billing.invoices.decoder.lumino_decoder import decode_lumino_invoice, get_tags_dict
 from raiden.utils import random_secret
 
+import sys
 
 log = structlog.get_logger(__name__)  # pylint: disable=invalid-name
 
@@ -1054,16 +1056,7 @@ class RaidenAPI:
 
     def get_invoice(self, payment_hash):
         invoice = self.raiden.wal.storage.query_invoice(payment_hash)
-        invoice_dict = None
-        if invoice is not None:
-            invoice_dict = {"identifier": invoice[0],
-                            "type": invoice[1],
-                            "status": invoice[2],
-                            "expiration_date": invoice[3],
-                            "encode": invoice[4],
-                            "payment_hash": invoice[5]}
-
-        return invoice_dict
+        return invoice
 
     def decode_invoice(self, registry_address, coded_invoice):
         return decode_lumino_invoice(coded_invoice)
@@ -1229,6 +1222,12 @@ class RaidenAPI:
 
     def create_invoice(self, data):
 
+        if not is_binary_address(data['token_address']):
+            raise InvalidAddress("Expected binary address format for token in create_invoice")
+
+        if not is_binary_address(data['partner_address']):
+            raise InvalidAddress("Expected binary address format for partner in create_invoice")
+
         if data['already_coded_invoice'] is False:
             chain = self.raiden.chain
             private_key = chain.client.privkey.hex()
@@ -1259,7 +1258,10 @@ class RaidenAPI:
 
             lumino_invoice_obj = parse_options(options_args)
 
-            lumino_invoice_encoded = encode_invoice(lumino_invoice_obj, options_args.privkey)
+            try:
+                lumino_invoice_encoded = encode_invoice(lumino_invoice_obj, options_args.privkey)
+            except TypeError:
+                raise InvoiceCoding("Error coding the invoice, review the input data provided")
 
             expiration_date = get_utc_expiration_time(expires)
 

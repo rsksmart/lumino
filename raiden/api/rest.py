@@ -1720,6 +1720,11 @@ class RestAPI:
                        amount,
                        description):
 
+        if amount and amount < 0:
+            return api_error(
+                errors="Amount to deposit must not be negative.", status_code=HTTPStatus.CONFLICT
+            )
+
         data = {"currency_symbol": currency_symbol,
                 "token_address" : token_address,
                 "partner_address" : partner_address,

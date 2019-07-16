@@ -207,7 +207,17 @@ class SQLiteStorage:
             (payment_hash,)
         )
 
-        return cursor.fetchone()
+        invoice = cursor.fetchone()
+        invoice_dict = None
+        if invoice is not None:
+            invoice_dict = {"identifier": invoice[0],
+                            "type": invoice[1],
+                            "status": invoice[2],
+                            "expiration_date": invoice[3],
+                            "encode": invoice[4],
+                            "payment_hash": invoice[5]}
+
+        return invoice_dict
 
     def query_token_action(self, token):
         cursor = self.conn.cursor()
@@ -997,6 +1007,12 @@ class SerializedSQLiteStorage(SQLiteStorage):
         super().__init__(database_path)
 
         self.serializer = serializer
+
+    def query_invoice(self, payment_hash_invoice):
+        return super().query_invoice(payment_hash_invoice)
+
+    def update_invoice(self, payment_hash_invoice):
+        return super().update_invoice(payment_hash_invoice)
 
     def write_state_change(self, state_change, log_time):
         serialized_data = self.serializer.serialize(state_change)
