@@ -61,6 +61,7 @@ def lockedtransfersigned_from_message(message: "LockedTransfer") -> "LockedTrans
     transfer_state = LockedTransferSignedState(
         message.message_identifier,
         message.payment_identifier,
+        message.payment_hash_invoice,
         message.token,
         balance_proof,
         lock,
@@ -464,6 +465,7 @@ class LockedTransferSignedState(LockedTransferState):
     __slots__ = (
         "message_identifier",
         "payment_identifier",
+        "payment_hash_invoice",
         "token",
         "balance_proof",
         "lock",
@@ -475,6 +477,7 @@ class LockedTransferSignedState(LockedTransferState):
         self,
         message_identifier: MessageID,
         payment_identifier: PaymentID,
+        payment_hash_invoice: PaymentHashInvoice,
         token: TokenAddress,
         balance_proof: BalanceProofSignedState,
         lock: HashTimeLockState,
@@ -494,6 +497,7 @@ class LockedTransferSignedState(LockedTransferState):
 
         self.message_identifier = message_identifier
         self.payment_identifier = payment_identifier
+        self.payment_hash_invoice = payment_hash_invoice
         self.token = token
         self.balance_proof = balance_proof
         self.lock = lock
@@ -520,6 +524,7 @@ class LockedTransferSignedState(LockedTransferState):
             isinstance(other, LockedTransferSignedState)
             and self.message_identifier == other.message_identifier
             and self.payment_identifier == other.payment_identifier
+            and self.payment_hash_invoice == other.payment_hash_invoice
             and self.token == other.token
             and self.balance_proof == other.balance_proof
             and self.lock == other.lock
@@ -535,6 +540,7 @@ class LockedTransferSignedState(LockedTransferState):
         result_dict = {
             "message_identifier": str(self.message_identifier),
             "payment_identifier": str(self.payment_identifier),
+            "payment_hash_invoice": encode_hex(self.payment_hash_invoice),
             "token": to_checksum_address(self.token),
             "balance_proof": self.balance_proof,
             "lock": self.lock,
@@ -546,9 +552,13 @@ class LockedTransferSignedState(LockedTransferState):
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "LockedTransferSignedState":
+        if "payment_hash_invoice" not in data:
+            data["payment_hash_invoice"] = DEFAULT_PAYMENT_INVOICE_HASH
+
         restored = cls(
             message_identifier=MessageID(int(data["message_identifier"])),
             payment_identifier=PaymentID(int(data["payment_identifier"])),
+            payment_hash_invoice=PaymentHashInvoice(decode_hex(data["payment_hash_invoice"])),
             token=to_canonical_address(data["token"]),
             balance_proof=data["balance_proof"],
             lock=data["lock"],

@@ -123,6 +123,8 @@ from raiden.billing.invoices.constants.invoice_type import InvoiceType
 from raiden.billing.invoices.constants.invoice_status import InvoiceStatus
 from raiden.billing.invoices.decoder.lumino_decoder import get_tags_dict, get_unknown_tags_dict
 
+from dateutil.relativedelta import relativedelta
+import dateutil.parser
 
 log = structlog.get_logger(__name__)
 
@@ -1382,7 +1384,7 @@ class RestAPI:
 
         invoice_decoded = self.raiden_api.decode_invoice(registry_address, coded_invoice)
 
-        persistent_invoice = self.raiden_api.get_invoice(invoice_decoded.paymenthash.hex())
+        persistent_invoice = self.raiden_api.get_invoice(encode_hex(invoice_decoded.paymenthash))
 
         tags_dict = get_tags_dict(invoice_decoded.tags)
         unknown_tags_dict = get_unknown_tags_dict(invoice_decoded.unknown_tags)
@@ -1406,9 +1408,22 @@ class RestAPI:
             if new_invoice is not None:
                 result = self.make_payment_with_invoice(registry_address, unknown_tags_dict, wei_amount, invoice_decoded)
 
-        elif persistent_invoice["status"] == InvoiceStatus.PENDING.value:
-            result = self.make_payment_with_invoice(registry_address, unknown_tags_dict, wei_amount, invoice_decoded)
+        elif persistent_invoice["status"] == InvoiceStatus.PENDING.value and \
+                not self.is_invoice_expired(parser.parse(persistent_invoice["expiration_date"])):
 
+            result = self.make_payment_with_invoice(registry_address, unknown_tags_dict, wei_amount, invoice_decoded)
+        elif persistent_invoice["status"] == InvoiceStatus.PAID.value:
+            return api_error(
+                errors="Payment couldn't be completed "
+                       "(The invoice you are trying to pay has already been paid).",
+                status_code=HTTPStatus.CONFLICT,
+            )
+        elif self.is_invoice_expired(parser.parse(persistent_invoice["expiration_date"])):
+            return api_error(
+                errors="Payment couldn't be completed "
+                       "(The invoice has expired).",
+                status_code=HTTPStatus.CONFLICT,
+            )
         else:
             return api_error(
                 errors="Payment couldn't be completed "
@@ -1417,6 +1432,15 @@ class RestAPI:
             )
 
         return result
+
+    def is_invoice_expired(self, expiration_date):
+        is_expired = False
+        utc_now = datetime.utcnow()
+
+        if expiration_date < utc_now:
+            is_expired = True
+
+        return  is_expired
 
     def make_payment_with_invoice(self, registry_address, unknown_tags_dict, wei_amount, invoice_decoded):
         # We make payment with data of invoice
@@ -1719,6 +1743,11 @@ class RestAPI:
                        partner_address,
                        amount,
                        description):
+
+        if amount and amount < 0:
+            return api_error(
+                errors="Amount to deposit must not be negative.", status_code=HTTPStatus.CONFLICT
+            )
 
         data = {"currency_symbol": currency_symbol,
                 "token_address" : token_address,
