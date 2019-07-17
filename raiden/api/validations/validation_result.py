@@ -15,4 +15,16 @@ class EnoughBalance(NamedTuple):
     balance: int = 0
 
 
+class EnoughGas(NamedTuple):
+    error: Any = None
+    valid: bool = False
+    gas_reserve: int = 0
+
+
+
+
+
+
+
+
 

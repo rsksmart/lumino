@@ -629,6 +629,7 @@ class RestAPI:
         if not enough_balance.valid:
             return enough_balance.error
 
+
     def open(
         self,
         registry_address: typing.PaymentNetworkID,
@@ -653,6 +654,7 @@ class RestAPI:
         enough_balance = ChannelValidator.enough_balance_to_deposit(total_deposit, self.raiden_api.raiden.address, token_exists.token, log)
         if not enough_balance.valid:
             return enough_balance.error
+
         try:
             self.raiden_api.channel_open(
                 registry_address, token_address, partner_address, settle_timeout
@@ -687,9 +689,9 @@ class RestAPI:
                     total_deposit=total_deposit,
                 )
             except InsufficientFunds as e:
-                return api_error(errors=str(e), status_code=HTTPStatus.PAYMENT_REQUIRED)
+                return ApiErrorBuilder.build_error(errors=str(e), status_code=HTTPStatus.PAYMENT_REQUIRED, log=log)
             except (DepositOverLimit, DepositMismatch) as e:
-                return api_error(errors=str(e), status_code=HTTPStatus.CONFLICT)
+                return ApiErrorBuilder.build_error(errors=str(e), status_code=HTTPStatus.CONFLICT, log=log)
 
         channel_state = views.get_channelstate_for(
             views.state_from_raiden(self.raiden_api.raiden),
@@ -699,7 +701,6 @@ class RestAPI:
         )
 
         result = self.channel_schema.dump(channel_state)
-
         return api_response(result=result.data, status_code=HTTPStatus.CREATED)
 
     def connect(

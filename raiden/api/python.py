@@ -383,21 +383,9 @@ class RaidenAPI:
         if settle_timeout is None:
             settle_timeout = self.raiden.config["settle_timeout"]
 
-        token_network = ChannelValidator.can_channel_open(registry_address, token_address, partner_address, settle_timeout, self.raiden)
+        token_network = ChannelValidator.can_open_channel(registry_address, token_address, partner_address, settle_timeout, self.raiden)
         with self.raiden.gas_reserve_lock:
-            has_enough_reserve, estimated_required_reserve = has_enough_gas_reserve(
-                self.raiden, channels_to_open=1
-            )
-
-            if not has_enough_reserve:
-                raise InsufficientGasReserve(
-                    (
-                        "The account balance is below the estimated amount necessary to "
-                        "finish the lifecycles of all active channels. A balance of at "
-                        f"least {estimated_required_reserve} wei is required."
-                    )
-                )
-
+            ChannelValidator.validate_gas_reserve(1, self.raiden)
             try:
                 token_network.new_netting_channel(
                     partner=partner_address,
@@ -421,9 +409,7 @@ class RaidenAPI:
             token_address=token_address,
             partner_address=partner_address,
         )
-
         assert channel_state, f"channel {channel_state} is gone"
-
         return channel_state.identifier
 
     def channel_open_lumino(
@@ -537,7 +523,6 @@ class RaidenAPI:
             DepositOverLimit: The total deposit amount is higher than the limit.
         """
         chain_state = views.state_from_raiden(self.raiden)
-
         token_addresses = views.get_token_identifiers(chain_state, registry_address)
         channel_state = views.get_channelstate_for(
             chain_state=chain_state,
@@ -546,17 +531,7 @@ class RaidenAPI:
             partner_address=partner_address,
         )
 
-        if not is_binary_address(token_address):
-            raise InvalidAddress("Expected binary address format for token in channel deposit")
-
-        if not is_binary_address(partner_address):
-            raise InvalidAddress("Expected binary address format for partner in channel deposit")
-
-        if token_address not in token_addresses:
-            raise UnknownTokenAddress("Unknown token address")
-
-        if channel_state is None:
-            raise InvalidAddress("No channel with partner_address for the given token")
+        ChannelValidator.can_set_total_channel_deposit(channel_state, token_address, token_addresses, partner_address, total_deposit)
 
         if self.raiden.config["environment_type"] == Environment.PRODUCTION:
             per_token_network_deposit_limit = RED_EYES_PER_TOKEN_NETWORK_LIMIT
@@ -570,39 +545,11 @@ class RaidenAPI:
         channel_proxy = self.raiden.chain.payment_channel(
             canonical_identifier=channel_state.canonical_identifier
         )
-
-        if total_deposit == 0:
-            raise DepositMismatch("Attempted to deposit with total deposit being 0")
-
         addendum = total_deposit - channel_state.our_state.contract_balance
-
         total_network_balance = token.balance_of(registry_address)
 
-        if total_network_balance + addendum > per_token_network_deposit_limit:
-            raise DepositOverLimit(
-                f"The deposit of {addendum} will exceed the "
-                f"token network limit of {per_token_network_deposit_limit}"
-            )
-
-        balance = token.balance_of(self.raiden.address)
-
-        functions = token_network_proxy.proxy.contract.functions
-        deposit_limit = functions.channel_participant_deposit_limit().call()
-
-        if total_deposit > deposit_limit:
-            raise DepositOverLimit(
-                f"The additional deposit of {addendum} will exceed the "
-                f"channel participant limit of {deposit_limit}"
-            )
-
-        # If this check succeeds it does not imply the the `deposit` will
-        # succeed, since the `deposit` transaction may race with another
-        # transaction.
-        if not balance >= addendum:
-            msg = "Not enough balance to deposit. {} Available={} Needed={}".format(
-                pex(token_address), balance, addendum
-            )
-            raise InsufficientFunds(msg)
+        ChannelValidator.validate_deposit_amount(total_network_balance, addendum, per_token_network_deposit_limit,
+                                                     total_deposit, token, self.raiden.address, token_network_proxy)
 
         # set_total_deposit calls approve
         # token.approve(netcontract_address, addendum)
