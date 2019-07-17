@@ -14,6 +14,7 @@ from raiden.storage.migrations.v18_to_v19 import upgrade_v18_to_v19
 from raiden.storage.migrations.v19_to_v20 import upgrade_v19_to_v20
 from raiden.storage.migrations.v20_to_v21 import upgrade_v20_to_v21
 from raiden.storage.migrations.v21_to_v22 import upgrade_v21_to_v22
+from raiden.storage.migrations.v22_to_v23 import upgrade_v22_to_v23
 from raiden.storage.sqlite import SQLiteStorage
 from raiden.storage.versions import VERSION_RE, filter_db_names, latest_db_file
 from raiden.utils.typing import Callable, List, NamedTuple
@@ -31,6 +32,8 @@ UPGRADES_LIST = [
     UpgradeRecord(from_version=19, function=upgrade_v19_to_v20),
     UpgradeRecord(from_version=20, function=upgrade_v20_to_v21),
     UpgradeRecord(from_version=21, function=upgrade_v21_to_v22),
+    UpgradeRecord(from_version=22, function=upgrade_v22_to_v23),
+
 ]
 
 

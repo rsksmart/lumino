@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS state_events (
     log_time TEXT,
     data JSON,
     FOREIGN KEY(source_statechange_id) REFERENCES state_changes(identifier)
+
 );
 """
 
@@ -56,17 +57,40 @@ CREATE TABLE IF NOT EXISTS token_action (
 );
 """
 
+DB_CREATE_CLIENT = """
+CREATE TABLE IF NOT EXISTS client (
+    address TEXT PRIMARY KEY,
+    password TEXT NOT NULL, 
+    api_key TEXT NOT NULL,
+    type TEXT CHECK ( type IN ('HUB','FULL','LIGHT') ) NOT NULL DEFAULT 'FULL'
+);
+"""
+
 DB_SCRIPT_CREATE_TABLES = """
 PRAGMA foreign_keys=off;
 BEGIN TRANSACTION;
-{}{}{}{}{}{}
+{}{}{}{}{}{}{}
 COMMIT;
 PRAGMA foreign_keys=on;
 """.format(
     DB_CREATE_SETTINGS,
     DB_CREATE_STATE_CHANGES,
     DB_CREATE_SNAPSHOT,
+    DB_CREATE_CLIENT,
     DB_CREATE_STATE_EVENTS,
     DB_CREATE_RUNS,
-    DB_CREATE_TOKEN_ACTION
+    DB_CREATE_TOKEN_ACTION,
 )
+
+DB_STATE_EVENT_ADD_CLIENT_FK = """
+ALTER TABLE state_events ADD COLUMN client_address TEXT NULLABLE REFERENCES client(address);
+"""
+
+DB_UPDATE_TABLES = """
+BEGIN TRANSACTION;
+{}
+COMMIT;
+""".format(
+    DB_STATE_EVENT_ADD_CLIENT_FK
+)
+

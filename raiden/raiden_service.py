@@ -31,6 +31,7 @@ from raiden.exceptions import (
     RaidenRecoverableError,
     RaidenUnrecoverableError,
 )
+from raiden.lightclient.light_client_service import LightClientService
 from raiden.messages import (
     LockedTransfer,
     Message,
@@ -470,6 +471,9 @@ class RaidenService(Runnable):
                     f"{configured_registry}, which conflicts with the current known "
                     f"smart contracts {known_registries}"
                 )
+        #Read lc data
+        light_client_service = LightClientService(self.wal)
+        lc = light_client_service.get_light_clients_data()
 
         # Restore the current snapshot group
         state_change_qty = self.wal.storage.count_state_changes()
