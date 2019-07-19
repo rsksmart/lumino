@@ -1222,12 +1222,6 @@ class RaidenAPI:
 
     def create_invoice(self, data):
 
-        if not is_binary_address(data['token_address']):
-            raise InvalidAddress("Expected binary address format for token in create_invoice")
-
-        if not is_binary_address(data['partner_address']):
-            raise InvalidAddress("Expected binary address format for partner in create_invoice")
-
         if data['already_coded_invoice'] is False:
 
             if not is_binary_address(data['token_address']):
