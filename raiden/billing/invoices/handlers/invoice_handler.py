@@ -2,6 +2,7 @@ from eth_utils import encode_hex
 
 from raiden.encoding.messages import DEFAULT_PAYMENT_INVOICE_HASH
 from raiden.billing.invoices.constants.invoice_status import InvoiceStatus
+from raiden.billing.invoices.util.time_util import is_invoice_expired
 
 
 def handle_received_invoice(storage, payment_hash_invoice):
@@ -17,6 +18,9 @@ def handle_received_invoice(storage, payment_hash_invoice):
         elif invoice['status'] == InvoiceStatus.PENDING.value:
             storage.update_invoice({"payment_hash" : payment_hash_invoice_hex,
                                     "status" : InvoiceStatus.PAID.value})
+        elif is_invoice_expired(invoice["expiration_date"]):
+            result['is_valid'] = False
+            result['msg'] = "Payment couldn't be completed (The invoice has expired)."
 
     return result
 
