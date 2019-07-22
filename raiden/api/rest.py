@@ -126,7 +126,7 @@ log = structlog.get_logger(__name__)
 URLS_V1 = [
     ("/address", AddressResource),
     ("/channels", ChannelsResource),
-    ("/channels_light", ChannelsResourceLight),
+    ("/light_channels", ChannelsResourceLight),
 
     ("/channels/<hexaddress:token_address>", ChannelsResourceByTokenAddress),
     (
@@ -609,6 +609,7 @@ class RestAPI:
         registry_address: typing.PaymentNetworkID,
         partner_address: typing.Address,
         token_address: typing.TokenAddress,
+        signed_tx: typing.Any,
         settle_timeout: typing.BlockTimeout = None,
         total_deposit: typing.TokenAmount = None,
     ):
@@ -628,6 +629,11 @@ class RestAPI:
         enough_balance = ChannelValidator.enough_balance_to_deposit(total_deposit, self.raiden_api.raiden.address, token_exists.token, log)
         if not enough_balance.valid:
             return enough_balance.error
+
+        self.raiden_api.channel_open_light(registry_address, token_address, partner_address, signed_tx, settle_timeout)
+
+        return api_response(result="hola", status_code=HTTPStatus.FAILED_DEPENDENCY)
+
 
 
     def open(

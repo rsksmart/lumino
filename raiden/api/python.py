@@ -369,6 +369,27 @@ class RaidenAPI:
 
         return connection_manager.leave(registry_address)
 
+    def channel_open_light(
+        self,
+        registry_address: PaymentNetworkID,
+        token_address: TokenAddress,
+        partner_address: Address,
+        signed_tx: str,
+        settle_timeout: BlockTimeout = None,
+        retry_timeout: NetworkTimeout = DEFAULT_RETRY_TIMEOUT,
+    ) -> ChannelID:
+        if settle_timeout is None:
+            settle_timeout = self.raiden.config["settle_timeout"]
+
+        token_network = ChannelValidator.can_open_channel(registry_address, token_address, partner_address,
+                                                          settle_timeout, self.raiden)
+        transaction_hash = token_network.new_netting_channel_light(
+                    partner=partner_address,
+                    signed_tx=signed_tx,
+                    settle_timeout=settle_timeout,
+                    given_block_identifier=views.state_from_raiden(self.raiden).block_hash
+        )
+
     def channel_open(
         self,
         registry_address: PaymentNetworkID,

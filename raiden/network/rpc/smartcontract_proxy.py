@@ -72,6 +72,10 @@ class ContractProxy:
         self.jsonrpc_client = jsonrpc_client
         self.contract = contract
 
+    def broadcast_signed_transaction(self, signed_tx):
+        txhash = self.jsonrpc_client.send_signed_transaction(signed_tx)
+        return txhash
+
     def transact(
         self, function_name: str, startgas: int, *args: Any, **kwargs: Any
     ) -> typing.TransactionHash:

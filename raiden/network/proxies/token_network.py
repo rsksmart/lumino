@@ -195,6 +195,11 @@ class TokenNetwork:
         if channel_created:
             raise DuplicatedChannelError("Channel with given partner address already exists")
 
+    def new_netting_channel_light(self, partner: Address, signed_tx, settle_timeout: int,
+                                  given_block_identifier: BlockSpecification) -> str:
+        transaction_hash = self.proxy.broadcast_signed_transaction(signed_tx)
+        return transaction_hash
+
     def new_netting_channel(
         self, partner: Address, settle_timeout: int, given_block_identifier: BlockSpecification
     ) -> ChannelID:

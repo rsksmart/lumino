@@ -16,8 +16,8 @@ from raiden.api.v1.encoding import (
     RaidenEventsRequestSchemaV2,
     SearchLuminoRequestSchema,
     TokenActionSchema,
-    TokenActionRequestSchema
-)
+    TokenActionRequestSchema,
+    ChannelLightPutSchema)
 from raiden.utils import typing
 
 
@@ -60,7 +60,7 @@ class ChannelsResource(BaseResource):
 
 class ChannelsResourceLight(BaseResource):
 
-    put_schema = ChannelPutSchema
+    put_schema = ChannelLightPutSchema
 
     def get(self):
         """
