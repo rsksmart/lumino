@@ -9,7 +9,6 @@ from typing import Dict
 import gevent
 import gevent.pool
 import structlog
-from dateutil.relativedelta import relativedelta
 from eth_utils import encode_hex, to_checksum_address
 from flask import Flask, make_response, send_from_directory, url_for, request
 
@@ -124,7 +123,7 @@ from raiden.billing.invoices.constants.invoice_status import InvoiceStatus
 from raiden.billing.invoices.decoder.lumino_decoder import get_tags_dict, get_unknown_tags_dict
 
 from dateutil.relativedelta import relativedelta
-import dateutil.parser
+from raiden.billing.invoices.util.time_util import parse_utc_str
 
 log = structlog.get_logger(__name__)
 
@@ -1409,7 +1408,7 @@ class RestAPI:
                 result = self.make_payment_with_invoice(registry_address, unknown_tags_dict, wei_amount, invoice_decoded)
 
         elif persistent_invoice["status"] == InvoiceStatus.PENDING.value and \
-                not self.is_invoice_expired(parser.parse(persistent_invoice["expiration_date"])):
+                not self.is_invoice_expired(persistent_invoice["expiration_date"]):
 
             result = self.make_payment_with_invoice(registry_address, unknown_tags_dict, wei_amount, invoice_decoded)
         elif persistent_invoice["status"] == InvoiceStatus.PAID.value:
@@ -1418,7 +1417,7 @@ class RestAPI:
                        "(The invoice you are trying to pay has already been paid).",
                 status_code=HTTPStatus.CONFLICT,
             )
-        elif self.is_invoice_expired(parser.parse(persistent_invoice["expiration_date"])):
+        elif self.is_invoice_expired(persistent_invoice["expiration_date"]):
             return api_error(
                 errors="Payment couldn't be completed "
                        "(The invoice has expired).",
@@ -1434,6 +1433,7 @@ class RestAPI:
         return result
 
     def is_invoice_expired(self, expiration_date):
+        expiration_date = parse_utc_str(expiration_date)
         is_expired = False
         utc_now = datetime.utcnow()
 

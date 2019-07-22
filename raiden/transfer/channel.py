@@ -636,13 +636,8 @@ def valid_lockedtransfer_check(
                 "The secrethash is the keccak of 0x0 and will not be usable onchain"
             )
             result = (False, msg, None)
-
-        elif not handle_invoice_result['is_valid']:
-            msg = handle_invoice_result['msg']
-            result = (False, msg, None)
-
         else:
-            result = (True, None, merkletree)
+            result = (True, None, merkletree, handle_invoice_result)
 
     return result
 
@@ -1586,7 +1581,7 @@ def handle_receive_lockedtransfer(
     secrethash included, otherwise it won't be able to claim it.
     """
     events: List[Event]
-    is_valid, msg, merkletree = is_valid_lockedtransfer(
+    is_valid, msg, merkletree, handle_invoice_result = is_valid_lockedtransfer(
         mediated_transfer, channel_state, channel_state.partner_state, channel_state.our_state, storage
     )
 
@@ -1611,7 +1606,7 @@ def handle_receive_lockedtransfer(
         )
         events = [invalid_locked]
 
-    return is_valid, events, msg
+    return is_valid, events, msg, handle_invoice_result
 
 
 def handle_receive_refundtransfercancelroute(

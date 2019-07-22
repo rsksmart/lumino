@@ -98,7 +98,7 @@ def handle_inittarget(
     route = state_change.route
 
     assert channel_state.identifier == transfer.balance_proof.channel_identifier
-    is_valid, channel_events, errormsg = channel.handle_receive_lockedtransfer(
+    is_valid, channel_events, errormsg, handle_invoice_result = channel.handle_receive_lockedtransfer(
         channel_state, transfer, storage
     )
 
@@ -120,7 +120,12 @@ def handle_inittarget(
         # silently let the transfer expire. The target task must be created to
         # handle the ReceiveLockExpired state change, which will clear the
         # expired lock.
-        if safe_to_wait:
+        #
+        # We add a new validation.
+        # It is verified that if there was an invoice it was paid successfully,
+        # if it was not, the payment is interrupted
+        # by not generating an event send secret request
+        if safe_to_wait and handle_invoice_result['is_valid']:
             message_identifier = message_identifier_from_prng(pseudo_random_generator)
             recipient = transfer.initiator
             secret_request = SendSecretRequest(
