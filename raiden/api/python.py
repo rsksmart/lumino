@@ -79,7 +79,7 @@ from raiden.utils.typing import (
     TokenNetworkAddress,
     TokenNetworkID,
     Tuple,
-)
+    SignedTransaction)
 
 from raiden.rns_constants import RNS_ADDRESS_ZERO
 from raiden.utils.rns import is_rns_address
@@ -373,22 +373,30 @@ class RaidenAPI:
         self,
         registry_address: PaymentNetworkID,
         token_address: TokenAddress,
+        creator_address: Address,
         partner_address: Address,
-        signed_tx: str,
+        signed_tx: SignedTransaction,
         settle_timeout: BlockTimeout = None,
         retry_timeout: NetworkTimeout = DEFAULT_RETRY_TIMEOUT,
     ) -> ChannelID:
         if settle_timeout is None:
             settle_timeout = self.raiden.config["settle_timeout"]
 
-        token_network = ChannelValidator.can_open_channel(registry_address, token_address, partner_address,
-                                                          settle_timeout, self.raiden)
-        transaction_hash = token_network.new_netting_channel_light(
-                    partner=partner_address,
-                    signed_tx=signed_tx,
-                    settle_timeout=settle_timeout,
-                    given_block_identifier=views.state_from_raiden(self.raiden).block_hash
+        token_network = ChannelValidator.can_open_channel(registry_address, token_address, creator_address, partner_address, settle_timeout, self.raiden)
+
+        transaction_hash = token_network.new_netting_channel_light(creator_address, partner_address, signed_tx, settle_timeout, given_block_identifier=views.state_from_raiden(self.raiden).block_hash)
+        # TODO marcos handle when the transaction fail as an unexpected error
+
+        waiting.wait_for_new_lc_channel(
+            raiden=self.raiden,
+            payment_network_id=registry_address,
+            token_address=token_address,
+            creator_address=creator_address,
+            partner_address=partner_address,
+            retry_timeout=retry_timeout,
         )
+        exists = views.get_channel_existence_from_network_participants(views.state_from_raiden(self.raiden), registry_address, token_address, creator_address, partner_address)
+        print(exists)
 
     def channel_open(
         self,

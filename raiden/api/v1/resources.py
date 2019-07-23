@@ -82,8 +82,7 @@ class ChannelsResourceLumino(BaseResource):
     put_schema = ChannelPutLuminoSchema
 
     @use_kwargs(get_schema, locations=('query',))
-    def get(self,
-            token_addresses: typing.ByteString = None):
+    def get(self, token_addresses: typing.ByteString = None):
         """
         this translates to 'get the channels for the tokens and check if they can join'
         """

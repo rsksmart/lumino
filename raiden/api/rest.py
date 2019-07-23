@@ -607,15 +607,16 @@ class RestAPI:
     def open_light(
         self,
         registry_address: typing.PaymentNetworkID,
+        creator_address: typing.Address,
         partner_address: typing.Address,
         token_address: typing.TokenAddress,
-        signed_tx: typing.Any,
+        signed_tx: typing.SignedTransaction,
         settle_timeout: typing.BlockTimeout = None,
         total_deposit: typing.TokenAmount = None,
     ):
         log.debug(
-            "Opening channel",
-            node=pex(self.raiden_api.address),
+            "Opening channel for light client",
+            node=pex(creator_address),
             registry_address=to_checksum_address(registry_address),
             partner_address=to_checksum_address(partner_address),
             token_address=to_checksum_address(token_address),
@@ -625,12 +626,18 @@ class RestAPI:
         token_exists = ChannelValidator.validate_token_exists(self.raiden_api.raiden.chain, token_address, log)
         if not token_exists.valid:
             return token_exists.error
-
-        enough_balance = ChannelValidator.enough_balance_to_deposit(total_deposit, self.raiden_api.raiden.address, token_exists.token, log)
-        if not enough_balance.valid:
-            return enough_balance.error
-
-        self.raiden_api.channel_open_light(registry_address, token_address, partner_address, signed_tx, settle_timeout)
+        try:
+            self.raiden_api.channel_open_light(registry_address, token_address, creator_address, partner_address, signed_tx,
+                                               settle_timeout)
+        except (
+            InvalidAddress,
+            InvalidSettleTimeout,
+            SamePeerAddress,
+            AddressWithoutCode,
+            DuplicatedChannelError,
+            TokenNotRegistered,
+        ) as e:
+            return ApiErrorBuilder.build_error(errors=str(e), status_code=HTTPStatus.CONFLICT, log=log)
 
         return api_response(result="hola", status_code=HTTPStatus.FAILED_DEPENDENCY)
 

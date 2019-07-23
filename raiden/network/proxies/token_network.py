@@ -55,7 +55,7 @@ from raiden.utils.typing import (
     T_ChannelState,
     TokenAmount,
     TokenNetworkAddress,
-)
+    SignedTransaction)
 from raiden_contracts.constants import (
     CONTRACT_TOKEN_NETWORK,
     GAS_REQUIRED_FOR_CLOSE_CHANNEL,
@@ -156,8 +156,10 @@ class TokenNetwork:
         """ Return the token of this manager. """
         return to_canonical_address(self.proxy.contract.functions.token().call())
 
+
+
     def _new_channel_preconditions(
-        self, partner: Address, settle_timeout: int, block_identifier: BlockSpecification
+        self, creator: Address, partner: Address, settle_timeout: int, block_identifier: BlockSpecification
     ):
         if not is_binary_address(partner):
             raise InvalidAddress("Expected binary address format for channel partner")
@@ -173,7 +175,7 @@ class TokenNetwork:
                 )
             )
 
-        if self.node_address == partner:
+        if creator == partner:
             raise SamePeerAddress("The other peer must not have the same address as the client.")
 
         if not self.client.can_query_state_for_block(block_identifier):
@@ -183,21 +185,28 @@ class TokenNetwork:
             )
 
         channel_exists = self._channel_exists_and_not_settled(
-            participant1=self.node_address, participant2=partner, block_identifier=block_identifier
+            participant1=creator, participant2=partner, block_identifier=block_identifier
         )
         if channel_exists:
             raise DuplicatedChannelError("Channel with given partner address already exists")
 
-    def _new_channel_postconditions(self, partner: Address, block: BlockSpecification):
+    def _new_channel_postconditions(self, creator: Address, partner: Address, block: BlockSpecification):
         channel_created = self._channel_exists_and_not_settled(
-            participant1=self.node_address, participant2=partner, block_identifier=block
+            participant1=creator, participant2=partner, block_identifier=block
         )
         if channel_created:
             raise DuplicatedChannelError("Channel with given partner address already exists")
 
-    def new_netting_channel_light(self, partner: Address, signed_tx, settle_timeout: int,
+    def new_netting_channel_light(self, creator: Address, partner: Address, signed_tx, settle_timeout: int,
                                   given_block_identifier: BlockSpecification) -> str:
+        self._new_channel_preconditions(
+            creator=creator, partner=partner, settle_timeout=settle_timeout,
+            block_identifier=given_block_identifier
+        )
         transaction_hash = self.proxy.broadcast_signed_transaction(signed_tx)
+        checking_block = self.client.get_checking_block()
+        self._new_channel_postconditions(creator=creator, partner=partner, block=checking_block)
+
         return transaction_hash
 
     def new_netting_channel(
@@ -216,7 +225,7 @@ class TokenNetwork:
         """
         checking_block = self.client.get_checking_block()
         self._new_channel_preconditions(
-            partner=partner, settle_timeout=settle_timeout, block_identifier=given_block_identifier
+            creator=self.node_address, partner=partner, settle_timeout=settle_timeout, block_identifier=given_block_identifier
         )
         log_details = {"peer1": pex(self.node_address), "peer2": pex(partner)}
         gas_limit = self.proxy.estimate_gas(
@@ -233,7 +242,7 @@ class TokenNetwork:
                 required_gas=GAS_REQUIRED_FOR_OPEN_CHANNEL,
                 block_identifier=checking_block,
             )
-            self._new_channel_postconditions(partner=partner, block=checking_block)
+            self._new_channel_postconditions(creator=self.node_address, partner=partner, block=checking_block)
 
             log.critical("new_netting_channel call will fail", **log_details)
             raise RaidenUnrecoverableError("Creating a new channel will fail")
@@ -257,7 +266,7 @@ class TokenNetwork:
                 receipt_or_none = check_transaction_threw(self.client, transaction_hash)
                 if receipt_or_none:
                     self._new_channel_postconditions(
-                        partner=partner, block=receipt_or_none["blockNumber"]
+                        creator=self.node_address, partner=partner, block=receipt_or_none["blockNumber"]
                     )
                     log.critical("new_netting_channel failed", **log_details)
                     raise RaidenUnrecoverableError("creating new channel failed")

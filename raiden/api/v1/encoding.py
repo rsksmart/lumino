@@ -345,6 +345,7 @@ class ChannelPutSchema(BaseSchema):
 
 class ChannelLightPutSchema(BaseSchema):
     token_address = AddressField(required=True)
+    creator_address = AddressField(required=True)
     partner_address = AddressField(required=True)
     signed_tx = fields.String(required=True)
     settle_timeout = fields.Integer(missing=None)

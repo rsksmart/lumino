@@ -37,7 +37,7 @@ class ChannelValidator:
         return EnoughBalance(None, True, balance)
 
     @staticmethod
-    def can_open_channel(registry_address: PaymentNetworkID, token_address: TokenAddress, partner_address: Address,
+    def can_open_channel(registry_address: PaymentNetworkID, token_address: TokenAddress, creator_address: Address, partner_address: Address,
                            settle_timeout: BlockTimeout, raiden) -> TokenNetwork:
 
         if settle_timeout < raiden.config["reveal_timeout"] * 2:
@@ -54,25 +54,34 @@ class ChannelValidator:
         if not is_binary_address(partner_address):
             raise InvalidAddress("Expected binary address format for partner in channel open")
 
-        chain_state = views.state_from_raiden(raiden)
-        channel_state = views.get_channelstate_for(
-            chain_state=chain_state,
-            payment_network_id=registry_address,
-            token_address=token_address,
-            partner_address=partner_address,
-        )
+        if not is_binary_address(creator_address):
+            raise InvalidAddress("Expected binary address format for creator in channel open")
 
-        if channel_state:
-            raise DuplicatedChannelError("Channel with given partner address already exists")
+        chain_state = views.state_from_raiden(raiden)
+        # The node is the creator
+        if creator_address == raiden.address:
+            channel_state = views.get_channelstate_for(
+                chain_state=chain_state,
+                payment_network_id=registry_address,
+                token_address=token_address,
+                partner_address=partner_address,
+            )
+            if channel_state:
+                raise DuplicatedChannelError("Channel with given partner address already exists")
+        else:
+            # A light client creates the channel
+            exists = views.get_channel_existence_from_network_participants(chain_state, registry_address, token_address,
+                                                                           creator_address, partner_address)
+            if exists:
+                raise DuplicatedChannelError("Channel with given partner address already exists")
 
         registry: TokenNetworkRegistry = raiden.chain.token_network_registry(registry_address)
-        token_network_address = registry.get_token_network(token_address)
+        token_network = raiden.chain.token_network(registry.get_token_network(token_address))
 
-        if token_network_address is None:
+        if token_network is None:
             raise TokenNotRegistered(
                 "Token network for token %s does not exist" % to_checksum_address(token_address)
             )
-        token_network = raiden.chain.token_network(registry.get_token_network(token_address))
         return token_network
 
     @staticmethod

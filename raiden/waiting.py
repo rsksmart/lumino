@@ -41,6 +41,23 @@ def wait_for_block(
 
         gevent.sleep(retry_timeout)
 
+def wait_for_new_lc_channel(
+    raiden: "RaidenService",
+    payment_network_id: PaymentNetworkID,
+    token_address: TokenAddress,
+    creator_address: Address,
+    partner_address: Address,
+    retry_timeout: float,
+) -> None:
+    exists = views.get_channel_existence_from_network_participants(views.state_from_raiden(raiden),payment_network_id, token_address, creator_address, partner_address)
+    while not exists:
+        assert raiden, ALARM_TASK_ERROR_MSG
+        assert raiden.alarm, ALARM_TASK_ERROR_MSG
+        gevent.sleep(retry_timeout)
+        exists = views.get_channel_existence_from_network_participants(views.state_from_raiden(raiden),
+                                                                       payment_network_id, token_address,
+                                                                       creator_address, partner_address)
+
 
 def wait_for_newchannel(
     raiden: "RaidenService",
