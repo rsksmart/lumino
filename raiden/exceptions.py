@@ -282,3 +282,8 @@ class ServiceRequestIOURejected(ServiceRequestFailed):
     def __init__(self, message: str, error_code: int) -> None:
         super().__init__(f"{message} ({error_code})")
         self.error_code = error_code
+
+
+class RawTransactionFailed(RaidenError):
+    """ Raised when a raw transaction, signed b a Light Client, fails
+    """

@@ -384,8 +384,13 @@ class RaidenAPI:
 
         token_network = ChannelValidator.can_open_channel(registry_address, token_address, creator_address, partner_address, settle_timeout, self.raiden)
 
-        transaction_hash = token_network.new_netting_channel_light(creator_address, partner_address, signed_tx, settle_timeout, given_block_identifier=views.state_from_raiden(self.raiden).block_hash)
-        # TODO marcos handle when the transaction fail as an unexpected error
+        try:
+            token_network.new_netting_channel_light(creator_address, partner_address, signed_tx, settle_timeout,
+                                                    given_block_identifier=views.state_from_raiden(
+                                                        self.raiden).block_hash)
+
+        except DuplicatedChannelError:
+            log.info("partner opened channel first")
 
         waiting.wait_for_new_lc_channel(
             raiden=self.raiden,
@@ -411,8 +416,7 @@ class RaidenAPI:
         """
         if settle_timeout is None:
             settle_timeout = self.raiden.config["settle_timeout"]
-
-        token_network = ChannelValidator.can_open_channel(registry_address, token_address, partner_address, settle_timeout, self.raiden)
+        token_network = ChannelValidator.can_open_channel(registry_address, token_address, self.address, partner_address, settle_timeout, self.raiden)
         with self.raiden.gas_reserve_lock:
             ChannelValidator.validate_gas_reserve(1, self.raiden)
             try:

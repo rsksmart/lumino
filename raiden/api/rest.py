@@ -97,7 +97,7 @@ from raiden.exceptions import (
     TokenNotRegistered,
     TransactionThrew,
     UnknownTokenAddress,
-    RaidenRecoverableError)
+    RawTransactionFailed)
 from raiden.transfer import channel, views
 from raiden.transfer.events import (
     EventPaymentReceivedSuccess,
@@ -638,6 +638,9 @@ class RestAPI:
             TokenNotRegistered,
         ) as e:
             return ApiErrorBuilder.build_error(errors=str(e), status_code=HTTPStatus.CONFLICT, log=log)
+        except RawTransactionFailed as e1:
+            return ApiErrorBuilder.build_error(errors=str(e1), status_code=HTTPStatus.BAD_REQUEST, log=log)
+
 
         return api_response(result="hola", status_code=HTTPStatus.FAILED_DEPENDENCY)
 

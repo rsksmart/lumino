@@ -11,6 +11,7 @@ from eth_utils import (
 )
 from gevent.event import AsyncResult
 from gevent.lock import RLock, Semaphore
+from requests import HTTPError
 
 from raiden.constants import (
     EMPTY_HASH,
@@ -29,7 +30,7 @@ from raiden.exceptions import (
     RaidenRecoverableError,
     RaidenUnrecoverableError,
     SamePeerAddress,
-)
+    RawTransactionFailed)
 from raiden.network.proxies.token import Token
 from raiden.network.proxies.utils import compare_contract_versions
 from raiden.network.rpc.client import StatelessFilter, check_address_has_code
@@ -203,9 +204,22 @@ class TokenNetwork:
             creator=creator, partner=partner, settle_timeout=settle_timeout,
             block_identifier=given_block_identifier
         )
-        transaction_hash = self.proxy.broadcast_signed_transaction(signed_tx)
-        checking_block = self.client.get_checking_block()
-        self._new_channel_postconditions(creator=creator, partner=partner, block=checking_block)
+        log_details = {"peer1": pex(creator), "peer2": pex(partner)}
+        try:
+            log.debug("new_netting_channel_light called", **log_details)
+            transaction_hash = self.proxy.broadcast_signed_transaction(signed_tx)
+            self.client.poll(transaction_hash)
+            receipt_or_none = check_transaction_threw(self.client, transaction_hash)
+            if receipt_or_none:
+                self._new_channel_postconditions(
+                    creator=creator, partner=partner, block=receipt_or_none["blockNumber"]
+                )
+                log.critical("new_netting_channel_light failed", **log_details)
+                raise RaidenUnrecoverableError("creating new channel failed")
+
+        except HTTPError as e:
+            log.critical("new_netting_channel failed: transaction malformed", **log_details)
+            raise RawTransactionFailed("Light Client raw transaction failed: rejected by RSK node")
 
         return transaction_hash
 
