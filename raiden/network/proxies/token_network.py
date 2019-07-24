@@ -1,5 +1,6 @@
-from collections import defaultdict
+from collections import defaultdict, namedtuple
 from typing import Any, Dict, List, NamedTuple, Optional, Tuple
+from dataclasses import dataclass
 
 import structlog
 from eth_utils import (
@@ -100,6 +101,10 @@ class ChannelDetails(NamedTuple):
     channel_data: ChannelData
     participants_data: ParticipantsDetails
 
+@dataclass(frozen=True)
+class OpenChannelTrKey:
+    participant1: Address
+    participant2: Address
 
 class TokenNetwork:
     def __init__(
@@ -132,9 +137,10 @@ class TokenNetwork:
         self.proxy = proxy
         self.client = jsonrpc_client
         self.node_address = self.client.address
-        self.open_channel_transactions: Dict[Address, AsyncResult] = dict()
+        self.open_channel_transactions: Dict[OpenChannelTrKey, AsyncResult] = dict()
 
         # Forbids concurrent operations on the same channel
+
         self.channel_operations_lock: Dict[Address, RLock] = defaultdict(RLock)
 
         # Serializes concurent deposits on this token network. This must be an
@@ -199,29 +205,48 @@ class TokenNetwork:
             raise DuplicatedChannelError("Channel with given partner address already exists")
 
     def new_netting_channel_light(self, creator: Address, partner: Address, signed_tx, settle_timeout: int,
-                                  given_block_identifier: BlockSpecification) -> str:
+                                  given_block_identifier: BlockSpecification) -> ChannelID:
         self._new_channel_preconditions(
             creator=creator, partner=partner, settle_timeout=settle_timeout,
             block_identifier=given_block_identifier
         )
         log_details = {"peer1": pex(creator), "peer2": pex(partner)}
-        try:
-            log.debug("new_netting_channel_light called", **log_details)
-            transaction_hash = self.proxy.broadcast_signed_transaction(signed_tx)
-            self.client.poll(transaction_hash)
-            receipt_or_none = check_transaction_threw(self.client, transaction_hash)
-            if receipt_or_none:
-                self._new_channel_postconditions(
-                    creator=creator, partner=partner, block=receipt_or_none["blockNumber"]
-                )
-                log.critical("new_netting_channel_light failed", **log_details)
-                raise RaidenUnrecoverableError("creating new channel failed")
+        if OpenChannelTrKey(creator, partner) not in self.open_channel_transactions:
+            new_open_channel_transaction = AsyncResult()
+            self.open_channel_transactions[OpenChannelTrKey(creator, partner)] = new_open_channel_transaction
+            try:
+                log.debug("new_netting_channel_light called", **log_details)
+                transaction_hash = self.proxy.broadcast_signed_transaction(signed_tx)
+                self.client.poll(transaction_hash)
+                receipt_or_none = check_transaction_threw(self.client, transaction_hash)
+                if receipt_or_none:
+                    self._new_channel_postconditions(
+                        creator=creator, partner=partner, block=receipt_or_none["blockNumber"]
+                    )
+                    log.critical("new_netting_channel_light failed", **log_details)
+                    raise RaidenUnrecoverableError("creating new channel failed")
+            except HTTPError as e:
+                log.critical("new_netting_channel failed: transaction malformed", **log_details)
+                new_open_channel_transaction.set_exception(e)
+                raise RawTransactionFailed("Light Client raw transaction failed: rejected by RSK node")
+            except Exception as e:
+                log.critical("new_netting_channel failed", **log_details)
+                new_open_channel_transaction.set_exception(e)
+                raise
+            else:
+                new_open_channel_transaction.set(transaction_hash)
+            finally:
+                self.open_channel_transactions.pop(OpenChannelTrKey(creator, partner), None)
+        else:
+            # If already exists wait for completition or exception
+            self.open_channel_transactions[OpenChannelTrKey(creator, partner)].get()
 
-        except HTTPError as e:
-            log.critical("new_netting_channel failed: transaction malformed", **log_details)
-            raise RawTransactionFailed("Light Client raw transaction failed: rejected by RSK node")
-
-        return transaction_hash
+        channel_identifier: ChannelID = self._detail_channel(
+            participant1=creator, participant2=partner, block_identifier="latest"
+        ).channel_identifier
+        log_details["channel_identifier"] = str(channel_identifier)
+        log.info("new_netting_channel_light successful", **log_details)
+        return channel_identifier
 
     def new_netting_channel(
         self, partner: Address, settle_timeout: int, given_block_identifier: BlockSpecification
@@ -264,9 +289,10 @@ class TokenNetwork:
         log.debug("new_netting_channel called", **log_details)
         # Prevent concurrent attempts to open a channel with the same token and
         # partner address.
-        if gas_limit and partner not in self.open_channel_transactions:
+
+        if gas_limit and OpenChannelTrKey(self.node_address, partner) not in self.open_channel_transactions:
             new_open_channel_transaction = AsyncResult()
-            self.open_channel_transactions[partner] = new_open_channel_transaction
+            self.open_channel_transactions[OpenChannelTrKey(self.node_address, partner)] = new_open_channel_transaction
             gas_limit = safe_gas_limit(gas_limit, GAS_REQUIRED_FOR_OPEN_CHANNEL)
             try:
                 transaction_hash = self.proxy.transact(
@@ -292,10 +318,10 @@ class TokenNetwork:
             else:
                 new_open_channel_transaction.set(transaction_hash)
             finally:
-                self.open_channel_transactions.pop(partner, None)
+                self.open_channel_transactions.pop(OpenChannelTrKey(self.node_address, partner), None)
         else:
             # All other concurrent threads should block on the result of opening this channel
-            self.open_channel_transactions[partner].get()
+            self.open_channel_transactions[OpenChannelTrKey(self.node_address, partner)].get()
 
         channel_identifier: ChannelID = self._detail_channel(
             participant1=self.node_address, participant2=partner, block_identifier="latest"
