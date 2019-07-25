@@ -123,7 +123,7 @@ from raiden.billing.invoices.constants.invoice_status import InvoiceStatus
 from raiden.billing.invoices.decoder.lumino_decoder import get_tags_dict, get_unknown_tags_dict
 
 from dateutil.relativedelta import relativedelta
-from raiden.billing.invoices.util.time_util import parse_utc_str
+from raiden.billing.invoices.util.time_util import is_invoice_expired
 
 log = structlog.get_logger(__name__)
 
@@ -703,7 +703,7 @@ class RestAPI:
     def open_lumino(
         self,
         registry_address: typing.PaymentNetworkID,
-        partner_rns_address: typing.RnsAddress,
+        partner_address: typing.RnsAddress,
         token_address: typing.TokenAddress,
         settle_timeout: typing.BlockTimeout = None,
         total_deposit: typing.TokenAmount = None,
@@ -712,7 +712,7 @@ class RestAPI:
             'Opening channel',
             node=pex(self.raiden_api.address),
             registry_address=to_checksum_address(registry_address),
-            partner_rns_address=partner_rns_address,
+            partner_address=partner_address,
             token_address=to_checksum_address(token_address),
             settle_timeout=settle_timeout,
         )
@@ -737,9 +737,10 @@ class RestAPI:
             )
 
         # First we check if the address received is an RNS address and exists a Hex address
-        if is_rns_address(partner_rns_address):
-            rns_resolved_address = self.raiden_api.raiden.chain.get_address_from_rns(partner_rns_address)
-            if rns_resolved_address == RNS_ADDRESS_ZERO:
+        address_to_send = partner_address
+        if is_rns_address(partner_address):
+            address_to_send = self.raiden_api.raiden.chain.get_address_from_rns(partner_address)
+            if address_to_send == RNS_ADDRESS_ZERO:
                 return api_error(
                     errors=str('RNS domain isnt registered'),
                     status_code=HTTPStatus.PAYMENT_REQUIRED,
@@ -749,7 +750,7 @@ class RestAPI:
             self.raiden_api.channel_open(
                 registry_address,
                 token_address,
-                to_canonical_address(rns_resolved_address),
+                to_canonical_address(address_to_send),
                 settle_timeout,
             )
         except (InvalidAddress, InvalidSettleTimeout, SamePeerAddress,
@@ -771,14 +772,14 @@ class RestAPI:
                 node=pex(self.raiden_api.address),
                 registry_address=to_checksum_address(registry_address),
                 token_address=to_checksum_address(token_address),
-                partner_rns_address=rns_resolved_address,
+                partner_rns_address=address_to_send,
                 total_deposit=total_deposit,
             )
             try:
                 self.raiden_api.set_total_channel_deposit(
                     registry_address=registry_address,
                     token_address=token_address,
-                    partner_address=to_canonical_address(rns_resolved_address),
+                    partner_address=to_canonical_address(address_to_send),
                     total_deposit=total_deposit,
                 )
             except InsufficientFunds as e:
@@ -796,7 +797,7 @@ class RestAPI:
             views.state_from_raiden(self.raiden_api.raiden),
             registry_address,
             token_address,
-            to_canonical_address(rns_resolved_address),
+            to_canonical_address(address_to_send),
         )
 
         result = self.channel_schema.dump(channel_state)
@@ -1408,7 +1409,7 @@ class RestAPI:
                 result = self.make_payment_with_invoice(registry_address, unknown_tags_dict, wei_amount, invoice_decoded)
 
         elif persistent_invoice["status"] == InvoiceStatus.PENDING.value and \
-                not self.is_invoice_expired(persistent_invoice["expiration_date"]):
+                not is_invoice_expired(persistent_invoice["expiration_date"]):
 
             result = self.make_payment_with_invoice(registry_address, unknown_tags_dict, wei_amount, invoice_decoded)
         elif persistent_invoice["status"] == InvoiceStatus.PAID.value:
@@ -1417,7 +1418,7 @@ class RestAPI:
                        "(The invoice you are trying to pay has already been paid).",
                 status_code=HTTPStatus.CONFLICT,
             )
-        elif self.is_invoice_expired(persistent_invoice["expiration_date"]):
+        elif is_invoice_expired(persistent_invoice["expiration_date"]):
             return api_error(
                 errors="Payment couldn't be completed "
                        "(The invoice has expired).",
@@ -1431,16 +1432,6 @@ class RestAPI:
             )
 
         return result
-
-    def is_invoice_expired(self, expiration_date):
-        expiration_date = parse_utc_str(expiration_date)
-        is_expired = False
-        utc_now = datetime.utcnow()
-
-        if expiration_date < utc_now:
-            is_expired = True
-
-        return  is_expired
 
     def make_payment_with_invoice(self, registry_address, unknown_tags_dict, wei_amount, invoice_decoded):
         # We make payment with data of invoice
