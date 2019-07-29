@@ -1,6 +1,8 @@
+from eth_utils.typing import ChecksumAddress
+
 from raiden.transfer import channel
 from raiden.transfer.architecture import Event, StateChange, TransitionResult
-from raiden.transfer.state import TokenNetworkState
+from raiden.transfer.state import TokenNetworkState, NettingChannelState
 from raiden.transfer.state_change import (
     ActionChannelClose,
     ActionChannelSetFee,
@@ -13,7 +15,8 @@ from raiden.transfer.state_change import (
     ContractReceiveRouteNew,
     ContractReceiveUpdateTransfer,
 )
-from raiden.utils.typing import MYPY_ANNOTATION, BlockHash, BlockNumber, List, Union
+from raiden.utils.typing import MYPY_ANNOTATION, BlockHash, BlockNumber, List, Union, Dict, ChannelID, Address, \
+    AddressHex
 
 # TODO: The proper solution would be to introduce a marker for state changes
 # that contains channel IDs and other specific channel attributes
@@ -27,17 +30,20 @@ StateChangeWithChannelID = Union[
 ]
 
 
-def subdispatch_to_channel_by_id(
+def subdispatch_to_channel_by_id_and_address(
     token_network_state: TokenNetworkState,
     state_change: StateChangeWithChannelID,
     block_number: BlockNumber,
     block_hash: BlockHash,
+    node_address: AddressHex
 ) -> TransitionResult:
     events = list()
 
     ids_to_channels = token_network_state.channelidentifiers_to_channels
 
-    channel_state = ids_to_channels.get(state_change.channel_identifier)
+    channel_state = None
+    if node_address in ids_to_channels:
+        channel_state = ids_to_channels[node_address].get(state_change.channel_identifier)
 
     if channel_state:
         result = channel.state_transition(
@@ -53,10 +59,10 @@ def subdispatch_to_channel_by_id(
 
         channel_identifier = state_change.channel_identifier
         if result.new_state is None:
-            del ids_to_channels[channel_identifier]
+            del ids_to_channels[node_address][channel_identifier]
             partner_to_channelids.remove(channel_identifier)
         else:
-            ids_to_channels[channel_identifier] = result.new_state
+            ids_to_channels[node_address][channel_identifier] = result.new_state
 
         events.extend(result.events)
 
@@ -96,10 +102,14 @@ def handle_channelnew(
     # reopens the blockchain events ChannelSettled and ChannelOpened must be
     # processed in correct order, this should be guaranteed by the filters in
     # the ethereum node
-    if channel_identifier not in token_network_state.channelidentifiers_to_channels:
-        token_network_state.channelidentifiers_to_channels[channel_identifier] = channel_state
-        addresses_to_ids = token_network_state.partneraddresses_to_channelidentifiers
-        addresses_to_ids[partner_address].append(channel_identifier)
+    # TODO if channel_identifier not in token_network_state.channelidentifiers_to_channels:
+    if our_address not in token_network_state.channelidentifiers_to_channels:
+        token_network_state.channelidentifiers_to_channels[our_address]: Dict[AddressHex, NettingChannelState] = dict()
+
+    token_network_state.channelidentifiers_to_channels[our_address][channel_identifier] = channel_state
+    # TODO partneraddress to channel ids for light clients?
+    addresses_to_ids = token_network_state.partneraddresses_to_channelidentifiers
+    addresses_to_ids[partner_address].append(channel_identifier)
 
     return TransitionResult(token_network_state, events)
 
@@ -109,12 +119,14 @@ def handle_balance(
     state_change: ContractReceiveChannelNewBalance,
     block_number: BlockNumber,
     block_hash: BlockHash,
+    participant: AddressHex
 ) -> TransitionResult:
-    return subdispatch_to_channel_by_id(
+    return subdispatch_to_channel_by_id_and_address(
         token_network_state=token_network_state,
         state_change=state_change,
         block_number=block_number,
         block_hash=block_hash,
+        node_address=participant
     )
 
 
@@ -265,7 +277,7 @@ def state_transition(
         iteration = handle_channelnew(token_network_state, state_change)
     elif type(state_change) == ContractReceiveChannelNewBalance:
         assert isinstance(state_change, ContractReceiveChannelNewBalance), MYPY_ANNOTATION
-        iteration = handle_balance(token_network_state, state_change, block_number, block_hash)
+        iteration = handle_balance(token_network_state, state_change, block_number, block_hash, state_change.participant)
     elif type(state_change) == ContractReceiveChannelClosed:
         assert isinstance(state_change, ContractReceiveChannelClosed), MYPY_ANNOTATION
         iteration = handle_closed(token_network_state, state_change, block_number, block_hash)

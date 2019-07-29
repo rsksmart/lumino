@@ -6,7 +6,7 @@ from random import Random
 from typing import TYPE_CHECKING, Tuple
 
 import networkx
-from eth_utils import encode_hex, to_canonical_address, to_checksum_address
+from eth_utils import encode_hex, to_canonical_address, to_checksum_address, to_normalized_address
 
 from raiden.constants import EMPTY_MERKLE_ROOT, UINT64_MAX, UINT256_MAX
 from raiden.encoding import messages
@@ -59,7 +59,7 @@ from raiden.utils.typing import (
     TokenNetworkAddress,
     TokenNetworkID,
     Union,
-)
+    AddressHex)
 
 if TYPE_CHECKING:
     # pylint: disable=unused-import
@@ -476,7 +476,7 @@ class TokenNetworkState(State):
         self.network_graph = TokenNetworkGraphState(self.address)
 
         self.channelidentifiers_to_channels: ChannelMap = dict()
-        self.partneraddresses_to_channelidentifiers: Dict[Address, List[ChannelID]] = defaultdict(
+        self.partneraddresses_to_channelidentifiers: Dict[AddressHex, List[ChannelID]] = defaultdict(
             list
         )
 
@@ -525,10 +525,11 @@ class TokenNetworkState(State):
             token_address=to_canonical_address(data["token_address"]),
         )
         restored.network_graph = data["network_graph"]
+
         restored.channelidentifiers_to_channels = map_dict(
             serialization.deserialize_channel_id,
             serialization.identity,
-            data["channelidentifiers_to_channels"],
+            data["channelidentifiers_to_channels"]
         )
 
         restored_partneraddresses_to_channelidentifiers = map_dict(

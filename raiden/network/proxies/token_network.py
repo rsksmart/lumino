@@ -224,11 +224,11 @@ class TokenNetwork:
                         creator=creator, partner=partner, block=receipt_or_none["blockNumber"]
                     )
                     log.critical("new_netting_channel_light failed", **log_details)
-                    raise RaidenUnrecoverableError("creating new channel failed")
+                    raise RawTransactionFailed("creating new channel failed")
             except HTTPError as e:
                 log.critical("new_netting_channel failed: transaction malformed", **log_details)
                 new_open_channel_transaction.set_exception(e)
-                raise RawTransactionFailed("Light Client raw transaction failed: rejected by RSK node")
+                raise RawTransactionFailed("Light Client raw transaction receipt status failed")
             except Exception as e:
                 log.critical("new_netting_channel failed", **log_details)
                 new_open_channel_transaction.set_exception(e)
@@ -449,8 +449,8 @@ class TokenNetwork:
         Note:
             For now one of the participants has to be the node_address
         """
-        if self.node_address not in (participant1, participant2):
-            raise ValueError("One participant must be the node address")
+        ##TODO Check if light clients
+
 
         if self.node_address == participant2:
             participant1, participant2 = participant2, participant1
@@ -493,8 +493,8 @@ class TokenNetwork:
         Note:
             For now one of the participants has to be the node_address
         """
-        if self.node_address not in (participant1, participant2):
-            raise ValueError("One participant must be the node address")
+        ##TODO Check if light clients
+
 
         if self.node_address == participant2:
             participant1, participant2 = participant2, participant1

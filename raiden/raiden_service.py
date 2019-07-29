@@ -668,8 +668,7 @@ class RaidenService(Runnable):
         old_state = views.state_from_raiden(self)
         new_state, raiden_event_list = self.wal.log_and_dispatch(state_change)
 
-        for changed_balance_proof in views.detect_balance_proof_change(old_state, new_state):
-            update_services_from_balance_proof(self, new_state, changed_balance_proof)
+
 
         log.debug(
             "Raiden events",
@@ -951,8 +950,7 @@ class RaidenService(Runnable):
             ),
             current_state=chain_state,
         )
-        for balance_proof in current_balance_proofs:
-            update_services_from_balance_proof(self, chain_state, balance_proof)
+
 
     def _initialize_whitelists(self, chain_state: ChainState):
         """ Whitelist neighbors and mediated transfer targets on transport """
