@@ -67,10 +67,18 @@ CREATE TABLE IF NOT EXISTS invoices (
 );
 """
 
+DB_CREATE_INVOICES_PAYMENTS = """
+CREATE TABLE IF NOT EXISTS invoices_payments (
+    identifier INTEGER constraint invoices_payments_pk PRIMARY KEY AUTOINCREMENT,
+    invoice_id INTEGER references invoices,
+    state_event_id INTEGER references state_events
+);
+"""
+
 DB_SCRIPT_CREATE_TABLES = """
 PRAGMA foreign_keys=off;
 BEGIN TRANSACTION;
-{}{}{}{}{}{}{}
+{}{}{}{}{}{}{}{}
 COMMIT;
 PRAGMA foreign_keys=on;
 """.format(
@@ -80,5 +88,6 @@ PRAGMA foreign_keys=on;
     DB_CREATE_STATE_EVENTS,
     DB_CREATE_RUNS,
     DB_CREATE_TOKEN_ACTION,
-    DB_CREATE_INVOICES
+    DB_CREATE_INVOICES,
+    DB_CREATE_INVOICES_PAYMENTS
 )

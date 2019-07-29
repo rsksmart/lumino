@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING
 
 import structlog
 from eth_utils import to_checksum_address, to_hex
+from eth_utils import encode_hex
 
 from raiden.constants import EMPTY_BALANCE_HASH, EMPTY_HASH, EMPTY_MESSAGE_HASH, EMPTY_SIGNATURE
 from raiden.exceptions import ChannelOutdatedError, RaidenUnrecoverableError
@@ -52,6 +53,8 @@ from raiden.transfer.utils import (
 from raiden.transfer.views import get_channelstate_by_token_network_and_partner
 from raiden.utils import pex
 from raiden.utils.typing import MYPY_ANNOTATION, Address, Nonce, TokenNetworkID
+
+from raiden.billing.invoices.handlers.invoice_handler import handle_receive_events_with_payments
 
 if TYPE_CHECKING:
     # pylint: disable=unused-import
@@ -205,9 +208,15 @@ class RaidenEventHandler(EventHandler):
     def handle_paymentsentsuccess(
         raiden: "RaidenService", payment_sent_success_event: EventPaymentSentSuccess
     ):
+
         target = payment_sent_success_event.target
         payment_identifier = payment_sent_success_event.identifier
         payment_status = raiden.targets_to_identifiers_to_statuses[target].pop(payment_identifier)
+
+        handle_receive_events_with_payments(raiden.wal.storage,
+                                            payment_status.payment_hash_invoice,
+                                            'raiden.transfer.events.EventPaymentSentSuccess',
+                                            payment_identifier)
 
         # With the introduction of the lock we should always get
         # here only once per identifier so payment_status should always exist
@@ -223,6 +232,12 @@ class RaidenEventHandler(EventHandler):
         payment_status = raiden.targets_to_identifiers_to_statuses[target].pop(
             payment_identifier, None
         )
+
+        handle_receive_events_with_payments(raiden.wal.storage,
+                                            payment_status.payment_hash_invoice,
+                                            'raiden.transfer.events.EventPaymentSentFailed',
+                                            payment_identifier)
+
         # In the case of a refund transfer the payment fails earlier
         # but the lock expiration will generate a second
         # EventPaymentSentFailed message which we can ignore here

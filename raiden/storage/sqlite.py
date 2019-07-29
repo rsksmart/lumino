@@ -74,8 +74,9 @@ class SQLiteStorage:
         # https://sqlite.org/atomiccommit.html#_exclusive_access_mode
         # https://sqlite.org/pragma.html#pragma_locking_mode
 
-        conn.execute("PRAGMA locking_mode=EXCLUSIVE")
-        
+        # conn.execute("PRAGMA locking_mode=EXCLUSIVE")
+        conn.execute("PRAGMA locking_mode=NORMAL")
+
         # Keep the journal around and skip inode updates.
         # References:
         # https://sqlite.org/atomiccommit.html#_persistent_rollback_journals
@@ -177,6 +178,20 @@ class SQLiteStorage:
             cursor = self.conn.execute(
                 "INSERT INTO invoices(identifier, type, status, expiration_date, encode, payment_hash) VALUES(null, ?, ?, ?, ?, ?)",
                 (invoice_data['type'], invoice_data['status'], invoice_data['expiration_date'], invoice_data['encode'], invoice_data['payment_hash']),
+            )
+            last_id = cursor.lastrowid
+
+        return last_id
+
+    def write_invoice_payments(self, invoice_data):
+        with self.write_lock, self.conn:
+            cursor = self.conn.execute(
+                "INSERT INTO invoices_payments(identifier, "
+                "invoice_id, "
+                "state_event_id) VALUES(null, ?, ?)",
+
+                (invoice_data['invoice_id'],
+                 invoice_data['state_event_id'],)
             )
             last_id = cursor.lastrowid
 
@@ -577,6 +592,32 @@ class SQLiteStorage:
             for entry in entries
         ]
         return result
+
+    def get_payment_event(self, identifier, event_type):
+        cursor = self.conn.cursor()
+
+        query = """
+
+           SELECT identifier, data FROM state_events
+                   WHERE json_extract(state_events.data,
+                      '$.identifier') IN ({})
+                   AND
+                   json_extract(state_events.data,
+                      '$._type') IN ({})        
+           """
+
+        query = query.format("\'" + str(identifier) + "\'", "\'" + event_type + "\'")
+
+        cursor.execute(
+            query
+        )
+
+        payment_event = cursor.fetchone()
+
+        payment_event_dict = {"identifier": payment_event[0],
+                              "data": payment_event[1]}
+
+        return payment_event_dict
 
     def _query_payments_events(self,
                                token_network_identifier,

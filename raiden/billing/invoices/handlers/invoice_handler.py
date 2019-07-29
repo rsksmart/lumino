@@ -25,3 +25,17 @@ def handle_received_invoice(storage, payment_hash_invoice):
     return result
 
 
+def handle_receive_events_with_payments(storage, payment_hash_invoice, event_type, payment_identifier):
+    # Get invoice by payment_hash_invoice
+    invoice = storage.query_invoice(encode_hex(payment_hash_invoice))
+    if invoice is not None:
+        # Get event associate
+        state_event = storage.get_payment_event(payment_identifier, event_type)
+
+        data_invoice_payment = {'state_event_id': state_event['identifier'],
+                                'invoice_id': invoice['identifier']}
+
+        # Associate payment with invoice
+        storage.write_invoice_payments(data_invoice_payment)
+
+
