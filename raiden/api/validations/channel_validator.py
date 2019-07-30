@@ -58,22 +58,16 @@ class ChannelValidator:
             raise InvalidAddress("Expected binary address format for creator in channel open")
 
         chain_state = views.state_from_raiden(raiden)
-        # The node is the creator
-        if creator_address == raiden.address:
-            channel_state = views.get_channelstate_for(
-                chain_state=chain_state,
-                payment_network_id=registry_address,
-                token_address=token_address,
-                partner_address=partner_address,
-            )
-            if channel_state:
-                raise DuplicatedChannelError("Channel with given partner address already exists")
-        else:
-            # A light client creates the channel
-            exists = views.get_channel_existence_from_network_participants(chain_state, registry_address, token_address,
-                                                                           creator_address, partner_address)
-            if exists:
-                raise DuplicatedChannelError("Channel with given partner address already exists")
+
+        channel_state = views.get_channelstate_for(
+            chain_state=chain_state,
+            payment_network_id=registry_address,
+            creator_address=creator_address,
+            token_address=token_address,
+            partner_address=partner_address,
+        )
+        if channel_state:
+            raise DuplicatedChannelError("Channel with given partner address already exists")
 
         registry: TokenNetworkRegistry = raiden.chain.token_network_registry(registry_address)
         token_network = raiden.chain.token_network(registry.get_token_network(token_address))

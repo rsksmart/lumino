@@ -54,15 +54,10 @@ def all_neighbour_nodes(chain_state: ChainState) -> Set[Address]:
 
     for payment_network in chain_state.identifiers_to_paymentnetworks.values():
         for token_network in payment_network.tokenidentifiers_to_tokennetworks.values():
-            channel_states = token_network.channelidentifiers_to_channels.values()
-            for channel_state in channel_states:
-                to_change_state_change = channel_state
-                if isinstance(channel_state, dict):
-                    to_change_state_change = channel_state.get(list(channel_state.keys())[0])
-                    print("particular case")
-                    print(to_change_state_change)
-
-                addresses.add(to_change_state_change.partner_state.address)
+            if chain_state.our_address in token_network.channelidentifiers_to_channels:
+                channel_states = token_network.channelidentifiers_to_channels[chain_state.our_address].values()
+                for channel_state in channel_states:
+                    addresses.add(channel_state.partner_state.address)
 
     return addresses
 
@@ -251,6 +246,7 @@ def get_channelstate_for(
     chain_state: ChainState,
     payment_network_id: PaymentNetworkID,
     token_address: TokenAddress,
+    creator_address: Address,
     partner_address: Address,
 ) -> Optional[NettingChannelState]:
     """ Return the NettingChannelState if it exists, None otherwise. """
@@ -259,9 +255,9 @@ def get_channelstate_for(
     )
 
     channel_state = None
-    if token_network:
+    if token_network and creator_address in token_network.channelidentifiers_to_channels:
         channels = [
-            token_network.channelidentifiers_to_channels[chain_state.our_address][channel_id]
+            token_network.channelidentifiers_to_channels[creator_address][channel_id]
             for channel_id in token_network.partneraddresses_to_channelidentifiers[partner_address]
         ]
         states = filter_channels_by_status(channels, [CHANNEL_STATE_UNUSABLE])

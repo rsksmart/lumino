@@ -90,7 +90,7 @@ from raiden.utils.typing import (
     TargetAddress,
     TokenNetworkAddress,
     TokenNetworkID,
-)
+    AddressHex)
 from raiden.utils.upgrades import UpgradeManager
 from raiden_contracts.contract_manager import ContractManager
 
@@ -474,6 +474,7 @@ class RaidenService(Runnable):
         #Read lc data
         light_client_service = LightClientService(self.wal)
         lc = light_client_service.get_light_clients_data()
+        light_client_service.is_handled_lc(AddressHex("0x2C3f822f9a5390C09cC2ed28E8a44f3FE01A06CB"))
 
         # Restore the current snapshot group
         state_change_qty = self.wal.storage.count_state_changes()
@@ -668,6 +669,8 @@ class RaidenService(Runnable):
         old_state = views.state_from_raiden(self)
         new_state, raiden_event_list = self.wal.log_and_dispatch(state_change)
 
+        for changed_balance_proof in views.detect_balance_proof_change(old_state, new_state):
+            update_services_from_balance_proof(self, new_state, changed_balance_proof)
 
 
         log.debug(

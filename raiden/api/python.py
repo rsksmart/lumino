@@ -392,7 +392,7 @@ class RaidenAPI:
         except DuplicatedChannelError:
             log.info("partner opened channel first")
 
-        waiting.wait_for_new_lc_channel(
+        waiting.wait_for_newchannel(
             raiden=self.raiden,
             payment_network_id=registry_address,
             token_address=token_address,
@@ -400,8 +400,16 @@ class RaidenAPI:
             partner_address=partner_address,
             retry_timeout=retry_timeout,
         )
-        exists = views.get_channel_existence_from_network_participants(views.state_from_raiden(self.raiden), registry_address, token_address, creator_address, partner_address)
-        print(exists)
+        chain_state = views.state_from_raiden(self.raiden)
+        channel_state = views.get_channelstate_for(
+            chain_state=chain_state,
+            payment_network_id=registry_address,
+            token_address=token_address,
+            creator_address=creator_address,
+            partner_address=partner_address,
+        )
+        assert channel_state, f"channel {channel_state} is gone"
+        return channel_state.identifier
 
     def channel_open(
         self,
@@ -432,6 +440,7 @@ class RaidenAPI:
             raiden=self.raiden,
             payment_network_id=registry_address,
             token_address=token_address,
+            creator_address=self.address,
             partner_address=partner_address,
             retry_timeout=retry_timeout,
         )
@@ -440,6 +449,7 @@ class RaidenAPI:
             chain_state=chain_state,
             payment_network_id=registry_address,
             token_address=token_address,
+            creator_address=self.address,
             partner_address=partner_address,
         )
         assert channel_state, f"channel {channel_state} is gone"
@@ -561,6 +571,7 @@ class RaidenAPI:
             chain_state=chain_state,
             payment_network_id=registry_address,
             token_address=token_address,
+            creator_address=self.address,
             partner_address=partner_address,
         )
 
@@ -708,6 +719,7 @@ class RaidenAPI:
                 chain_state=views.state_from_raiden(self.raiden),
                 payment_network_id=registry_address,
                 token_address=token_address,
+                creator_address=self.address,
                 partner_address=partner_address,
             )
 
@@ -1215,19 +1227,14 @@ class RaidenAPI:
 
     def _get_channel_identifiers_for_search(self, token_network):
         channels = []
-        channels_objects = token_network.channelidentifiers_to_channels.values()
-        for channel in channels_objects:
-            ##TODO CHANGE ME
-            to_change_state_change = channel
-            if isinstance(channel, dict):
-                to_change_state_change = channel.get(list(channel.keys())[0])
-                print("particular case")
-                print(to_change_state_change)
-            channel_info = {"id": str(to_change_state_change.identifier),
-                            "token_address": to_checksum_address(to_change_state_change.token_address),
-                            "token_network_identifier":to_checksum_address(to_change_state_change.token_network_identifier),
-                            "partner_address": to_checksum_address(to_change_state_change.partner_state.address)}
-            channels.append(channel_info)
+        if self.address in token_network.channelidentifiers_to_channels:
+            channels_objects = token_network.channelidentifiers_to_channels[self.address].values()
+            for channel in channels_objects:
+                channel_info = {"id": str(channel.identifier),
+                                "token_address": to_checksum_address(channel.token_address),
+                                "token_network_identifier": to_checksum_address(channel.token_network_identifier),
+                                "partner_address": to_checksum_address(channel.partner_state.address)}
+                channels.append(channel_info)
 
         return channels
 

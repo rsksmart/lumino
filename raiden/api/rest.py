@@ -641,9 +641,16 @@ class RestAPI:
         except RawTransactionFailed as e1:
             return ApiErrorBuilder.build_error(errors=str(e1), status_code=HTTPStatus.BAD_REQUEST, log=log)
 
+        channel_state = views.get_channelstate_for(
+            views.state_from_raiden(self.raiden_api.raiden),
+            registry_address,
+            token_address,
+            creator_address,
+            partner_address,
+        )
 
-        return api_response(result="hola", status_code=HTTPStatus.FAILED_DEPENDENCY)
-
+        result = self.channel_schema.dump(channel_state)
+        return api_response(result=result.data, status_code=HTTPStatus.CREATED)
 
 
     def open(
@@ -713,6 +720,7 @@ class RestAPI:
             views.state_from_raiden(self.raiden_api.raiden),
             registry_address,
             token_address,
+            self.raiden_api.address,
             partner_address,
         )
 
