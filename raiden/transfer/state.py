@@ -16,7 +16,7 @@ from raiden.transfer.identifiers import CanonicalIdentifier, QueueIdentifier
 from raiden.transfer.merkle_tree import merkleroot
 from raiden.transfer.utils import hash_balance_data, pseudo_random_generator_from_json
 from raiden.utils import lpex, pex, serialization, sha3
-from raiden.utils.serialization import map_dict, map_list, serialize_bytes
+from raiden.utils.serialization import map_dict, map_list, serialize_bytes, map_matrix
 from raiden.utils.typing import (
     AdditionalHash,
     Address,
@@ -506,9 +506,10 @@ class TokenNetworkState(State):
             "address": to_checksum_address(self.address),
             "token_address": to_checksum_address(self.token_address),
             "network_graph": self.network_graph,
-            "channelidentifiers_to_channels": map_dict(
+            "channelidentifiers_to_channels": map_matrix(
                 str,  # keys in json can only be strings
                 serialization.identity,
+                serialization.checksum_address,
                 self.channelidentifiers_to_channels,
             ),
             "partneraddresses_to_channelidentifiers": map_dict(
@@ -526,9 +527,10 @@ class TokenNetworkState(State):
         )
         restored.network_graph = data["network_graph"]
 
-        restored.channelidentifiers_to_channels = map_dict(
+        restored.channelidentifiers_to_channels = map_matrix(
             serialization.deserialize_channel_id,
             serialization.identity,
+            to_canonical_address,
             data["channelidentifiers_to_channels"]
         )
 

@@ -991,8 +991,8 @@ class SerializedSQLiteStorage(SQLiteStorage):
         return super().write_state_change(serialized_data, log_time)
 
     def write_state_snapshot(self, statechange_id, snapshot):
-        print("TODO VOLVER A HACERLO")
-
+        serialized_data = self.serializer.serialize(snapshot)
+        return super().write_state_snapshot(statechange_id, serialized_data)
 
     def write_events(self, state_change_identifier, events, log_time):
         """ Save events.

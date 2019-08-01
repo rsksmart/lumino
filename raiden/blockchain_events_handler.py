@@ -1,11 +1,15 @@
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, List
 
 import gevent
 import structlog
+from eth.utils.hexadecimal import encode_hex
+from eth_utils import to_canonical_address, to_checksum_address
 
 from raiden.blockchain.events import Event
 from raiden.blockchain.state import get_channel_state
 from raiden.connection_manager import ConnectionManager
+from raiden.lightclient.client_model import ClientModel
+from raiden.lightclient.light_client_service import LightClientService
 from raiden.network.proxies.utils import get_onchain_locksroots
 from raiden.transfer import views
 from raiden.transfer.architecture import StateChange
@@ -33,6 +37,8 @@ from raiden_contracts.constants import (
     EVENT_TOKEN_NETWORK_CREATED,
     ChannelEvent,
 )
+
+from raiden.utils.typing import AddressHex
 
 if TYPE_CHECKING:
     # pylint: disable=unused-import
@@ -84,8 +90,11 @@ def handle_channel_new(raiden: "RaidenService", event: Event):
     participant2 = args["participant2"]
     is_participant = raiden.address in (participant1, participant2)
 
-    # Raiden node is participant TODO or one of the participants is a handled light client.
-    if is_participant or True:
+    # Check if at least one of the implied participants is a LC handled by the node
+    is_participant1_handled_lc = LightClientService.is_handled_lc(to_checksum_address(encode_hex(participant1)), raiden.wal)
+    is_participant2_handled_lc = LightClientService.is_handled_lc(to_checksum_address(encode_hex(participant2)), raiden.wal)
+
+    if is_participant or is_participant1_handled_lc or is_participant2_handled_lc:
         channel_proxy = raiden.chain.payment_channel(
             canonical_identifier=CanonicalIdentifier(
                 chain_identifier=views.state_from_raiden(raiden).chain_id,
@@ -116,7 +125,7 @@ def handle_channel_new(raiden: "RaidenService", event: Event):
         if ConnectionManager.BOOTSTRAP_ADDR != partner_address:
             raiden.start_health_check_for(partner_address)
 
-    # Raiden node is not participant of channel
+    # Raiden node is not participant of channel. Lc are not participants
     else:
         new_route = ContractReceiveRouteNew(
             transaction_hash=transaction_hash,
