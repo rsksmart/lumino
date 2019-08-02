@@ -36,7 +36,8 @@ from raiden.exceptions import (
     RaidenRecoverableError,
     TokenNotRegistered,
     UnknownTokenAddress,
-)
+    UnhandledLightClient)
+from raiden.lightclient.light_client_service import LightClientService
 from raiden.messages import RequestMonitoring
 from raiden.settings import DEFAULT_RETRY_TIMEOUT, DEVELOPMENT_CONTRACT_VERSION
 from raiden.transfer import architecture, views
@@ -385,9 +386,18 @@ class RaidenAPI:
         token_network = ChannelValidator.can_open_channel(registry_address, token_address, creator_address, partner_address, settle_timeout, self.raiden)
 
         try:
-            token_network.new_netting_channel_light(creator_address, partner_address, signed_tx, settle_timeout,
-                                                    given_block_identifier=views.state_from_raiden(
-                                                        self.raiden).block_hash)
+            is_participant1_handled_lc = LightClientService.is_handled_lc(to_checksum_address(creator_address),
+                                                                          self.raiden.wal)
+            is_participant2_handled_lc = LightClientService.is_handled_lc(to_checksum_address(partner_address),
+                                                                          self.raiden.wal)
+            if is_participant1_handled_lc or is_participant2_handled_lc:
+                token_network.new_netting_channel_light(creator_address, partner_address, signed_tx, settle_timeout,
+                                                        given_block_identifier=views.state_from_raiden(
+                                                            self.raiden).block_hash)
+            else:
+                raise UnhandledLightClient("Rejecting channel creation. Light Client isnt registered")
+
+
 
         except DuplicatedChannelError:
             log.info("partner opened channel first")

@@ -97,7 +97,7 @@ from raiden.exceptions import (
     TokenNotRegistered,
     TransactionThrew,
     UnknownTokenAddress,
-    RawTransactionFailed)
+    RawTransactionFailed, UnhandledLightClient)
 from raiden.transfer import channel, views
 from raiden.transfer.events import (
     EventPaymentReceivedSuccess,
@@ -636,6 +636,7 @@ class RestAPI:
             AddressWithoutCode,
             DuplicatedChannelError,
             TokenNotRegistered,
+            UnhandledLightClient
         ) as e:
             return ApiErrorBuilder.build_error(errors=str(e), status_code=HTTPStatus.CONFLICT, log=log)
         except RawTransactionFailed as e1:
