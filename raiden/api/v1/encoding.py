@@ -75,9 +75,24 @@ class AddressRnsField(fields.Field):
 
     def _deserialize(self, value, attr, data):
         if not is_rns_address(value):
-            self.fail('missing_dot')
+            deserialize_address_helper(self, value, attr, data)
 
         return value
+
+
+def deserialize_address_helper(self, value, attr, data):  # pylint: disable=unused-argument
+    if not is_0x_prefixed(value):
+        self.fail("missing_prefix")
+
+    if not is_checksum_address(value):
+        self.fail("invalid_checksum")
+    try:
+        value = to_canonical_address(value)
+    except ValueError:
+        self.fail("invalid_data")
+    if len(value) != 20:
+        self.fail("invalid_size")
+    return value
 
 
 class AddressField(fields.Field):
@@ -93,21 +108,7 @@ class AddressField(fields.Field):
         return to_checksum_address(value)
 
     def _deserialize(self, value, attr, data):  # pylint: disable=unused-argument
-        if not is_0x_prefixed(value):
-            self.fail("missing_prefix")
-
-        if not is_checksum_address(value):
-            self.fail("invalid_checksum")
-
-        try:
-            value = to_canonical_address(value)
-        except ValueError:
-            self.fail("invalid_data")
-
-        if len(value) != 20:
-            self.fail("invalid_size")
-
-        return value
+        return deserialize_address_helper(self, value, attr, data)
 
 
 class DataField(fields.Field):
@@ -345,7 +346,7 @@ class ChannelPutSchema(BaseSchema):
 
 class ChannelPutLuminoSchema(BaseSchema):
     token_address = AddressField(required=True)
-    partner_rns_address = AddressRnsField(required=True)
+    partner_address = AddressRnsField(required=True)
     settle_timeout = fields.Integer(missing=None)
     total_deposit = fields.Integer(default=None, missing=None)
 
