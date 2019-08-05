@@ -36,6 +36,8 @@ class MessageHandler:
     def on_message(self, raiden: RaidenService, message: Message) -> None:
         # pylint: disable=unidiomatic-typecheck
 
+        print(message.to_dict())
+
         if type(message) == SecretRequest:
             assert isinstance(message, SecretRequest), MYPY_ANNOTATION
             self.handle_message_secretrequest(raiden, message)

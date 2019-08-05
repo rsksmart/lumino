@@ -176,8 +176,33 @@ class SQLiteStorage:
     def write_invoice(self, invoice_data):
         with self.write_lock, self.conn:
             cursor = self.conn.execute(
-                "INSERT INTO invoices(identifier, type, status, expiration_date, encode, payment_hash) VALUES(null, ?, ?, ?, ?, ?)",
-                (invoice_data['type'], invoice_data['status'], invoice_data['expiration_date'], invoice_data['encode'], invoice_data['payment_hash']),
+                "INSERT INTO invoices("
+                "identifier, "
+                "type, "
+                "status, "
+                "expiration_date, "
+                "encode, "
+                "payment_hash, "
+                "secret, "
+                "currency, "
+                "amount, "
+                "description, "
+                "target_address, "
+                "token_address, "            
+                "created_at)"
+                "VALUES(null, ?, ?, ?, ?, ?, ?, ?, ?, ? ,?, ?, ?)",
+                (invoice_data['type'],
+                 invoice_data['status'],
+                 invoice_data['expiration_date'],
+                 invoice_data['encode'],
+                 invoice_data['payment_hash'],
+                 invoice_data['secret'],
+                 invoice_data['currency'],
+                 invoice_data['amount'],
+                 invoice_data['description'],
+                 invoice_data['target_address'],
+                 invoice_data['token_address'],
+                 invoice_data['created_at'],),
             )
             last_id = cursor.lastrowid
 

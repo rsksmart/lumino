@@ -62,7 +62,6 @@ if TYPE_CHECKING:
 
 log = structlog.get_logger(__name__)  # pylint: disable=invalid-name
 UNEVENTFUL_EVENTS = (
-    EventPaymentReceivedSuccess,
     EventUnlockSuccess,
     EventUnlockClaimFailed,
     EventUnlockClaimSuccess,
@@ -173,6 +172,7 @@ class RaidenEventHandler(EventHandler):
 
     @staticmethod
     def handle_send_balanceproof(raiden: "RaidenService", balance_proof_event: SendBalanceProof):
+        # print("No se manda Balance proof")
         unlock_message = message_from_sendevent(balance_proof_event)
         raiden.sign(unlock_message)
         raiden.transport.send_async(balance_proof_event.queue_identifier, unlock_message)

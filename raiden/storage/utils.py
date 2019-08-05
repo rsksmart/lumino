@@ -63,7 +63,8 @@ CREATE TABLE IF NOT EXISTS invoices (
     status INTEGER,
     expiration_date TEXT,
     encode TEXT,
-    payment_hash TEXT
+    payment_hash TEXT,
+    secret  TEXT
 );
 """
 

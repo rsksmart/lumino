@@ -3,6 +3,8 @@ import calendar
 from dateutil.relativedelta import relativedelta
 from dateutil import parser
 
+UTC_FORMAT = '%Y-%m-%dT%H:%M:%SZ'
+
 
 def get_utc_unix_time():
     utc_date_time = datetime.utcnow()
@@ -11,6 +13,9 @@ def get_utc_unix_time():
 
 
 def get_utc_expiration_time(expiration):
+    # expires_at = datetime.utcnow() + relativedelta(seconds=expiration)
+    # expires_at_iso_format = expires_at.strftime(UTC_FORMAT)
+    # return expires_at_iso_format
     expires_at = datetime.utcnow() + relativedelta(seconds=expiration)
     expires_at_iso_format = expires_at.isoformat()
     return expires_at_iso_format

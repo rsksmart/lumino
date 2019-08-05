@@ -123,7 +123,7 @@ from raiden.billing.invoices.constants.invoice_status import InvoiceStatus
 from raiden.billing.invoices.decoder.lumino_decoder import get_tags_dict, get_unknown_tags_dict
 
 from dateutil.relativedelta import relativedelta
-from raiden.billing.invoices.util.time_util import is_invoice_expired
+from raiden.billing.invoices.util.time_util import is_invoice_expired, UTC_FORMAT
 
 log = structlog.get_logger(__name__)
 
@@ -1394,12 +1394,19 @@ class RestAPI:
             expiration_date = datetime.utcfromtimestamp(invoice_decoded.date) \
                               + relativedelta(seconds=tags_dict['expires'])
 
-            data = {"invoice_type": InvoiceType.RECEIVED.value,
-                    "invoice_status": InvoiceStatus.PENDING.value,
+            data = {"type": InvoiceType.RECEIVED.value,
+                    "status": InvoiceStatus.PENDING.value,
                     "already_coded_invoice" : True,
                     "payment_hash" : encode_hex(invoice_decoded.paymenthash),
                     "encode" : coded_invoice,
-                    "expiration_date" : expiration_date.isoformat()
+                    "expiration_date" :  expiration_date.isoformat(),
+                    "secret" : 'test',
+                    "currency" : invoice_decoded.currency,
+                    "amount" : str(invoice_decoded.amount),
+                    "description" : tags_dict['description'],
+                    "target_address" : encode_hex(unknown_tags_dict['target_address'].bytes),
+                    "token_address" : encode_hex(unknown_tags_dict['token_address'].bytes) ,
+                    "created_at": datetime.utcfromtimestamp(invoice_decoded.date).strftime(UTC_FORMAT)
                     }
 
             # currency_symbol, token_address, partner_address, amount, description

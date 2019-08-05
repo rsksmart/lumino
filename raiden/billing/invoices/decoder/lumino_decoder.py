@@ -215,6 +215,8 @@ def get_tags_dict(tags):
         value = tags[1]
         if key == 'x':
             tags_dict['expires'] = value
+        elif key == 'd':
+            tags_dict['description'] = value
 
     return tags_dict
 
