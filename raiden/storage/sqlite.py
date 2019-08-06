@@ -74,7 +74,7 @@ class SQLiteStorage:
         # https://sqlite.org/atomiccommit.html#_exclusive_access_mode
         # https://sqlite.org/pragma.html#pragma_locking_mode
 
-        conn.execute("PRAGMA locking_mode=EXCLUSIVE")
+        conn.execute("PRAGMA locking_mode=NORMAL")
 
         # Keep the journal around and skip inode updates.
         # References:
@@ -240,8 +240,20 @@ class SQLiteStorage:
 
         cursor.execute(
             """
-            SELECT identifier, type, status, expiration_date, encode, payment_hash
-                FROM invoices WHERE payment_hash = ?;
+            SELECT 
+                identifier, 
+                type, 
+                status, 
+                expiration_date, 
+                encode, 
+                payment_hash, 
+                secret, 
+                currency, 
+                amount, 
+                description, 
+                target_address, 
+                token_address
+            FROM invoices WHERE payment_hash = ?;
             """,
             (payment_hash,)
         )
@@ -254,7 +266,13 @@ class SQLiteStorage:
                             "status": invoice[2],
                             "expiration_date": invoice[3],
                             "encode": invoice[4],
-                            "payment_hash": invoice[5]}
+                            "payment_hash": invoice[5],
+                            "secret": invoice[6],
+                            "currency": invoice[7],
+                            "amount": invoice[8],
+                            "description": invoice[9],
+                            "target_address": invoice[10],
+                            "token_address": invoice[11]}
 
         return invoice_dict
 

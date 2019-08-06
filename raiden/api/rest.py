@@ -9,7 +9,7 @@ from typing import Dict
 import gevent
 import gevent.pool
 import structlog
-from eth_utils import encode_hex, to_checksum_address
+from eth_utils import encode_hex, decode_hex, to_checksum_address
 from flask import Flask, make_response, send_from_directory, url_for, request
 
 from flask_restful import Api, abort
@@ -1379,25 +1379,27 @@ class RestAPI:
 
     def initiate_payment_with_invoice(self, registry_address: typing.PaymentNetworkID, coded_invoice):
 
-        invoice_decoded = self.raiden_api.decode_invoice(registry_address, coded_invoice)
+        invoice_decoded = self.raiden_api.decode_invoice(coded_invoice)
 
         persistent_invoice = self.raiden_api.get_invoice(encode_hex(invoice_decoded.paymenthash))
 
         tags_dict = get_tags_dict(invoice_decoded.tags)
         unknown_tags_dict = get_unknown_tags_dict(invoice_decoded.unknown_tags)
-        wei_amount = Web3.toWei(invoice_decoded.amount, 'ether')
 
         if persistent_invoice is None:
             expiration_date = datetime.utcfromtimestamp(invoice_decoded.date) \
                               + relativedelta(seconds=tags_dict['expires'])
 
+            # When the invoice is received and the node don't have it saved,
+            # then the secret is not generated
+            # Look this when the payment protocol has changed TODO
             data = {"type": InvoiceType.RECEIVED.value,
                     "status": InvoiceStatus.PENDING.value,
                     "already_coded_invoice" : True,
                     "payment_hash" : encode_hex(invoice_decoded.paymenthash),
                     "encode" : coded_invoice,
                     "expiration_date" : expiration_date.isoformat(),
-                    "secret" : 'test',
+                    "secret" : None,
                     "currency" : invoice_decoded.currency,
                     "amount" : str(invoice_decoded.amount),
                     "description" : tags_dict['description'],
@@ -1411,12 +1413,12 @@ class RestAPI:
             new_invoice = self.raiden_api.create_invoice(data)
 
             if new_invoice is not None:
-                result = self.make_payment_with_invoice(registry_address, unknown_tags_dict, wei_amount, invoice_decoded)
+                result = self.make_payment_with_invoice(registry_address, new_invoice)
 
         elif persistent_invoice["status"] == InvoiceStatus.PENDING.value and \
                 not is_invoice_expired(persistent_invoice["expiration_date"]):
 
-            result = self.make_payment_with_invoice(registry_address, unknown_tags_dict, wei_amount, invoice_decoded)
+            result = self.make_payment_with_invoice(registry_address, persistent_invoice)
         elif persistent_invoice["status"] == InvoiceStatus.PAID.value:
             return api_error(
                 errors=INVOICE_PAID,
@@ -1435,19 +1437,20 @@ class RestAPI:
 
         return result
 
-    def make_payment_with_invoice(self, registry_address, unknown_tags_dict, wei_amount, invoice_decoded):
+    def make_payment_with_invoice(self, registry_address, invoice):
+        wei_amount = Web3.toWei(invoice['amount'], 'ether')
         # We make payment with data of invoice
         result = self.initiate_payment(registry_address,
-                                       to_canonical_address("0x" + unknown_tags_dict['token_address'].hex),
-                                       to_canonical_address("0x" + unknown_tags_dict['target_address'].hex),
+                                       to_canonical_address(invoice['token_address']),
+                                       to_canonical_address(invoice['target_address']),
                                        wei_amount,
                                        None,
                                        None,
                                        None,
-                                       invoice_decoded.paymenthash)
+                                       decode_hex(invoice['payment_hash']))
         if result.status_code == HTTPStatus.OK:
             data = {"status": InvoiceStatus.PAID.value,
-                    "payment_hash": encode_hex(invoice_decoded.paymenthash)}
+                    "payment_hash": invoice['payment_hash']}
             self.raiden_api.update_invoice(data)
 
         return result

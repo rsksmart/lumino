@@ -1056,7 +1056,7 @@ class RaidenAPI:
         invoice = self.raiden.wal.storage.query_invoice(payment_hash)
         return invoice
 
-    def decode_invoice(self, registry_address, coded_invoice):
+    def decode_invoice(self, coded_invoice):
         return decode_lumino_invoice(coded_invoice)
 
     def get_blockchain_events_network(
