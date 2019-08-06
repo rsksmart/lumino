@@ -74,8 +74,7 @@ class SQLiteStorage:
         # https://sqlite.org/atomiccommit.html#_exclusive_access_mode
         # https://sqlite.org/pragma.html#pragma_locking_mode
 
-        # conn.execute("PRAGMA locking_mode=EXCLUSIVE")
-        conn.execute("PRAGMA locking_mode=NORMAL")
+        conn.execute("PRAGMA locking_mode=EXCLUSIVE")
 
         # Keep the journal around and skip inode updates.
         # References:

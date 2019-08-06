@@ -1,6 +1,7 @@
 from raiden.billing.invoices.util.bech32 import bech32_decode, CHARSET, bech32_encode
 from raiden.billing.invoices.util.encoding_util import u5_to_bitarray, base58_prefix_map, bitarray_to_u5
-from raiden.billing.invoices.lumino_invoice import LuminoInvoice
+from raiden.billing.invoices.invoice import Invoice
+from raiden.billing.invoices.constants.errors import BAD_BECH32_CHECKSUM, PREFIX_ERROR, SIGNATURE_LENGTH, INVALID_SIGNATURE
 
 import bitstring
 import re
@@ -14,28 +15,28 @@ from binascii import hexlify
 def decode_lumino_invoice(coded_invoice, verbose=True):
     hrp, data = bech32_decode(coded_invoice)
     if not hrp:
-        raise ValueError("Bad bech32 checksum")
+        raise ValueError(BAD_BECH32_CHECKSUM)
 
     # BOLT #11:
     #
     # A reader MUST fail if it does not understand the `prefix`.
     if not hrp.startswith('lm'):
-        raise ValueError("Does not start with ln")
+        raise ValueError(PREFIX_ERROR)
 
     data = u5_to_bitarray(data);
 
     # Final signature 65 bytes, split it off.
     if len(data) < 65 * 8:
-        raise ValueError("Too short to contain signature")
+        raise ValueError(SIGNATURE_LENGTH)
     sigdecoded = data[-65 * 8:].tobytes()
     data = bitstring.ConstBitStream(data[:-65 * 8])
 
-    lumino_invoice = LuminoInvoice()
-    lumino_invoice.pubkey = None
+    invoice = Invoice()
+    invoice.pubkey = None
 
     m = re.search("[^\d]+", hrp[2:])
     if m:
-        lumino_invoice.currency = m.group(0)
+        invoice.currency = m.group(0)
         amountstr = hrp[2 + m.end():]
         # BOLT #11:
         #
@@ -43,9 +44,9 @@ def decode_lumino_invoice(coded_invoice, verbose=True):
         # multiply `amount` by the `multiplier` value (if any) to derive the
         # amount required for payment.
         if amountstr != '':
-            lumino_invoice.amount = unshorten_amount(amountstr)
+            invoice.amount = unshorten_amount(amountstr)
 
-    lumino_invoice.date = data.read(35).uint
+    invoice.date = data.read(35).uint
 
     while data.pos != data.len:
         tag, tagdata, data = pull_tagged(data)
@@ -76,42 +77,42 @@ def decode_lumino_invoice(coded_invoice, verbose=True):
                               s.read(32).intbe,
                               s.read(32).intbe,
                               s.read(16).intbe))
-            lumino_invoice.tags.append(('r', route))
+            invoice.tags.append(('r', route))
         elif tag == 'f':
-            fallback = parse_fallback(tagdata, lumino_invoice.currency)
+            fallback = parse_fallback(tagdata, invoice.currency)
             if fallback:
-                lumino_invoice.tags.append(('f', fallback))
+                invoice.tags.append(('f', fallback))
             else:
                 # Incorrect version.
-                lumino_invoice.unknown_tags.append((tag, tagdata))
+                invoice.unknown_tags.append((tag, tagdata))
                 continue
 
         elif tag == 'd':
-            lumino_invoice.tags.append(('d', trim_to_bytes(tagdata).decode('utf-8')))
+            invoice.tags.append(('d', trim_to_bytes(tagdata).decode('utf-8')))
 
         elif tag == 'h':
             if data_length != 52:
-                lumino_invoice.unknown_tags.append((tag, tagdata))
+                invoice.unknown_tags.append((tag, tagdata))
                 continue
-            lumino_invoice.tags.append(('h', trim_to_bytes(tagdata)))
+            invoice.tags.append(('h', trim_to_bytes(tagdata)))
 
         elif tag == 'x':
-            lumino_invoice.tags.append(('x', tagdata.uint))
+            invoice.tags.append(('x', tagdata.uint))
 
         elif tag == 'p':
             if data_length != 52:
-                lumino_invoice.unknown_tags.append((tag, tagdata))
+                invoice.unknown_tags.append((tag, tagdata))
                 continue
-            lumino_invoice.paymenthash = trim_to_bytes(tagdata)
+            invoice.paymenthash = trim_to_bytes(tagdata)
 
         elif tag == 'n':
             if data_length != 53:
-                lumino_invoice.unknown_tags.append((tag, tagdata))
+                invoice.unknown_tags.append((tag, tagdata))
                 continue
-            lumino_invoice.pubkey = secp256k1.PublicKey(flags=secp256k1.ALL_FLAGS)
-            lumino_invoice.pubkey.deserialize(trim_to_bytes(tagdata))
+            invoice.pubkey = secp256k1.PublicKey(flags=secp256k1.ALL_FLAGS)
+            invoice.pubkey.deserialize(trim_to_bytes(tagdata))
         else:
-            lumino_invoice.unknown_tags.append((tag, tagdata))
+            invoice.unknown_tags.append((tag, tagdata))
 
     if verbose:
         print('hex of signature data (32 byte r, 32 byte s): {}'
@@ -127,22 +128,22 @@ def decode_lumino_invoice(coded_invoice, verbose=True):
     #
     # A reader MUST check that the `signature` is valid (see the `n` tagged
     # field specified below).
-    if lumino_invoice.pubkey:  # Specified by `n`
+    if invoice.pubkey:  # Specified by `n`
         # BOLT #11:
         #
         # A reader MUST use the `n` field to validate the signature instead of
         # performing signature recovery if a valid `n` field is provided.
-        lumino_invoice.signature = lumino_invoice.pubkey.ecdsa_deserialize_compact(sigdecoded[0:64])
-        if not lumino_invoice.pubkey.ecdsa_verify(bytearray([ord(c) for c in hrp]) + data.tobytes(), lumino_invoice.signature):
-            raise ValueError('Invalid signature')
+        invoice.signature = invoice.pubkey.ecdsa_deserialize_compact(sigdecoded[0:64])
+        if not invoice.pubkey.ecdsa_verify(bytearray([ord(c) for c in hrp]) + data.tobytes(), invoice.signature):
+            raise ValueError(INVALID_SIGNATURE)
     else:  # Recover pubkey from signature.
-        lumino_invoice.pubkey = secp256k1.PublicKey(flags=secp256k1.ALL_FLAGS)
-        lumino_invoice.signature = lumino_invoice.pubkey.ecdsa_recoverable_deserialize(
+        invoice.pubkey = secp256k1.PublicKey(flags=secp256k1.ALL_FLAGS)
+        invoice.signature = invoice.pubkey.ecdsa_recoverable_deserialize(
             sigdecoded[0:64], sigdecoded[64])
-        lumino_invoice.pubkey.public_key = lumino_invoice.pubkey.ecdsa_recover(
-            bytearray([ord(c) for c in hrp]) + data.tobytes(), lumino_invoice.signature)
+        invoice.pubkey.public_key = invoice.pubkey.ecdsa_recover(
+            bytearray([ord(c) for c in hrp]) + data.tobytes(), invoice.signature)
 
-    return lumino_invoice
+    return invoice
 
 
 def unshorten_amount(amount):

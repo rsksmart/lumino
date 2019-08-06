@@ -13,9 +13,6 @@ def get_utc_unix_time():
 
 
 def get_utc_expiration_time(expiration):
-    # expires_at = datetime.utcnow() + relativedelta(seconds=expiration)
-    # expires_at_iso_format = expires_at.strftime(UTC_FORMAT)
-    # return expires_at_iso_format
     expires_at = datetime.utcnow() + relativedelta(seconds=expiration)
     expires_at_iso_format = expires_at.isoformat()
     return expires_at_iso_format

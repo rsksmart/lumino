@@ -87,8 +87,8 @@ from raiden.utils.rns import is_rns_address
 
 from raiden.billing.invoices.options_args import OptionsArgs
 from raiden.billing.invoices.util.time_util import get_utc_unix_time, get_utc_expiration_time, UTC_FORMAT
-from raiden.billing.invoices.encoder.lumino_encoder import parse_options, encode_invoice
-from raiden.billing.invoices.decoder.lumino_decoder import decode_lumino_invoice, get_tags_dict
+from raiden.billing.invoices.encoder.invoice_encoder import parse_options, encode_invoice
+from raiden.billing.invoices.decoder.invoice_decoder import decode_lumino_invoice, get_tags_dict
 from raiden.utils import random_secret, sha3
 
 log = structlog.get_logger(__name__)  # pylint: disable=invalid-name
@@ -1255,7 +1255,7 @@ class RaidenAPI:
 
         description = data['description']
         description_hashed = None
-        expires = 3600
+        expires = data['expires']
         route = []
         beneficiary = "0x" + data['partner_address'].hex()
         token = "0x" + data['token_address'].hex()

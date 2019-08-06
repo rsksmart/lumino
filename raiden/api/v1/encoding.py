@@ -417,6 +417,7 @@ class InvoiceCreateSchema(BaseSchema):
     token_address = AddressField(required=True)
     partner_address = AddressField(required=True)
     amount = fields.Integer(default=None, missing=None)
+    expires = fields.Integer(default=None, missing=None)
 
     class Meta:
         strict = True

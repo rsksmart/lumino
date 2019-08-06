@@ -68,7 +68,7 @@ from raiden.api.v1.resources import (
     SearchLuminoResource,
     TokenActionResource,
     InvoiceResource,
-    PaymentInvoiceResourceLumino)
+    PaymentInvoiceResource)
 
 from raiden.constants import GENESIS_BLOCK_NUMBER, UINT256_MAX, Environment
 
@@ -120,10 +120,11 @@ from eth_utils import (
 
 from raiden.billing.invoices.constants.invoice_type import InvoiceType
 from raiden.billing.invoices.constants.invoice_status import InvoiceStatus
-from raiden.billing.invoices.decoder.lumino_decoder import get_tags_dict, get_unknown_tags_dict
+from raiden.billing.invoices.decoder.invoice_decoder import get_tags_dict, get_unknown_tags_dict
 
 from dateutil.relativedelta import relativedelta
 from raiden.billing.invoices.util.time_util import is_invoice_expired, UTC_FORMAT
+from raiden.billing.invoices.constants.errors import AUTO_PAY_INVOICE, INVOICE_EXPIRED, INVOICE_PAID
 
 log = structlog.get_logger(__name__)
 
@@ -147,7 +148,7 @@ URLS_V1 = [
     ),
     ("/connections/<hexaddress:token_address>", ConnectionsResource),
     ("/connections", ConnectionsInfoResource),
-    ("/paymentsLumino/invoice", PaymentInvoiceResourceLumino),
+    ("/payments/invoice", PaymentInvoiceResource),
     ("/payments", PaymentResource),
     ("/payments/<luminoaddress:token_address>", PaymentResource, "token_paymentresource"),
     (
@@ -1376,10 +1377,7 @@ class RestAPI:
         result = self.partner_per_token_list_schema.dump(schema_list)
         return api_response(result=result.data)
 
-    def initiate_payment_with_invoice(
-        self,
-        registry_address: typing.PaymentNetworkID,
-        coded_invoice):
+    def initiate_payment_with_invoice(self, registry_address: typing.PaymentNetworkID, coded_invoice):
 
         invoice_decoded = self.raiden_api.decode_invoice(registry_address, coded_invoice)
 
@@ -1398,14 +1396,15 @@ class RestAPI:
                     "already_coded_invoice" : True,
                     "payment_hash" : encode_hex(invoice_decoded.paymenthash),
                     "encode" : coded_invoice,
-                    "expiration_date" :  expiration_date.isoformat(),
+                    "expiration_date" : expiration_date.isoformat(),
                     "secret" : 'test',
                     "currency" : invoice_decoded.currency,
                     "amount" : str(invoice_decoded.amount),
                     "description" : tags_dict['description'],
                     "target_address" : encode_hex(unknown_tags_dict['target_address'].bytes),
                     "token_address" : encode_hex(unknown_tags_dict['token_address'].bytes) ,
-                    "created_at": datetime.utcfromtimestamp(invoice_decoded.date).strftime(UTC_FORMAT)
+                    "created_at": datetime.utcfromtimestamp(invoice_decoded.date).strftime(UTC_FORMAT),
+                    "expires": tags_dict['expires']
                     }
 
             # currency_symbol, token_address, partner_address, amount, description
@@ -1420,20 +1419,17 @@ class RestAPI:
             result = self.make_payment_with_invoice(registry_address, unknown_tags_dict, wei_amount, invoice_decoded)
         elif persistent_invoice["status"] == InvoiceStatus.PAID.value:
             return api_error(
-                errors="Payment couldn't be completed "
-                       "(The invoice you are trying to pay has already been paid).",
+                errors=INVOICE_PAID,
                 status_code=HTTPStatus.CONFLICT,
             )
         elif is_invoice_expired(persistent_invoice["expiration_date"]):
             return api_error(
-                errors="Payment couldn't be completed "
-                       "(The invoice has expired).",
+                errors=INVOICE_EXPIRED,
                 status_code=HTTPStatus.CONFLICT,
             )
         else:
             return api_error(
-                errors="Payment couldn't be completed "
-                       "(You can not autopay an invoice).",
+                errors=AUTO_PAY_INVOICE,
                 status_code=HTTPStatus.CONFLICT,
             )
 
@@ -1739,7 +1735,8 @@ class RestAPI:
                        token_address,
                        partner_address,
                        amount,
-                       description):
+                       description,
+                       expires):
 
         if amount and amount < 0:
             return api_error(
@@ -1753,7 +1750,8 @@ class RestAPI:
                 "description" : description,
                 "invoice_type": InvoiceType.ISSUED.value,
                 "invoice_status": InvoiceStatus.PENDING.value,
-                "already_coded_invoice" : False}
+                "already_coded_invoice" : False,
+                "expires" : expires}
 
         invoice = self.raiden_api.create_invoice(data)
 

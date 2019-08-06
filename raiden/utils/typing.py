@@ -108,6 +108,9 @@ PaymentAmount = NewType("PaymentAmount", T_PaymentAmount)
 T_InvoiceAmount = int
 InvoiceAmount = NewType("InvoiceAmount", T_InvoiceAmount)
 
+T_Invoice_Expires = int
+InvoiceExpires = NewType("InvoiceExpires", T_Invoice_Expires)
+
 T_PrivateKey = bytes
 PrivateKey = NewType("PrivateKey", T_PrivateKey)
 

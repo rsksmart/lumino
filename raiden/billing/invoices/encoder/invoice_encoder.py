@@ -1,7 +1,7 @@
 from decimal import Decimal
 from raiden.billing.invoices.util.bech32 import CHARSET, bech32_encode, bech32_decode
 from binascii import unhexlify
-from raiden.billing.invoices.lumino_invoice import LuminoInvoice
+from raiden.billing.invoices.invoice import Invoice
 from raiden.billing.invoices.util.encoding_util import u5_to_bitarray, base58_prefix_map, bitarray_to_u5
 from eth_utils import decode_hex
 
@@ -14,31 +14,31 @@ import base58
 def parse_options(options):
     """ Convert options into Lumino Invoice and pass it to the encoder
        """
-    lumino_invoice = LuminoInvoice()
-    lumino_invoice.currency = options.currency
-    lumino_invoice.fallback = options.fallback if options.fallback else None
+    invoice = Invoice()
+    invoice.currency = options.currency
+    invoice.fallback = options.fallback if options.fallback else None
     if options.amount:
-        lumino_invoice.amount = options.amount
+        invoice.amount = options.amount
     if options.timestamp:
-        lumino_invoice.date = int(options.timestamp)
+        invoice.date = int(options.timestamp)
 
-    lumino_invoice.paymenthash = decode_hex(options.paymenthash)
+    invoice.paymenthash = decode_hex(options.paymenthash)
 
     if options.description:
-        lumino_invoice.tags.append(('d', options.description))
+        invoice.tags.append(('d', options.description))
     if options.description_hashed:
-        lumino_invoice.tags.append(('h', options.description_hashed))
+        invoice.tags.append(('h', options.description_hashed))
     if options.expires:
-        lumino_invoice.tags.append(('x', options.expires))
+        invoice.tags.append(('x', options.expires))
 
     if options.fallback:
-        lumino_invoice.tags.append(('f', options.fallback))
+        invoice.tags.append(('f', options.fallback))
 
     if options.beneficiary:
-        lumino_invoice.tags.append(('n', options.beneficiary))
+        invoice.tags.append(('n', options.beneficiary))
 
     if options.token:
-        lumino_invoice.tags.append(('t', options.token))
+        invoice.tags.append(('t', options.token))
 
     for r in options.route:
         print("R " + r)
@@ -52,9 +52,9 @@ def parse_options(options):
                           int(splits[4])))
             splits = splits[5:]
         assert (len(splits) == 0)
-        lumino_invoice.tags.append(('r', route))
+        invoice.tags.append(('r', route))
 
-    return lumino_invoice
+    return invoice
 
 
 def encode_invoice(addr, privkey):

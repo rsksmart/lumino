@@ -57,15 +57,26 @@ CREATE TABLE IF NOT EXISTS token_action (
 """
 
 DB_CREATE_INVOICES = """
-CREATE TABLE IF NOT EXISTS invoices (
-    identifier INTEGER constraint invoices_pk PRIMARY KEY AUTOINCREMENT,
-    type INTEGER,
-    status INTEGER,
+
+CREATE TABLE IF NOT EXISTS invoices
+(
+    identifier      INTEGER
+        constraint invoices_pk
+            primary key autoincrement,
+    type            INTEGER,
+    status          INTEGER,
     expiration_date TEXT,
-    encode TEXT,
-    payment_hash TEXT,
-    secret  TEXT
+    encode          TEXT,
+    payment_hash    TEXT,
+    secret          TEXT,
+    currency        TEXT,
+    amount          TEXT,
+    description     TEXT,
+    target_address  TEXT,
+    token_address   TEXT,
+    created_at      TEXT
 );
+
 """
 
 DB_CREATE_INVOICES_PAYMENTS = """

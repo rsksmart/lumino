@@ -3,24 +3,31 @@ from eth_utils import encode_hex
 from raiden.encoding.messages import DEFAULT_PAYMENT_INVOICE_HASH
 from raiden.billing.invoices.constants.invoice_status import InvoiceStatus
 from raiden.billing.invoices.util.time_util import is_invoice_expired
+from raiden.billing.invoices.constants.errors import INVOICE_NOT_EXISTS, INVOICE_EXPIRED, INVOICE_PAID
+
+IS_VALID_KEY = 'is_valid'
+MSG_KEY = 'msg'
+STATUS_KEY = 'status'
 
 
 def handle_received_invoice(storage, payment_hash_invoice):
-    result = {'is_valid': True}
+    result = {IS_VALID_KEY: True}
     payment_hash_invoice_hex = encode_hex(payment_hash_invoice)
 
     if not payment_hash_invoice_hex == DEFAULT_PAYMENT_INVOICE_HASH:
         invoice = storage.query_invoice(payment_hash_invoice_hex)
         if invoice is None:
-            result['is_valid'] = False
-            result['msg'] = "It is not possible to complete the payment. " \
-                            "The invoice you are trying to pay not issued by this node."
-        elif invoice['status'] == InvoiceStatus.PENDING.value:
-            storage.update_invoice({"payment_hash" : payment_hash_invoice_hex,
-                                    "status" : InvoiceStatus.PAID.value})
-        elif is_invoice_expired(invoice["expiration_date"]):
-            result['is_valid'] = False
-            result['msg'] = "Payment couldn't be completed (The invoice has expired)."
+            result[IS_VALID_KEY] = False
+            result[MSG_KEY] = INVOICE_NOT_EXISTS
+        elif invoice[STATUS_KEY] == InvoiceStatus.PENDING.value:
+            storage.update_invoice({'payment_hash' : payment_hash_invoice_hex,
+                                    STATUS_KEY : InvoiceStatus.PAID.value})
+        elif is_invoice_expired(invoice['expiration_date']):
+            result[IS_VALID_KEY] = False
+            result[MSG_KEY] = INVOICE_EXPIRED
+        elif invoice[STATUS_KEY] == InvoiceStatus.PAID.value:
+            result[IS_VALID_KEY] = False
+            result[MSG_KEY] = INVOICE_PAID
 
     return result
 

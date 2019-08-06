@@ -229,7 +229,7 @@ class ConnectionsInfoResource(BaseResource):
         )
 
 
-class PaymentInvoiceResourceLumino(BaseResource):
+class PaymentInvoiceResource(BaseResource):
     post_schema = PaymentInvoiceSchema()
 
     @use_kwargs(post_schema, locations=("json",))
@@ -397,12 +397,14 @@ class InvoiceResource(BaseResource):
         description: typing.ByteString = None,
         token_address: typing.TokenAddress = None,
         partner_address: typing.Address = None,
-        amount: typing.InvoiceAmount = None
+        amount: typing.InvoiceAmount = None,
+        expires: typing.InvoiceExpires = None,
     ):
         return self.rest_api.create_invoice(
             currency_symbol=currency_symbol,
             token_address=token_address,
             partner_address=partner_address,
             amount=amount,
-            description=description
+            description=description,
+            expires=expires
         )
