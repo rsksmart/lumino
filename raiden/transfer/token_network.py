@@ -98,20 +98,22 @@ def handle_channelnew(
         state_change.channel_identifier
     ] = (our_address, partner_address)
 
+    if our_address not in token_network_state.channelidentifiers_to_channels:
+        token_network_state.channelidentifiers_to_channels[our_address]: Dict[AddressHex, NettingChannelState] = dict()
+
     # Ignore duplicated channelnew events. For this to work properly on channel
     # reopens the blockchain events ChannelSettled and ChannelOpened must be
     # processed in correct order, this should be guaranteed by the filters in
     # the ethereum node
-    # TODO if channel_identifier not in token_network_state.channelidentifiers_to_channels:
-    if our_address not in token_network_state.channelidentifiers_to_channels:
-        token_network_state.channelidentifiers_to_channels[our_address]: Dict[AddressHex, NettingChannelState] = dict()
+    if channel_identifier not in token_network_state.channelidentifiers_to_channels[our_address]:
+        token_network_state.channelidentifiers_to_channels[our_address][channel_identifier] = channel_state
 
-    token_network_state.channelidentifiers_to_channels[our_address][channel_identifier] = channel_state
-    # TODO partneraddress to channel ids for light clients?
-    addresses_to_ids = token_network_state.partneraddresses_to_channelidentifiers
-    addresses_to_ids[partner_address].append(channel_identifier)
+        addresses_to_ids = token_network_state.partneraddresses_to_channelidentifiers
+        addresses_to_ids[partner_address].append(channel_identifier)
 
-    return TransitionResult(token_network_state, events)
+        return TransitionResult(token_network_state, events)
+
+
 
 
 def handle_balance(

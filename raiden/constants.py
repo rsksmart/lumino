@@ -68,7 +68,7 @@ HTTP_PORT = 80
 HTTPS_PORT = 443
 
 START_QUERY_BLOCK_KEY = "DefaultStartBlock"
-SNAPSHOT_STATE_CHANGES_COUNT = 100
+SNAPSHOT_STATE_CHANGES_COUNT = 500
 
 # An arbitrary limit for transaction size in Raiden, added in PR #1990
 TRANSACTION_GAS_LIMIT_UPPER_BOUND = int(0.4 * 3_141_592)

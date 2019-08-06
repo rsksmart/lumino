@@ -113,7 +113,7 @@ def raiden_spawner(tmp_path, request):
 
         child = pexpect.spawn(
             sys.executable,
-            ["-m", "raiden"] + args,
+            ["-m", "lumino"] + args,
             logfile=sys.stdout,
             encoding="utf-8",
             env=new_env,

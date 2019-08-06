@@ -471,9 +471,6 @@ class RaidenService(Runnable):
                     f"{configured_registry}, which conflicts with the current known "
                     f"smart contracts {known_registries}"
                 )
-        #Read lc data
-        lc = LightClientService.get_light_clients_data(self.wal)
-        LightClientService.is_handled_lc(AddressHex("0x2C3f822f9a5390C09cC2ed28E8a44f3FE01A06CB"), self.wal)
 
         # Restore the current snapshot group
         state_change_qty = self.wal.storage.count_state_changes()
@@ -550,12 +547,12 @@ class RaidenService(Runnable):
         # We need a timeout to prevent an endless loop from trying to
         # contact the disconnected client
         self.transport[0].stop()
-       # self.transport[1].stop()
+        self.transport[1].stop()
 
         self.alarm.stop()
 
         self.transport[0].join()
-       # self.transport[1].join()
+        self.transport[1].join()
 
         self.alarm.join()
 
@@ -608,11 +605,11 @@ class RaidenService(Runnable):
             prev_auth_data=chain_state.last_transport_authdata,
         )
 
-        # self.transport[1].start(
-        #     raiden_service=self,
-        #     message_handler=self.message_handler,
-        #     prev_auth_data=chain_state.last_transport_authdata,
-        # )
+        self.transport[1].start(
+            raiden_service=self,
+            message_handler=self.message_handler,
+            prev_auth_data=chain_state.last_transport_authdata,
+        )
 
         for neighbour in views.all_neighbour_nodes(chain_state):
             if neighbour != ConnectionManager.BOOTSTRAP_ADDR:
@@ -668,7 +665,8 @@ class RaidenService(Runnable):
         old_state = views.state_from_raiden(self)
         new_state, raiden_event_list = self.wal.log_and_dispatch(state_change)
 
-
+        for changed_balance_proof in views.detect_balance_proof_change(old_state, new_state):
+            update_services_from_balance_proof(self, new_state, changed_balance_proof)
 
         log.debug(
             "Raiden events",
@@ -751,7 +749,7 @@ class RaidenService(Runnable):
         """
         if self.transport:
             self.transport[0].start_health_check(node_address)
-          #  self.transport[1].start_health_check(node_address)
+            self.transport[1].start_health_check(node_address)
 
 
     def _callback_new_block(self, latest_block: Dict):
@@ -959,7 +957,7 @@ class RaidenService(Runnable):
             if neighbour == ConnectionManager.BOOTSTRAP_ADDR:
                 continue
             self.transport[0].whitelist(neighbour)
-            #self.transport[1].whitelist(neighbour)
+            self.transport[1].whitelist(neighbour)
 
 
         events_queues = views.get_all_messagequeues(chain_state)
@@ -970,7 +968,7 @@ class RaidenService(Runnable):
                     transfer = event.transfer
                     if transfer.initiator == self.address:
                         self.transport[0].whitelist(address=transfer.target)
-                        #self.transport[1].whitelist(address=transfer.target)
+                        self.transport[1].whitelist(address=transfer.target)
 
 
 

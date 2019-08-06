@@ -22,7 +22,6 @@ class LightClientService:
         light_clients : List[ClientModel] = cls.get_light_clients_data(wal)
         for lc in light_clients:
             if lc.address == client_address:
-                print("Is light client")
                 return True
         return False
 

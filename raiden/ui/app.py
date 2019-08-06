@@ -76,13 +76,13 @@ def _setup_matrix(config):
     try:
 
         transport = MatrixTransport(config["transport"]["matrix"], False)
-        #transport2 = MatrixTransport(config["transport"]["matrix"], True)
+        transport2 = MatrixTransport(config["transport"]["matrix"], True)
 
     except RaidenError as ex:
         click.secho(f"FATAL: {ex}", fg="red")
         sys.exit(1)
 
-    return [transport]
+    return [transport, transport2]
 
 
 def _setup_web3(eth_rpc_endpoint):

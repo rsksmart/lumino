@@ -723,7 +723,7 @@ class MatrixTransport(Runnable):
 
     def _handle_message(self, room, event) -> bool:
         """ Handle text messages sent to listening rooms """
-        print(" ----- HANDLE MESSAGE. LC?: " + str(self._lc))
+        log.debug("_handle_message. Is LC?: " + str(self._lc))
 
         if self._lc:
             return False

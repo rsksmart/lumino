@@ -397,8 +397,6 @@ class RaidenAPI:
             else:
                 raise UnhandledLightClient("Rejecting channel creation. Light Client isnt registered")
 
-
-
         except DuplicatedChannelError:
             log.info("partner opened channel first")
 
@@ -489,6 +487,9 @@ class RaidenAPI:
 
         if not is_binary_address(token_address):
             raise InvalidAddress('Expected binary address format for token in channel open')
+
+        if not is_binary_address(partner_address):
+            raise InvalidAddress('Expected binary address format for partner in channel open')
 
         chain_state = views.state_from_raiden(self.raiden)
         channel_state = views.get_channelstate_for(
