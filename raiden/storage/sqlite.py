@@ -199,15 +199,16 @@ class SQLiteStorage:
                 events,
             )
 
-    def delete_state_changes(self, state_changes_to_delete: List[int]) -> None:
+    def delete_state_changes(self, state_changes_to_delete: List[Tuple[int]]) -> None:
         """ Delete state changes.
         Args:
             state_changes_to_delete: List of ids to delete.
         """
-        with self.write_lock, self.conn:
+        with self.write_lock:
             self.conn.executemany(
-                "DELETE FROM state_events WHERE identifier = ?", state_changes_to_delete
+                "DELETE FROM state_changes WHERE identifier = ?", state_changes_to_delete
             )
+            self.maybe_commit()
 
     def get_latest_state_snapshot(self) -> Optional[Tuple[int, Any]]:
         """ Return the tuple of (last_applied_state_change_id, snapshot) or None"""

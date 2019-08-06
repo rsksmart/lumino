@@ -139,7 +139,7 @@ URLS_V1 = [
     ("/connections/<hexaddress:token_address>", ConnectionsResource),
     ("/connections", ConnectionsInfoResource),
     ("/payments", PaymentResource),
-    ("/payments/<luminoaddress:token_address>", PaymentResource, "token_paymentresource"),
+    ("/payments/<hexaddress:token_address>", PaymentResource, "token_paymentresource"),
     (
         "/payments/<hexaddress:token_address>/<hexaddress:target_address>",
         PaymentResource,
