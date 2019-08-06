@@ -822,20 +822,6 @@ class SQLiteStorage:
         """
         return case_event_type_label
 
-    def _get_event_type_query(self, event_type: int = None):
-
-        event_type_result = ['raiden.transfer.events.EventPaymentReceivedSuccess',
-                             'raiden.transfer.events.EventPaymentSentFailed',
-                             'raiden.transfer.events.EventPaymentSentSuccess']
-
-        if event_type == 1:
-            event_type_result = [event_type_result[0]]
-        elif event_type == 2:
-            event_type_result = [event_type_result[1]]
-        elif event_type == 3:
-            event_type_result = [event_type_result[2]]
-
-        return event_type_result
 
     def _get_table_data(self, limit: int = None):
 
