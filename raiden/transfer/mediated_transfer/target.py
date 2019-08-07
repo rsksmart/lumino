@@ -138,10 +138,6 @@ def handle_inittarget(
                 secrethash=transfer.lock.secrethash,
             )
 
-            print("CREATED SECRET REQUEST")
-            print(secret_request.to_dict())
-
-
             channel_events.append(secret_request)
 
         iteration = TransitionResult(target_state, channel_events)

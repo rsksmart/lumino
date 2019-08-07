@@ -709,7 +709,6 @@ class RaidenService(Runnable):
     def _handle_event(self, chain_state: ChainState, raiden_event: RaidenEvent):
         assert isinstance(chain_state, ChainState)
         assert isinstance(raiden_event, RaidenEvent)
-        print(raiden_event)
         try:
             self.raiden_event_handler.on_raiden_event(
                 raiden=self, chain_state=chain_state, event=raiden_event
