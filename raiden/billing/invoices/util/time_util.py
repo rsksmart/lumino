@@ -24,10 +24,5 @@ def parse_utc_str(utc_str):
 
 def is_invoice_expired(expiration_date):
     expiration_date = parse_utc_str(expiration_date)
-    is_expired = False
     utc_now = datetime.utcnow()
-
-    if expiration_date < utc_now:
-        is_expired = True
-
-    return is_expired
+    return expiration_date < utc_now

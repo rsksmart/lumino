@@ -12,7 +12,7 @@ import secp256k1
 from binascii import hexlify
 
 
-def decode_lumino_invoice(coded_invoice, verbose=True):
+def decode_invoice(coded_invoice, verbose=True):
     hrp, data = bech32_decode(coded_invoice)
     if not hrp:
         raise ValueError(BAD_BECH32_CHECKSUM)

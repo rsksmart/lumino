@@ -86,9 +86,9 @@ from raiden.rns_constants import RNS_ADDRESS_ZERO
 from raiden.utils.rns import is_rns_address
 
 from raiden.billing.invoices.options_args import OptionsArgs
-from raiden.billing.invoices.util.time_util import get_utc_unix_time, get_utc_expiration_time, UTC_FORMAT
+from raiden.billing.invoices.util.time_util import get_utc_unix_time, get_utc_expiration_time
 from raiden.billing.invoices.encoder.invoice_encoder import parse_options, encode_invoice
-from raiden.billing.invoices.decoder.invoice_decoder import decode_lumino_invoice, get_tags_dict
+from raiden.billing.invoices.decoder.invoice_decoder import decode_invoice
 from raiden.utils import random_secret, sha3
 
 log = structlog.get_logger(__name__)  # pylint: disable=invalid-name
@@ -1057,7 +1057,7 @@ class RaidenAPI:
         return invoice
 
     def decode_invoice(self, coded_invoice):
-        return decode_lumino_invoice(coded_invoice)
+        return decode_invoice(coded_invoice)
 
     def get_blockchain_events_network(
         self,
