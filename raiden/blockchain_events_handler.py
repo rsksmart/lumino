@@ -481,7 +481,7 @@ def on_blockchain_event(raiden: "RaidenService", event: Event):
         print("Implement me!")
 
     elif event_name == ChannelEvent.SETTLED:
-        #TTDO FIXME MARCOS UNINMPLEMENTED handle_channel_settled(raiden, event)
+        #TODO FIXME MARCOS UNINMPLEMENTED handle_channel_settled(raiden, event)
         print("Implement me!")
 
 

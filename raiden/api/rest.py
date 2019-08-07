@@ -638,9 +638,9 @@ class RestAPI:
             TokenNotRegistered,
             UnhandledLightClient
         ) as e:
-            return ApiErrorBuilder.build_error(errors=str(e), status_code=HTTPStatus.CONFLICT, log=log)
+            return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.CONFLICT, log=log)
         except RawTransactionFailed as e1:
-            return ApiErrorBuilder.build_error(errors=str(e1), status_code=HTTPStatus.BAD_REQUEST, log=log)
+            return ApiErrorBuilder.build_and_log_error(errors=str(e1), status_code=HTTPStatus.BAD_REQUEST, log=log)
 
         channel_state = views.get_channelstate_for(
             views.state_from_raiden(self.raiden_api.raiden),
@@ -691,9 +691,9 @@ class RestAPI:
             DuplicatedChannelError,
             TokenNotRegistered,
         ) as e:
-            return ApiErrorBuilder.build_error(errors=str(e), status_code=HTTPStatus.CONFLICT, log=log)
+            return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.CONFLICT, log=log)
         except (InsufficientFunds, InsufficientGasReserve) as e:
-            return ApiErrorBuilder.build_error(errors=str(e), status_code=HTTPStatus.PAYMENT_REQUIRED, log=log)
+            return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.PAYMENT_REQUIRED, log=log)
 
         if total_deposit:
             # make initial deposit
@@ -713,9 +713,9 @@ class RestAPI:
                     total_deposit=total_deposit,
                 )
             except InsufficientFunds as e:
-                return ApiErrorBuilder.build_error(errors=str(e), status_code=HTTPStatus.PAYMENT_REQUIRED, log=log)
+                return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.PAYMENT_REQUIRED, log=log)
             except (DepositOverLimit, DepositMismatch) as e:
-                return ApiErrorBuilder.build_error(errors=str(e), status_code=HTTPStatus.CONFLICT, log=log)
+                return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.CONFLICT, log=log)
 
         channel_state = views.get_channelstate_for(
             views.state_from_raiden(self.raiden_api.raiden),

@@ -217,7 +217,6 @@ class RaidenAPI:
 
         return channel_list[0]
 
-
     def validate_token_app(self, token_app):
         token_result = self.get_token_action(token_app)
         result = {}
@@ -230,10 +229,10 @@ class RaidenAPI:
             result['action_request'] = token_result[3]
 
         expires_at = dateutil.parser.parse(result['expires_at'])
-        utc_now= datetime.utcnow()
+        utc_now = datetime.utcnow()
 
         diff = utc_now - expires_at
-        diff_minutes = diff.total_seconds()/60
+        diff_minutes = diff.total_seconds() / 60
         time_elapsed = diff_minutes - 30
         if time_elapsed > 30:
             raise TokenAppExpired("Token app expired")
@@ -383,7 +382,8 @@ class RaidenAPI:
         if settle_timeout is None:
             settle_timeout = self.raiden.config["settle_timeout"]
 
-        token_network = ChannelValidator.can_open_channel(registry_address, token_address, creator_address, partner_address, settle_timeout, self.raiden)
+        token_network = ChannelValidator.can_open_channel(registry_address, token_address, creator_address,
+                                                          partner_address, settle_timeout, self.raiden)
 
         try:
             is_participant1_handled_lc = LightClientService.is_handled_lc(to_checksum_address(creator_address),
@@ -432,7 +432,8 @@ class RaidenAPI:
         """
         if settle_timeout is None:
             settle_timeout = self.raiden.config["settle_timeout"]
-        token_network = ChannelValidator.can_open_channel(registry_address, token_address, self.address, partner_address, settle_timeout, self.raiden)
+        token_network = ChannelValidator.can_open_channel(registry_address, token_address, self.address,
+                                                          partner_address, settle_timeout, self.raiden)
         with self.raiden.gas_reserve_lock:
             ChannelValidator.validate_gas_reserve(1, self.raiden)
             try:
@@ -586,7 +587,8 @@ class RaidenAPI:
             partner_address=partner_address,
         )
 
-        ChannelValidator.can_set_total_channel_deposit(channel_state, token_address, token_addresses, partner_address, total_deposit)
+        ChannelValidator.can_set_total_channel_deposit(channel_state, token_address, token_addresses, partner_address,
+                                                       total_deposit)
 
         if self.raiden.config["environment_type"] == Environment.PRODUCTION:
             per_token_network_deposit_limit = RED_EYES_PER_TOKEN_NETWORK_LIMIT
@@ -604,7 +606,7 @@ class RaidenAPI:
         total_network_balance = token.balance_of(registry_address)
 
         ChannelValidator.validate_deposit_amount(total_network_balance, addendum, per_token_network_deposit_limit,
-                                                     total_deposit, token, self.raiden.address, token_network_proxy)
+                                                 total_deposit, token, self.raiden.address, token_network_proxy)
 
         # set_total_deposit calls approve
         # token.approve(netcontract_address, addendum)
@@ -751,11 +753,10 @@ class RaidenAPI:
 
         return result
 
-
     def get_channel_list_for_tokens(
-            self,
-            registry_address: typing.PaymentNetworkID,
-            token_addresses: typing.ByteString = None,
+        self,
+        registry_address: typing.PaymentNetworkID,
+        token_addresses: typing.ByteString = None,
     ) -> typing.List[NettingChannelState]:
         """Returns a list of channels associated with the mandatory given
            `token_addresses`.
@@ -983,11 +984,10 @@ class RaidenAPI:
 
         return events
 
-    def get_dashboard_data(self, graph_from_date, graph_to_date, table_limit:int = None):
+    def get_dashboard_data(self, graph_from_date, graph_to_date, table_limit: int = None):
         result = self.raiden.wal.storage.get_dashboard_data(graph_from_date, graph_to_date, table_limit)
 
         return result
-
 
     def get_raiden_events_payment_history(
         self,
@@ -1149,7 +1149,8 @@ class RaidenAPI:
         letters_and_digits = string.ascii_letters + string.digits
         random_characters = ''.join(random.choice(letters_and_digits) for i in range(30))
 
-        hash_result = hashlib.new("sha1", str(expires_at.timestamp()).encode('utf-8') + str(random_characters).encode('utf-8'))
+        hash_result = hashlib.new("sha1",
+                                  str(expires_at.timestamp()).encode('utf-8') + str(random_characters).encode('utf-8'))
 
         token_data = {"token": hash_result.hexdigest(), "expires_at": expires_at_iso_format, "action_request": action}
 
@@ -1179,7 +1180,8 @@ class RaidenAPI:
                 if len(channel_identifiers) > 0:
                     channel_identifiers_by_token_network.append(channel_identifiers)
 
-        result_search = self._search_in(channel_identifiers_by_token_network, node_addresses_by_token_network, token_addresses, query, only_receivers)
+        result_search = self._search_in(channel_identifiers_by_token_network, node_addresses_by_token_network,
+                                        token_addresses, query, only_receivers)
 
         # First we check if the address received is an RNS address or a hexadecimal address
         if is_rns_address(query):
@@ -1187,7 +1189,7 @@ class RaidenAPI:
             if rns_resolved_address != RNS_ADDRESS_ZERO:
                 result_search["rns_address_matches"].append(rns_resolved_address)
 
-        return {"results":result_search}
+        return {"results": result_search}
 
     def _search_in(self, channel_identifiers, node_addresses, token_addresses, query, only_receivers):
         result_search = {"token_address_matches": [],

@@ -22,7 +22,7 @@ class ChannelValidator:
         try:
             return TokenExists(None, True, chain.token(token_address))
         except AddressWithoutCode as e:
-            return TokenExists(ApiErrorBuilder.build_error(errors=str(e), status_code=HTTPStatus.CONFLICT, log=log),
+            return TokenExists(ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.CONFLICT, log=log),
                                False, None)
 
     @staticmethod
@@ -32,7 +32,7 @@ class ChannelValidator:
             error_msg = "Not enough balance to deposit. {} Available={} Needed={}".format(
                 pex(token.address), balance, total_deposit
             )
-            return EnoughBalance(ApiErrorBuilder.build_error(errors=error_msg, status_code=HTTPStatus.PAYMENT_REQUIRED, log=log)
+            return EnoughBalance(ApiErrorBuilder.build_and_log_error(errors=error_msg, status_code=HTTPStatus.PAYMENT_REQUIRED, log=log)
                                  , True, balance)
         return EnoughBalance(None, True, balance)
 
