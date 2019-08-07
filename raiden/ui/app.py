@@ -327,35 +327,38 @@ def run_app(
 
 
 def check_network_params(running_network):
-
     config_path = os.path.join(ROOT_DIR, 'config.json')
 
     with open(config_path) as json_data_file:
         config_data = json.load(json_data_file)
 
-    networks = config_data['networks']
-    test_net = networks['test_net']
-    main_net = networks['main_net']
+    network_data = _get_network_info(running_network["network_id"], config_data)
+    if network_data:
+        # Running Mainnet or Testnet. Validate smart contracts addresses
+        if not validate_network_contracts(network_data, running_network):
+            click.secho(
+                "One or more of the specified smart contract addresses does not match with the configured ones",
+                fg="red",
+            )
+            sys.exit(1)
+    else:
+        # Running custom network
+        print("You are running a custom network")
 
-    msg = check_network_info(test_net, running_network)
-    msg = check_network_info(main_net, running_network)
 
-    if msg is None:
-        msg = "You are running a private custom network"
+def _get_network_info(network_id, config_data):
+    for network in config_data['networks'].values():
+        if network["network_id"] == network_id:
+            return network
+    return None
 
-    print(msg)
 
-
-def check_network_info(config_network, running_network):
-    msg = None
-    if running_network['network_id'] == config_network['network_id'] and \
-       running_network['token_network_registry'] == config_network['token_network_registry'] and \
+def validate_network_contracts(config_network, running_network):
+    if running_network['token_network_registry'] == config_network['token_network_registry'] and \
        running_network['secret_registry'] == config_network['secret_registry'] and \
        running_network['endpoint_registry'] == config_network['endpoint_registry']:
-
-        msg = "\nYou are running the network '{}'".format(config_network['name'])
-
-    return msg
+        return True
+    return False
 
 
 
