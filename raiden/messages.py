@@ -9,7 +9,7 @@ from eth_utils import (
     to_normalized_address,
 )
 
-from raiden.constants import UINT64_MAX, UINT256_MAX
+from raiden.constants import UINT64_MAX, UINT256_MAX, EMPTY_PAYMENT_HASH_INVOICE
 from raiden.encoding import messages
 from raiden.encoding.format import buffer_for
 from raiden.exceptions import InvalidProtocolMessage, InvalidSignature
@@ -65,8 +65,6 @@ from raiden.utils.typing import (
     TokenNetworkID,
     Type,
 )
-
-from raiden.encoding.messages import DEFAULT_PAYMENT_INVOICE_HASH
 
 __all__ = (
     "Delivered",
@@ -1274,7 +1272,7 @@ class LockedTransfer(LockedTransferBase):
     @classmethod
     def from_dict(cls, data):
         if "payment_hash_invoice" not in data:
-            data["payment_hash_invoice"] = DEFAULT_PAYMENT_INVOICE_HASH
+            data["payment_hash_invoice"] = EMPTY_PAYMENT_HASH_INVOICE
 
         message = cls(
             chain_id=data["chain_id"],

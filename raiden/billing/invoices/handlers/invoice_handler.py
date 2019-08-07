@@ -1,6 +1,6 @@
 from eth_utils import encode_hex
 
-from raiden.encoding.messages import DEFAULT_PAYMENT_INVOICE_HASH
+from raiden.constants import EMPTY_PAYMENT_HASH_INVOICE
 from raiden.billing.invoices.constants.invoice_status import InvoiceStatus
 from raiden.billing.invoices.util.time_util import is_invoice_expired
 from raiden.billing.invoices.constants.errors import INVOICE_NOT_EXISTS, INVOICE_EXPIRED, INVOICE_PAID
@@ -12,9 +12,9 @@ STATUS_KEY = 'status'
 
 def handle_received_invoice(storage, payment_hash_invoice):
     result = {IS_VALID_KEY: True}
-    payment_hash_invoice_hex = encode_hex(payment_hash_invoice)
 
-    if not payment_hash_invoice_hex == DEFAULT_PAYMENT_INVOICE_HASH:
+    if not payment_hash_invoice == EMPTY_PAYMENT_HASH_INVOICE:
+        payment_hash_invoice_hex = encode_hex(payment_hash_invoice)
         invoice = storage.query_invoice(payment_hash_invoice_hex)
         if invoice is None:
             result[IS_VALID_KEY] = False

@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING
 
 from eth_utils import encode_hex, decode_hex, to_canonical_address, to_checksum_address
 
-from raiden.constants import EMPTY_MERKLE_ROOT
+from raiden.constants import EMPTY_MERKLE_ROOT, EMPTY_PAYMENT_HASH_INVOICE
 from raiden.transfer.architecture import State
 from raiden.transfer.state import (
     BalanceProofSignedState,
@@ -42,8 +42,6 @@ from raiden.utils.typing import (
     TokenAddress,
     TokenNetworkID,
 )
-
-from raiden.encoding.messages import DEFAULT_PAYMENT_INVOICE_HASH
 
 if TYPE_CHECKING:
     # pylint: disable=unused-import
@@ -442,7 +440,7 @@ class LockedTransferUnsignedState(LockedTransferState):
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "LockedTransferUnsignedState":
         if "payment_hash_invoice" not in data:
-            data["payment_hash_invoice"] = DEFAULT_PAYMENT_INVOICE_HASH
+            data["payment_hash_invoice"] = EMPTY_PAYMENT_HASH_INVOICE
 
         restored = cls(
             payment_identifier=PaymentID(int(data["payment_identifier"])),
@@ -553,7 +551,7 @@ class LockedTransferSignedState(LockedTransferState):
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "LockedTransferSignedState":
         if "payment_hash_invoice" not in data:
-            data["payment_hash_invoice"] = DEFAULT_PAYMENT_INVOICE_HASH
+            data["payment_hash_invoice"] = EMPTY_PAYMENT_HASH_INVOICE
 
         restored = cls(
             message_identifier=MessageID(int(data["message_identifier"])),
@@ -662,7 +660,7 @@ class TransferDescriptionWithSecretState(State):
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "TransferDescriptionWithSecretState":
         if "payment_hash_invoice" not in data:
-            data["payment_hash_invoice"] = DEFAULT_PAYMENT_INVOICE_HASH
+            data["payment_hash_invoice"] = EMPTY_PAYMENT_HASH_INVOICE
 
         restored = cls(
             payment_network_identifier=to_canonical_address(data["payment_network_identifier"]),

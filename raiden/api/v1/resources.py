@@ -21,7 +21,7 @@ from raiden.api.v1.encoding import (
     PaymentInvoiceSchema
 )
 from raiden.utils import typing
-from raiden.encoding.messages import DEFAULT_PAYMENT_INVOICE_HASH
+from raiden.constants import EMPTY_PAYMENT_HASH_INVOICE
 
 from eth_utils import (
     decode_hex
@@ -278,7 +278,7 @@ class PaymentResource(BaseResource):
             identifier=identifier,
             secret=secret,
             secret_hash=secret_hash,
-            payment_hash_invoice=decode_hex(DEFAULT_PAYMENT_INVOICE_HASH)
+            payment_hash_invoice=EMPTY_PAYMENT_HASH_INVOICE
         )
 
 
