@@ -1,11 +1,14 @@
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, List
 
 import gevent
 import structlog
+from eth_utils import to_canonical_address, to_checksum_address, encode_hex
 
 from raiden.blockchain.events import Event
 from raiden.blockchain.state import get_channel_state
 from raiden.connection_manager import ConnectionManager
+from raiden.lightclient.client_model import ClientModel
+from raiden.lightclient.light_client_service import LightClientService
 from raiden.network.proxies.utils import get_onchain_locksroots
 from raiden.transfer import views
 from raiden.transfer.architecture import StateChange
@@ -33,6 +36,8 @@ from raiden_contracts.constants import (
     EVENT_TOKEN_NETWORK_CREATED,
     ChannelEvent,
 )
+
+from raiden.utils.typing import AddressHex
 
 if TYPE_CHECKING:
     # pylint: disable=unused-import
@@ -84,8 +89,11 @@ def handle_channel_new(raiden: "RaidenService", event: Event):
     participant2 = args["participant2"]
     is_participant = raiden.address in (participant1, participant2)
 
-    # Raiden node is participant
-    if is_participant:
+    # Check if at least one of the implied participants is a LC handled by the node
+    is_participant1_handled_lc = LightClientService.is_handled_lc(to_checksum_address(encode_hex(participant1)), raiden.wal)
+    is_participant2_handled_lc = LightClientService.is_handled_lc(to_checksum_address(encode_hex(participant2)), raiden.wal)
+
+    if is_participant or is_participant1_handled_lc or is_participant2_handled_lc:
         channel_proxy = raiden.chain.payment_channel(
             canonical_identifier=CanonicalIdentifier(
                 chain_identifier=views.state_from_raiden(raiden).chain_id,
@@ -116,7 +124,7 @@ def handle_channel_new(raiden: "RaidenService", event: Event):
         if ConnectionManager.BOOTSTRAP_ADDR != partner_address:
             raiden.start_health_check_for(partner_address)
 
-    # Raiden node is not participant of channel
+    # Raiden node is not participant of channel. Lc are not participants
     else:
         new_route = ContractReceiveRouteNew(
             transaction_hash=transaction_hash,
@@ -151,13 +159,14 @@ def handle_channel_new_balance(raiden: "RaidenService", event: Event):
     transaction_hash = data["transaction_hash"]
 
     chain_state = views.state_from_raiden(raiden)
-    previous_channel_state = views.get_channelstate_by_canonical_identifier(
+    previous_channel_state = views.get_channelstate_by_canonical_identifier_and_address(
         chain_state=chain_state,
         canonical_identifier=CanonicalIdentifier(
             chain_identifier=chain_state.chain_id,
             token_network_address=token_network_identifier,
             channel_identifier=channel_identifier,
         ),
+        address=raiden.address
     )
 
     # Channels will only be registered if this node is a participant
@@ -175,6 +184,7 @@ def handle_channel_new_balance(raiden: "RaidenService", event: Event):
             deposit_transaction=deposit_transaction,
             block_number=block_number,
             block_hash=block_hash,
+            participant=participant_address
         )
         raiden.handle_and_track_state_change(newbalance_statechange)
 
@@ -466,10 +476,13 @@ def on_blockchain_event(raiden: "RaidenService", event: Event):
         handle_channel_update_transfer(raiden, event)
 
     elif event_name == ChannelEvent.CLOSED:
-        handle_channel_closed(raiden, event)
+        #TODO FIXME MARCOS UNINMPLEMENTED  handle_channel_closed(raiden, event)
+        print("Implement me!")
 
     elif event_name == ChannelEvent.SETTLED:
-        handle_channel_settled(raiden, event)
+        #TODO FIXME MARCOS UNINMPLEMENTED handle_channel_settled(raiden, event)
+        print("Implement me!")
+
 
     elif event_name == EVENT_SECRET_REVEALED:
         handle_secret_revealed(raiden, event)

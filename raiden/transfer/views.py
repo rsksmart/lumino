@@ -3,7 +3,6 @@ from raiden.transfer.architecture import ContractSendEvent
 from raiden.transfer.identifiers import CanonicalIdentifier
 from eth_utils import to_canonical_address
 
-
 from raiden.transfer.state import (
     CHANNEL_STATE_CLOSED,
     CHANNEL_STATE_CLOSING,
@@ -40,7 +39,8 @@ from raiden.utils.typing import (
     TokenAddress,
     TokenNetworkID,
     Union,
-)
+    ChannelID, AddressHex)
+
 
 # TODO: Either enforce immutability or make a copy of the values returned by
 #     the view functions
@@ -54,9 +54,10 @@ def all_neighbour_nodes(chain_state: ChainState) -> Set[Address]:
 
     for payment_network in chain_state.identifiers_to_paymentnetworks.values():
         for token_network in payment_network.tokenidentifiers_to_tokennetworks.values():
-            channel_states = token_network.channelidentifiers_to_channels.values()
-            for channel_state in channel_states:
-                addresses.add(channel_state.partner_state.address)
+            if chain_state.our_address in token_network.channelidentifiers_to_channels:
+                channel_states = token_network.channelidentifiers_to_channels[chain_state.our_address].values()
+                for channel_state in channel_states:
+                    addresses.add(channel_state.partner_state.address)
 
     return addresses
 
@@ -92,7 +93,7 @@ def get_pending_transactions(chain_state: ChainState) -> List[ContractSendEvent]
     return chain_state.pending_transactions
 
 
-def get_all_messagequeues(chain_state: ChainState,) -> QueueIdsToQueues:
+def get_all_messagequeues(chain_state: ChainState, ) -> QueueIdsToQueues:
     return chain_state.queueids_to_queues
 
 
@@ -101,7 +102,6 @@ def get_networkstatuses(chain_state: ChainState) -> Dict:
 
 
 def get_node_network_status(chain_state: ChainState, node_address: Address) -> str:
-
     return chain_state.nodeaddresses_to_networkstates.get(node_address, NODE_NETWORK_UNKNOWN)
 
 
@@ -191,7 +191,6 @@ def get_token_identifiers(
 def total_token_network_channels(
     chain_state: ChainState, payment_network_id: PaymentNetworkID, token_address: TokenAddress
 ) -> int:
-
     token_network = get_token_network_by_token_address(
         chain_state, payment_network_id, token_address
     )
@@ -206,7 +205,6 @@ def total_token_network_channels(
 def get_token_network_by_token_address(
     chain_state: ChainState, payment_network_id: PaymentNetworkID, token_address: TokenAddress
 ) -> Optional[TokenNetworkState]:
-
     payment_network = chain_state.identifiers_to_paymentnetworks.get(payment_network_id)
 
     if payment_network is not None:
@@ -221,7 +219,6 @@ def get_token_network_by_token_address(
 def get_token_network_by_identifier(
     chain_state: ChainState, token_network_id: TokenNetworkID
 ) -> Optional[TokenNetworkState]:
-
     token_network_state = None
     for payment_network_state in chain_state.identifiers_to_paymentnetworks.values():
         token_network_state = payment_network_state.tokenidentifiers_to_tokennetworks.get(
@@ -233,10 +230,23 @@ def get_token_network_by_identifier(
     return token_network_state
 
 
+def get_channel_existence_from_network_participants(
+    chain_state: ChainState, payment_network_id: PaymentNetworkID, token_address: TokenAddress, participant1: Address, participant2: Address
+) -> bool:
+    token_network = get_token_network_by_token_address(
+        chain_state, payment_network_id, token_address
+    )
+    if token_network:
+        return token_network.network_graph.channel_exists(participant1, participant2)
+    return False
+
+
+
 def get_channelstate_for(
     chain_state: ChainState,
     payment_network_id: PaymentNetworkID,
     token_address: TokenAddress,
+    creator_address: Address,
     partner_address: Address,
 ) -> Optional[NettingChannelState]:
     """ Return the NettingChannelState if it exists, None otherwise. """
@@ -245,9 +255,9 @@ def get_channelstate_for(
     )
 
     channel_state = None
-    if token_network:
+    if token_network and creator_address in token_network.channelidentifiers_to_channels:
         channels = [
-            token_network.channelidentifiers_to_channels[channel_id]
+            token_network.channelidentifiers_to_channels[creator_address][channel_id]
             for channel_id in token_network.partneraddresses_to_channelidentifiers[partner_address]
         ]
         states = filter_channels_by_status(channels, [CHANNEL_STATE_UNUSABLE])
@@ -277,8 +287,8 @@ def get_channelstate_by_token_network_and_partner(
     return channel_state
 
 
-def get_channelstate_by_canonical_identifier(
-    chain_state: ChainState, canonical_identifier: CanonicalIdentifier
+def get_channelstate_by_canonical_identifier_and_address(
+    chain_state: ChainState, canonical_identifier: CanonicalIdentifier, address: AddressHex
 ) -> Optional[NettingChannelState]:
     """ Return the NettingChannelState if it exists, None otherwise. """
     token_network = get_token_network_by_identifier(
@@ -286,8 +296,8 @@ def get_channelstate_by_canonical_identifier(
     )
 
     channel_state = None
-    if token_network:
-        channel_state = token_network.channelidentifiers_to_channels.get(
+    if token_network and address in token_network.channelidentifiers_to_channels:
+        channel_state = token_network.channelidentifiers_to_channels[address].get(
             canonical_identifier.channel_identifier
         )
 
@@ -309,9 +319,10 @@ def get_channelstate_filter(
     if not token_network:
         return result
 
-    for channel_state in token_network.channelidentifiers_to_channels.values():
-        if filter_fn(channel_state):
-            result.append(channel_state)
+    if chain_state.our_address in token_network.channelidentifiers_to_channels:
+        for channel_state in token_network.channelidentifiers_to_channels[chain_state.our_address].values():
+            if filter_fn(channel_state):
+                result.append(channel_state)
 
     return result
 
@@ -431,7 +442,6 @@ def get_all_transfer_tasks(chain_state: ChainState) -> Dict[SecretHash, Transfer
 def list_channelstate_for_tokennetwork(
     chain_state: ChainState, payment_network_id: PaymentNetworkID, token_address: TokenAddress
 ) -> List[NettingChannelState]:
-
     token_network = get_token_network_by_token_address(
         chain_state, payment_network_id, token_address
     )
@@ -445,11 +455,11 @@ def list_channelstate_for_tokennetwork(
 
 
 def list_channelstate_for_tokennetwork_lumino(
-        chain_state: ChainState,
-        payment_network_id: PaymentNetworkID,
-        token_addresses_split
+    chain_state: ChainState,
+    payment_network_id: PaymentNetworkID,
+    token_addresses_split,
+    node_address
 ) -> List[NettingChannelState]:
-
     channels_by_token = []
 
     for token_address in token_addresses_split:
@@ -476,8 +486,8 @@ def list_all_channelstate(chain_state: ChainState) -> List[NettingChannelState]:
     for payment_network in chain_state.identifiers_to_paymentnetworks.values():
         for token_network in payment_network.tokenidentifiers_to_tokennetworks.values():
             # TODO: Either enforce immutability or make a copy
-            result.extend(token_network.channelidentifiers_to_channels.values())
-
+            if chain_state.our_address in token_network.channelidentifiers_to_channels:
+                result.extend(token_network.channelidentifiers_to_channels[chain_state.our_address].values())
     return result
 
 
@@ -487,7 +497,6 @@ def filter_channels_by_partneraddress(
     token_address: TokenAddress,
     partner_addresses: List[Address],
 ) -> List[NettingChannelState]:
-
     token_network = get_token_network_by_token_address(
         chain_state, payment_network_id, token_address
     )
@@ -560,15 +569,15 @@ def detect_balance_proof_change(
             if old_token_network == current_token_network:
                 continue
 
-            for channel_identifier in current_token_network.channelidentifiers_to_channels:
+            for channel_identifier in current_token_network.channelidentifiers_to_channels[current_state.our_address]:
                 if old_token_network:
-                    old_channel = old_token_network.channelidentifiers_to_channels.get(
+                    old_channel = old_token_network.channelidentifiers_to_channels[current_state.our_address].get(
                         channel_identifier
                     )
                 else:
                     old_channel = None
 
-                current_channel = current_token_network.channelidentifiers_to_channels[
+                current_channel = current_token_network.channelidentifiers_to_channels[current_state.our_address][
                     channel_identifier
                 ]
                 if current_channel == old_channel:

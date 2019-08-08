@@ -1,5 +1,6 @@
-from collections import defaultdict
+from collections import defaultdict, namedtuple
 from typing import Any, Dict, List, NamedTuple, Optional, Tuple
+from dataclasses import dataclass
 
 import structlog
 from eth_utils import (
@@ -11,6 +12,7 @@ from eth_utils import (
 )
 from gevent.event import AsyncResult
 from gevent.lock import RLock, Semaphore
+from requests import HTTPError
 
 from raiden.constants import (
     EMPTY_HASH,
@@ -29,7 +31,7 @@ from raiden.exceptions import (
     RaidenRecoverableError,
     RaidenUnrecoverableError,
     SamePeerAddress,
-)
+    RawTransactionFailed)
 from raiden.network.proxies.token import Token
 from raiden.network.proxies.utils import compare_contract_versions
 from raiden.network.rpc.client import StatelessFilter, check_address_has_code
@@ -55,7 +57,7 @@ from raiden.utils.typing import (
     T_ChannelState,
     TokenAmount,
     TokenNetworkAddress,
-)
+    SignedTransaction)
 from raiden_contracts.constants import (
     CONTRACT_TOKEN_NETWORK,
     GAS_REQUIRED_FOR_CLOSE_CHANNEL,
@@ -99,6 +101,10 @@ class ChannelDetails(NamedTuple):
     channel_data: ChannelData
     participants_data: ParticipantsDetails
 
+@dataclass(frozen=True)
+class OpenChannelTrKey:
+    participant1: Address
+    participant2: Address
 
 class TokenNetwork:
     def __init__(
@@ -131,9 +137,10 @@ class TokenNetwork:
         self.proxy = proxy
         self.client = jsonrpc_client
         self.node_address = self.client.address
-        self.open_channel_transactions: Dict[Address, AsyncResult] = dict()
+        self.open_channel_transactions: Dict[OpenChannelTrKey, AsyncResult] = dict()
 
         # Forbids concurrent operations on the same channel
+
         self.channel_operations_lock: Dict[Address, RLock] = defaultdict(RLock)
 
         # Serializes concurent deposits on this token network. This must be an
@@ -156,8 +163,10 @@ class TokenNetwork:
         """ Return the token of this manager. """
         return to_canonical_address(self.proxy.contract.functions.token().call())
 
+
+
     def _new_channel_preconditions(
-        self, partner: Address, settle_timeout: int, block_identifier: BlockSpecification
+        self, creator: Address, partner: Address, settle_timeout: int, block_identifier: BlockSpecification
     ):
         if not is_binary_address(partner):
             raise InvalidAddress("Expected binary address format for channel partner")
@@ -173,7 +182,7 @@ class TokenNetwork:
                 )
             )
 
-        if self.node_address == partner:
+        if creator == partner:
             raise SamePeerAddress("The other peer must not have the same address as the client.")
 
         if not self.client.can_query_state_for_block(block_identifier):
@@ -183,17 +192,61 @@ class TokenNetwork:
             )
 
         channel_exists = self._channel_exists_and_not_settled(
-            participant1=self.node_address, participant2=partner, block_identifier=block_identifier
+            participant1=creator, participant2=partner, block_identifier=block_identifier
         )
         if channel_exists:
             raise DuplicatedChannelError("Channel with given partner address already exists")
 
-    def _new_channel_postconditions(self, partner: Address, block: BlockSpecification):
+    def _new_channel_postconditions(self, creator: Address, partner: Address, block: BlockSpecification):
         channel_created = self._channel_exists_and_not_settled(
-            participant1=self.node_address, participant2=partner, block_identifier=block
+            participant1=creator, participant2=partner, block_identifier=block
         )
         if channel_created:
             raise DuplicatedChannelError("Channel with given partner address already exists")
+
+    def new_netting_channel_light(self, creator: Address, partner: Address, signed_tx, settle_timeout: int,
+                                  given_block_identifier: BlockSpecification) -> ChannelID:
+        self._new_channel_preconditions(
+            creator=creator, partner=partner, settle_timeout=settle_timeout,
+            block_identifier=given_block_identifier
+        )
+        log_details = {"peer1": pex(creator), "peer2": pex(partner)}
+        if OpenChannelTrKey(creator, partner) not in self.open_channel_transactions:
+            new_open_channel_transaction = AsyncResult()
+            self.open_channel_transactions[OpenChannelTrKey(creator, partner)] = new_open_channel_transaction
+            try:
+                log.debug("new_netting_channel_light called", **log_details)
+                transaction_hash = self.proxy.broadcast_signed_transaction(signed_tx)
+                self.client.poll(transaction_hash)
+                receipt_or_none = check_transaction_threw(self.client, transaction_hash)
+                if receipt_or_none:
+                    self._new_channel_postconditions(
+                        creator=creator, partner=partner, block=receipt_or_none["blockNumber"]
+                    )
+                    log.critical("new_netting_channel_light failed", **log_details)
+                    raise RawTransactionFailed("creating new channel failed")
+            except HTTPError as e:
+                log.critical("new_netting_channel failed: transaction malformed", **log_details)
+                new_open_channel_transaction.set_exception(e)
+                raise RawTransactionFailed("Light Client raw transaction receipt status failed")
+            except Exception as e:
+                log.critical("new_netting_channel failed", **log_details)
+                new_open_channel_transaction.set_exception(e)
+                raise
+            else:
+                new_open_channel_transaction.set(transaction_hash)
+            finally:
+                self.open_channel_transactions.pop(OpenChannelTrKey(creator, partner), None)
+        else:
+            # If already exists wait for completition or exception
+            self.open_channel_transactions[OpenChannelTrKey(creator, partner)].get()
+
+        channel_identifier: ChannelID = self._detail_channel(
+            participant1=creator, participant2=partner, block_identifier="latest"
+        ).channel_identifier
+        log_details["channel_identifier"] = str(channel_identifier)
+        log.info("new_netting_channel_light successful", **log_details)
+        return channel_identifier
 
     def new_netting_channel(
         self, partner: Address, settle_timeout: int, given_block_identifier: BlockSpecification
@@ -211,7 +264,7 @@ class TokenNetwork:
         """
         checking_block = self.client.get_checking_block()
         self._new_channel_preconditions(
-            partner=partner, settle_timeout=settle_timeout, block_identifier=given_block_identifier
+            creator=self.node_address, partner=partner, settle_timeout=settle_timeout, block_identifier=given_block_identifier
         )
         log_details = {"peer1": pex(self.node_address), "peer2": pex(partner)}
         gas_limit = self.proxy.estimate_gas(
@@ -228,7 +281,7 @@ class TokenNetwork:
                 required_gas=GAS_REQUIRED_FOR_OPEN_CHANNEL,
                 block_identifier=checking_block,
             )
-            self._new_channel_postconditions(partner=partner, block=checking_block)
+            self._new_channel_postconditions(creator=self.node_address, partner=partner, block=checking_block)
 
             log.critical("new_netting_channel call will fail", **log_details)
             raise RaidenUnrecoverableError("Creating a new channel will fail")
@@ -236,9 +289,10 @@ class TokenNetwork:
         log.debug("new_netting_channel called", **log_details)
         # Prevent concurrent attempts to open a channel with the same token and
         # partner address.
-        if gas_limit and partner not in self.open_channel_transactions:
+
+        if gas_limit and OpenChannelTrKey(self.node_address, partner) not in self.open_channel_transactions:
             new_open_channel_transaction = AsyncResult()
-            self.open_channel_transactions[partner] = new_open_channel_transaction
+            self.open_channel_transactions[OpenChannelTrKey(self.node_address, partner)] = new_open_channel_transaction
             gas_limit = safe_gas_limit(gas_limit, GAS_REQUIRED_FOR_OPEN_CHANNEL)
             try:
                 transaction_hash = self.proxy.transact(
@@ -252,7 +306,7 @@ class TokenNetwork:
                 receipt_or_none = check_transaction_threw(self.client, transaction_hash)
                 if receipt_or_none:
                     self._new_channel_postconditions(
-                        partner=partner, block=receipt_or_none["blockNumber"]
+                        creator=self.node_address, partner=partner, block=receipt_or_none["blockNumber"]
                     )
                     log.critical("new_netting_channel failed", **log_details)
                     raise RaidenUnrecoverableError("creating new channel failed")
@@ -264,10 +318,10 @@ class TokenNetwork:
             else:
                 new_open_channel_transaction.set(transaction_hash)
             finally:
-                self.open_channel_transactions.pop(partner, None)
+                self.open_channel_transactions.pop(OpenChannelTrKey(self.node_address, partner), None)
         else:
             # All other concurrent threads should block on the result of opening this channel
-            self.open_channel_transactions[partner].get()
+            self.open_channel_transactions[OpenChannelTrKey(self.node_address, partner)].get()
 
         channel_identifier: ChannelID = self._detail_channel(
             participant1=self.node_address, participant2=partner, block_identifier="latest"
@@ -395,8 +449,8 @@ class TokenNetwork:
         Note:
             For now one of the participants has to be the node_address
         """
-        if self.node_address not in (participant1, participant2):
-            raise ValueError("One participant must be the node address")
+        ##TODO Check if light clients
+
 
         if self.node_address == participant2:
             participant1, participant2 = participant2, participant1
@@ -439,8 +493,8 @@ class TokenNetwork:
         Note:
             For now one of the participants has to be the node_address
         """
-        if self.node_address not in (participant1, participant2):
-            raise ValueError("One participant must be the node address")
+        ##TODO Check if light clients
+
 
         if self.node_address == participant2:
             participant1, participant2 = participant2, participant1

@@ -735,6 +735,10 @@ class JSONRPCClient:
 
         return self.new_contract_proxy(contract_interface, contract_address), receipt
 
+    def send_signed_transaction(self, signed_tx):
+        tx_hash = self.web3.eth.sendRawTransaction(signed_tx)
+        return tx_hash
+
     def send_transaction(
         self, to: Address, startgas: int, value: int = 0, data: bytes = b""
     ) -> bytes:

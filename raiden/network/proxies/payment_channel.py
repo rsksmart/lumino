@@ -57,8 +57,7 @@ class PaymentChannel:
         participant1 = Address(decode_hex(event["args"]["participant1"]))
         participant2 = Address(decode_hex(event["args"]["participant2"]))
 
-        if token_network.node_address not in (participant1, participant2):
-            raise ValueError("One participant must be the node address")
+        # TODO light client check. Partcicipants should be a handled light client or the node itself.
 
         if token_network.node_address == participant2:
             participant1, participant2 = participant2, participant1

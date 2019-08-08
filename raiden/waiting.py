@@ -41,11 +41,29 @@ def wait_for_block(
 
         gevent.sleep(retry_timeout)
 
+def wait_for_new_lc_channel(
+    raiden: "RaidenService",
+    payment_network_id: PaymentNetworkID,
+    token_address: TokenAddress,
+    creator_address: Address,
+    partner_address: Address,
+    retry_timeout: float,
+) -> None:
+    exists = views.get_channel_existence_from_network_participants(views.state_from_raiden(raiden),payment_network_id, token_address, creator_address, partner_address)
+    while not exists:
+        assert raiden, ALARM_TASK_ERROR_MSG
+        assert raiden.alarm, ALARM_TASK_ERROR_MSG
+        gevent.sleep(retry_timeout)
+        exists = views.get_channel_existence_from_network_participants(views.state_from_raiden(raiden),
+                                                                       payment_network_id, token_address,
+                                                                       creator_address, partner_address)
+
 
 def wait_for_newchannel(
     raiden: "RaidenService",
     payment_network_id: PaymentNetworkID,
     token_address: TokenAddress,
+    creator_address: Address,
     partner_address: Address,
     retry_timeout: float,
 ) -> None:
@@ -55,7 +73,7 @@ def wait_for_newchannel(
         This does not time out, use gevent.Timeout.
     """
     channel_state = views.get_channelstate_for(
-        views.state_from_raiden(raiden), payment_network_id, token_address, partner_address
+        views.state_from_raiden(raiden), payment_network_id, token_address, creator_address, partner_address
     )
 
     while channel_state is None:
@@ -64,7 +82,7 @@ def wait_for_newchannel(
 
         gevent.sleep(retry_timeout)
         channel_state = views.get_channelstate_for(
-            views.state_from_raiden(raiden), payment_network_id, token_address, partner_address
+            views.state_from_raiden(raiden), payment_network_id, token_address, creator_address, partner_address
         )
 
 
@@ -90,7 +108,7 @@ def wait_for_participant_newbalance(
         raise ValueError("target_address must be one of the channel participants")
 
     channel_state = views.get_channelstate_for(
-        views.state_from_raiden(raiden), payment_network_id, token_address, partner_address
+        views.state_from_raiden(raiden), payment_network_id, token_address, target_address, partner_address
     )
 
     while balance(channel_state) < target_balance:
@@ -99,7 +117,7 @@ def wait_for_participant_newbalance(
 
         gevent.sleep(retry_timeout)
         channel_state = views.get_channelstate_for(
-            views.state_from_raiden(raiden), payment_network_id, token_address, partner_address
+            views.state_from_raiden(raiden), payment_network_id, token_address, target_address, partner_address
         )
 
 
