@@ -1,6 +1,6 @@
 def expect_cli_until_acknowledgment(child):
-    child.expect("Welcome to Raiden")
-    child.expect("Have you read, understood and hereby accept the above")
+    #child.expect("Welcome to RIF Lumino Payments Protocol, Version 0.1")
+    #child.expect("Have you read and understood and do you accept the RIF Lumino Disclosure Agreement and Privacy Warning?")
     child.sendline("y")
 
 
@@ -14,7 +14,7 @@ def expect_cli_until_account_selection(child):
 def expect_cli_successful_connected(child, mode):
     child.expect(f"Raiden is running in {mode} mode")
     child.expect("You are connected")
-    child.expect("The Raiden API RPC server is now running")
+    child.expect("The Lumino API RPC server is now running")
 
 
 def expect_cli_normal_startup(child, mode):
