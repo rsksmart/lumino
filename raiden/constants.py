@@ -16,8 +16,8 @@ from raiden.utils.typing import (
     PaymentHashInvoice,
 )
 
-LATEST = "https://api.github.com/repos/raiden-network/raiden/releases/latest"
-RELEASE_PAGE = "https://github.com/raiden-network/raiden/releases"
+LATEST = "https://api.github.com/repos/rsksmart/lumino/releases/latest"
+RELEASE_PAGE = "https://github.com/rsksmart/lumino/releases"
 SECURITY_EXPRESSION = r"\[CRITICAL UPDATE.*?\]"
 
 RAIDEN_DB_VERSION = 22

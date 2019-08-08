@@ -8,6 +8,9 @@ import filelock
 import structlog
 from eth_utils import to_canonical_address, to_normalized_address
 from web3 import HTTPProvider, Web3
+from definitions import ROOT_DIR
+import json
+from eth_utils import encode_hex
 
 from raiden.accounts import AccountManager
 from raiden.constants import (
@@ -262,6 +265,13 @@ def run_app(
         )
     )
 
+    running_network = {"network_id": network_id,
+                       "token_network_registry": encode_hex(tokennetwork_registry_contract_address),
+                       "secret_registry": encode_hex(secret_registry_contract_address),
+                       "endpoint_registry": encode_hex(endpoint_registry_contract_address)}
+
+    check_network_params(running_network)
+
     discovery = None
     if transport == "udp":
         transport, discovery = setup_udp_or_exit(
@@ -314,3 +324,42 @@ def run_app(
         sys.exit(1)
 
     return raiden_app
+
+
+def check_network_params(running_network):
+    config_path = os.path.join(ROOT_DIR, 'config.json')
+
+    with open(config_path) as json_data_file:
+        config_data = json.load(json_data_file)
+
+    network_data = _get_network_info(running_network["network_id"], config_data)
+    if network_data:
+        # Running Mainnet or Testnet. Validate smart contracts addresses
+        if not validate_network_contracts(network_data, running_network):
+            click.secho(
+                "One or more of the specified smart contract addresses does not match with the configured ones",
+                fg="red",
+            )
+            sys.exit(1)
+    else:
+        # Running custom network
+        print("You are running a custom network")
+
+
+def _get_network_info(network_id, config_data):
+    for network in config_data['networks'].values():
+        if network["network_id"] == network_id:
+            return network
+    return None
+
+
+def validate_network_contracts(config_network, running_network):
+    if running_network['token_network_registry'] == config_network['token_network_registry'] and \
+       running_network['secret_registry'] == config_network['secret_registry'] and \
+       running_network['endpoint_registry'] == config_network['endpoint_registry']:
+        return True
+    return False
+
+
+
+

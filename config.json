@@ -1,0 +1,21 @@
+{
+	"networks": {
+		"test_net": {
+			"network_id": 31,
+      "name": "tesnet",
+			"endpoint_registry": "0x8FBa5cB1a889d7e418fB1B23160EF39707d182bc",
+			"secret_registry": "0x1A4df359d94ae4A8A54C8045b3D7c9EbB6C4af8A",
+			"token_network_registry": "0x6BE0478E93a464093a52af9d689da3294501CaA7"
+		},
+		"main_net": {
+			"network_id": 30,
+      "name": "mainet",
+			"endpoint_registry": "0x7d1E6f17baa2744B5213b697ae4C1D287bB10df0",
+			"secret_registry": "0x4Dea623Ae7c5cb1F4aF9B46721D9a72d93C42BE9",
+			"token_network_registry": "0x59eC7Ced1e1ee2e4ccC74F197fB680D8f9426B96"
+		}
+	},
+	"project": {
+		"version": "0.0.2"
+	}
+}
