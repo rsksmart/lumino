@@ -91,14 +91,15 @@ def handle_inittarget(
     channel_state: NettingChannelState,
     pseudo_random_generator: random.Random,
     block_number: BlockNumber,
+    storage
 ) -> TransitionResult[TargetTransferState]:
     """ Handles an ActionInitTarget state change. """
     transfer = state_change.transfer
     route = state_change.route
 
     assert channel_state.identifier == transfer.balance_proof.channel_identifier
-    is_valid, channel_events, errormsg = channel.handle_receive_lockedtransfer(
-        channel_state, transfer
+    is_valid, channel_events, errormsg, handle_invoice_result = channel.handle_receive_lockedtransfer(
+        channel_state, transfer, storage
     )
 
     if is_valid:
@@ -119,7 +120,12 @@ def handle_inittarget(
         # silently let the transfer expire. The target task must be created to
         # handle the ReceiveLockExpired state change, which will clear the
         # expired lock.
-        if safe_to_wait:
+        #
+        # We add a new validation.
+        # It is verified that if there was an invoice it was paid successfully,
+        # if it was not, the payment is interrupted
+        # by not generating an event send secret request
+        if safe_to_wait and handle_invoice_result['is_valid']:
             message_identifier = message_identifier_from_prng(pseudo_random_generator)
             recipient = transfer.initiator
             secret_request = SendSecretRequest(
@@ -131,6 +137,7 @@ def handle_inittarget(
                 expiration=transfer.lock.expiration,
                 secrethash=transfer.lock.secrethash,
             )
+
             channel_events.append(secret_request)
 
         iteration = TransitionResult(target_state, channel_events)
@@ -330,6 +337,7 @@ def state_transition(
     channel_state: NettingChannelState,
     pseudo_random_generator: random.Random,
     block_number: BlockNumber,
+    storage
 ) -> TransitionResult[TargetTransferState]:
     """ State machine for the target node of a mediated transfer. """
     # pylint: disable=too-many-branches,unidiomatic-typecheck
@@ -339,7 +347,7 @@ def state_transition(
         assert isinstance(state_change, ActionInitTarget), MYPY_ANNOTATION
         if target_state is None:
             iteration = handle_inittarget(
-                state_change, channel_state, pseudo_random_generator, block_number
+                state_change, channel_state, pseudo_random_generator, block_number, storage
             )
     elif type(state_change) == Block:
         assert isinstance(state_change, Block), MYPY_ANNOTATION

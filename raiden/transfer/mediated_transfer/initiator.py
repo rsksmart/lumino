@@ -288,6 +288,7 @@ def send_lockedtransfer(
         amount=total_amount,
         message_identifier=message_identifier,
         payment_identifier=transfer_description.payment_identifier,
+        payment_hash_invoice=transfer_description.payment_hash_invoice,
         expiration=lock_expiration,
         secrethash=transfer_description.secrethash,
     )

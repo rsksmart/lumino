@@ -41,7 +41,7 @@ def restore_to_state_change(
 
     log.debug("Replaying state changes", num_state_changes=len(unapplied_state_changes))
     for state_change in unapplied_state_changes:
-        wal.state_manager.dispatch(state_change)
+        wal.state_manager.dispatch(state_change, storage)
 
     return wal
 
@@ -76,7 +76,7 @@ class WriteAheadLog(Generic[ST]):
             state_change_id = self.storage.write_state_change(state_change, timestamp)
             self.state_change_id = state_change_id
 
-            state, events = self.state_manager.dispatch(state_change)
+            state, events = self.state_manager.dispatch(state_change, self.storage)
 
             self.storage.write_events(state_change_id, events, timestamp)
 

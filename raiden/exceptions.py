@@ -87,6 +87,12 @@ class InvalidAddress(RaidenError):
     pass
 
 
+class InvoiceCoding(RaidenError):
+    """Raised when build a new invoice with BOLT11 and some data is incorrect"""
+
+    pass
+
+
 class InvalidSecret(RaidenError):
     """ Raised when the user provided value is not a valid secret. """
 

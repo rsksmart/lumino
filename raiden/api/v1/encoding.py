@@ -395,8 +395,30 @@ class PaymentSchema(BaseSchema):
         decoding_class = dict
 
 
+class PaymentInvoiceSchema(BaseSchema):
+    coded_invoice = fields.String(required=True, missing=None)
+
+    class Meta:
+        strict = True
+        decoding_class = dict
+
+
 class TokenActionSchema(BaseSchema):
     action = fields.String(missing=None)
+
+    class Meta:
+        strict = True
+        # decoding to a dict is required by the @use_kwargs decorator from webargs
+        decoding_class = dict
+
+
+class InvoiceCreateSchema(BaseSchema):
+    description= fields.String(required=True, missing=None)
+    currency_symbol = fields.String(required=True, missing=None)
+    token_address = AddressField(required=True)
+    partner_address = AddressField(required=True)
+    amount = fields.Integer(default=None, missing=None)
+    expires = fields.Integer(default=None, missing=None)
 
     class Meta:
         strict = True

@@ -74,8 +74,8 @@ class SQLiteStorage:
         # https://sqlite.org/atomiccommit.html#_exclusive_access_mode
         # https://sqlite.org/pragma.html#pragma_locking_mode
 
-        conn.execute("PRAGMA locking_mode=EXCLUSIVE")
-        
+        conn.execute("PRAGMA locking_mode=NORMAL")
+
         # Keep the journal around and skip inode updates.
         # References:
         # https://sqlite.org/atomiccommit.html#_persistent_rollback_journals
@@ -171,6 +171,110 @@ class SQLiteStorage:
             last_id = cursor.lastrowid
 
         return last_id
+
+    def write_invoice(self, invoice_data):
+        with self.write_lock, self.conn:
+            cursor = self.conn.execute(
+                "INSERT INTO invoices("
+                "identifier, "
+                "type, "
+                "status, "
+                "expiration_date, "
+                "encode, "
+                "payment_hash, "
+                "secret, "
+                "currency, "
+                "amount, "
+                "description, "
+                "target_address, "
+                "token_address, "            
+                "created_at)"
+                "VALUES(null, ?, ?, ?, ?, ?, ?, ?, ?, ? ,?, ?, ?)",
+                (invoice_data['type'],
+                 invoice_data['status'],
+                 invoice_data['expiration_date'],
+                 invoice_data['encode'],
+                 invoice_data['payment_hash'],
+                 invoice_data['secret'],
+                 invoice_data['currency'],
+                 invoice_data['amount'],
+                 invoice_data['description'],
+                 invoice_data['target_address'],
+                 invoice_data['token_address'],
+                 invoice_data['created_at'],),
+            )
+            last_id = cursor.lastrowid
+
+        return last_id
+
+    def write_invoice_payments(self, invoice_data):
+        with self.write_lock, self.conn:
+            cursor = self.conn.execute(
+                "INSERT INTO invoices_payments(identifier, "
+                "invoice_id, "
+                "state_event_id) VALUES(null, ?, ?)",
+
+                (invoice_data['invoice_id'],
+                 invoice_data['state_event_id'],)
+            )
+            last_id = cursor.lastrowid
+
+        return last_id
+
+    def update_invoice(self, data):
+        if isinstance(data, (bytes, bytearray)):
+            payment_hash = data["payment_hash"].hex()
+        else:
+            payment_hash = data["payment_hash"]
+
+        with self.write_lock, self.conn:
+            cursor = self.conn.execute(
+                "UPDATE invoices SET status =? WHERE payment_hash=?", (data["status"], payment_hash)
+            )
+            last_id = cursor.lastrowid
+
+        return last_id
+
+    def query_invoice(self, payment_hash):
+        cursor = self.conn.cursor()
+
+        cursor.execute(
+            """
+            SELECT 
+                identifier, 
+                type, 
+                status, 
+                expiration_date, 
+                encode, 
+                payment_hash, 
+                secret, 
+                currency, 
+                amount, 
+                description, 
+                target_address, 
+                token_address
+            FROM invoices WHERE payment_hash = ?;
+            """,
+            (payment_hash,)
+        )
+
+        invoice = cursor.fetchone()
+        invoice_dict = None
+        if invoice is not None:
+            invoice_dict = {"identifier": invoice[0],
+                            "type": invoice[1],
+                            "status": invoice[2],
+                            "expiration_date": invoice[3],
+                            "encode": invoice[4],
+                            "payment_hash": invoice[5],
+                            "secret": invoice[6],
+                            "currency": invoice[7],
+                            "amount": invoice[8],
+                            "description": invoice[9],
+                            "target_address": invoice[10],
+                            "token_address": invoice[11]}
+
+        return invoice_dict
 
     def query_token_action(self, token):
         cursor = self.conn.cursor()
@@ -530,6 +634,32 @@ class SQLiteStorage:
             for entry in entries
         ]
         return result
+
+    def get_payment_event(self, identifier, event_type):
+        cursor = self.conn.cursor()
+
+        query = """
+
+           SELECT identifier, data FROM state_events
+                   WHERE json_extract(state_events.data,
+                      '$.identifier') IN ({})
+                   AND
+                   json_extract(state_events.data,
+                      '$._type') IN ({})        
+           """
+
+        query = query.format("\'" + str(identifier) + "\'", "\'" + event_type + "\'")
+
+        cursor.execute(
+            query
+        )
+
+        payment_event = cursor.fetchone()
+
+        payment_event_dict = {"identifier": payment_event[0],
+                              "data": payment_event[1]}
+
+        return payment_event_dict
 
     def _query_payments_events(self,
                                token_network_identifier,
@@ -960,6 +1090,12 @@ class SerializedSQLiteStorage(SQLiteStorage):
         super().__init__(database_path)
 
         self.serializer = serializer
+
+    def query_invoice(self, payment_hash_invoice):
+        return super().query_invoice(payment_hash_invoice)
+
+    def update_invoice(self, payment_hash_invoice):
+        return super().update_invoice(payment_hash_invoice)
 
     def write_state_change(self, state_change, log_time):
         serialized_data = self.serializer.serialize(state_change)

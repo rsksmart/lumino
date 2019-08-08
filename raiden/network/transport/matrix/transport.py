@@ -509,6 +509,7 @@ class MatrixTransport(Runnable):
         It may be called before transport is started, to initialize message queues
         The actual sending is started only when the transport is started
         """
+
         # even if transport is not started, can run to enqueue messages to send when it starts
         receiver_address = queue_identifier.recipient
 

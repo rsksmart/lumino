@@ -7,7 +7,7 @@ import hashlib
 import dateutil.parser
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
-from eth_utils import is_binary_address, to_checksum_address, to_canonical_address, to_normalized_address
+from eth_utils import is_binary_address, to_checksum_address, to_canonical_address, to_normalized_address, decode_hex, encode_hex
 
 import raiden.blockchain.events as blockchain_events
 from raiden import waiting
@@ -35,6 +35,7 @@ from raiden.exceptions import (
     RaidenRecoverableError,
     TokenNotRegistered,
     UnknownTokenAddress,
+    InvoiceCoding
 )
 from raiden.messages import RequestMonitoring
 from raiden.settings import DEFAULT_RETRY_TIMEOUT, DEVELOPMENT_CONTRACT_VERSION
@@ -70,6 +71,7 @@ from raiden.utils.typing import (
     Optional,
     PaymentID,
     PaymentNetworkID,
+    PaymentHashInvoice,
     Secret,
     SecretHash,
     Set,
@@ -82,6 +84,12 @@ from raiden.utils.typing import (
 
 from raiden.rns_constants import RNS_ADDRESS_ZERO
 from raiden.utils.rns import is_rns_address
+
+from raiden.billing.invoices.options_args import OptionsArgs
+from raiden.billing.invoices.util.time_util import get_utc_unix_time, get_utc_expiration_time
+from raiden.billing.invoices.encoder.invoice_encoder import parse_options, encode_invoice
+from raiden.billing.invoices.decoder.invoice_decoder import decode_invoice
+from raiden.utils import random_secret, sha3
 
 log = structlog.get_logger(__name__)  # pylint: disable=invalid-name
 
@@ -855,6 +863,7 @@ class RaidenAPI:
         transfer_timeout: int = None,
         secret: Secret = None,
         secrethash: SecretHash = None,
+        payment_hash_invoice: PaymentHashInvoice = None
     ):
         """ Do a transfer with `target` with the given `amount` of `token_address`. """
         # pylint: disable=too-many-arguments
@@ -867,6 +876,7 @@ class RaidenAPI:
             identifier=identifier,
             secret=secret,
             secrethash=secrethash,
+            payment_hash_invoice=payment_hash_invoice
         )
         payment_status.payment_done.wait(timeout=transfer_timeout)
         return payment_status
@@ -880,6 +890,7 @@ class RaidenAPI:
         identifier: PaymentID = None,
         secret: Secret = None,
         secrethash: SecretHash = None,
+        payment_hash_invoice: PaymentHashInvoice = None
     ):
         current_state = views.state_from_raiden(self.raiden)
         payment_network_identifier = self.raiden.default_registry.address
@@ -921,6 +932,7 @@ class RaidenAPI:
             token=pex(token_address),
             amount=amount,
             identifier=identifier,
+            payment_hash_invoice=payment_hash_invoice
         )
 
         token_network_identifier = views.get_token_network_identifier_by_token_address(
@@ -935,6 +947,7 @@ class RaidenAPI:
             identifier=identifier,
             secret=secret,
             secrethash=secrethash,
+            payment_hash_invoice=payment_hash_invoice
         )
         return payment_status
 
@@ -1038,6 +1051,13 @@ class RaidenAPI:
         return self.raiden.wal.storage.get_events_with_timestamps(limit=limit, offset=offset)
 
     transfer = transfer_and_wait
+
+    def get_invoice(self, payment_hash):
+        invoice = self.raiden.wal.storage.query_invoice(payment_hash)
+        return invoice
+
+    def decode_invoice(self, coded_invoice):
+        return decode_invoice(coded_invoice)
 
     def get_blockchain_events_network(
         self,
@@ -1193,6 +1213,87 @@ class RaidenAPI:
     def get_token_action(self, token):
         token_data = self.raiden.wal.storage.query_token_action(token)
         return token_data
+
+    def update_invoice(self, data):
+        # Update this information
+        self.raiden.wal.storage.update_invoice(data)
+
+    def create_invoice(self, data):
+        if data['already_coded_invoice']:
+            persisted_invoice = self.persist_invoice(data)
+        else:
+            persisted_invoice = self.do_encode_invoce(data)
+
+        return persisted_invoice
+
+    def persist_invoice(self, data):
+        # Save this information
+        self.raiden.wal.storage.write_invoice(data)
+
+        return data
+
+    def do_encode_invoce(self, data):
+
+        if not is_binary_address(data['token_address']):
+            raise InvalidAddress("Expected binary address format for token in create_invoice")
+
+        if not is_binary_address(data['partner_address']):
+            raise InvalidAddress("Expected binary address format for partner in create_invoice")
+
+        chain = self.raiden.chain
+        private_key = chain.client.privkey.hex()
+        timestamp = get_utc_unix_time()
+
+        timestamp_utc_str = datetime.utcfromtimestamp(timestamp).isoformat()
+
+        currency = data['currency_symbol']
+        fallback = None
+        amount = data['amount']
+        invoice_secret = random_secret()
+        payment_hash = sha3(invoice_secret)
+        payment_hash = encode_hex(payment_hash)
+
+        description = data['description']
+        description_hashed = None
+        expires = data['expires']
+        route = []
+        beneficiary = "0x" + data['partner_address'].hex()
+        token = "0x" + data['token_address'].hex()
+
+        options_args = OptionsArgs(timestamp,
+                                   currency,
+                                   fallback,
+                                   amount,
+                                   payment_hash,
+                                   description,
+                                   description_hashed,
+                                   expires,
+                                   route,
+                                   private_key,
+                                   beneficiary,
+                                   token)
+
+        lumino_invoice_obj = parse_options(options_args)
+
+        try:
+            lumino_invoice_encoded = encode_invoice(lumino_invoice_obj, options_args.privkey)
+        except TypeError:
+            raise InvoiceCoding("Error coding the invoice, review the input data provided")
+
+        expiration_date = get_utc_expiration_time(expires)
+
+        return self.persist_invoice({"type": data['invoice_type'],
+                                     "status": data['invoice_status'],
+                                     "expiration_date": expiration_date,
+                                     "encode": lumino_invoice_encoded,
+                                     "payment_hash": payment_hash,
+                                     "secret": encode_hex(invoice_secret),
+                                     "currency": currency,
+                                     "amount": str(amount),
+                                     "description": description,
+                                     "target_address": beneficiary,
+                                     "token_address": token,
+                                     "created_at": timestamp_utc_str})
 
     def search_lumino(self, registry_address: typing.PaymentNetworkID, query, only_receivers):
 

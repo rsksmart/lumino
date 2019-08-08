@@ -13,6 +13,7 @@ from raiden.utils.typing import (
     Secret,
     Signature,
     TokenAmount,
+    PaymentHashInvoice,
 )
 
 LATEST = "https://api.github.com/repos/raiden-network/raiden/releases/latest"
@@ -49,6 +50,8 @@ EMPTY_HASH_KECCAK = keccak(EMPTY_HASH)
 EMPTY_SIGNATURE = Signature(bytes(65))
 EMPTY_MERKLE_ROOT = Locksroot(bytes(32))
 EMPTY_SECRET = Secret(b"")
+EMPTY_PAYMENT_HASH_INVOICE = PaymentHashInvoice(b"")
+
 ZERO_TOKENS = TokenAmount(0)
 
 SECRET_LENGTH = 32
