@@ -395,6 +395,24 @@ class ChannelPatchSchema(BaseSchema):
         decoding_class = dict
 
 
+class ChannelLightPatchSchema(BaseSchema):
+    total_deposit = fields.Integer(default=None, missing=None)
+    state = fields.String(
+        default=None,
+        missing=None,
+        validate=validate.OneOf(
+            [CHANNEL_STATE_CLOSED, CHANNEL_STATE_OPENED, CHANNEL_STATE_SETTLED]
+        ),
+    )
+    signed_approval_tx = fields.String(required=True)
+    signed_deposit_tx = fields.String(required=True)
+
+    class Meta:
+        strict = True
+        # decoding to a dict is required by the @use_kwargs decorator from webargs:
+        decoding_class = dict
+
+
 class PaymentSchema(BaseSchema):
     initiator_address = AddressField(missing=None)
     target_address = AddressField(missing=None)

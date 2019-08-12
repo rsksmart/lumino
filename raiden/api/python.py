@@ -206,15 +206,19 @@ class RaidenAPI:
         self,
         registry_address: PaymentNetworkID,
         token_address: TokenAddress,
+        creator_address: Address,
         partner_address: Address,
     ) -> NettingChannelState:
         if not is_binary_address(token_address):
             raise InvalidAddress("Expected binary address format for token in get_channel")
 
+        if not is_binary_address(creator_address):
+            raise InvalidAddress("Expected binary address format for creator in get_channel")
+
         if not is_binary_address(partner_address):
             raise InvalidAddress("Expected binary address format for partner in get_channel")
 
-        channel_list = self.get_channel_list(registry_address, token_address, partner_address)
+        channel_list = self.get_channel_list(registry_address, token_address, creator_address, partner_address)
         assert len(channel_list) <= 1
 
         if not channel_list:
@@ -562,6 +566,39 @@ class RaidenAPI:
 
         return channel_state.identifier
 
+    def set_total_channel_deposit_light(
+        self,
+        registry_address: PaymentNetworkID,
+        token_address: TokenAddress,
+        creator_address: Address,
+        partner_address: Address,
+        signed_approval_tx: SignedTransaction,
+        signed_deposit_tx: SignedTransaction,
+        total_deposit: TokenAmount,
+        retry_timeout: NetworkTimeout = DEFAULT_RETRY_TIMEOUT,
+    ):
+        chain_state = views.state_from_raiden(self.raiden)
+
+        channel_state = views.get_channelstate_for(
+            chain_state=chain_state,
+            payment_network_id=registry_address,
+            token_address=token_address,
+            creator_address=creator_address,
+            partner_address=partner_address,
+        )
+
+        channel_proxy = self.raiden.chain.payment_channel(
+            canonical_identifier=channel_state.canonical_identifier
+        )
+
+        channel_proxy.set_total_deposit_light(
+            total_deposit=total_deposit,
+            block_identifier=views.state_from_raiden(self.raiden).block_hash,
+            signed_approval_tx=signed_approval_tx,
+            signed_deposit_tx=signed_deposit_tx
+        )
+        return None
+
     def set_total_channel_deposit(
         self,
         registry_address: PaymentNetworkID,
@@ -709,12 +746,14 @@ class RaidenAPI:
         self,
         registry_address: PaymentNetworkID,
         token_address: TokenAddress = None,
+        creator_address: Address = None,
         partner_address: Address = None,
     ) -> List[NettingChannelState]:
         """Returns a list of channels associated with the optionally given
            `token_address` and/or `partner_address`.
         Args:
             token_address: an optionally provided token address
+            creator_address: an optionally provided creator address
             partner_address: an optionally provided partner address
         Return:
             A list containing all channels the node participates. Optionally
@@ -728,20 +767,24 @@ class RaidenAPI:
         if token_address and not is_binary_address(token_address):
             raise InvalidAddress("Expected binary address format for token in get_channel_list")
 
-        if partner_address:
+        if partner_address and creator_address:
             if not is_binary_address(partner_address):
                 raise InvalidAddress(
                     "Expected binary address format for partner in get_channel_list"
                 )
+            if not is_binary_address(creator_address):
+                raise InvalidAddress(
+                    "Expected binary address format for creator in get_channel_list"
+                )
             if not token_address:
                 raise UnknownTokenAddress("Provided a partner address but no token address")
 
-        if token_address and partner_address:
+        if token_address and partner_address and creator_address:
             channel_state = views.get_channelstate_for(
                 chain_state=views.state_from_raiden(self.raiden),
                 payment_network_id=registry_address,
                 token_address=token_address,
-                creator_address=self.address,
+                creator_address=creator_address,
                 partner_address=partner_address,
             )
 
@@ -1145,6 +1188,7 @@ class RaidenAPI:
                 partner_channel = self.get_channel(
                     registry_address=self.raiden.default_registry.address,
                     token_address=token_address,
+                    creator_address=self.address,
                     partner_address=partner_address,
                 )
                 channel_id = partner_channel.identifier

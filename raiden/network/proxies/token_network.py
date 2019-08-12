@@ -664,6 +664,23 @@ class TokenNetwork:
             log.info("setTotalDeposit failed", reason=msg, **log_details)
             raise DepositMismatch(msg)
 
+
+    def set_total_deposit_light(
+        self,
+        given_block_identifier: BlockSpecification,
+        channel_identifier: ChannelID,
+        total_deposit: TokenAmount,
+        creator: Address,
+        partner: Address,
+        signed_approval_tx: SignedTransaction,
+        signed_deposit_tx: SignedTransaction
+    ):
+        approval_hash = self.proxy.broadcast_signed_transaction(signed_approval_tx)
+        deposit_hash = self.proxy.broadcast_signed_transaction(signed_deposit_tx)
+
+        return approval_hash
+
+
     def set_total_deposit(
         self,
         given_block_identifier: BlockSpecification,

@@ -19,7 +19,9 @@ from raiden.api.v1.encoding import (
     TokenActionRequestSchema,
     InvoiceCreateSchema,
     PaymentInvoiceSchema,
-    ChannelLightPutSchema)
+    ChannelLightPutSchema,
+    ChannelLightPatchSchema
+)
 from raiden.utils import typing
 from raiden.constants import EMPTY_PAYMENT_HASH_INVOICE
 
@@ -118,6 +120,22 @@ class ChannelsResourceByTokenAndPartnerAddress(BaseResource):
     @use_kwargs(patch_schema, locations=("json",))
     def patch(self, **kwargs):
         return self.rest_api.patch_channel(
+            registry_address=self.rest_api.raiden_api.raiden.default_registry.address, **kwargs
+        )
+
+    def get(self, **kwargs):
+        return self.rest_api.get_channel(
+            registry_address=self.rest_api.raiden_api.raiden.default_registry.address, **kwargs
+        )
+
+
+class LightChannelsResourceByTokenAndPartnerAddress(BaseResource):
+
+    patch_schema = ChannelLightPatchSchema
+
+    @use_kwargs(patch_schema, locations=("json",))
+    def patch(self, **kwargs):
+        return self.rest_api.patch_light_channel(
             registry_address=self.rest_api.raiden_api.raiden.default_registry.address, **kwargs
         )
 

@@ -17,7 +17,7 @@ from raiden.utils.typing import (
     Nonce,
     Signature,
     TokenAmount,
-)
+    SignedTransaction)
 from raiden_contracts.constants import CONTRACT_TOKEN_NETWORK, ChannelEvent
 from raiden_contracts.contract_manager import ContractManager
 
@@ -167,6 +167,18 @@ class PaymentChannel:
             channel_identifier=self.channel_identifier,
             total_deposit=total_deposit,
             partner=self.participant2,
+        )
+
+    def set_total_deposit_light(self, total_deposit: TokenAmount, block_identifier: BlockSpecification,
+                                signed_approval_tx: SignedTransaction, signed_deposit_tx: SignedTransaction):
+        self.token_network.set_total_deposit_light(
+            given_block_identifier=block_identifier,
+            channel_identifier=self.channel_identifier,
+            total_deposit=total_deposit,
+            creator=self.participant1,
+            partner=self.participant2,
+            signed_approval_tx=signed_approval_tx,
+            signed_deposit_tx=signed_deposit_tx
         )
 
     def close(
