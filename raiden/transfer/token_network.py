@@ -1,3 +1,4 @@
+from eth_utils import to_checksum_address, to_normalized_address, decode_hex
 from eth_utils.typing import ChecksumAddress
 
 from raiden.transfer import channel
@@ -279,7 +280,10 @@ def state_transition(
         iteration = handle_channelnew(token_network_state, state_change)
     elif type(state_change) == ContractReceiveChannelNewBalance:
         assert isinstance(state_change, ContractReceiveChannelNewBalance), MYPY_ANNOTATION
-        iteration = handle_balance(token_network_state, state_change, block_number, block_hash, state_change.participant)
+        client_address = state_change.participant
+        if type(client_address) != bytes:
+            client_address = decode_hex(state_change.participant)
+        iteration = handle_balance(token_network_state, state_change, block_number, block_hash, client_address)
     elif type(state_change) == ContractReceiveChannelClosed:
         assert isinstance(state_change, ContractReceiveChannelClosed), MYPY_ANNOTATION
         iteration = handle_closed(token_network_state, state_change, block_number, block_hash)

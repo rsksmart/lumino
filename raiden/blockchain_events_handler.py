@@ -166,7 +166,7 @@ def handle_channel_new_balance(raiden: "RaidenService", event: Event):
             token_network_address=token_network_identifier,
             channel_identifier=channel_identifier,
         ),
-        address=raiden.address
+        address=participant_address
     )
 
     # Channels will only be registered if this node is a participant
@@ -188,16 +188,18 @@ def handle_channel_new_balance(raiden: "RaidenService", event: Event):
         )
         raiden.handle_and_track_state_change(newbalance_statechange)
 
-        if balance_was_zero and participant_address != raiden.address:
-            connection_manager = raiden.connection_manager_for_token_network(
-                token_network_identifier
-            )
 
-            join_channel = gevent.spawn(
-                connection_manager.join_channel, participant_address, total_deposit
-            )
-
-            raiden.add_pending_greenlet(join_channel)
+        ## TODO CHECK THIS AND HANDLE DIFERENTLY FOR LIGHT CLIENTS
+        # if balance_was_zero and participant_address != raiden.address:
+        #     connection_manager = raiden.connection_manager_for_token_network(
+        #         token_network_identifier
+        #     )
+        #
+        #     join_channel = gevent.spawn(
+        #         connection_manager.join_channel, participant_address, total_deposit
+        #     )
+        #
+        #     raiden.add_pending_greenlet(join_channel)
 
 
 def handle_channel_closed(raiden: "RaidenService", event: Event):

@@ -149,8 +149,8 @@ def subdispatch_to_all_channels(
 
     for payment_network in chain_state.identifiers_to_paymentnetworks.values():
         for token_network_state in payment_network.tokenidentifiers_to_tokennetworks.values():
-            if chain_state.our_address in token_network_state.channelidentifiers_to_channels:
-                for channel_state in token_network_state.channelidentifiers_to_channels[chain_state.our_address].values():
+            for client in token_network_state.channelidentifiers_to_channels:
+                for channel_state in token_network_state.channelidentifiers_to_channels[client].values():
                     result = channel.state_transition(
                         channel_state=channel_state,
                         state_change=state_change,
