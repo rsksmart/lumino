@@ -1472,7 +1472,13 @@ class RestAPI:
         except DepositMismatch as e:
             return api_error(errors=str(e), status_code=HTTPStatus.CONFLICT)
 
-        return api_response(result="Hello")
+        updated_channel_state = self.raiden_api.get_channel(
+            registry_address, channel_state.token_address, channel_state.our_state.address,
+            channel_state.partner_state.address
+        )
+
+        result = self.channel_schema.dump(updated_channel_state)
+        return api_response(result=result.data)
 
     def _deposit(
         self,
@@ -1616,7 +1622,13 @@ class RestAPI:
                 errors="Provided invalid channel state {}".format(state),
                 status_code=HTTPStatus.BAD_REQUEST,
             )
-        return result
+
+        updated_channel_state = self.raiden_api.get_channel(
+            registry_address, channel_state.token_address, channel_state.our_state.address,
+            channel_state.partner_state.address
+        )
+        result = self.channel_schema.dump(updated_channel_state)
+        return api_response(result=result.data)
 
     def patch_channel(
         self,

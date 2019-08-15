@@ -1,7 +1,7 @@
 from eth_utils import to_checksum_address, to_normalized_address, decode_hex
 from eth_utils.typing import ChecksumAddress
 
-from raiden.transfer import channel
+from raiden.transfer import channel, views
 from raiden.transfer.architecture import Event, StateChange, TransitionResult
 from raiden.transfer.state import TokenNetworkState, NettingChannelState
 from raiden.transfer.state_change import (
@@ -17,7 +17,7 @@ from raiden.transfer.state_change import (
     ContractReceiveUpdateTransfer,
 )
 from raiden.utils.typing import MYPY_ANNOTATION, BlockHash, BlockNumber, List, Union, Dict, ChannelID, Address, \
-    AddressHex
+    AddressHex, Tuple
 
 # TODO: The proper solution would be to introduce a marker for state changes
 # that contains channel IDs and other specific channel attributes
@@ -45,7 +45,13 @@ def subdispatch_to_channel_by_id_and_address(
     channel_state = None
     if node_address in ids_to_channels:
         channel_state = ids_to_channels[node_address].get(state_change.channel_identifier)
-
+    else:
+        lc_address = views.get_lc_address_by_channel_id_and_partner(token_network_state, node_address,
+                                                                    state_change.canonical_identifier)
+        node_address = lc_address
+        if lc_address in token_network_state.channelidentifiers_to_channels:
+            channel_state = token_network_state.channelidentifiers_to_channels[lc_address].get(
+                state_change.canonical_identifier.channel_identifier)
     if channel_state:
         result = channel.state_transition(
             channel_state=channel_state,
@@ -110,11 +116,10 @@ def handle_channelnew(
         token_network_state.channelidentifiers_to_channels[our_address][channel_identifier] = channel_state
 
         addresses_to_ids = token_network_state.partneraddresses_to_channelidentifiers
+        addresses_to_ids[our_address].append(channel_identifier)
         addresses_to_ids[partner_address].append(channel_identifier)
 
         return TransitionResult(token_network_state, events)
-
-
 
 
 def handle_balance(
@@ -208,7 +213,6 @@ def handle_batch_unlock(
         events.extend(sub_iteration.events)
 
         if sub_iteration.new_state is None:
-
             token_network_state.partneraddresses_to_channelidentifiers[
                 channel_state.partner_state.address
             ].remove(channel_state.identifier)

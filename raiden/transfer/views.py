@@ -1,7 +1,7 @@
 from raiden.transfer import channel
 from raiden.transfer.architecture import ContractSendEvent
 from raiden.transfer.identifiers import CanonicalIdentifier
-from eth_utils import to_canonical_address
+from eth_utils import to_canonical_address, to_checksum_address
 
 from raiden.transfer.state import (
     CHANNEL_STATE_CLOSED,
@@ -39,7 +39,7 @@ from raiden.utils.typing import (
     TokenAddress,
     TokenNetworkID,
     Union,
-    ChannelID, AddressHex)
+    ChannelID, AddressHex, Tuple)
 
 
 # TODO: Either enforce immutability or make a copy of the values returned by
@@ -231,7 +231,8 @@ def get_token_network_by_identifier(
 
 
 def get_channel_existence_from_network_participants(
-    chain_state: ChainState, payment_network_id: PaymentNetworkID, token_address: TokenAddress, participant1: Address, participant2: Address
+    chain_state: ChainState, payment_network_id: PaymentNetworkID, token_address: TokenAddress, participant1: Address,
+    participant2: Address
 ) -> bool:
     token_network = get_token_network_by_token_address(
         chain_state, payment_network_id, token_address
@@ -239,7 +240,6 @@ def get_channel_existence_from_network_participants(
     if token_network:
         return token_network.network_graph.channel_exists(participant1, participant2)
     return False
-
 
 
 def get_channelstate_for(
@@ -300,8 +300,30 @@ def get_channelstate_by_canonical_identifier_and_address(
         channel_state = token_network.channelidentifiers_to_channels[address].get(
             canonical_identifier.channel_identifier
         )
-
+    else:
+        # Get the channel by the light client associated with the participant and the canonical id
+        lc_address = get_lc_address_by_channel_id_and_partner(token_network, address, canonical_identifier)
+        if lc_address in token_network.channelidentifiers_to_channels:
+            channel_state = token_network.channelidentifiers_to_channels[lc_address].get(
+                canonical_identifier.channel_identifier)
     return channel_state
+
+
+def get_lc_address_by_channel_id_and_partner(token_network_state: TokenNetworkState, node_address: AddressHex,
+                                             canonical_identifier: CanonicalIdentifier) -> Optional[AddressHex]:
+    lc_address = None
+    if token_network_state and node_address in token_network_state.partneraddresses_to_channelidentifiers:
+        channel_ids: List[ChannelID] = token_network_state.partneraddresses_to_channelidentifiers[node_address]
+        for channel_id in channel_ids:
+            if channel_id == canonical_identifier.channel_identifier:
+                participants: Tuple[Address, Address] = \
+                    token_network_state.network_graph.channel_identifier_to_participants[channel_id]
+                if participants[0] is node_address:
+                    lc_address = participants[1]
+                else:
+                    lc_address = participants[0]
+                    return lc_address
+    return lc_address
 
 
 def get_channelstate_filter(

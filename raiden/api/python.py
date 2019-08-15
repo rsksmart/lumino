@@ -597,7 +597,16 @@ class RaidenAPI:
             signed_approval_tx=signed_approval_tx,
             signed_deposit_tx=signed_deposit_tx
         )
-        return None
+
+        waiting.wait_for_participant_newbalance(
+            raiden=self.raiden,
+            payment_network_id=registry_address,
+            token_address=token_address,
+            partner_address=partner_address,
+            target_address=creator_address,
+            target_balance=total_deposit,
+            retry_timeout=retry_timeout,
+        )
 
     def set_total_channel_deposit(
         self,
