@@ -578,6 +578,7 @@ class RaidenAPI:
         retry_timeout: NetworkTimeout = DEFAULT_RETRY_TIMEOUT,
     ):
         chain_state = views.state_from_raiden(self.raiden)
+        token_addresses = views.get_token_identifiers(chain_state, registry_address)
 
         channel_state = views.get_channelstate_for(
             chain_state=chain_state,
@@ -586,6 +587,61 @@ class RaidenAPI:
             creator_address=creator_address,
             partner_address=partner_address,
         )
+
+        if not is_binary_address(token_address):
+            raise InvalidAddress("Expected binary address format for token in channel deposit")
+
+        if not is_binary_address(partner_address):
+            raise InvalidAddress("Expected binary address format for partner in channel deposit")
+
+        if token_address not in token_addresses:
+            raise UnknownTokenAddress("Unknown token address")
+
+        if channel_state is None:
+            raise InvalidAddress("No channel with partner_address for the given token")
+
+        if self.raiden.config["environment_type"] == Environment.PRODUCTION:
+            per_token_network_deposit_limit = RED_EYES_PER_TOKEN_NETWORK_LIMIT
+        else:
+            per_token_network_deposit_limit = UINT256_MAX
+
+        token = self.raiden.chain.token(token_address)
+        token_network_registry = self.raiden.chain.token_network_registry(registry_address)
+        token_network_address = token_network_registry.get_token_network(token_address)
+        token_network_proxy = self.raiden.chain.token_network(token_network_address)
+
+        if total_deposit == 0:
+            raise DepositMismatch("Attempted to deposit with total deposit being 0")
+
+        addendum = total_deposit - channel_state.our_state.contract_balance
+
+        total_network_balance = token.balance_of(registry_address)
+
+        if total_network_balance + addendum > per_token_network_deposit_limit:
+            raise DepositOverLimit(
+                f"The deposit of {addendum} will exceed the "
+                f"token network limit of {per_token_network_deposit_limit}"
+            )
+
+        balance = token.balance_of(self.raiden.address)
+
+        functions = token_network_proxy.proxy.contract.functions
+        deposit_limit = functions.channel_participant_deposit_limit().call()
+
+        if total_deposit > deposit_limit:
+            raise DepositOverLimit(
+                f"The additional deposit of {addendum} will exceed the "
+                f"channel participant limit of {deposit_limit}"
+            )
+
+        # If this check succeeds it does not imply the the `deposit` will
+        # succeed, since the `deposit` transaction may race with another
+        # transaction.
+        if not balance >= addendum:
+            msg = "Not enough balance to deposit. {} Available={} Needed={}".format(
+                pex(token_address), balance, addendum
+            )
+            raise InsufficientFunds(msg)
 
         channel_proxy = self.raiden.chain.payment_channel(
             canonical_identifier=channel_state.canonical_identifier

@@ -108,9 +108,6 @@ def wait_for_participant_newbalance(
 
     balance = _check_balance(channel_state, target_address)
     while balance < target_balance:
-        print(balance)
-        print("Vs")
-        print(target_balance)
         assert raiden, ALARM_TASK_ERROR_MSG
         assert raiden.alarm, ALARM_TASK_ERROR_MSG
 

@@ -1444,7 +1444,7 @@ class RestAPI:
     ):
         log.debug(
             "Depositing to light channel",
-            node=pex(self.raiden_api.address),
+            node=pex(channel_state.our_state.address),
             registry_address=to_checksum_address(registry_address),
             channel_identifier=channel_state.identifier,
             total_deposit=total_deposit,
@@ -1565,8 +1565,8 @@ class RestAPI:
 
     ):
         log.debug(
-            "Patching channel",
-            node=pex(self.raiden_api.address),
+            "Patching light channel",
+            node=pex(creator_address),
             registry_address=to_checksum_address(registry_address),
             token_address=to_checksum_address(token_address),
             creator_address=to_checksum_address(creator_address),
@@ -1617,18 +1617,13 @@ class RestAPI:
 
         elif state == CHANNEL_STATE_CLOSED:
             log.critical("Not implemented yet!")
+            result = None
         else:  # should never happen, channel_state is validated in the schema
             result = api_error(
                 errors="Provided invalid channel state {}".format(state),
                 status_code=HTTPStatus.BAD_REQUEST,
             )
-
-        updated_channel_state = self.raiden_api.get_channel(
-            registry_address, channel_state.token_address, channel_state.our_state.address,
-            channel_state.partner_state.address
-        )
-        result = self.channel_schema.dump(updated_channel_state)
-        return api_response(result=result.data)
+        return result
 
     def patch_channel(
         self,

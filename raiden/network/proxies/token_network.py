@@ -224,7 +224,7 @@ class TokenNetwork:
                         creator=creator, partner=partner, block=receipt_or_none["blockNumber"]
                     )
                     log.critical("new_netting_channel_light failed", **log_details)
-                    raise RawTransactionFailed("creating new channel failed")
+                    raise RaidenUnrecoverableError("creating new channel failed")
             except HTTPError as e:
                 log.critical("new_netting_channel failed: transaction malformed", **log_details)
                 new_open_channel_transaction.set_exception(e)
@@ -616,6 +616,7 @@ class TokenNetwork:
         self,
         channel_identifier: ChannelID,
         total_deposit: TokenAmount,
+        creator: Address,
         partner: Address,
         token: Token,
         previous_total_deposit: TokenAmount,
@@ -626,7 +627,7 @@ class TokenNetwork:
             raise NoStateForBlockIdentifier()
 
         self._check_for_outdated_channel(
-            participant1=self.node_address,
+            participant1=creator,
             participant2=partner,
             block_identifier=block_identifier,
             channel_identifier=channel_identifier,
@@ -675,10 +676,125 @@ class TokenNetwork:
         signed_approval_tx: SignedTransaction,
         signed_deposit_tx: SignedTransaction
     ):
-        approval_hash = self.proxy.broadcast_signed_transaction(signed_approval_tx)
-        deposit_hash = self.proxy.broadcast_signed_transaction(signed_deposit_tx)
+        """ Set channel's total deposit.
 
-        return approval_hash
+               `total_deposit` has to be monotonically increasing, this is enforced by
+               the `TokenNetwork` smart contract. This is done for the same reason why
+               the balance proofs have a monotonically increasing transferred amount,
+               it simplifies the analysis of bad behavior and the handling code of
+               out-dated balance proofs.
+
+               Races to `set_total_deposit` are handled by the smart contract, where
+               largest total deposit wins. The end balance of the funding accounts is
+               undefined. E.g.
+
+               - Acc1 calls set_total_deposit with 10 tokens
+               - Acc2 calls set_total_deposit with 13 tokens
+
+               - If Acc2's transaction is mined first, then Acc1 token supply is left intact.
+               - If Acc1's transaction is mined first, then Acc2 will only move 3 tokens.
+
+               Races for the same account don't have any unexpeted side-effect.
+
+               Raises:
+                   DepositMismatch: If the new request total deposit is lower than the
+                       existing total deposit on-chain for the `given_block_identifier`.
+                   RaidenRecoverableError: If the channel was closed meanwhile the
+                       deposit was in transit.
+                   RaidenUnrecoverableError: If the transaction was sucessful and the
+                       deposit_amount is not as large as the requested value.
+                   RuntimeError: If the token address is empty.
+                   ValueError: If an argument is of the invalid type.
+               """
+
+        if not isinstance(total_deposit, int):
+            raise ValueError("total_deposit needs to be an integer number.")
+        token_address = self.token_address()
+        token = Token(
+            jsonrpc_client=self.client,
+            token_address=token_address,
+            contract_manager=self.contract_manager,
+        )
+        checking_block = self.client.get_checking_block()
+        error_prefix = "setTotalDeposit call will fail"
+        with self.channel_operations_lock[partner], self.deposit_lock:
+            previous_total_deposit = self._detail_participant(
+                channel_identifier=channel_identifier,
+                participant=creator,
+                partner=partner,
+                block_identifier=given_block_identifier,
+            ).deposit
+            amount_to_deposit = TokenAmount(total_deposit - previous_total_deposit)
+            log_details = {
+                "token_network": pex(self.address),
+                "channel_identifier": channel_identifier,
+                "node": pex(creator),
+                "partner": pex(partner),
+                "new_total_deposit": total_deposit,
+                "previous_total_deposit": previous_total_deposit,
+            }
+            try:
+                self._deposit_preconditions(
+                    channel_identifier=channel_identifier,
+                    total_deposit=total_deposit,
+                    creator=creator,
+                    partner=partner,
+                    token=token,
+                    previous_total_deposit=previous_total_deposit,
+                    log_details=log_details,
+                    block_identifier=given_block_identifier,
+                )
+            except NoStateForBlockIdentifier:
+                # If preconditions end up being on pruned state skip them. Estimate
+                # gas will stop us from sending a transaction that will fail
+                pass
+
+            # If there are channels being set up concurrenlty either the
+            # allowance must be accumulated *or* the calls to `approve` and
+            # `setTotalDeposit` must be serialized. This is necessary otherwise
+            # the deposit will fail.
+            #
+            # Calls to approve and setTotalDeposit are serialized with the
+            # deposit_lock to avoid transaction failure, because with two
+            # concurrent deposits, we may have the transactions executed in the
+            # following order
+            #
+            # - approve
+            # - approve
+            # - setTotalDeposit
+            # - setTotalDeposit
+            #
+            # in which case  the second `approve` will overwrite the first,
+            # and the first `setTotalDeposit` will consume the allowance,
+            #  making the second deposit fail.
+            approval_hash = None
+            try:
+                approval_hash = self.proxy.broadcast_signed_transaction(signed_approval_tx)
+
+            except HTTPError as e:
+                log.critical("approval failed: transaction malformed", **log_details) #TODO log exception
+                raise RawTransactionFailed("Light Client raw transaction receipt status failed")
+
+        self.client.poll(approval_hash)
+        approval_receipt_or_none = check_transaction_threw(self.client, approval_hash)
+
+        if approval_receipt_or_none:
+            #TODO tx failure
+            print("Failure")
+        else:
+            log.info("approve light successful", **log_details)
+            #Make deposit
+            try:
+                deposit_hash = self.proxy.broadcast_signed_transaction(signed_deposit_tx)
+            except HTTPError as e:
+                log.critical("setTotalDeposit failed: transaction malformed", str(e), **log_details)
+                raise RawTransactionFailed("Light Client raw transaction receipt status failed")
+            self.client.poll(deposit_hash)
+            deposit_receipt_or_none = check_transaction_threw(self.client, deposit_hash)
+            if deposit_receipt_or_none:
+                # Deposit failure TODO
+                print("Failure")
+            log.info("setTotalDeposit light successful", **log_details)
 
 
     def set_total_deposit(
@@ -748,6 +864,7 @@ class TokenNetwork:
                 self._deposit_preconditions(
                     channel_identifier=channel_identifier,
                     total_deposit=total_deposit,
+                    creator=self.node_address,
                     partner=partner,
                     token=token,
                     previous_total_deposit=previous_total_deposit,

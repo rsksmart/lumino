@@ -291,8 +291,9 @@ class ServiceRequestIOURejected(ServiceRequestFailed):
 
 
 class RawTransactionFailed(RaidenError):
-    """ Raised when a raw transaction, signed b a Light Client, fails
-    """
+    """ Raised when a raw transaction, signed by a Light Client, fails """
+
 
 class UnhandledLightClient(RaidenRecoverableError):
     """Raised if someone tries to create a channel using this node as a hub and the light clients are not registered."""
+
