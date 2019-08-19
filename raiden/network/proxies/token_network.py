@@ -101,10 +101,12 @@ class ChannelDetails(NamedTuple):
     channel_data: ChannelData
     participants_data: ParticipantsDetails
 
+
 @dataclass(frozen=True)
 class OpenChannelTrKey:
     participant1: Address
     participant2: Address
+
 
 class TokenNetwork:
     def __init__(
@@ -162,8 +164,6 @@ class TokenNetwork:
     def token_address(self) -> Address:
         """ Return the token of this manager. """
         return to_canonical_address(self.proxy.contract.functions.token().call())
-
-
 
     def _new_channel_preconditions(
         self, creator: Address, partner: Address, settle_timeout: int, block_identifier: BlockSpecification
@@ -226,9 +226,9 @@ class TokenNetwork:
                     log.critical("new_netting_channel_light failed", **log_details)
                     raise RaidenUnrecoverableError("creating new channel failed")
             except HTTPError as e:
-                log.critical("new_netting_channel failed: transaction malformed", **log_details)
+                log.warning("new_netting_channel failed: transaction malformed", **log_details)
                 new_open_channel_transaction.set_exception(e)
-                raise RawTransactionFailed("Light Client raw transaction receipt status failed")
+                raise RawTransactionFailed("Light Client raw transaction malformed")
             except Exception as e:
                 log.critical("new_netting_channel failed", **log_details)
                 new_open_channel_transaction.set_exception(e)
@@ -264,7 +264,8 @@ class TokenNetwork:
         """
         checking_block = self.client.get_checking_block()
         self._new_channel_preconditions(
-            creator=self.node_address, partner=partner, settle_timeout=settle_timeout, block_identifier=given_block_identifier
+            creator=self.node_address, partner=partner, settle_timeout=settle_timeout,
+            block_identifier=given_block_identifier
         )
         log_details = {"peer1": pex(self.node_address), "peer2": pex(partner)}
         gas_limit = self.proxy.estimate_gas(
@@ -277,6 +278,7 @@ class TokenNetwork:
         if not gas_limit:
             self.proxy.jsonrpc_client.check_for_insufficient_eth(
                 transaction_name="openChannel",
+                address=self.node_address,
                 transaction_executed=False,
                 required_gas=GAS_REQUIRED_FOR_OPEN_CHANNEL,
                 block_identifier=checking_block,
@@ -451,7 +453,6 @@ class TokenNetwork:
         """
         ##TODO Check if light clients
 
-
         if self.node_address == participant2:
             participant1, participant2 = participant2, participant1
 
@@ -494,7 +495,6 @@ class TokenNetwork:
             For now one of the participants has to be the node_address
         """
         ##TODO Check if light clients
-
 
         if self.node_address == participant2:
             participant1, participant2 = participant2, participant1
@@ -665,7 +665,6 @@ class TokenNetwork:
             log.info("setTotalDeposit failed", reason=msg, **log_details)
             raise DepositMismatch(msg)
 
-
     def set_total_deposit_light(
         self,
         given_block_identifier: BlockSpecification,
@@ -676,37 +675,6 @@ class TokenNetwork:
         signed_approval_tx: SignedTransaction,
         signed_deposit_tx: SignedTransaction
     ):
-        """ Set channel's total deposit.
-
-               `total_deposit` has to be monotonically increasing, this is enforced by
-               the `TokenNetwork` smart contract. This is done for the same reason why
-               the balance proofs have a monotonically increasing transferred amount,
-               it simplifies the analysis of bad behavior and the handling code of
-               out-dated balance proofs.
-
-               Races to `set_total_deposit` are handled by the smart contract, where
-               largest total deposit wins. The end balance of the funding accounts is
-               undefined. E.g.
-
-               - Acc1 calls set_total_deposit with 10 tokens
-               - Acc2 calls set_total_deposit with 13 tokens
-
-               - If Acc2's transaction is mined first, then Acc1 token supply is left intact.
-               - If Acc1's transaction is mined first, then Acc2 will only move 3 tokens.
-
-               Races for the same account don't have any unexpeted side-effect.
-
-               Raises:
-                   DepositMismatch: If the new request total deposit is lower than the
-                       existing total deposit on-chain for the `given_block_identifier`.
-                   RaidenRecoverableError: If the channel was closed meanwhile the
-                       deposit was in transit.
-                   RaidenUnrecoverableError: If the transaction was sucessful and the
-                       deposit_amount is not as large as the requested value.
-                   RuntimeError: If the token address is empty.
-                   ValueError: If an argument is of the invalid type.
-               """
-
         if not isinstance(total_deposit, int):
             raise ValueError("total_deposit needs to be an integer number.")
         token_address = self.token_address()
@@ -716,7 +684,6 @@ class TokenNetwork:
             contract_manager=self.contract_manager,
         )
         checking_block = self.client.get_checking_block()
-        error_prefix = "setTotalDeposit call will fail"
         with self.channel_operations_lock[partner], self.deposit_lock:
             previous_total_deposit = self._detail_participant(
                 channel_identifier=channel_identifier,
@@ -748,54 +715,81 @@ class TokenNetwork:
                 # If preconditions end up being on pruned state skip them. Estimate
                 # gas will stop us from sending a transaction that will fail
                 pass
-
-            # If there are channels being set up concurrenlty either the
-            # allowance must be accumulated *or* the calls to `approve` and
-            # `setTotalDeposit` must be serialized. This is necessary otherwise
-            # the deposit will fail.
-            #
-            # Calls to approve and setTotalDeposit are serialized with the
-            # deposit_lock to avoid transaction failure, because with two
-            # concurrent deposits, we may have the transactions executed in the
-            # following order
-            #
-            # - approve
-            # - approve
-            # - setTotalDeposit
-            # - setTotalDeposit
-            #
-            # in which case  the second `approve` will overwrite the first,
-            # and the first `setTotalDeposit` will consume the allowance,
-            #  making the second deposit fail.
             approval_hash = None
             try:
                 approval_hash = self.proxy.broadcast_signed_transaction(signed_approval_tx)
-
             except HTTPError as e:
-                log.critical("approval failed: transaction malformed", **log_details) #TODO log exception
-                raise RawTransactionFailed("Light Client raw transaction receipt status failed")
+                log.warning("approval failed: transaction malformed", **log_details)  # TODO log exception
+                raise RawTransactionFailed("Approval for Light Client raw transaction malformed")
 
         self.client.poll(approval_hash)
         approval_receipt_or_none = check_transaction_threw(self.client, approval_hash)
 
         if approval_receipt_or_none:
-            #TODO tx failure
-            print("Failure")
+            log.warning("approval failed: receipt status failed", **log_details)  # TODO log exception
+            raise RawTransactionFailed("Approval for Light Client raw transaction receipt status failed")
         else:
             log.info("approve light successful", **log_details)
-            #Make deposit
+            # Make deposit
             try:
                 deposit_hash = self.proxy.broadcast_signed_transaction(signed_deposit_tx)
             except HTTPError as e:
-                log.critical("setTotalDeposit failed: transaction malformed", str(e), **log_details)
-                raise RawTransactionFailed("Light Client raw transaction receipt status failed")
+                log.warning("setTotalDeposit failed: transaction malformed", **log_details)
+                raise RawTransactionFailed("Light Client raw transaction malformed")
             self.client.poll(deposit_hash)
             deposit_receipt_or_none = check_transaction_threw(self.client, deposit_hash)
             if deposit_receipt_or_none:
-                # Deposit failure TODO
-                print("Failure")
+                log.warning("setTotalDeposit for Light Client raw transaction receipt status failed",
+                            **log_details)  # TODO log exception
+                self._check_deposit_failure_reasons(
+                    channel_identifier=channel_identifier,
+                    creator=creator,
+                    partner=partner,
+                    token=token,
+                    amount_to_deposit=amount_to_deposit,
+                    total_deposit=total_deposit,
+                    transaction_executed=True,
+                    block_identifier=deposit_receipt_or_none["blockNumber"],
+                    log_details=log_details
+                )
             log.info("setTotalDeposit light successful", **log_details)
 
+    def _check_deposit_failure_reasons(
+        self,
+        channel_identifier: ChannelID,
+        creator: Address,
+        partner: Address,
+        token: Token,
+        amount_to_deposit: TokenAmount,
+        total_deposit: TokenAmount,
+        transaction_executed: bool,
+        block_identifier: BlockSpecification,
+        log_details
+    ):
+        self.proxy.jsonrpc_client.check_for_insufficient_eth(
+            transaction_name="setTotalDeposit",
+            address=creator,
+            transaction_executed=transaction_executed,
+            required_gas=GAS_REQUIRED_FOR_SET_TOTAL_DEPOSIT,
+            block_identifier=block_identifier,
+        )
+        error_type, msg = self._check_why_deposit_failed(
+            channel_identifier=channel_identifier,
+            creator=creator,
+            partner=partner,
+            token=token,
+            amount_to_deposit=amount_to_deposit,
+            total_deposit=total_deposit,
+            transaction_executed=transaction_executed,
+            block_identifier=block_identifier,
+        )
+
+        error_msg = f"setTotalDeposit fail. {msg}"
+        if error_type == RaidenRecoverableError:
+            log.warning(error_msg, **log_details)
+        else:
+            log.warning(error_msg, **log_details)
+        raise error_type(error_msg)
 
     def set_total_deposit(
         self,
@@ -930,12 +924,14 @@ class TokenNetwork:
 
                 self.proxy.jsonrpc_client.check_for_insufficient_eth(
                     transaction_name="setTotalDeposit",
+                    address=self.node_address,
                     transaction_executed=transaction_executed,
                     required_gas=GAS_REQUIRED_FOR_SET_TOTAL_DEPOSIT,
                     block_identifier=block,
                 )
                 error_type, msg = self._check_why_deposit_failed(
                     channel_identifier=channel_identifier,
+                    creator=self.node_address,
                     partner=partner,
                     token=token,
                     amount_to_deposit=amount_to_deposit,
@@ -956,6 +952,7 @@ class TokenNetwork:
     def _check_why_deposit_failed(
         self,
         channel_identifier: ChannelID,
+        creator: Address,
         partner: Address,
         token: Token,
         amount_to_deposit: TokenAmount,
@@ -963,17 +960,17 @@ class TokenNetwork:
         transaction_executed: bool,
         block_identifier: BlockSpecification,
     ) -> Tuple[ErrorType, str]:
-        error_type: ErrorType = RaidenUnrecoverableError
+        error_type: ErrorType = RaidenRecoverableError
         msg = ""
         latest_deposit = self._detail_participant(
             channel_identifier=channel_identifier,
-            participant=self.node_address,
+            participant=creator,
             partner=partner,
             block_identifier=block_identifier,
         ).deposit
 
         allowance = token.allowance(
-            owner=self.node_address,
+            owner=creator,
             spender=Address(self.address),
             block_identifier=block_identifier,
         )
@@ -982,19 +979,19 @@ class TokenNetwork:
                 "The allowance is insufficient. Check concurrent deposits "
                 "for the same token network but different proxies."
             )
-        elif token.balance_of(self.node_address, block_identifier) < amount_to_deposit:
+        elif token.balance_of(creator, block_identifier) < amount_to_deposit:
             msg = "The address doesnt have enough tokens"
         elif transaction_executed and latest_deposit < total_deposit:
             msg = "The tokens were not transferred"
         else:
             participant_details = self.detail_participants(
-                participant1=self.node_address,
+                participant1=creator,
                 participant2=partner,
                 block_identifier=block_identifier,
                 channel_identifier=channel_identifier,
             )
             channel_state = self._get_channel_state(
-                participant1=self.node_address,
+                participant1=creator,
                 participant2=partner,
                 block_identifier=block_identifier,
                 channel_identifier=channel_identifier,
@@ -1002,7 +999,7 @@ class TokenNetwork:
             # Check if deposit is being made on a nonexistent channel
             if channel_state in (ChannelState.NONEXISTENT, ChannelState.REMOVED):
                 msg = (
-                    f"Channel between participant {to_checksum_address(self.node_address)} "
+                    f"Channel between participant {to_checksum_address(creator)} "
                     f"and {to_checksum_address(partner)} does not exist"
                 )
             # Deposit was prohibited because the channel is settled
@@ -1189,6 +1186,7 @@ class TokenNetwork:
 
                 self.proxy.jsonrpc_client.check_for_insufficient_eth(
                     transaction_name="closeChannel",
+                    address=self.node_address,
                     transaction_executed=True,
                     required_gas=GAS_REQUIRED_FOR_CLOSE_CHANNEL,
                     block_identifier=failed_at_blocknumber,
@@ -1476,6 +1474,7 @@ class TokenNetwork:
 
             self.proxy.jsonrpc_client.check_for_insufficient_eth(
                 transaction_name="updateNonClosingBalanceProof",
+                address=self.node_address,
                 transaction_executed=False,
                 required_gas=GAS_REQUIRED_FOR_UPDATE_BALANCE_PROOF,
                 block_identifier=failed_at_blocknumber,
@@ -1582,6 +1581,7 @@ class TokenNetwork:
 
             self.proxy.jsonrpc_client.check_for_insufficient_eth(
                 transaction_name="unlock",
+                address=self.node_address,
                 transaction_executed=transaction_executed,
                 required_gas=UNLOCK_TX_GAS_LIMIT,
                 block_identifier=block,
@@ -1708,6 +1708,7 @@ class TokenNetwork:
 
             self.proxy.jsonrpc_client.check_for_insufficient_eth(
                 transaction_name="settleChannel",
+                address=self.node_address,
                 transaction_executed=transaction_executed,
                 required_gas=GAS_REQUIRED_FOR_SETTLE_CHANNEL,
                 block_identifier=block,

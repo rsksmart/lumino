@@ -101,7 +101,7 @@ from raiden.exceptions import (
     TokenNotRegistered,
     TransactionThrew,
     UnknownTokenAddress,
-    RawTransactionFailed, UnhandledLightClient)
+    RawTransactionFailed, UnhandledLightClient, RaidenRecoverableError)
 from raiden.transfer import channel, views
 from raiden.transfer.events import (
     EventPaymentReceivedSuccess,
@@ -659,7 +659,8 @@ class RestAPI:
             AddressWithoutCode,
             DuplicatedChannelError,
             TokenNotRegistered,
-            UnhandledLightClient
+            UnhandledLightClient,
+            RaidenRecoverableError
         ) as e:
             return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.CONFLICT, log=log)
         except RawTransactionFailed as e1:
@@ -741,6 +742,7 @@ class RestAPI:
                 self.raiden_api.set_total_channel_deposit(
                     registry_address=registry_address,
                     token_address=token_address,
+                    creator_address=to_canonical_address(self.raiden_api.address),
                     partner_address=to_canonical_address(address_to_send),
                     total_deposit=total_deposit,
                 )
@@ -1466,11 +1468,15 @@ class RestAPI:
                 total_deposit,
             )
         except InsufficientFunds as e:
-            return api_error(errors=str(e), status_code=HTTPStatus.PAYMENT_REQUIRED)
+            return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.PAYMENT_REQUIRED, log=log)
         except DepositOverLimit as e:
-            return api_error(errors=str(e), status_code=HTTPStatus.CONFLICT)
+            return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.CONFLICT, log=log)
         except DepositMismatch as e:
-            return api_error(errors=str(e), status_code=HTTPStatus.CONFLICT)
+            return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.CONFLICT, log=log)
+        except RawTransactionFailed as e:
+            return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.BAD_REQUEST, log=log)
+        except RaidenRecoverableError as e:
+            return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.BAD_REQUEST, log=log)
 
         updated_channel_state = self.raiden_api.get_channel(
             registry_address, channel_state.token_address, channel_state.our_state.address,
@@ -1504,8 +1510,9 @@ class RestAPI:
             self.raiden_api.set_total_channel_deposit(
                 registry_address,
                 channel_state.token_address,
+                self.raiden_api.address,
                 channel_state.partner_state.address,
-                total_deposit,
+                total_deposit
             )
         except InsufficientFunds as e:
             return api_error(errors=str(e), status_code=HTTPStatus.PAYMENT_REQUIRED)

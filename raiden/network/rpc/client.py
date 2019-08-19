@@ -873,6 +873,7 @@ class JSONRPCClient:
 
     def check_for_insufficient_eth(
         self,
+        address: Address,
         transaction_name: str,
         transaction_executed: bool,
         required_gas: int,
