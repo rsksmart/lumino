@@ -770,7 +770,7 @@ class TokenNetwork:
                     checking_block,
                     "setTotalDeposit",
                     channel_identifier=channel_identifier,
-                    participant=self.node_address,
+                    participant=creator,
                     total_deposit=total_deposit,
                     partner=partner,
                 )
