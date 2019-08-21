@@ -43,7 +43,6 @@ if TYPE_CHECKING:
     # pylint: disable=unused-import
     from raiden.raiden_service import RaidenService  # noqa: F401
 
-
 log = structlog.get_logger(__name__)  # pylint: disable=invalid-name
 
 
@@ -90,8 +89,10 @@ def handle_channel_new(raiden: "RaidenService", event: Event):
     is_participant = raiden.address in (participant1, participant2)
 
     # Check if at least one of the implied participants is a LC handled by the node
-    is_participant1_handled_lc = LightClientService.is_handled_lc(to_checksum_address(encode_hex(participant1)), raiden.wal)
-    is_participant2_handled_lc = LightClientService.is_handled_lc(to_checksum_address(encode_hex(participant2)), raiden.wal)
+    is_participant1_handled_lc = LightClientService.is_handled_lc(to_checksum_address(encode_hex(participant1)),
+                                                                  raiden.wal)
+    is_participant2_handled_lc = LightClientService.is_handled_lc(to_checksum_address(encode_hex(participant2)),
+                                                                  raiden.wal)
 
     if is_participant or is_participant1_handled_lc or is_participant2_handled_lc:
         channel_proxy = raiden.chain.payment_channel(
@@ -187,7 +188,6 @@ def handle_channel_new_balance(raiden: "RaidenService", event: Event):
             participant=participant_address
         )
         raiden.handle_and_track_state_change(newbalance_statechange)
-
 
         ## TODO CHECK THIS AND HANDLE DIFERENTLY FOR LIGHT CLIENTS
         # if balance_was_zero and participant_address != raiden.address:
@@ -478,11 +478,11 @@ def on_blockchain_event(raiden: "RaidenService", event: Event):
         handle_channel_update_transfer(raiden, event)
 
     elif event_name == ChannelEvent.CLOSED:
-        #TODO FIXME MARCOS UNINMPLEMENTED  handle_channel_closed(raiden, event)
+        # TODO FIXME MARCOS UNINMPLEMENTED  handle_channel_closed(raiden, event)
         print("Implement me!")
 
     elif event_name == ChannelEvent.SETTLED:
-        #TODO FIXME MARCOS UNINMPLEMENTED handle_channel_settled(raiden, event)
+        # TODO FIXME MARCOS UNINMPLEMENTED handle_channel_settled(raiden, event)
         print("Implement me!")
 
 

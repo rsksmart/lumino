@@ -1520,6 +1520,8 @@ class RestAPI:
             return api_error(errors=str(e), status_code=HTTPStatus.CONFLICT)
         except DepositMismatch as e:
             return api_error(errors=str(e), status_code=HTTPStatus.CONFLICT)
+        except RaidenRecoverableError as e:
+            return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.BAD_REQUEST, log=log)
 
         updated_channel_state = self.raiden_api.get_channel(
             registry_address, channel_state.token_address, channel_state.our_state.address,

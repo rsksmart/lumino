@@ -7,7 +7,8 @@ import hashlib
 import dateutil.parser
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
-from eth_utils import is_binary_address, to_checksum_address, to_canonical_address, to_normalized_address, decode_hex, encode_hex
+from eth_utils import is_binary_address, to_checksum_address, to_canonical_address, to_normalized_address, decode_hex, \
+    encode_hex
 
 import raiden.blockchain.events as blockchain_events
 from raiden import waiting
@@ -56,7 +57,7 @@ from raiden.transfer.state import (
     NettingChannelState,
     TargetTask,
     TransferTask,
-)
+    ChainState)
 
 from raiden.transfer.state_change import ActionChannelClose
 from raiden.utils import pex, typing
@@ -566,30 +567,26 @@ class RaidenAPI:
 
         return channel_state.identifier
 
-    def set_total_channel_deposit_light(
+    def _set_total_deposit_preconditions(
         self,
         registry_address: PaymentNetworkID,
         token_address: TokenAddress,
         creator_address: Address,
         partner_address: Address,
-        signed_approval_tx: SignedTransaction,
-        signed_deposit_tx: SignedTransaction,
         total_deposit: TokenAmount,
-        retry_timeout: NetworkTimeout = DEFAULT_RETRY_TIMEOUT,
+        channel_state: NettingChannelState,
+        chain_state: ChainState
     ):
-        chain_state = views.state_from_raiden(self.raiden)
         token_addresses = views.get_token_identifiers(chain_state, registry_address)
 
-        channel_state = views.get_channelstate_for(
-            chain_state=chain_state,
-            payment_network_id=registry_address,
-            token_address=token_address,
-            creator_address=creator_address,
-            partner_address=partner_address,
-        )
+        if not isinstance(total_deposit, int):
+            raise ValueError("total_deposit needs to be an integer number.")
 
         if not is_binary_address(token_address):
             raise InvalidAddress("Expected binary address format for token in channel deposit")
+
+        if not is_binary_address(creator_address):
+            raise InvalidAddress("Expected binary address format for creator in channel deposit")
 
         if not is_binary_address(partner_address):
             raise InvalidAddress("Expected binary address format for partner in channel deposit")
@@ -643,6 +640,53 @@ class RaidenAPI:
             )
             raise InsufficientFunds(msg)
 
+    def set_total_channel_deposit_light(
+        self,
+        registry_address: PaymentNetworkID,
+        token_address: TokenAddress,
+        creator_address: Address,
+        partner_address: Address,
+        signed_approval_tx: SignedTransaction,
+        signed_deposit_tx: SignedTransaction,
+        total_deposit: TokenAmount,
+        retry_timeout: NetworkTimeout = DEFAULT_RETRY_TIMEOUT,
+    ):
+        """ Set the `total_deposit` in the channel of the 'creator address' with `partner_address` and the
+                given `token_address` in order to be able to do transfers.
+                Raises:
+                    InvalidAddress: If either token_address or partner_address is not
+                        20 bytes long.
+                    TransactionThrew: May happen for multiple reasons:
+                        - If the token approval fails, e.g. the token may validate if
+                        account has enough balance for the allowance.
+                        - The deposit failed, e.g. the allowance did not set the token
+                        aside for use and the user spent it before deposit was called.
+                        - The channel was closed/settled between the allowance call and
+                        the deposit call.
+                    AddressWithoutCode: The channel was settled during the deposit
+                        execution.
+                    DepositOverLimit: The total deposit amount is higher than the limit.
+                """
+        chain_state = views.state_from_raiden(self.raiden)
+
+        channel_state = views.get_channelstate_for(
+            chain_state=chain_state,
+            payment_network_id=registry_address,
+            token_address=token_address,
+            creator_address=creator_address,
+            partner_address=partner_address,
+        )
+
+        self._set_total_deposit_preconditions(
+            registry_address,
+            token_address,
+            creator_address,
+            partner_address,
+            total_deposit,
+            channel_state,
+            chain_state
+        )
+
         channel_proxy = self.raiden.chain.payment_channel(
             canonical_identifier=channel_state.canonical_identifier
         )
@@ -691,72 +735,26 @@ class RaidenAPI:
         """
         chain_state = views.state_from_raiden(self.raiden)
 
-        token_addresses = views.get_token_identifiers(chain_state, registry_address)
         channel_state = views.get_channelstate_for(
             chain_state=chain_state,
             payment_network_id=registry_address,
             token_address=token_address,
-            creator_address= creator_address,
+            creator_address=creator_address,
             partner_address=partner_address,
         )
+        self._set_total_deposit_preconditions(
+            registry_address,
+            token_address,
+            creator_address,
+            partner_address,
+            total_deposit,
+            channel_state,
+            chain_state
+        )
 
-        if not is_binary_address(token_address):
-            raise InvalidAddress("Expected binary address format for token in channel deposit")
-
-        if not is_binary_address(partner_address):
-            raise InvalidAddress("Expected binary address format for partner in channel deposit")
-
-        if token_address not in token_addresses:
-            raise UnknownTokenAddress("Unknown token address")
-
-        if channel_state is None:
-            raise InvalidAddress("No channel with partner_address for the given token")
-
-        if self.raiden.config["environment_type"] == Environment.PRODUCTION:
-            per_token_network_deposit_limit = RED_EYES_PER_TOKEN_NETWORK_LIMIT
-        else:
-            per_token_network_deposit_limit = UINT256_MAX
-
-        token = self.raiden.chain.token(token_address)
-        token_network_registry = self.raiden.chain.token_network_registry(registry_address)
-        token_network_address = token_network_registry.get_token_network(token_address)
-        token_network_proxy = self.raiden.chain.token_network(token_network_address)
         channel_proxy = self.raiden.chain.payment_channel(
             canonical_identifier=channel_state.canonical_identifier
         )
-
-        if total_deposit == 0:
-            raise DepositMismatch("Attempted to deposit with total deposit being 0")
-
-        addendum = total_deposit - channel_state.our_state.contract_balance
-
-        total_network_balance = token.balance_of(registry_address)
-
-        if total_network_balance + addendum > per_token_network_deposit_limit:
-            raise DepositOverLimit(
-                f"The deposit of {addendum} will exceed the "
-                f"token network limit of {per_token_network_deposit_limit}"
-            )
-
-        balance = token.balance_of(creator_address)
-
-        functions = token_network_proxy.proxy.contract.functions
-        deposit_limit = functions.channel_participant_deposit_limit().call()
-
-        if total_deposit > deposit_limit:
-            raise DepositOverLimit(
-                f"The additional deposit of {addendum} will exceed the "
-                f"channel participant limit of {deposit_limit}"
-            )
-
-        # If this check succeeds it does not imply the the `deposit` will
-        # succeed, since the `deposit` transaction may race with another
-        # transaction.
-        if not balance >= addendum:
-            msg = "Not enough balance to deposit. {} Available={} Needed={}".format(
-                pex(token_address), balance, addendum
-            )
-            raise InsufficientFunds(msg)
 
         # set_total_deposit calls approve
         # token.approve(netcontract_address, addendum)

@@ -226,11 +226,11 @@ class TokenNetwork:
                     log.critical("new_netting_channel_light failed", **log_details)
                     raise RaidenUnrecoverableError("creating new channel failed")
             except HTTPError as e:
-                log.warning("new_netting_channel failed: transaction malformed", **log_details)
+                log.warning("new_netting_channel failed: transaction malformed", ex=e, **log_details)
                 new_open_channel_transaction.set_exception(e)
                 raise RawTransactionFailed("Light Client raw transaction malformed")
             except Exception as e:
-                log.critical("new_netting_channel failed", **log_details)
+                log.warning("new_netting_channel failed", ex=e, **log_details)
                 new_open_channel_transaction.set_exception(e)
                 raise
             else:
@@ -665,6 +665,45 @@ class TokenNetwork:
             log.info("setTotalDeposit failed", reason=msg, **log_details)
             raise DepositMismatch(msg)
 
+    def _check_deposit_failure_reasons(
+        self,
+        channel_identifier: ChannelID,
+        creator: Address,
+        partner: Address,
+        token: Token,
+        amount_to_deposit: TokenAmount,
+        total_deposit: TokenAmount,
+        transaction_executed: bool,
+        block_identifier: BlockSpecification,
+        log_details
+    ):
+        self.proxy.jsonrpc_client.check_for_insufficient_eth(
+            transaction_name="setTotalDeposit",
+            address=creator,
+            transaction_executed=transaction_executed,
+            required_gas=GAS_REQUIRED_FOR_SET_TOTAL_DEPOSIT,
+            block_identifier=block_identifier,
+        )
+        error_type, msg = self._check_why_deposit_failed(
+            channel_identifier=channel_identifier,
+            creator=creator,
+            partner=partner,
+            token=token,
+            amount_to_deposit=amount_to_deposit,
+            total_deposit=total_deposit,
+            transaction_executed=transaction_executed,
+            block_identifier=block_identifier,
+        )
+
+        error_msg = f"setTotalDeposit fail. {msg}"
+        if error_type == RaidenRecoverableError:
+            log.warning(error_msg, **log_details)
+        else:
+            log.warning(error_msg, **log_details)
+        raise error_type(error_msg)
+
+    # Make a deposit on a channel that a light client is participant. For more information take
+    # a look at of set_total_deposit docs.
     def set_total_deposit_light(
         self,
         given_block_identifier: BlockSpecification,
@@ -675,8 +714,6 @@ class TokenNetwork:
         signed_approval_tx: SignedTransaction,
         signed_deposit_tx: SignedTransaction
     ):
-        if not isinstance(total_deposit, int):
-            raise ValueError("total_deposit needs to be an integer number.")
         token_address = self.token_address()
         token = Token(
             jsonrpc_client=self.client,
@@ -715,81 +752,59 @@ class TokenNetwork:
                 # If preconditions end up being on pruned state skip them. Estimate
                 # gas will stop us from sending a transaction that will fail
                 pass
-            approval_hash = None
+            # See comments of set_total_deposit of why approval is always executed.
             try:
                 approval_hash = self.proxy.broadcast_signed_transaction(signed_approval_tx)
             except HTTPError as e:
-                log.warning("approval failed: transaction malformed", **log_details)  # TODO log exception
+                log.warning("approval failed: transaction malformed", ex=e, **log_details)
                 raise RawTransactionFailed("Approval for Light Client raw transaction malformed")
-
-        self.client.poll(approval_hash)
-        approval_receipt_or_none = check_transaction_threw(self.client, approval_hash)
-
-        if approval_receipt_or_none:
-            log.warning("approval failed: receipt status failed", **log_details)  # TODO log exception
-            raise RawTransactionFailed("Approval for Light Client raw transaction receipt status failed")
-        else:
-            log.info("approve light successful", **log_details)
-            # Make deposit
-            try:
-                deposit_hash = self.proxy.broadcast_signed_transaction(signed_deposit_tx)
-            except HTTPError as e:
-                log.warning("setTotalDeposit failed: transaction malformed", **log_details)
-                raise RawTransactionFailed("Light Client raw transaction malformed")
-            self.client.poll(deposit_hash)
-            deposit_receipt_or_none = check_transaction_threw(self.client, deposit_hash)
-            if deposit_receipt_or_none:
-                log.warning("setTotalDeposit for Light Client raw transaction receipt status failed",
-                            **log_details)  # TODO log exception
-                self._check_deposit_failure_reasons(
+            self.client.poll(approval_hash)
+            approval_receipt_or_none = check_transaction_threw(self.client, approval_hash)
+            if approval_receipt_or_none:
+                log.warning("approval failed: receipt status failed", **log_details)
+                raise RawTransactionFailed("Approval for Light Client raw transaction receipt status failed")
+            else:
+                log.info("approve light successful", **log_details)
+                deposit_hash = None
+                gas_limit = self.proxy.estimate_gas(
+                    checking_block,
+                    "setTotalDeposit",
                     channel_identifier=channel_identifier,
-                    creator=creator,
-                    partner=partner,
-                    token=token,
-                    amount_to_deposit=amount_to_deposit,
+                    participant=self.node_address,
                     total_deposit=total_deposit,
-                    transaction_executed=True,
-                    block_identifier=deposit_receipt_or_none["blockNumber"],
-                    log_details=log_details
+                    partner=partner,
                 )
-            log.info("setTotalDeposit light successful", **log_details)
+                if gas_limit:
+                    gas_limit = safe_gas_limit(gas_limit, GAS_REQUIRED_FOR_SET_TOTAL_DEPOSIT)
+                    try:
+                        log.info("setTotalDeposit light called", **log_details)
+                        deposit_hash = self.proxy.broadcast_signed_transaction(signed_deposit_tx)
+                    except HTTPError as e:
+                        log.warning("setTotalDeposit failed: transaction malformed", ex=e, **log_details)
+                        raise RawTransactionFailed("Light Client raw transaction malformed")
+                    self.client.poll(deposit_hash)
 
-    def _check_deposit_failure_reasons(
-        self,
-        channel_identifier: ChannelID,
-        creator: Address,
-        partner: Address,
-        token: Token,
-        amount_to_deposit: TokenAmount,
-        total_deposit: TokenAmount,
-        transaction_executed: bool,
-        block_identifier: BlockSpecification,
-        log_details
-    ):
-        self.proxy.jsonrpc_client.check_for_insufficient_eth(
-            transaction_name="setTotalDeposit",
-            address=creator,
-            transaction_executed=transaction_executed,
-            required_gas=GAS_REQUIRED_FOR_SET_TOTAL_DEPOSIT,
-            block_identifier=block_identifier,
-        )
-        error_type, msg = self._check_why_deposit_failed(
-            channel_identifier=channel_identifier,
-            creator=creator,
-            partner=partner,
-            token=token,
-            amount_to_deposit=amount_to_deposit,
-            total_deposit=total_deposit,
-            transaction_executed=transaction_executed,
-            block_identifier=block_identifier,
-        )
-
-        error_msg = f"setTotalDeposit fail. {msg}"
-        if error_type == RaidenRecoverableError:
-            log.warning(error_msg, **log_details)
-        else:
-            log.warning(error_msg, **log_details)
-        raise error_type(error_msg)
+                deposit_receipt_or_none = check_transaction_threw(self.client, deposit_hash)
+                deposit_executed = gas_limit is not None
+                if deposit_receipt_or_none or not deposit_executed:
+                    log.warning("setTotalDeposit for Light Client raw transaction receipt status failed",
+                                **log_details)
+                    if deposit_executed:
+                        block = deposit_receipt_or_none["blockNumber"]
+                    else:
+                        block = checking_block
+                    self._check_deposit_failure_reasons(
+                        channel_identifier=channel_identifier,
+                        creator=creator,
+                        partner=partner,
+                        token=token,
+                        amount_to_deposit=amount_to_deposit,
+                        total_deposit=total_deposit,
+                        transaction_executed=deposit_executed,
+                        block_identifier=block,
+                        log_details=log_details
+                    )
+                log.info("setTotalDeposit light successful", **log_details)
 
     def set_total_deposit(
         self,
@@ -837,7 +852,6 @@ class TokenNetwork:
             contract_manager=self.contract_manager,
         )
         checking_block = self.client.get_checking_block()
-        error_prefix = "setTotalDeposit call will fail"
         with self.channel_operations_lock[partner], self.deposit_lock:
             previous_total_deposit = self._detail_participant(
                 channel_identifier=channel_identifier,
@@ -901,9 +915,7 @@ class TokenNetwork:
 
             if gas_limit:
                 gas_limit = safe_gas_limit(gas_limit, GAS_REQUIRED_FOR_SET_TOTAL_DEPOSIT)
-                error_prefix = "setTotalDeposit call failed"
-
-                log.debug("setTotalDeposit called", **log_details)
+                log.info("setTotalDeposit called", **log_details)
                 transaction_hash = self.proxy.transact(
                     "setTotalDeposit",
                     gas_limit,
@@ -922,14 +934,7 @@ class TokenNetwork:
                 else:
                     block = checking_block
 
-                self.proxy.jsonrpc_client.check_for_insufficient_eth(
-                    transaction_name="setTotalDeposit",
-                    address=self.node_address,
-                    transaction_executed=transaction_executed,
-                    required_gas=GAS_REQUIRED_FOR_SET_TOTAL_DEPOSIT,
-                    block_identifier=block,
-                )
-                error_type, msg = self._check_why_deposit_failed(
+                self._check_deposit_failure_reasons(
                     channel_identifier=channel_identifier,
                     creator=self.node_address,
                     partner=partner,
@@ -938,14 +943,8 @@ class TokenNetwork:
                     total_deposit=total_deposit,
                     transaction_executed=transaction_executed,
                     block_identifier=block,
+                    log_details=log_details
                 )
-
-                error_msg = f"{error_prefix}. {msg}"
-                if error_type == RaidenRecoverableError:
-                    log.warning(error_msg, **log_details)
-                else:
-                    log.critical(error_msg, **log_details)
-                raise error_type(error_msg)
 
             log.info("setTotalDeposit successful", **log_details)
 
