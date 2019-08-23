@@ -799,11 +799,3 @@ workflows:
           requires:
             - build-binary-linux
             - build-binary-macos
-
-    triggers:
-      - schedule:
-          cron: "0 0 * * *"
-          filters:
-            branches:
-              only:
-                - master
