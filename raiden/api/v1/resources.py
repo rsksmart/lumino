@@ -16,9 +16,16 @@ from raiden.api.v1.encoding import (
     RaidenEventsRequestSchemaV2,
     SearchLuminoRequestSchema,
     TokenActionSchema,
-    TokenActionRequestSchema
+    TokenActionRequestSchema,
+    InvoiceCreateSchema,
+    PaymentInvoiceSchema
 )
 from raiden.utils import typing
+from raiden.constants import EMPTY_PAYMENT_HASH_INVOICE
+
+from eth_utils import (
+    decode_hex
+)
 
 
 def create_blueprint():
@@ -222,6 +229,20 @@ class ConnectionsInfoResource(BaseResource):
         )
 
 
+class PaymentInvoiceResource(BaseResource):
+    post_schema = PaymentInvoiceSchema()
+
+    @use_kwargs(post_schema, locations=("json",))
+    def post(
+        self,
+        coded_invoice: typing.ByteString
+    ):
+        return self.rest_api.initiate_payment_with_invoice(
+            registry_address=self.rest_api.raiden_api.raiden.default_registry.address,
+            coded_invoice=coded_invoice
+        )
+
+
 class PaymentResource(BaseResource):
 
     post_schema = PaymentSchema(only=("amount", "identifier", "secret", "secret_hash"))
@@ -257,6 +278,7 @@ class PaymentResource(BaseResource):
             identifier=identifier,
             secret=secret,
             secret_hash=secret_hash,
+            payment_hash_invoice=EMPTY_PAYMENT_HASH_INVOICE
         )
 
 
@@ -363,3 +385,26 @@ class TokenActionResource(BaseResource):
         action: typing.ByteString,
     ):
         return self.rest_api.write_token_action(action)
+
+
+class InvoiceResource(BaseResource):
+    post_schema = InvoiceCreateSchema()
+
+    @use_kwargs(post_schema, locations=("json",))
+    def post(
+        self,
+        currency_symbol: typing.ByteString = None,
+        description: typing.ByteString = None,
+        token_address: typing.TokenAddress = None,
+        partner_address: typing.Address = None,
+        amount: typing.InvoiceAmount = None,
+        expires: typing.InvoiceExpires = None,
+    ):
+        return self.rest_api.create_invoice(
+            currency_symbol=currency_symbol,
+            token_address=token_address,
+            partner_address=partner_address,
+            amount=amount,
+            description=description,
+            expires=expires
+        )

@@ -57,6 +57,7 @@ def _do_check_version(current_version: Tuple[str, ...]):
 def check_version(current_version: str):
     """ Check periodically for a new release """
     app_version = parse_version(current_version)
+
     while True:
         try:
             _do_check_version(app_version)

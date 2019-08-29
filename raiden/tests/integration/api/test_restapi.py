@@ -1598,6 +1598,8 @@ def test_payment_events_endpoints(api_server_test_instance, raiden_network, toke
     )
 
     # test endpoint without partner for app0
+    print("********************************************** URL ********************************************")
+    print(        api_url_for(api_server_test_instance, "token_paymentresource", token_address=token_address))
     request = grequests.get(
         api_url_for(api_server_test_instance, "token_paymentresource", token_address=token_address)
     )

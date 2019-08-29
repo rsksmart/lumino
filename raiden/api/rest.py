@@ -9,7 +9,7 @@ from typing import Dict
 import gevent
 import gevent.pool
 import structlog
-from eth_utils import encode_hex, to_checksum_address
+from eth_utils import encode_hex, decode_hex, to_checksum_address
 from flask import Flask, make_response, send_from_directory, url_for, request
 
 from flask_restful import Api, abort
@@ -24,7 +24,8 @@ from raiden.api.objects import DashboardTableItem
 from raiden.api.objects import DashboardGeneralItem
 from flask_cors import CORS
 from raiden.schedulers.setup import setup_schedule_config
-
+from datetime import datetime
+from web3 import Web3
 
 from raiden.api.objects import AddressList, PartnersPerTokenList
 from raiden.api.v1.encoding import (
@@ -65,7 +66,9 @@ from raiden.api.v1.resources import (
     create_blueprint,
     NetworkResource, PaymentResourceLumino,
     SearchLuminoResource,
-    TokenActionResource)
+    TokenActionResource,
+    InvoiceResource,
+    PaymentInvoiceResource)
 
 from raiden.constants import GENESIS_BLOCK_NUMBER, UINT256_MAX, Environment
 
@@ -115,6 +118,13 @@ from eth_utils import (
     to_canonical_address
 )
 
+from raiden.billing.invoices.constants.invoice_type import InvoiceType
+from raiden.billing.invoices.constants.invoice_status import InvoiceStatus
+from raiden.billing.invoices.decoder.invoice_decoder import get_tags_dict, get_unknown_tags_dict
+
+from dateutil.relativedelta import relativedelta
+from raiden.billing.invoices.util.time_util import is_invoice_expired, UTC_FORMAT
+from raiden.billing.invoices.constants.errors import AUTO_PAY_INVOICE, INVOICE_EXPIRED, INVOICE_PAID
 
 log = structlog.get_logger(__name__)
 
@@ -138,8 +148,9 @@ URLS_V1 = [
     ),
     ("/connections/<hexaddress:token_address>", ConnectionsResource),
     ("/connections", ConnectionsInfoResource),
+    ("/payments/invoice", PaymentInvoiceResource),
     ("/payments", PaymentResource),
-    ("/payments/<luminoaddress:token_address>", PaymentResource, "token_paymentresource"),
+    ("/payments/<hexaddress:token_address>", PaymentResource, "token_paymentresource"),
     (
         "/payments/<hexaddress:token_address>/<hexaddress:target_address>",
         PaymentResource,
@@ -197,6 +208,10 @@ URLS_V1 = [
     (
         '/tokenAction',
         TokenActionResource,
+    ),
+    (
+        '/invoice',
+        InvoiceResource,
     ),
 
 ]
@@ -689,7 +704,7 @@ class RestAPI:
     def open_lumino(
         self,
         registry_address: typing.PaymentNetworkID,
-        partner_rns_address: typing.RnsAddress,
+        partner_address: typing.RnsAddress,
         token_address: typing.TokenAddress,
         settle_timeout: typing.BlockTimeout = None,
         total_deposit: typing.TokenAmount = None,
@@ -698,7 +713,7 @@ class RestAPI:
             'Opening channel',
             node=pex(self.raiden_api.address),
             registry_address=to_checksum_address(registry_address),
-            partner_rns_address=partner_rns_address,
+            partner_address=partner_address,
             token_address=to_checksum_address(token_address),
             settle_timeout=settle_timeout,
         )
@@ -723,9 +738,10 @@ class RestAPI:
             )
 
         # First we check if the address received is an RNS address and exists a Hex address
-        if is_rns_address(partner_rns_address):
-            rns_resolved_address = self.raiden_api.raiden.chain.get_address_from_rns(partner_rns_address)
-            if rns_resolved_address == RNS_ADDRESS_ZERO:
+        address_to_send = partner_address
+        if is_rns_address(partner_address):
+            address_to_send = self.raiden_api.raiden.chain.get_address_from_rns(partner_address)
+            if address_to_send == RNS_ADDRESS_ZERO:
                 return api_error(
                     errors=str('RNS domain isnt registered'),
                     status_code=HTTPStatus.PAYMENT_REQUIRED,
@@ -735,7 +751,7 @@ class RestAPI:
             self.raiden_api.channel_open(
                 registry_address,
                 token_address,
-                to_canonical_address(rns_resolved_address),
+                to_canonical_address(address_to_send),
                 settle_timeout,
             )
         except (InvalidAddress, InvalidSettleTimeout, SamePeerAddress,
@@ -757,14 +773,14 @@ class RestAPI:
                 node=pex(self.raiden_api.address),
                 registry_address=to_checksum_address(registry_address),
                 token_address=to_checksum_address(token_address),
-                partner_rns_address=rns_resolved_address,
+                address_to_send=address_to_send,
                 total_deposit=total_deposit,
             )
             try:
                 self.raiden_api.set_total_channel_deposit(
                     registry_address=registry_address,
                     token_address=token_address,
-                    partner_address=to_canonical_address(rns_resolved_address),
+                    partner_address=to_canonical_address(address_to_send),
                     total_deposit=total_deposit,
                 )
             except InsufficientFunds as e:
@@ -782,7 +798,7 @@ class RestAPI:
             views.state_from_raiden(self.raiden_api.raiden),
             registry_address,
             token_address,
-            to_canonical_address(rns_resolved_address),
+            to_canonical_address(address_to_send),
         )
 
         result = self.channel_schema.dump(channel_state)
@@ -1209,64 +1225,9 @@ class RestAPI:
 
         return result
 
+
     def _get_events_group_by_month(self, month, data):
         return [dashboardItem for dashboardItem in data if dashboardItem.month_of_year_label == month]
-
-    def get_raiden_events_payment_history_with_timestamps_v2(
-        self,
-        token_network_identifier: typing.Address = None,
-        initiator_address: typing.Address = None,
-        target_address: typing.Address = None,
-        from_date: typing.LogTime = None,
-        to_date: typing.LogTime = None,
-        event_type: int = None,
-        limit: int = None,
-        offset: int = None,
-    ):
-        log.info(
-            'Getting payment history',
-            node=pex(self.raiden_api.address),
-            token_network_identifier=optional_address_to_string(token_network_identifier),
-            initiator_address=optional_address_to_string(initiator_address),
-            target_address=optional_address_to_string(target_address),
-            from_date=from_date,
-            to_date=to_date,
-            event_type=event_type,
-            limit=limit,
-            offset=offset,
-        )
-        try:
-            service_result = self.raiden_api.get_raiden_events_payment_history_with_timestamps_v2(
-                token_network_identifier=token_network_identifier,
-                initiator_address=initiator_address,
-                target_address=target_address,
-                from_date=from_date,
-                to_date=to_date,
-                event_type=event_type,
-                limit=limit,
-                offset=offset,
-            )
-        except (InvalidNumberInput, InvalidAddress) as e:
-            return api_error(str(e), status_code=HTTPStatus.CONFLICT)
-
-        result = []
-        for event in service_result:
-            if isinstance(event.wrapped_event, EventPaymentSentSuccess):
-                serialized_event = self.sent_success_payment_schema.dump(event)
-            elif isinstance(event.wrapped_event, EventPaymentSentFailed):
-                serialized_event = self.failed_payment_schema.dump(event)
-            elif isinstance(event.wrapped_event, EventPaymentReceivedSuccess):
-                serialized_event = self.received_success_payment_schema.dump(event)
-            else:
-                log.warning(
-                    'Unexpected event',
-                    node=pex(self.raiden_api.address),
-                    unexpected_event=event.wrapped_event,
-                )
-
-            result.append(serialized_event.data)
-
-        return api_response(result=result)
 
     def get_raiden_internal_events_with_timestamps(self, limit, offset):
         return [
@@ -1362,6 +1323,84 @@ class RestAPI:
         result = self.partner_per_token_list_schema.dump(schema_list)
         return api_response(result=result.data)
 
+    def initiate_payment_with_invoice(self, registry_address: typing.PaymentNetworkID, coded_invoice):
+
+        invoice_decoded = self.raiden_api.decode_invoice(coded_invoice)
+
+        persistent_invoice = self.raiden_api.get_invoice(encode_hex(invoice_decoded.paymenthash))
+
+        tags_dict = get_tags_dict(invoice_decoded.tags)
+        unknown_tags_dict = get_unknown_tags_dict(invoice_decoded.unknown_tags)
+
+        if persistent_invoice is None:
+            expiration_date = datetime.utcfromtimestamp(invoice_decoded.date) \
+                              + relativedelta(seconds=tags_dict['expires'])
+
+            # When the invoice is received and the node don't have it saved,
+            # then the secret is not generated
+            # Look this when the payment protocol has changed TODO
+            data = {"type": InvoiceType.RECEIVED.value,
+                    "status": InvoiceStatus.PENDING.value,
+                    "already_coded_invoice" : True,
+                    "payment_hash" : encode_hex(invoice_decoded.paymenthash),
+                    "encode" : coded_invoice,
+                    "expiration_date" : expiration_date.isoformat(),
+                    "secret" : None,
+                    "currency" : invoice_decoded.currency,
+                    "amount" : str(invoice_decoded.amount),
+                    "description" : tags_dict['description'],
+                    "target_address" : encode_hex(unknown_tags_dict['target_address'].bytes),
+                    "token_address" : encode_hex(unknown_tags_dict['token_address'].bytes) ,
+                    "created_at": datetime.utcfromtimestamp(invoice_decoded.date).strftime(UTC_FORMAT),
+                    "expires": tags_dict['expires']
+                    }
+
+            # currency_symbol, token_address, partner_address, amount, description
+            new_invoice = self.raiden_api.create_invoice(data)
+
+            if new_invoice is not None:
+                result = self.make_payment_with_invoice(registry_address, new_invoice)
+
+        elif persistent_invoice["status"] == InvoiceStatus.PENDING.value and \
+                not is_invoice_expired(persistent_invoice["expiration_date"]):
+
+            result = self.make_payment_with_invoice(registry_address, persistent_invoice)
+        elif persistent_invoice["status"] == InvoiceStatus.PAID.value:
+            return api_error(
+                errors=INVOICE_PAID,
+                status_code=HTTPStatus.CONFLICT,
+            )
+        elif is_invoice_expired(persistent_invoice["expiration_date"]):
+            return api_error(
+                errors=INVOICE_EXPIRED,
+                status_code=HTTPStatus.CONFLICT,
+            )
+        else:
+            return api_error(
+                errors=AUTO_PAY_INVOICE,
+                status_code=HTTPStatus.CONFLICT,
+            )
+
+        return result
+
+    def make_payment_with_invoice(self, registry_address, invoice):
+        wei_amount = Web3.toWei(invoice['amount'], 'ether')
+        # We make payment with data of invoice
+        result = self.initiate_payment(registry_address,
+                                       to_canonical_address(invoice['token_address']),
+                                       to_canonical_address(invoice['target_address']),
+                                       wei_amount,
+                                       None,
+                                       None,
+                                       None,
+                                       decode_hex(invoice['payment_hash']))
+        if result.status_code == HTTPStatus.OK:
+            data = {"status": InvoiceStatus.PAID.value,
+                    "payment_hash": invoice['payment_hash']}
+            self.raiden_api.update_invoice(data)
+
+        return result
+
     def initiate_payment(
         self,
         registry_address: typing.PaymentNetworkID,
@@ -1371,6 +1410,7 @@ class RestAPI:
         identifier: typing.PaymentID,
         secret: typing.Secret,
         secret_hash: typing.SecretHash,
+        payment_hash_invoice : typing.PaymentHashInvoice
     ):
         log.debug(
             "Initiating payment",
@@ -1404,6 +1444,7 @@ class RestAPI:
                 identifier=identifier,
                 secret=secret,
                 secrethash=secret_hash,
+                payment_hash_invoice=payment_hash_invoice
             )
         except (
             InvalidAmount,
@@ -1637,4 +1678,31 @@ class RestAPI:
                 status_code=HTTPStatus.INTERNAL_SERVER_ERROR,
             )
         return api_response(result=search_result)
+
+    def create_invoice(self,
+                       currency_symbol,
+                       token_address,
+                       partner_address,
+                       amount,
+                       description,
+                       expires):
+
+        if amount and amount < 0:
+            return api_error(
+                errors="Amount to deposit must not be negative.", status_code=HTTPStatus.CONFLICT
+            )
+
+        data = {"currency_symbol": currency_symbol,
+                "token_address" : token_address,
+                "partner_address" : partner_address,
+                "amount" : amount,
+                "description" : description,
+                "invoice_type": InvoiceType.ISSUED.value,
+                "invoice_status": InvoiceStatus.PENDING.value,
+                "already_coded_invoice" : False,
+                "expires" : expires}
+
+        invoice = self.raiden_api.create_invoice(data)
+
+        return api_response(invoice)
 

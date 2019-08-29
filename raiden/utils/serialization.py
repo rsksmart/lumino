@@ -19,6 +19,7 @@ from raiden.utils.typing import (
     TransactionHash,
     Tuple,
     TypeVar,
+    PaymentHashInvoice
 )
 
 # The names `T`, `KT`, `VT` are used the same way as the documentation:
@@ -57,6 +58,10 @@ def deserialize_bytes(data: str) -> bytes:
 
 def deserialize_secret(data: str) -> Secret:
     return Secret(deserialize_bytes(data))
+
+
+def deserialize_payment_hash_invoice(data: str) -> PaymentHashInvoice:
+    return PaymentHashInvoice(deserialize_bytes(data))
 
 
 def deserialize_secret_hash(data: str) -> SecretHash:

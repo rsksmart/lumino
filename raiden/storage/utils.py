@@ -56,10 +56,41 @@ CREATE TABLE IF NOT EXISTS token_action (
 );
 """
 
+DB_CREATE_INVOICES = """
+
+CREATE TABLE IF NOT EXISTS invoices
+(
+    identifier      INTEGER
+        constraint invoices_pk
+            primary key autoincrement,
+    type            INTEGER,
+    status          INTEGER,
+    expiration_date TEXT,
+    encode          TEXT,
+    payment_hash    TEXT,
+    secret          TEXT,
+    currency        TEXT,
+    amount          TEXT,
+    description     TEXT,
+    target_address  TEXT,
+    token_address   TEXT,
+    created_at      TEXT
+);
+
+"""
+
+DB_CREATE_INVOICES_PAYMENTS = """
+CREATE TABLE IF NOT EXISTS invoices_payments (
+    identifier INTEGER constraint invoices_payments_pk PRIMARY KEY AUTOINCREMENT,
+    invoice_id INTEGER references invoices,
+    state_event_id INTEGER references state_events
+);
+"""
+
 DB_SCRIPT_CREATE_TABLES = """
 PRAGMA foreign_keys=off;
 BEGIN TRANSACTION;
-{}{}{}{}{}{}
+{}{}{}{}{}{}{}{}
 COMMIT;
 PRAGMA foreign_keys=on;
 """.format(
@@ -68,5 +99,7 @@ PRAGMA foreign_keys=on;
     DB_CREATE_SNAPSHOT,
     DB_CREATE_STATE_EVENTS,
     DB_CREATE_RUNS,
-    DB_CREATE_TOKEN_ACTION
+    DB_CREATE_TOKEN_ACTION,
+    DB_CREATE_INVOICES,
+    DB_CREATE_INVOICES_PAYMENTS
 )

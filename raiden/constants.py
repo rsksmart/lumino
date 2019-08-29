@@ -13,10 +13,11 @@ from raiden.utils.typing import (
     Secret,
     Signature,
     TokenAmount,
+    PaymentHashInvoice,
 )
 
-LATEST = "https://api.github.com/repos/raiden-network/raiden/releases/latest"
-RELEASE_PAGE = "https://github.com/raiden-network/raiden/releases"
+LATEST = "https://api.github.com/repos/rsksmart/lumino/releases/latest"
+RELEASE_PAGE = "https://github.com/rsksmart/lumino/releases"
 SECURITY_EXPRESSION = r"\[CRITICAL UPDATE.*?\]"
 
 RAIDEN_DB_VERSION = 22
@@ -49,6 +50,8 @@ EMPTY_HASH_KECCAK = keccak(EMPTY_HASH)
 EMPTY_SIGNATURE = Signature(bytes(65))
 EMPTY_MERKLE_ROOT = Locksroot(bytes(32))
 EMPTY_SECRET = Secret(b"")
+EMPTY_PAYMENT_HASH_INVOICE = PaymentHashInvoice(b"")
+
 ZERO_TOKENS = TokenAmount(0)
 
 SECRET_LENGTH = 32

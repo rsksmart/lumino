@@ -6,6 +6,10 @@ from datetime import datetime
 from tempfile import NamedTemporaryFile
 from typing import Any, Dict
 
+import json
+import os
+from definitions import ROOT_DIR
+
 import click
 import gevent
 import gevent.monkey
@@ -193,9 +197,16 @@ class NodeRunner:
             console.start()
             tasks.append(console)
 
+        config_path = os.path.join(ROOT_DIR, 'config.json')
+
+        with open(config_path) as json_data_file:
+            config_data = json.load(json_data_file)
+
+        project_data = config_data['project']
+        project_version = project_data['version']
+
         # spawn a greenlet to handle the version checking
-        version = get_system_spec()["raiden"]
-        tasks.append(gevent.spawn(check_version, version))
+        tasks.append(gevent.spawn(check_version, project_version))
 
         # spawn a greenlet to handle the gas reserve check
         tasks.append(gevent.spawn(check_gas_reserve, app_.raiden))

@@ -89,6 +89,7 @@ from raiden.utils.typing import (
     TargetAddress,
     TokenNetworkAddress,
     TokenNetworkID,
+    PaymentHashInvoice
 )
 from raiden.utils.upgrades import UpgradeManager
 from raiden_contracts.contract_manager import ContractManager
@@ -120,6 +121,7 @@ def _redact_secret(data: Union[Dict, List],) -> Union[Dict, List]:
 def initiator_init(
     raiden: "RaidenService",
     transfer_identifier: PaymentID,
+    payment_hash_invoice: PaymentHashInvoice,
     transfer_amount: PaymentAmount,
     transfer_secret: Secret,
     transfer_secrethash: SecretHash,
@@ -132,6 +134,7 @@ def initiator_init(
     transfer_state = TransferDescriptionWithSecretState(
         payment_network_identifier=raiden.default_registry.address,
         payment_identifier=transfer_identifier,
+        payment_hash_invoice=payment_hash_invoice,
         amount=transfer_amount,
         allocated_fee=transfer_fee,
         token_network_identifier=token_network_identifier,
@@ -187,6 +190,7 @@ class PaymentStatus(NamedTuple):
     """
 
     payment_identifier: PaymentID
+    payment_hash_invoice : PaymentHashInvoice
     amount: PaymentAmount
     token_network_identifier: TokenNetworkID
     payment_done: AsyncResult
@@ -705,7 +709,6 @@ class RaidenService(Runnable):
     def _handle_event(self, chain_state: ChainState, raiden_event: RaidenEvent):
         assert isinstance(chain_state, ChainState)
         assert isinstance(raiden_event, RaidenEvent)
-
         try:
             self.raiden_event_handler.on_raiden_event(
                 raiden=self, chain_state=chain_state, event=raiden_event
@@ -1023,6 +1026,7 @@ class RaidenService(Runnable):
         fee: FeeAmount = MEDIATION_FEE,
         secret: Secret = None,
         secrethash: SecretHash = None,
+        payment_hash_invoice: PaymentHashInvoice = None
     ) -> PaymentStatus:
         """ Transfer `amount` between this node and `target`.
 
@@ -1048,6 +1052,7 @@ class RaidenService(Runnable):
             identifier=identifier,
             secret=secret,
             secrethash=secrethash,
+            payment_hash_invoice=payment_hash_invoice
         )
 
         return payment_status
@@ -1061,6 +1066,7 @@ class RaidenService(Runnable):
         identifier: PaymentID,
         secret: Secret,
         secrethash: SecretHash = None,
+        payment_hash_invoice: PaymentHashInvoice = None
     ) -> PaymentStatus:
 
         if secrethash is None:
@@ -1105,6 +1111,7 @@ class RaidenService(Runnable):
 
             payment_status = PaymentStatus(
                 payment_identifier=identifier,
+                payment_hash_invoice=payment_hash_invoice,
                 amount=amount,
                 token_network_identifier=token_network_identifier,
                 payment_done=AsyncResult(),
@@ -1114,6 +1121,7 @@ class RaidenService(Runnable):
         init_initiator_statechange = initiator_init(
             raiden=self,
             transfer_identifier=identifier,
+            payment_hash_invoice=payment_hash_invoice,
             transfer_amount=amount,
             transfer_secret=secret,
             transfer_secrethash=secrethash,

@@ -99,6 +99,7 @@ from raiden.utils.typing import (
     Optional,
     PaymentAmount,
     PaymentID,
+    PaymentHashInvoice,
     PaymentWithFeeAmount,
     Secret,
     SecretHash,
@@ -110,6 +111,9 @@ from raiden.utils.typing import (
     Union,
     cast,
 )
+
+from raiden.billing.invoices.handlers.invoice_handler import handle_received_invoice
+
 
 # This should be changed to `Union[str, MerkleTreeState]`
 MerkletreeOrError = Tuple[bool, Optional[str], Optional[MerkleTreeState]]
@@ -414,6 +418,7 @@ def is_valid_lockedtransfer(
     channel_state: NettingChannelState,
     sender_state: NettingChannelEndState,
     receiver_state: NettingChannelEndState,
+    storage
 ) -> MerkletreeOrError:
     return valid_lockedtransfer_check(
         channel_state,
@@ -422,6 +427,8 @@ def is_valid_lockedtransfer(
         "LockedTransfer",
         transfer_state.balance_proof,
         transfer_state.lock,
+        transfer_state.payment_hash_invoice,
+        storage
     )
 
 
@@ -538,7 +545,11 @@ def valid_lockedtransfer_check(
     message_name: str,
     received_balance_proof: BalanceProofSignedState,
     lock: HashTimeLockState,
+    payment_hash_invoice,
+    storage
 ) -> MerkletreeOrError:
+
+    handle_invoice_result = handle_received_invoice(storage, payment_hash_invoice)
 
     current_balance_proof = get_current_balanceproof(sender_state)
     merkletree = compute_merkletree_with(sender_state.merkletree, lock.lockhash)
@@ -625,9 +636,8 @@ def valid_lockedtransfer_check(
                 "The secrethash is the keccak of 0x0 and will not be usable onchain"
             )
             result = (False, msg, None)
-
         else:
-            result = (True, None, merkletree)
+            result = (True, None, merkletree, handle_invoice_result)
 
     return result
 
@@ -1078,6 +1088,7 @@ def create_sendlockedtransfer(
     amount: PaymentWithFeeAmount,
     message_identifier: MessageID,
     payment_identifier: PaymentID,
+    payment_hash_invoice: PaymentHashInvoice,
     expiration: BlockExpiration,
     secrethash: SecretHash,
 ) -> Tuple[SendLockedTransfer, MerkleTreeState]:
@@ -1122,7 +1133,7 @@ def create_sendlockedtransfer(
     )
 
     locked_transfer = LockedTransferUnsignedState(
-        payment_identifier, token, balance_proof, lock, initiator, target
+        payment_identifier, payment_hash_invoice, token, balance_proof, lock, initiator, target
     )
 
     lockedtransfer = SendLockedTransfer(
@@ -1195,6 +1206,7 @@ def send_lockedtransfer(
     amount: PaymentWithFeeAmount,
     message_identifier: MessageID,
     payment_identifier: PaymentID,
+    payment_hash_invoice: PaymentHashInvoice,
     expiration: BlockExpiration,
     secrethash: SecretHash,
 ) -> SendLockedTransfer:
@@ -1205,6 +1217,7 @@ def send_lockedtransfer(
         amount,
         message_identifier,
         payment_identifier,
+        payment_hash_invoice,
         expiration,
         secrethash,
     )
@@ -1558,7 +1571,7 @@ def handle_receive_lock_expired(
 
 
 def handle_receive_lockedtransfer(
-    channel_state: NettingChannelState, mediated_transfer: LockedTransferSignedState
+    channel_state: NettingChannelState, mediated_transfer: LockedTransferSignedState, storage
 ) -> EventsOrError:
     """Register the latest known transfer.
 
@@ -1568,8 +1581,8 @@ def handle_receive_lockedtransfer(
     secrethash included, otherwise it won't be able to claim it.
     """
     events: List[Event]
-    is_valid, msg, merkletree = is_valid_lockedtransfer(
-        mediated_transfer, channel_state, channel_state.partner_state, channel_state.our_state
+    is_valid, msg, merkletree, handle_invoice_result = is_valid_lockedtransfer(
+        mediated_transfer, channel_state, channel_state.partner_state, channel_state.our_state, storage
     )
 
     if is_valid:
@@ -1593,7 +1606,7 @@ def handle_receive_lockedtransfer(
         )
         events = [invalid_locked]
 
-    return is_valid, events, msg
+    return is_valid, events, msg, handle_invoice_result
 
 
 def handle_receive_refundtransfercancelroute(
