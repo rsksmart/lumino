@@ -116,5 +116,5 @@ def test_channel_closed_must_clear_ordered_messages(
         block_hash=factories.make_block_hash(),
     )
 
-    iteration = node.handle_state_change(chain_state, closed)
+    iteration = node.handle_state_change(chain_state, closed, None)
     assert queue_identifier not in iteration.new_state.queueids_to_queues

@@ -93,6 +93,7 @@ def make_target_state(
         channel_state=channels[0],
         pseudo_random_generator=pseudo_random_generator,
         block_number=block_number,
+        storage=None
     )
 
     return TargetStateSetup(
@@ -128,7 +129,7 @@ def test_events_for_onchain_secretreveal():
     channels = make_channel_set([channel_properties])
     from_transfer = make_target_transfer(channels[0], expiration=expiration)
 
-    channel.handle_receive_lockedtransfer(channels[0], from_transfer)
+    channel.handle_receive_lockedtransfer(channels[0], from_transfer, None)
 
     channel.register_offchain_secret(channels[0], UNIT_SECRET, UNIT_SECRETHASH)
 
@@ -182,7 +183,7 @@ def test_handle_inittarget():
     state_change = ActionInitTarget(channels.get_route(0), from_transfer)
 
     iteration = target.handle_inittarget(
-        state_change, channels[0], pseudo_random_generator, block_number
+        state_change, channels[0], pseudo_random_generator, block_number, None
     )
 
     assert search_for_item(
@@ -207,11 +208,11 @@ def test_handle_inittarget_bad_expiration():
     expiration = channels[0].reveal_timeout + block_number + 1
     from_transfer = make_target_transfer(channels[0], expiration=expiration)
 
-    channel.handle_receive_lockedtransfer(channels[0], from_transfer)
+    channel.handle_receive_lockedtransfer(channels[0], from_transfer, None)
 
     state_change = ActionInitTarget(channels.get_route(0), from_transfer)
     iteration = target.handle_inittarget(
-        state_change, channels[0], pseudo_random_generator, block_number
+        state_change, channels[0], pseudo_random_generator, block_number, None
     )
     assert search_for_item(iteration.events, EventUnlockClaimFailed, {})
 
@@ -273,6 +274,7 @@ def test_handle_offchain_secretreveal_after_lock_expired():
         channel_state=setup.channel,
         pseudo_random_generator=setup.pseudo_random_generator,
         block_number=lock_expiration_block_number,
+        storage=None
     )
     state = iteration.new_state
 
@@ -285,6 +287,7 @@ def test_handle_offchain_secretreveal_after_lock_expired():
         channel_state=setup.channel,
         pseudo_random_generator=setup.pseudo_random_generator,
         block_number=lock_expiration_block_number + 1,
+        storage=None
     )
     state = iteration.new_state
 
@@ -299,6 +302,7 @@ def test_handle_offchain_secretreveal_after_lock_expired():
         channel_state=setup.channel,
         pseudo_random_generator=setup.pseudo_random_generator,
         block_number=lock_expiration_block_number + 1,
+        storage=None
     )
     msg = "At the next block we should not get the same event"
     assert not search_for_item(iteration.events, EventUnlockClaimFailed, {}), msg
@@ -317,6 +321,7 @@ def test_handle_onchain_secretreveal():
         channel_state=setup.channel,
         pseudo_random_generator=setup.pseudo_random_generator,
         block_number=setup.block_number,
+        storage=None
     )
     assert UNIT_SECRETHASH in setup.channel.partner_state.secrethashes_to_unlockedlocks
     assert UNIT_SECRETHASH not in setup.channel.partner_state.secrethashes_to_lockedlocks
@@ -337,6 +342,7 @@ def test_handle_onchain_secretreveal():
         channel_state=setup.channel,
         pseudo_random_generator=setup.pseudo_random_generator,
         block_number=block_number_prior_the_expiration,
+        storage=None
     )
     unlocked_onchain = setup.channel.partner_state.secrethashes_to_onchain_unlockedlocks
     assert EMPTY_HASH_KECCAK not in unlocked_onchain
@@ -350,6 +356,7 @@ def test_handle_onchain_secretreveal():
         channel_state=setup.channel,
         pseudo_random_generator=setup.pseudo_random_generator,
         block_number=block_number_prior_the_expiration,
+        storage=None
     )
     unlocked_onchain = setup.channel.partner_state.secrethashes_to_onchain_unlockedlocks
     assert UNIT_SECRETHASH in unlocked_onchain
@@ -381,6 +388,7 @@ def test_handle_block():
         channel_state=setup.channel,
         pseudo_random_generator=setup.pseudo_random_generator,
         block_number=new_block.block_number,
+        storage=None
     )
 
     assert iteration.new_state
@@ -399,6 +407,7 @@ def test_handle_block_equal_block_number():
         channel_state=setup.channel,
         pseudo_random_generator=random.Random(),
         block_number=new_block.block_number,
+        storage=None
     )
 
     assert iteration.new_state
@@ -420,6 +429,7 @@ def test_handle_block_lower_block_number():
         channel_state=setup.channel,
         pseudo_random_generator=setup.pseudo_random_generator,
         block_number=new_block.block_number,
+        storage=None
     )
     assert iteration.new_state
     assert not iteration.events
@@ -443,6 +453,7 @@ def test_state_transition():
         channel_state=channels[0],
         pseudo_random_generator=pseudo_random_generator,
         block_number=block_number,
+        storage=None
     )
     assert init_transition.new_state is not None
     assert init_transition.new_state.route == channels.get_route(0)
@@ -457,6 +468,7 @@ def test_state_transition():
         channel_state=channels[0],
         pseudo_random_generator=pseudo_random_generator,
         block_number=first_new_block.block_number,
+        storage=None
     )
 
     secret_reveal = ReceiveSecretReveal(UNIT_SECRET, initiator)
@@ -466,6 +478,7 @@ def test_state_transition():
         channel_state=channels[0],
         pseudo_random_generator=pseudo_random_generator,
         block_number=first_new_block.block_number,
+        storage=None
     )
     assert reveal_iteration.events
 
@@ -478,6 +491,7 @@ def test_state_transition():
         channel_state=channels[0],
         pseudo_random_generator=pseudo_random_generator,
         block_number=second_new_block.block_number,
+        storage=None
     )
     assert not iteration.events
 
@@ -507,6 +521,7 @@ def test_state_transition():
         channel_state=channels[0],
         pseudo_random_generator=pseudo_random_generator,
         block_number=block_number + 2,
+        storage=None
     )
     assert proof_iteration.new_state is None
 
@@ -538,6 +553,7 @@ def test_target_reject_keccak_empty_hash():
         channel_state=channels[0],
         pseudo_random_generator=pseudo_random_generator,
         block_number=block_number,
+        storage=None
     )
     assert init_transition.new_state is None
 
@@ -562,6 +578,7 @@ def test_target_receive_lock_expired():
         channel_state=channels[0],
         pseudo_random_generator=pseudo_random_generator,
         block_number=block_number,
+        storage=None
     )
     assert init_transition.new_state is not None
     assert init_transition.new_state.route == channels.get_route(0)
@@ -588,6 +605,7 @@ def test_target_receive_lock_expired():
         channel_state=channels[0],
         pseudo_random_generator=pseudo_random_generator,
         block_number=block_before_confirmed_expiration,
+        storage=None
     )
     assert not search_for_item(iteration.events, SendProcessed, {})
 
@@ -598,6 +616,7 @@ def test_target_receive_lock_expired():
         channel_state=channels[0],
         pseudo_random_generator=pseudo_random_generator,
         block_number=block_lock_expired,
+        storage=None
     )
     assert search_for_item(iteration.events, SendProcessed, {})
 
@@ -618,6 +637,7 @@ def test_target_lock_is_expired_if_secret_is_not_registered_onchain():
         channel_state=channels[0],
         pseudo_random_generator=pseudo_random_generator,
         block_number=block_number,
+        storage=None
     )
     assert init_transition.new_state is not None
 
@@ -627,6 +647,7 @@ def test_target_lock_is_expired_if_secret_is_not_registered_onchain():
         channel_state=channels[0],
         pseudo_random_generator=pseudo_random_generator,
         block_number=block_number,
+        storage=None
     )
 
     expired_block_number = channel.get_receiver_expiration_threshold(from_transfer.lock)
@@ -636,6 +657,7 @@ def test_target_lock_is_expired_if_secret_is_not_registered_onchain():
         channel_state=channels[0],
         pseudo_random_generator=pseudo_random_generator,
         block_number=expired_block_number,
+        storage=None
     )
     assert search_for_item(iteration.events, EventUnlockClaimFailed, {})
 

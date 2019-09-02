@@ -191,7 +191,7 @@ def test_channel_data_removed_after_unlock(
     from_route = factories.make_route_from_channel(channel_state)
     init_target = ActionInitTarget(from_route, mediated_transfer)
 
-    node.state_transition(chain_state, init_target)
+    node.state_transition(chain_state, init_target, None)
 
     closed_block_number = open_block_number + 10
     closed_block_hash = factories.make_block_hash()
@@ -302,7 +302,7 @@ def test_mediator_clear_pairs_after_batch_unlock(
         routes=[from_route], from_route=from_route, from_transfer=mediated_transfer
     )
 
-    node.state_transition(chain_state, init_mediator)
+    node.state_transition(chain_state, init_mediator, None)
 
     closed_block_number = open_block_number + 10
     closed_block_hash = factories.make_block_hash()
@@ -356,7 +356,7 @@ def test_mediator_clear_pairs_after_batch_unlock(
         block_hash=factories.make_block_hash(),
     )
     channel_unlock_iteration = node.state_transition(
-        chain_state=chain_state, state_change=channel_batch_unlock_state_change
+        chain_state=chain_state, state_change=channel_batch_unlock_state_change, storage=None
     )
     chain_state = channel_unlock_iteration.new_state
     token_network_state = views.get_token_network_by_identifier(
@@ -369,7 +369,7 @@ def test_mediator_clear_pairs_after_batch_unlock(
     block = Block(
         block_number=block_number + 1, gas_limit=1, block_hash=factories.make_transaction_hash()
     )
-    iteration = node.state_transition(chain_state=chain_state, state_change=block)
+    iteration = node.state_transition(chain_state=chain_state, state_change=block, storage=None)
     assert iteration.new_state
 
     # Make sure that mediator task was cleared during the next block processing
@@ -412,7 +412,7 @@ def test_multiple_channel_states(chain_state, token_network_state, channel_prope
     from_route = factories.make_route_from_channel(channel_state)
     init_target = ActionInitTarget(from_route, mediated_transfer)
 
-    node.state_transition(chain_state, init_target)
+    node.state_transition(chain_state, init_target, None)
 
     closed_block_number = open_block_number + 10
     closed_block_hash = factories.make_block_hash()

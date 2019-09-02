@@ -15,7 +15,7 @@ from hypothesis.stateful import (
 )
 from hypothesis.strategies import binary, builds, composite, integers, random_module, randoms
 
-from raiden.constants import EMPTY_MERKLE_ROOT, GENESIS_BLOCK_NUMBER, UINT64_MAX
+from raiden.constants import EMPTY_MERKLE_ROOT, GENESIS_BLOCK_NUMBER, UINT64_MAX, EMPTY_PAYMENT_HASH_INVOICE
 from raiden.messages import Lock
 from raiden.settings import DEFAULT_NUMBER_OF_BLOCK_CONFIRMATIONS, DEFAULT_WAIT_BEFORE_LOCK_REMOVAL
 from raiden.tests.utils import factories
@@ -48,7 +48,7 @@ from raiden.transfer.state_change import (
     ContractReceiveChannelNew,
     ContractReceiveChannelSettled,
 )
-from raiden.utils import random_secret, sha3
+from raiden.utils import random_secret, sha3, random_payment_hash_invoice
 from raiden.utils.typing import BlockNumber
 
 
@@ -65,6 +65,10 @@ def address(draw):
 @composite
 def payment_id(draw):
     return draw(integers(min_value=1, max_value=UINT64_MAX))
+
+@composite
+def payment_invoice_hash(draw):
+    return draw(builds(random_payment_hash_invoice))
 
 
 def event_types_match(events, *expected_types):
@@ -139,7 +143,7 @@ class ChainStateStateMachine(RuleBasedStateMachine):
             block_number=self.block_number,
             block_hash=factories.make_block_hash(),
         )
-        node.state_transition(self.chain_state, channel_new_state_change)
+        node.state_transition(self.chain_state, channel_new_state_change, None)
         self.chain_state.nodeaddresses_to_networkstates[partner_address] = NODE_NETWORK_REACHABLE
 
         return partner_address
@@ -305,12 +309,13 @@ class InitiatorMixin:
             sender=transfer.target,
         )
 
-    def _new_transfer_description(self, target, payment_id, amount, secret):
+    def _new_transfer_description(self, target, payment_id, payment_hash_invoice, amount, secret):
         self.used_secrets.add(secret)
 
         return TransferDescriptionWithSecretState(
             payment_network_identifier=self.payment_network_id,
             payment_identifier=payment_id,
+            payment_hash_invoice=payment_hash_invoice,
             amount=amount,
             allocated_fee=0,
             token_network_identifier=self.token_network_id,
@@ -320,14 +325,14 @@ class InitiatorMixin:
         )
 
     def _invalid_authentic_secret_request(self, previous, action):
-        result = node.state_transition(self.chain_state, action)
+        result = node.state_transition(self.chain_state, action, None)
         if action.secrethash in self.processed_secret_requests or self._is_removed(previous):
             assert not result.events
         else:
             self.processed_secret_requests.add(action.secrethash)
 
     def _unauthentic_secret_request(self, action):
-        result = node.state_transition(self.chain_state, action)
+        result = node.state_transition(self.chain_state, action, None)
         assert not result.events
 
     def _available_amount(self, partner_address):
@@ -348,16 +353,17 @@ class InitiatorMixin:
         target=init_initiators,
         partner=partners,
         payment_id=payment_id(),
+        payment_hash_invoice=payment_invoice_hash(),
         amount=integers(min_value=1, max_value=100),
         secret=secret(),  # pylint: disable=no-value-for-parameter
     )
-    def valid_init_initiator(self, partner, payment_id, amount, secret):
+    def valid_init_initiator(self, partner, payment_id, payment_hash_invoice, amount, secret):
         assume(amount <= self._available_amount(partner))
         assume(secret not in self.used_secrets)
 
-        transfer = self._new_transfer_description(partner, payment_id, amount, secret)
+        transfer = self._new_transfer_description(partner, payment_id, payment_hash_invoice, amount, secret)
         action = self._action_init_initiator(transfer)
-        result = node.state_transition(self.chain_state, action)
+        result = node.state_transition(self.chain_state, action, None)
 
         assert event_types_match(result.events, SendLockedTransfer)
 
@@ -369,14 +375,15 @@ class InitiatorMixin:
     @rule(
         partner=partners,
         payment_id=payment_id(),
+        payment_invoice_hash=payment_invoice_hash(),
         excess_amount=integers(min_value=1),
         secret=secret(),  # pylint: disable=no-value-for-parameter
     )
-    def exceeded_capacity_init_initiator(self, partner, payment_id, excess_amount, secret):
+    def exceeded_capacity_init_initiator(self, partner, payment_id, payment_invoice_hash, excess_amount, secret):
         amount = self._available_amount(partner) + excess_amount
-        transfer = self._new_transfer_description(partner, payment_id, amount, secret)
+        transfer = self._new_transfer_description(partner, payment_id, payment_invoice_hash, amount, secret)
         action = self._action_init_initiator(transfer)
-        result = node.state_transition(self.chain_state, action)
+        result = node.state_transition(self.chain_state, action, None)
         assert event_types_match(result.events, EventPaymentSentFailed)
         self.event("ActionInitInitiator failed: Amount exceeded")
 
@@ -384,28 +391,29 @@ class InitiatorMixin:
         previous_action=init_initiators,
         partner=partners,
         payment_id=payment_id(),
+        payment_invoice_hash=payment_invoice_hash(),
         amount=integers(min_value=1),
     )
-    def used_secret_init_initiator(self, previous_action, partner, payment_id, amount):
+    def used_secret_init_initiator(self, previous_action, partner, payment_id, payment_invoice_hash, amount):
         assume(not self._is_removed(previous_action))
         secret = previous_action.transfer.secret
-        transfer = self._new_transfer_description(partner, payment_id, amount, secret)
+        transfer = self._new_transfer_description(partner, payment_id, payment_invoice_hash, amount, secret)
         action = self._action_init_initiator(transfer)
-        result = node.state_transition(self.chain_state, action)
+        result = node.state_transition(self.chain_state, action, None)
         assert not result.events
         self.event("ActionInitInitiator failed: Secret already in use.")
 
     @rule(previous_action=init_initiators)
     def replay_init_initator(self, previous_action):
         assume(not self._is_removed(previous_action))
-        result = node.state_transition(self.chain_state, previous_action)
+        result = node.state_transition(self.chain_state, previous_action, None)
         assert not result.events
 
     @rule(previous_action=init_initiators)
     def valid_secret_request(self, previous_action):
         action = self._receive_secret_request(previous_action.transfer)
         self._assume_channel_opened(previous_action)
-        result = node.state_transition(self.chain_state, action)
+        result = node.state_transition(self.chain_state, action, None)
         if action.secrethash in self.processed_secret_requests:
             assert not result.events
             self.event("Valid SecretRequest dropped due to previous invalid one.")
@@ -549,7 +557,7 @@ class MediatorMixin:
             initiator_address, target_address, payment_id, amount, secret
         )
         action = self._action_init_mediator(transfer)
-        result = node.state_transition(self.chain_state, action)
+        result = node.state_transition(self.chain_state, action, None)
 
         assert event_types_match(result.events, SendProcessed, SendLockedTransfer)
 
@@ -562,7 +570,7 @@ class MediatorMixin:
         recipient = previous_action.from_transfer.initiator
 
         action = ReceiveSecretReveal(secret, sender)
-        result = node.state_transition(self.chain_state, action)
+        result = node.state_transition(self.chain_state, action, None)
 
         expiration = previous_action.from_transfer.lock.expiration
         in_time = self.block_number < expiration - DEFAULT_NUMBER_OF_BLOCK_CONFIRMATIONS
@@ -584,20 +592,20 @@ class MediatorMixin:
 
     @rule(previous_action=secret_requests)
     def replay_receive_secret_reveal(self, previous_action):
-        result = node.state_transition(self.chain_state, previous_action)
+        result = node.state_transition(self.chain_state, previous_action, None)
         assert not result.events
 
     @rule(previous_action=secret_requests, invalid_sender=address())
     def replay_receive_secret_reveal_scrambled_sender(self, previous_action, invalid_sender):
         action = ReceiveSecretReveal(previous_action.secret, invalid_sender)
-        result = node.state_transition(self.chain_state, action)
+        result = node.state_transition(self.chain_state, action, None)
         assert not result.events
 
     @rule(previous_action=init_mediators, secret=secret())
     def wrong_secret_receive_secret_reveal(self, previous_action, secret):
         sender = previous_action.from_transfer.target
         action = ReceiveSecretReveal(secret, sender)
-        result = node.state_transition(self.chain_state, action)
+        result = node.state_transition(self.chain_state, action, None)
         assert not result.events
 
     @rule(
@@ -606,7 +614,7 @@ class MediatorMixin:
     def wrong_address_receive_secret_reveal(self, previous_action, invalid_sender):
         secret = self.secrethash_to_secret[previous_action.from_transfer.lock.secrethash]
         invalid_action = ReceiveSecretReveal(secret, invalid_sender)
-        result = node.state_transition(self.chain_state, invalid_action)
+        result = node.state_transition(self.chain_state, invalid_action, None)
         assert not result.events
 
         valid_sender = previous_action.from_transfer.target
@@ -628,7 +636,7 @@ class OnChainMixin:
                 gas_limit=1,
                 block_hash=factories.make_keccak_hash(),
             )
-            result = node.state_transition(self.chain_state, block_state_change)
+            result = node.state_transition(self.chain_state, block_state_change, None)
             events.extend(result.events)
 
             self.block_number += 1
@@ -654,7 +662,7 @@ class OnChainMixin:
             partner_onchain_locksroot=EMPTY_MERKLE_ROOT,
         )
 
-        node.state_transition(self.chain_state, channel_settled_state_change)
+        node.state_transition(self.chain_state, channel_settled_state_change, None)
 
 
 class InitiatorStateMachine(InitiatorMixin, ChainStateStateMachine):
@@ -694,7 +702,7 @@ def test_regression_malicious_secret_request_handled_properly():
     state.replay_path = True
 
     v1 = unwrap_multiple(state.initialize(block_number=1, random=Random(), random_seed=None))
-    v2 = state.valid_init_initiator(partner=v1, amount=1, payment_id=1, secret=b"\x00" * 32)
+    v2 = state.valid_init_initiator(partner=v1, amount=1, payment_id=1, payment_hash_invoice=b"invoicehashtest", secret=b"\x00" * 32)
     state.wrong_amount_secret_request(amount=0, previous_action=v2)
     state.replay_init_initator(previous_action=v2)
 
@@ -708,7 +716,7 @@ def test_try_secret_request_after_settle_channel():
     state.failing_path_2 = True
 
     v1 = state.initialize(block_number=1, random=Random(), random_seed=None)
-    v2 = state.valid_init_initiator(amount=1, partner=v1, payment_id=1, secret=b"\x91" * 32)
+    v2 = state.valid_init_initiator(amount=1, partner=v1, payment_id=1, payment_hash_invoice=b"invoicehashtest", secret=b"\x91" * 32)
     state.settle_channel(partner=v1)
     state.valid_secret_request(previous_action=v2)
 
