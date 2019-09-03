@@ -491,6 +491,8 @@ class MatrixTransport(Runnable):
             queue_identifier: QueueIdentifier,
             message: Message,
     ):
+        print("------------- MATRIX SEND_ASYNC -----------------")
+
         """Queue the message for sending to recipient in the queue_identifier
 
         It may be called before transport is started, to initialize message queues
@@ -536,6 +538,8 @@ class MatrixTransport(Runnable):
         return bool(self._config.get('private_rooms'))
 
     def _login_or_register(self, prev_user_id=None, prev_access_token=None):
+        print("----- NETWORK MATRIX LOGIN OR REGISTER")
+
         base_username = to_normalized_address(self._raiden_service.address)
         _match_user = re.match(
             f'^@{re.escape(base_username)}.*:{re.escape(self._server_name)}$',
@@ -784,6 +788,7 @@ class MatrixTransport(Runnable):
         )
 
     def _handle_message(self, room, event) -> bool:
+        print("------------- MATRIX HANDLE_MESSAGE -----------------")
         """ Handle text messages sent to listening rooms """
         if (
                 event['type'] != 'm.room.message' or

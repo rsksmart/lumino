@@ -89,8 +89,9 @@ from raiden.utils.typing import (
     TargetAddress,
     TokenNetworkAddress,
     TokenNetworkID,
-    PaymentHashInvoice
-)
+    PaymentHashInvoice,
+    AddressHex)
+
 from raiden.utils.upgrades import UpgradeManager
 from raiden_contracts.contract_manager import ContractManager
 
@@ -234,7 +235,7 @@ def update_path_finding_service_from_balance_proof(
 
     msg = UpdatePFS.from_channel_state(channel_state)
     msg.sign(raiden.signer)
-    raiden.transport.send_global(constants.PATH_FINDING_BROADCASTING_ROOM, msg)
+    raiden.transport[0].send_global(constants.PATH_FINDING_BROADCASTING_ROOM, msg)
     log.debug("Sent a PFS Update", message=msg, balance_proof=new_balance_proof)
 
 
@@ -287,7 +288,7 @@ def update_monitoring_service_from_balance_proof(
         new_balance_proof, MONITORING_REWARD
     )
     monitoring_message.sign(raiden.signer)
-    raiden.transport.send_global(constants.MONITORING_BROADCASTING_ROOM, monitoring_message)
+    raiden.transport[0].send_global(constants.MONITORING_BROADCASTING_ROOM, monitoring_message)
 
 
 class RaidenService(Runnable):
@@ -514,7 +515,7 @@ class RaidenService(Runnable):
         # - Send pending transactions
         # - Send pending message
         self.alarm.link_exception(self.on_error)
-        self.transport.link_exception(self.on_error)
+        self.transport[0].link_exception(self.on_error)
         self._start_transport(chain_state)
         self._start_alarm_task()
 
@@ -549,10 +550,14 @@ class RaidenService(Runnable):
         #
         # We need a timeout to prevent an endless loop from trying to
         # contact the disconnected client
-        self.transport.stop()
+        self.transport[0].stop()
+        self.transport[1].stop()
+
         self.alarm.stop()
 
-        self.transport.join()
+        self.transport[0].join()
+        self.transport[1].join()
+
         self.alarm.join()
 
         self.blockchain_events.uninstall_all_event_listeners()
@@ -598,7 +603,13 @@ class RaidenService(Runnable):
         assert self.alarm.is_primed(), f"AlarmTask not primed. node:{self!r}"
         assert self.ready_to_process_events, f"Event procossing disable. node:{self!r}"
 
-        self.transport.start(
+        self.transport[0].start(
+            raiden_service=self,
+            message_handler=self.message_handler,
+            prev_auth_data=chain_state.last_transport_authdata,
+        )
+
+        self.transport[1].start(
             raiden_service=self,
             message_handler=self.message_handler,
             prev_auth_data=chain_state.last_transport_authdata,
@@ -620,7 +631,7 @@ class RaidenService(Runnable):
         self.alarm.start()
 
     def _initialize_ready_to_processed_events(self):
-        assert not self.transport
+        #  assert not self.transport
         assert not self.alarm
 
         # This flag /must/ be set to true before the transport or the alarm task is started
@@ -658,8 +669,9 @@ class RaidenService(Runnable):
         old_state = views.state_from_raiden(self)
         new_state, raiden_event_list = self.wal.log_and_dispatch(state_change)
 
-        for changed_balance_proof in views.detect_balance_proof_change(old_state, new_state):
-            update_services_from_balance_proof(self, new_state, changed_balance_proof)
+        # TODO FIXME cannot work after the lc refactor
+        # for changed_balance_proof in views.detect_balance_proof_change(old_state, new_state):
+        # update_services_from_balance_proof(self, new_state, changed_balance_proof)
 
         log.debug(
             "Raiden events",
@@ -740,7 +752,9 @@ class RaidenService(Runnable):
         `start_neighbours_healthcheck`.
         """
         if self.transport:
-            self.transport.start_health_check(node_address)
+            self.transport[0].start_health_check(node_address)
+            self.transport[1].start_health_check(node_address)
+
 
     def _callback_new_block(self, latest_block: Dict):
         """Called once a new block is detected by the alarm task.
@@ -881,7 +895,7 @@ class RaidenService(Runnable):
             otherwise queues for channel closed while the node was offline
             won't be properly cleared. It is not bad but it is suboptimal.
         """
-        assert not self.transport, f"Transport is running. node:{self!r}"
+       # assert not self.transport, f"Transport is running. node:{self!r}"
         assert self.alarm.is_primed(), f"AlarmTask not primed. node:{self!r}"
 
         events_queues = views.get_all_messagequeues(chain_state)
@@ -892,7 +906,7 @@ class RaidenService(Runnable):
             for event in event_queue:
                 message = message_from_sendevent(event)
                 self.sign(message)
-                self.transport.send_async(queue_identifier, message)
+                self.transport[0].send_async(queue_identifier, message)
 
     def _initialize_monitoring_services_queue(self, chain_state: ChainState):
         """Send the monitoring requests for all current balance proofs.
@@ -923,7 +937,7 @@ class RaidenService(Runnable):
             "Transport was started before the monitoring service queue was updated. "
             "This can lead to safety issue. node:{self!r}"
         )
-        assert not self.transport, msg
+       # assert not self.transport, msg
 
         msg = "The node state was not yet recovered, cant read balance proofs. node:{self!r}"
         assert self.wal, msg
@@ -938,8 +952,7 @@ class RaidenService(Runnable):
             ),
             current_state=chain_state,
         )
-        for balance_proof in current_balance_proofs:
-            update_services_from_balance_proof(self, chain_state, balance_proof)
+
 
     def _initialize_whitelists(self, chain_state: ChainState):
         """ Whitelist neighbors and mediated transfer targets on transport """
@@ -947,7 +960,9 @@ class RaidenService(Runnable):
         for neighbour in views.all_neighbour_nodes(chain_state):
             if neighbour == ConnectionManager.BOOTSTRAP_ADDR:
                 continue
-            self.transport.whitelist(neighbour)
+            self.transport[0].whitelist(neighbour)
+            self.transport[1].whitelist(neighbour)
+
 
         events_queues = views.get_all_messagequeues(chain_state)
 
@@ -956,7 +971,10 @@ class RaidenService(Runnable):
                 if isinstance(event, SendLockedTransfer):
                     transfer = event.transfer
                     if transfer.initiator == self.address:
-                        self.transport.whitelist(address=transfer.target)
+                        self.transport[0].whitelist(address=transfer.target)
+                        self.transport[1].whitelist(address=transfer.target)
+
+
 
     def sign(self, message: Message):
         """ Sign message inplace. """

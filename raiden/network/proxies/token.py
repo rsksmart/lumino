@@ -85,6 +85,7 @@ class Token:
                 block = checking_block
 
             self.proxy.jsonrpc_client.check_for_insufficient_eth(
+                address=self.node_address,
                 transaction_name="approve",
                 transaction_executed=transaction_executed,
                 required_gas=GAS_REQUIRED_FOR_APPROVE,

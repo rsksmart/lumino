@@ -18,15 +18,12 @@ from raiden.api.v1.encoding import (
     TokenActionSchema,
     TokenActionRequestSchema,
     InvoiceCreateSchema,
-    PaymentInvoiceSchema
+    PaymentInvoiceSchema,
+    ChannelLightPutSchema,
+    ChannelLightPatchSchema
 )
 from raiden.utils import typing
 from raiden.constants import EMPTY_PAYMENT_HASH_INVOICE
-
-from eth_utils import (
-    decode_hex
-)
-
 
 def create_blueprint():
     # Take a look at this SO question on hints how to organize versioned
@@ -65,13 +62,31 @@ class ChannelsResource(BaseResource):
         )
 
 
+class ChannelsResourceLight(BaseResource):
+
+    put_schema = ChannelLightPutSchema
+
+    def get(self):
+        """
+        this translates to 'get all light channels the node is connected with'
+        """
+        return self.rest_api.get_channel_list(
+            self.rest_api.raiden_api.raiden.default_registry.addressF
+        )
+
+    @use_kwargs(put_schema, locations=("json",))
+    def put(self, **kwargs):
+        return self.rest_api.open_light(
+            registry_address=self.rest_api.raiden_api.raiden.default_registry.address, **kwargs
+        )
+
+
 class ChannelsResourceLumino(BaseResource):
     get_schema = ChannelLuminoGetSchema
     put_schema = ChannelPutLuminoSchema
 
     @use_kwargs(get_schema, locations=('query',))
-    def get(self,
-            token_addresses: typing.ByteString = None):
+    def get(self, token_addresses: typing.ByteString = None):
         """
         this translates to 'get the channels for the tokens and check if they can join'
         """
@@ -105,6 +120,22 @@ class ChannelsResourceByTokenAndPartnerAddress(BaseResource):
     @use_kwargs(patch_schema, locations=("json",))
     def patch(self, **kwargs):
         return self.rest_api.patch_channel(
+            registry_address=self.rest_api.raiden_api.raiden.default_registry.address, **kwargs
+        )
+
+    def get(self, **kwargs):
+        return self.rest_api.get_channel(
+            registry_address=self.rest_api.raiden_api.raiden.default_registry.address, **kwargs
+        )
+
+
+class LightChannelsResourceByTokenAndPartnerAddress(BaseResource):
+
+    patch_schema = ChannelLightPatchSchema
+
+    @use_kwargs(patch_schema, locations=("json",))
+    def patch(self, **kwargs):
+        return self.rest_api.patch_light_channel(
             registry_address=self.rest_api.raiden_api.raiden.default_registry.address, **kwargs
         )
 

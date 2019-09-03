@@ -288,3 +288,12 @@ class ServiceRequestIOURejected(ServiceRequestFailed):
     def __init__(self, message: str, error_code: int) -> None:
         super().__init__(f"{message} ({error_code})")
         self.error_code = error_code
+
+
+class RawTransactionFailed(RaidenError):
+    """ Raised when a raw transaction, signed by a Light Client, fails """
+
+
+class UnhandledLightClient(RaidenRecoverableError):
+    """Raised if someone tries to create a channel using this node as a hub and the light clients are not registered."""
+

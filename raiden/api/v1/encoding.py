@@ -344,6 +344,20 @@ class ChannelPutSchema(BaseSchema):
         decoding_class = dict
 
 
+class ChannelLightPutSchema(BaseSchema):
+    token_address = AddressField(required=True)
+    creator_address = AddressField(required=True)
+    partner_address = AddressField(required=True)
+    signed_tx = fields.String(required=True)
+    settle_timeout = fields.Integer(missing=None)
+    total_deposit = fields.Integer(default=None, missing=None)
+
+    class Meta:
+        strict = True
+        # decoding to a dict is required by the @use_kwargs decorator from webargs:
+        decoding_class = dict
+
+
 class ChannelPutLuminoSchema(BaseSchema):
     token_address = AddressField(required=True)
     partner_address = AddressRnsField(required=True)
@@ -374,6 +388,24 @@ class ChannelPatchSchema(BaseSchema):
             [CHANNEL_STATE_CLOSED, CHANNEL_STATE_OPENED, CHANNEL_STATE_SETTLED]
         ),
     )
+
+    class Meta:
+        strict = True
+        # decoding to a dict is required by the @use_kwargs decorator from webargs:
+        decoding_class = dict
+
+
+class ChannelLightPatchSchema(BaseSchema):
+    total_deposit = fields.Integer(default=None, missing=None)
+    state = fields.String(
+        default=None,
+        missing=None,
+        validate=validate.OneOf(
+            [CHANNEL_STATE_CLOSED, CHANNEL_STATE_OPENED, CHANNEL_STATE_SETTLED]
+        ),
+    )
+    signed_approval_tx = fields.String(required=True)
+    signed_deposit_tx = fields.String(required=True)
 
     class Meta:
         strict = True

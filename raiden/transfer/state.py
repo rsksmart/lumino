@@ -6,7 +6,7 @@ from random import Random
 from typing import TYPE_CHECKING, Tuple
 
 import networkx
-from eth_utils import encode_hex, to_canonical_address, to_checksum_address
+from eth_utils import encode_hex, to_canonical_address, to_checksum_address, to_normalized_address
 
 from raiden.constants import EMPTY_MERKLE_ROOT, UINT64_MAX, UINT256_MAX
 from raiden.encoding import messages
@@ -16,7 +16,7 @@ from raiden.transfer.identifiers import CanonicalIdentifier, QueueIdentifier
 from raiden.transfer.merkle_tree import merkleroot
 from raiden.transfer.utils import hash_balance_data, pseudo_random_generator_from_json
 from raiden.utils import lpex, pex, serialization, sha3
-from raiden.utils.serialization import map_dict, map_list, serialize_bytes
+from raiden.utils.serialization import map_dict, map_list, serialize_bytes, map_matrix
 from raiden.utils.typing import (
     AdditionalHash,
     Address,
@@ -59,7 +59,7 @@ from raiden.utils.typing import (
     TokenNetworkAddress,
     TokenNetworkID,
     Union,
-)
+    AddressHex)
 
 if TYPE_CHECKING:
     # pylint: disable=unused-import
@@ -476,7 +476,7 @@ class TokenNetworkState(State):
         self.network_graph = TokenNetworkGraphState(self.address)
 
         self.channelidentifiers_to_channels: ChannelMap = dict()
-        self.partneraddresses_to_channelidentifiers: Dict[Address, List[ChannelID]] = defaultdict(
+        self.partneraddresses_to_channelidentifiers: Dict[AddressHex, List[ChannelID]] = defaultdict(
             list
         )
 
@@ -506,9 +506,10 @@ class TokenNetworkState(State):
             "address": to_checksum_address(self.address),
             "token_address": to_checksum_address(self.token_address),
             "network_graph": self.network_graph,
-            "channelidentifiers_to_channels": map_dict(
+            "channelidentifiers_to_channels": map_matrix(
                 str,  # keys in json can only be strings
                 serialization.identity,
+                serialization.checksum_address,
                 self.channelidentifiers_to_channels,
             ),
             "partneraddresses_to_channelidentifiers": map_dict(
@@ -525,10 +526,12 @@ class TokenNetworkState(State):
             token_address=to_canonical_address(data["token_address"]),
         )
         restored.network_graph = data["network_graph"]
-        restored.channelidentifiers_to_channels = map_dict(
+
+        restored.channelidentifiers_to_channels = map_matrix(
             serialization.deserialize_channel_id,
             serialization.identity,
-            data["channelidentifiers_to_channels"],
+            to_canonical_address,
+            data["channelidentifiers_to_channels"]
         )
 
         restored_partneraddresses_to_channelidentifiers = map_dict(
@@ -570,6 +573,15 @@ class TokenNetworkGraphState(State):
 
     def __ne__(self, other: Any) -> bool:
         return not self.__eq__(other)
+
+    def _same_channel_tuple(self, participant1: Address, participant2: Address, graph_tuple: Tuple[Address, Address]) -> bool:
+        return graph_tuple[0] == participant1 and graph_tuple[1] == participant2 or graph_tuple[0] == participant2 and graph_tuple[1] == participant1
+
+    def channel_exists(self, participant1: Address, participant2: Address) -> bool:
+        for key, val in self.channel_identifier_to_participants.items():
+            if self._same_channel_tuple(participant1, participant2, val):
+                return True
+        return False
 
     def to_dict(self) -> Dict[str, Any]:
         return {

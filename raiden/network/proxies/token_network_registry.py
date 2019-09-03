@@ -171,6 +171,7 @@ class TokenNetworkRegistry:
             required_gas = gas_limit if gas_limit else GAS_REQUIRED_FOR_CREATE_ERC20_TOKEN_NETWORK
             self.proxy.jsonrpc_client.check_for_insufficient_eth(
                 transaction_name="createERC20TokenNetwork",
+                address=self.node_address,
                 transaction_executed=transaction_executed,
                 required_gas=required_gas,
                 block_identifier=block,

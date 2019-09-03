@@ -7,7 +7,7 @@ import datetime
 from raiden.constants import RAIDEN_DB_VERSION, SQLITE_MIN_REQUIRED_VERSION
 from raiden.exceptions import InvalidDBData, InvalidNumberInput
 from raiden.storage.serialize import SerializationBase
-from raiden.storage.utils import DB_SCRIPT_CREATE_TABLES, TimestampedEvent
+from raiden.storage.utils import DB_SCRIPT_CREATE_TABLES, TimestampedEvent, DB_UPDATE_TABLES
 from raiden.utils import get_system_spec
 from raiden.utils.typing import Any, Dict, Iterator, List, NamedTuple, Optional, Tuple, Union
 from dateutil.relativedelta import relativedelta
@@ -90,6 +90,7 @@ class SQLiteStorage:
 
         with conn:
             conn.executescript(DB_SCRIPT_CREATE_TABLES)
+            #FIXME mmartinez conn.executescript(DB_UPDATE_TABLES)
 
         # When writting to a table where the primary key is the identifier and we want
         # to return said identifier we use cursor.lastrowid, which uses sqlite's last_insert_rowid
@@ -285,6 +286,30 @@ class SQLiteStorage:
                 FROM token_action WHERE token = ?;
             """,
             (token,)
+        )
+
+        return cursor.fetchone()
+
+    def query_clients(self, client_type):
+        cursor = self.conn.cursor()
+
+        cursor.execute(
+            """
+            SELECT * FROM client where type = ?;
+            """,
+            (client_type,)
+        )
+
+        return cursor.fetchall()
+
+    def query_client(self, hex_address):
+        cursor = self.conn.cursor()
+
+        cursor.execute(
+            """
+            SELECT * FROM client where address = ?;
+            """,
+            (hex_address,)
         )
 
         return cursor.fetchone()

@@ -38,6 +38,19 @@ def identity(val: T) -> T:
     return val
 
 
+def checksum_address(val: T) -> T:
+    return to_checksum_address(val)
+
+
+
+def map_matrix(
+    key_func: Callable[[KT], KRT], value_func_level1: Callable[[VT], VRT], key_func_level2: Callable[[KT], KRT], matrix: Dict[KT, Dict[KT, VT]]
+) -> Dict[KRT, Dict[KRT, VRT]]:
+    result = {}
+    for elem in matrix:
+        result[key_func_level2(elem)] = map_dict(key_func, value_func_level1, matrix[elem])
+    return result
+
 def map_dict(
     key_func: Callable[[KT], KRT], value_func: Callable[[VT], VRT], dict_: Dict[KT, VT]
 ) -> Dict[KRT, VRT]:

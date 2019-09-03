@@ -274,11 +274,11 @@ class MatrixTransport(Runnable):
     _room_sep = "_"
     log = log
 
-    def __init__(self, config: dict):
+    def __init__(self, config: dict, lc : bool):
         super().__init__()
         self._config = config
         self._raiden_service: Optional[RaidenService] = None
-
+        self._lc = lc
         if config["server"] == "auto":
             available_servers = config["available_servers"]
         elif urlparse(config["server"]).scheme in {"http", "https"}:
@@ -364,6 +364,7 @@ class MatrixTransport(Runnable):
             signer=self._raiden_service.signer,
             prev_user_id=prev_user_id,
             prev_access_token=prev_access_token,
+            lc = self._lc
         )
         self.log = log.bind(current_user=self._user_id, node=pex(self._raiden_service.address))
 
@@ -723,6 +724,10 @@ class MatrixTransport(Runnable):
 
     def _handle_message(self, room, event) -> bool:
         """ Handle text messages sent to listening rooms """
+        log.debug("_handle_message. Is LC?: " + str(self._lc))
+
+        if self._lc:
+            return False
         if (
             event["type"] != "m.room.message"
             or event["content"]["msgtype"] != "m.text"
@@ -836,6 +841,7 @@ class MatrixTransport(Runnable):
         self._raiden_service.on_message(delivered)
 
     def _receive_message(self, message: Union[SignedRetrieableMessage, Processed]):
+        print("Message "+str(message))
         assert self._raiden_service is not None
         self.log.debug(
             "Message received",
