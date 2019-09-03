@@ -1,10 +1,9 @@
-import threading
 
 from eth_utils.typing import ChecksumAddress
 
 from raiden.storage.wal import WriteAheadLog
 from .client_model import ClientModel, ClientType
-from raiden.utils.typing import List, AddressHex
+from raiden.utils.typing import List, Optional
 
 
 class LightClientService:
@@ -24,6 +23,14 @@ class LightClientService:
             if lc.address == client_address:
                 return True
         return False
+
+    @classmethod
+    def get_by_api_key(cls, api_key, wal: WriteAheadLog) -> Optional[ClientModel]:
+        result = None
+        lc = wal.storage.query_client_by_api_key(api_key)
+        if lc:
+            result = ClientModel(lc[0], lc[1], lc[2], lc[3])
+        return result
 
 
 

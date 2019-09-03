@@ -13,6 +13,7 @@ from matrix_client.errors import MatrixRequestError
 
 from raiden.constants import DISCOVERY_DEFAULT_ROOM
 from raiden.exceptions import InvalidAddress, TransportError, UnknownAddress, UnknownTokenAddress
+from raiden.lightclient.light_client_message_handler import LightClientMessageHandler
 from raiden.message_handler import MessageHandler
 from raiden.messages import (
     Delivered,
@@ -73,7 +74,6 @@ from raiden.utils.typing import (
     Union,
     cast,
 )
-
 log = structlog.get_logger(__name__)
 
 _RoomID = NewType("_RoomID", str)
@@ -523,7 +523,7 @@ class MatrixTransport(Runnable):
                 "Do not use send_async for {} messages".format(message.__class__.__name__)
             )
 
-        self.log.debug(
+        self.log.info(
             "Send async",
             receiver_address=pex(receiver_address),
             message=message,
@@ -724,9 +724,20 @@ class MatrixTransport(Runnable):
 
     def _handle_message(self, room, event) -> bool:
         """ Handle text messages sent to listening rooms """
-        log.debug("_handle_message. Is LC?: " + str(self._lc))
-
+        log.info("_handle_message. Is LC?: " + str(self._lc))
         if self._lc:
+            #TODO mmartinez fixme this should be moved to event handler probably
+            sender_id = event["sender"]
+            user = self._get_user(sender_id)
+            peer_address = validate_userid_signature(user)
+            can_store = True
+            try:
+                messages = validate_and_parse_message(event["content"]["body"], peer_address)
+            except TypeError:
+                print("Invoice error?")
+                can_store = False
+            if can_store:
+                LightClientMessageHandler.store_light_client_protocol_messages(messages, self._raiden_service.wal)
             return False
         if (
             event["type"] != "m.room.message"
