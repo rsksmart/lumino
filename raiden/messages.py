@@ -1352,6 +1352,7 @@ class RefundTransfer(LockedTransfer):
             chain_id=balance_proof.chain_id,
             message_identifier=event.message_identifier,
             payment_identifier=transfer.payment_identifier,
+            payment_hash_invoice=EMPTY_PAYMENT_HASH_INVOICE,
             nonce=balance_proof.nonce,
             token_network_address=balance_proof.token_network_identifier,
             token=transfer.token,

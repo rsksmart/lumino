@@ -6,7 +6,7 @@ import gevent
 from gevent.timeout import Timeout
 
 from raiden.app import App
-from raiden.constants import UINT64_MAX
+from raiden.constants import UINT64_MAX, EMPTY_PAYMENT_HASH_INVOICE
 from raiden.message_handler import MessageHandler
 from raiden.messages import LockedTransfer, LockExpired, Message, Unlock
 from raiden.tests.utils.factories import make_address, make_secret, make_payment_hash_invoice
@@ -150,6 +150,7 @@ def _transfer_unlocked(
         amount=amount,
         target=target_app.raiden.address,
         identifier=identifier,
+        payment_hash_invoice=EMPTY_PAYMENT_HASH_INVOICE,
         fee=fee,
     )
 
@@ -202,6 +203,7 @@ def _transfer_expired(
         fee=fee,
         target=target_app.raiden.address,
         identifier=identifier,
+        payment_hash_invoice=EMPTY_PAYMENT_HASH_INVOICE,
         secret=secret,
         secrethash=secrethash,
     )
@@ -246,6 +248,7 @@ def _transfer_secret_not_requested(
         fee=fee,
         target=target_app.raiden.address,
         identifier=identifier,
+        payment_hash_invoice=EMPTY_PAYMENT_HASH_INVOICE,
         secret=secret,
         secrethash=secrethash,
     )
@@ -348,6 +351,7 @@ def transfer_and_assert_path(
         fee=fee,
         target=last_app.raiden.address,
         identifier=identifier,
+        payment_hash_invoice=EMPTY_PAYMENT_HASH_INVOICE,
         secret=secret,
     )
 
