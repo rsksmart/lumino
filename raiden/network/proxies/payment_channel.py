@@ -188,6 +188,7 @@ class PaymentChannel:
         additional_hash: AdditionalHash,
         signature: Signature,
         block_identifier: BlockSpecification,
+        signed_close_tx: str
     ):
         """ Closes the channel using the provided balance proof. """
         self.token_network.close(
@@ -198,6 +199,7 @@ class PaymentChannel:
             additional_hash=additional_hash,
             signature=signature,
             given_block_identifier=block_identifier,
+            signed_close_tx=signed_close_tx
         )
 
     def update_transfer(

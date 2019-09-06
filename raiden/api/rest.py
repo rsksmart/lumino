@@ -1531,6 +1531,42 @@ class RestAPI:
         result = self.channel_schema.dump(updated_channel_state)
         return api_response(result=result.data)
 
+    def _close_light(
+        self,
+        registry_address: typing.PaymentNetworkID,
+        channel_state: NettingChannelState,
+        signed_close_tx: typing.SignedTransaction):
+
+        log.debug(
+            "Closing light channel",
+            node=pex(self.raiden_api.address),
+            registry_address=to_checksum_address(registry_address),
+            channel_identifier=channel_state.identifier
+        )
+
+        if channel.get_status(channel_state) != CHANNEL_STATE_OPENED:
+            return api_error(
+                errors="Attempted to close an already closed channel",
+                status_code=HTTPStatus.CONFLICT,
+            )
+
+        try:
+            self.raiden_api.channel_close_light(
+                registry_address,
+                channel_state.token_address,
+                channel_state.partner_state.address,
+                signed_close_tx=signed_close_tx
+            )
+        except InsufficientFunds as e:
+            return api_error(errors=str(e), status_code=HTTPStatus.PAYMENT_REQUIRED)
+
+        updated_channel_state = self.raiden_api.get_channel(
+            registry_address, channel_state.token_address, channel_state.partner_state.address
+        )
+
+        result = self.channel_schema.dump(updated_channel_state)
+        return api_response(result=result.data)
+
     def _close(
         self, registry_address: typing.PaymentNetworkID, channel_state: NettingChannelState
     ):
@@ -1569,6 +1605,7 @@ class RestAPI:
         partner_address: typing.Address,
         signed_approval_tx: typing.SignedTransaction,
         signed_deposit_tx: typing.SignedTransaction,
+        signed_close_tx:typing.SignedTransaction,
         total_deposit: typing.TokenAmount = None,
         state: str = None,
 
@@ -1625,8 +1662,7 @@ class RestAPI:
                                          signed_deposit_tx)
 
         elif state == CHANNEL_STATE_CLOSED:
-            log.critical("Not implemented yet!")
-            result = None
+            result = self._close_light(registry_address, channel_state, signed_close_tx)
         else:  # should never happen, channel_state is validated in the schema
             result = api_error(
                 errors="Provided invalid channel state {}".format(state),

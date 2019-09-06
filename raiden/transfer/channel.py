@@ -1292,7 +1292,8 @@ def send_unlock(
 
 
 def events_for_close(
-    channel_state: NettingChannelState, block_number: BlockNumber, block_hash: BlockHash
+    channel_state: NettingChannelState, block_number: BlockNumber, block_hash: BlockHash,
+    signed_close_tx: str
 ) -> List[Event]:
     events: List[Event] = list()
 
@@ -1307,6 +1308,7 @@ def events_for_close(
             canonical_identifier=channel_state.canonical_identifier,
             balance_proof=balance_proof,
             triggered_by_block_hash=block_hash,
+            signed_close_tx=signed_close_tx
         )
 
         events.append(close_event)
@@ -1483,7 +1485,8 @@ def handle_action_close(
     assert channel_state.identifier == close.channel_identifier, msg
 
     events = events_for_close(
-        channel_state=channel_state, block_number=block_number, block_hash=block_hash
+        channel_state=channel_state, block_number=block_number, block_hash=block_hash,
+        signed_close_tx=close.signed_close_tx
     )
     return TransitionResult(channel_state, events)
 

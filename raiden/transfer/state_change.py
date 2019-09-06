@@ -18,7 +18,7 @@ from raiden.transfer.state import (
     TransactionChannelNewBalance,
 )
 from raiden.transfer.utils import pseudo_random_generator_from_json
-from raiden.utils import pex, sha3
+from raiden.utils import pex, sha3, decode_hex
 from raiden.utils.serialization import (
     deserialize_blockhash,
     deserialize_bytes,
@@ -57,7 +57,8 @@ from raiden.utils.typing import (
     TokenNetworkID,
     TransactionHash,
     TransferID,
-    AddressHex)
+    AddressHex,
+    SignedTransaction)
 
 
 class Block(StateChange):
@@ -172,8 +173,12 @@ class ActionCancelPayment(StateChange):
 class ActionChannelClose(StateChange):
     """ User is closing an existing channel. """
 
-    def __init__(self, canonical_identifier: CanonicalIdentifier) -> None:
+    def __init__(self, canonical_identifier: CanonicalIdentifier,
+                 signed_close_tx: str,
+                 participant: AddressHex) -> None:
         self.canonical_identifier = canonical_identifier
+        self.signed_close_tx = signed_close_tx
+        self.participant = participant
 
     @property
     def chain_identifier(self) -> ChainID:
@@ -188,24 +193,37 @@ class ActionChannelClose(StateChange):
         return self.canonical_identifier.channel_identifier
 
     def __repr__(self) -> str:
-        return "<ActionChannelClose channel_identifier:{}>".format(self.channel_identifier)
+        return "<ActionChannelClose channel_identifier:{} signed_close_tx:{} participant:{}>".format(
+            self.channel_identifier,
+            self.signed_close_tx,
+            self.participant)
 
     def __eq__(self, other: Any) -> bool:
         return (
             isinstance(other, ActionChannelClose)
             and self.canonical_identifier == other.canonical_identifier
+            and self.signed_close_tx == other.signed_close_tx
+            and self.participant == other.participant
         )
 
     def __ne__(self, other: Any) -> bool:
         return not self.__eq__(other)
 
     def to_dict(self) -> Dict[str, Any]:
-        return {"canonical_identifier": self.canonical_identifier.to_dict()}
+        return {"canonical_identifier": self.canonical_identifier.to_dict(),
+                "signed_close_tx": self.signed_close_tx,
+                "participant": to_checksum_address(self.participant)}
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "ActionChannelClose":
+
+        if not "participant" in data:
+            data["participant"] = ""
+
         return cls(
-            canonical_identifier=CanonicalIdentifier.from_dict(data["canonical_identifier"])
+            canonical_identifier=CanonicalIdentifier.from_dict(data["canonical_identifier"]),
+            signed_close_tx=data["signed_close_tx"],
+            participant=AddressHex(data["participant"])
         )
 
 

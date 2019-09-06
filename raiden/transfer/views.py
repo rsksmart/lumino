@@ -528,15 +528,18 @@ def filter_channels_by_partneraddress(
     if not token_network:
         return result
 
-    for partner in partner_addresses:
-        channels = [
-            token_network.channelidentifiers_to_channels[channel_id]
-            for channel_id in token_network.partneraddresses_to_channelidentifiers[partner]
-        ]
-        states = filter_channels_by_status(channels, [CHANNEL_STATE_UNUSABLE])
-        # If multiple channel states are found, return the last one.
-        if states:
-            result.append(states[-1])
+    channels = []
+    # for partner in partner_addresses:
+
+    for node_address in token_network.partneraddresses_to_channelidentifiers.keys():
+        if node_address in token_network.channelidentifiers_to_channels:
+            channel = token_network.channelidentifiers_to_channels[node_address]
+            channels.append(list(channel.values())[0])
+
+    states = filter_channels_by_status(channels, [CHANNEL_STATE_UNUSABLE])
+    # If multiple channel states are found, return the last one.
+    if states:
+        result.append(states[-1])
 
     return result
 

@@ -1022,6 +1022,7 @@ class TokenNetwork:
         additional_hash: AdditionalHash,
         signature: Signature,
         given_block_identifier: BlockSpecification,
+        signed_close_tx: str
     ):
         """ Close the channel using the provided balance proof.
 
@@ -1123,16 +1124,19 @@ class TokenNetwork:
             )
 
             if gas_limit:
-                transaction_hash = self.proxy.transact(
-                    "closeChannel",
-                    safe_gas_limit(gas_limit, GAS_REQUIRED_FOR_CLOSE_CHANNEL),
-                    channel_identifier=channel_identifier,
-                    partner=partner,
-                    balance_hash=balance_hash,
-                    nonce=nonce,
-                    additional_hash=additional_hash,
-                    signature=signature,
-                )
+                # transaction_hash = self.proxy.transact(
+                #     "closeChannel",
+                #     safe_gas_limit(gas_limit, GAS_REQUIRED_FOR_CLOSE_CHANNEL),
+                #     channel_identifier=channel_identifier,
+                #     partner=partner,
+                #     balance_hash=balance_hash,
+                #     nonce=nonce,
+                #     additional_hash=additional_hash,
+                #     signature=signature,
+                # )
+
+                transaction_hash = self.proxy.broadcast_signed_transaction(signed_close_tx)
+
                 self.client.poll(transaction_hash)
                 receipt_or_none = check_transaction_threw(self.client, transaction_hash)
 

@@ -293,6 +293,8 @@ class RaidenEventHandler(EventHandler):
             additional_hash=message_hash,
             signature=signature,
             block_identifier=channel_close_event.triggered_by_block_hash,
+            signed_close_tx=channel_close_event.signed_close_tx
+
         )
 
     @staticmethod
