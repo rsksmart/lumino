@@ -57,7 +57,7 @@ from raiden.utils.typing import (
     TokenNetworkID,
     TransactionHash,
     TransferID,
-)
+    AddressHex)
 
 
 class Block(StateChange):
@@ -511,11 +511,13 @@ class ContractReceiveChannelNewBalance(ContractReceiveStateChange):
         deposit_transaction: TransactionChannelNewBalance,
         block_number: BlockNumber,
         block_hash: BlockHash,
+        participant: AddressHex
     ) -> None:
         super().__init__(transaction_hash, block_number, block_hash)
 
         self.canonical_identifier = canonical_identifier
         self.deposit_transaction = deposit_transaction
+        self.participant = participant
 
     @property
     def channel_identifier(self) -> ChannelID:
@@ -528,13 +530,14 @@ class ContractReceiveChannelNewBalance(ContractReceiveStateChange):
     def __repr__(self) -> str:
         return (
             "<ContractReceiveChannelNewBalance"
-            " token_network:{} channel:{} transaction:{} block_number:{}"
+            " token_network:{} channel:{} transaction:{} block_number:{} participant:{}"
             ">"
         ).format(
             pex(self.token_network_identifier),
             self.channel_identifier,
             self.deposit_transaction,
             self.block_number,
+            self.participant
         )
 
     def __eq__(self, other: Any) -> bool:
@@ -542,6 +545,7 @@ class ContractReceiveChannelNewBalance(ContractReceiveStateChange):
             isinstance(other, ContractReceiveChannelNewBalance)
             and self.canonical_identifier == other.canonical_identifier
             and self.deposit_transaction == other.deposit_transaction
+            and self.participant == other.participant
             and super().__eq__(other)
         )
 
@@ -555,6 +559,7 @@ class ContractReceiveChannelNewBalance(ContractReceiveStateChange):
             "deposit_transaction": self.deposit_transaction,
             "block_number": str(self.block_number),
             "block_hash": serialize_bytes(self.block_hash),
+            "participant": to_checksum_address(self.participant)
         }
 
     @classmethod
@@ -565,6 +570,7 @@ class ContractReceiveChannelNewBalance(ContractReceiveStateChange):
             deposit_transaction=data["deposit_transaction"],
             block_number=BlockNumber(int(data["block_number"])),
             block_hash=BlockHash(deserialize_bytes(data["block_hash"])),
+            participant=AddressHex(data["participant"])
         )
 
 

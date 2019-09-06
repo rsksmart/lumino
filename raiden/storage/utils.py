@@ -57,7 +57,6 @@ CREATE TABLE IF NOT EXISTS token_action (
 """
 
 DB_CREATE_INVOICES = """
-
 CREATE TABLE IF NOT EXISTS invoices
 (
     identifier      INTEGER
@@ -76,7 +75,6 @@ CREATE TABLE IF NOT EXISTS invoices
     token_address   TEXT,
     created_at      TEXT
 );
-
 """
 
 DB_CREATE_INVOICES_PAYMENTS = """
@@ -87,10 +85,19 @@ CREATE TABLE IF NOT EXISTS invoices_payments (
 );
 """
 
+DB_CREATE_CLIENT = """
+CREATE TABLE IF NOT EXISTS client (
+    address TEXT PRIMARY KEY,
+    password TEXT NOT NULL, 
+    api_key TEXT NOT NULL,
+    type TEXT CHECK ( type IN ('HUB','FULL','LIGHT') ) NOT NULL DEFAULT 'FULL'
+);
+"""
+
 DB_SCRIPT_CREATE_TABLES = """
 PRAGMA foreign_keys=off;
 BEGIN TRANSACTION;
-{}{}{}{}{}{}{}{}
+{}{}{}{}{}{}{}{}{}
 COMMIT;
 PRAGMA foreign_keys=on;
 """.format(
@@ -101,5 +108,18 @@ PRAGMA foreign_keys=on;
     DB_CREATE_RUNS,
     DB_CREATE_TOKEN_ACTION,
     DB_CREATE_INVOICES,
-    DB_CREATE_INVOICES_PAYMENTS
+    DB_CREATE_INVOICES_PAYMENTS,
+    DB_CREATE_CLIENT
+)
+
+DB_STATE_EVENT_ADD_CLIENT_FK = """
+ALTER TABLE state_events ADD COLUMN client_address TEXT NULLABLE REFERENCES client(address);
+"""
+
+DB_UPDATE_TABLES = """
+BEGIN TRANSACTION;
+{}
+COMMIT;
+""".format(
+    DB_STATE_EVENT_ADD_CLIENT_FK
 )

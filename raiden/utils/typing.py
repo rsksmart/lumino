@@ -171,12 +171,15 @@ Signature = NewType("Signature", T_Signature)
 T_TransactionHash = bytes
 TransactionHash = NewType("TransactionHash", T_TransactionHash)
 
+T_SignedTransaction = str
+SignedTransaction = NewType("SignedTransaction", T_SignedTransaction)
+
 # This should be changed to `Optional[str]`
 SuccessOrError = Tuple[bool, Optional[str]]
 
 BlockSpecification = Union[str, T_BlockNumber, T_BlockHash]
 
-ChannelMap = Dict[ChannelID, "NettingChannelState"]
+ChannelMap = Dict[AddressHex, Dict[ChannelID, "NettingChannelState"]]
 
 InitiatorTransfersMap = Dict[SecretHash, "InitiatorTransferState"]
 
@@ -189,3 +192,5 @@ HostPort = Tuple[Host, Optional[Port]]
 LockType = Union["HashTimeLockState", "UnlockPartialProofState"]
 ErrorType = Union[Type["RaidenRecoverableError"], Type["RaidenUnrecoverableError"]]
 LockedTransferType = Union["LockedTransferUnsignedState", "LockedTransferSignedState"]
+
+

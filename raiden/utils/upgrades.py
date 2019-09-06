@@ -31,6 +31,7 @@ UPGRADES_LIST = [
     UpgradeRecord(from_version=19, function=upgrade_v19_to_v20),
     UpgradeRecord(from_version=20, function=upgrade_v20_to_v21),
     UpgradeRecord(from_version=21, function=upgrade_v21_to_v22),
+
 ]
 
 

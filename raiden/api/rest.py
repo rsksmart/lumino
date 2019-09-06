@@ -16,6 +16,10 @@ from flask_restful import Api, abort
 from gevent.pywsgi import WSGIServer
 from hexbytes import HexBytes
 from raiden_webui import RAIDEN_WEBUI_PATH
+
+from raiden.api.validations.api_error_builder import ApiErrorBuilder
+from raiden.api.validations.api_status_codes import ERROR_STATUS_CODES
+from raiden.api.validations.channel_validator import ChannelValidator
 from raiden.rns_constants import RNS_ADDRESS_ZERO
 from raiden.utils.rns import is_rns_address
 from webargs.flaskparser import parser
@@ -68,10 +72,11 @@ from raiden.api.v1.resources import (
     SearchLuminoResource,
     TokenActionResource,
     InvoiceResource,
-    PaymentInvoiceResource)
+    PaymentInvoiceResource,
+    ChannelsResourceLight,
+    LightChannelsResourceByTokenAndPartnerAddress)
 
 from raiden.constants import GENESIS_BLOCK_NUMBER, UINT256_MAX, Environment
-
 
 from raiden.exceptions import (
     AddressWithoutCode,
@@ -96,7 +101,7 @@ from raiden.exceptions import (
     TokenNotRegistered,
     TransactionThrew,
     UnknownTokenAddress,
-    RaidenRecoverableError)
+    RawTransactionFailed, UnhandledLightClient, RaidenRecoverableError)
 from raiden.transfer import channel, views
 from raiden.transfer.events import (
     EventPaymentReceivedSuccess,
@@ -128,23 +133,19 @@ from raiden.billing.invoices.constants.errors import AUTO_PAY_INVOICE, INVOICE_E
 
 log = structlog.get_logger(__name__)
 
-ERROR_STATUS_CODES = [
-    HTTPStatus.CONFLICT,
-    HTTPStatus.REQUEST_TIMEOUT,
-    HTTPStatus.PAYMENT_REQUIRED,
-    HTTPStatus.BAD_REQUEST,
-    HTTPStatus.NOT_FOUND,
-    HTTPStatus.NOT_IMPLEMENTED,
-    HTTPStatus.INTERNAL_SERVER_ERROR,
-]
-
 URLS_V1 = [
     ("/address", AddressResource),
     ("/channels", ChannelsResource),
+    ("/light_channels", ChannelsResourceLight),
+
     ("/channels/<hexaddress:token_address>", ChannelsResourceByTokenAddress),
     (
         "/channels/<hexaddress:token_address>/<hexaddress:partner_address>",
         ChannelsResourceByTokenAndPartnerAddress,
+    ),
+    (
+        "/light_channels/<hexaddress:token_address>/<hexaddress:creator_address>/<hexaddress:partner_address>",
+        LightChannelsResourceByTokenAndPartnerAddress
     ),
     ("/connections/<hexaddress:token_address>", ConnectionsResource),
     ("/connections", ConnectionsInfoResource),
@@ -435,7 +436,9 @@ class APIServer(Runnable):
 
         if web_ui:
             self._set_ui_endpoint()
-            for route in ('/ui/<path:file_name>', '/ui', '/ui/', '/index.html', '/', '/dashboard', '/tokens', '/payments', '/channels'):
+            for route in (
+                '/ui/<path:file_name>', '/ui', '/ui/', '/index.html', '/', '/dashboard', '/tokens', '/payments',
+                '/channels'):
                 self.flask_app.add_url_rule(
                     route, route, view_func=self._serve_webui, methods=("GET",)
                 )
@@ -443,7 +446,8 @@ class APIServer(Runnable):
         # Setup Schedule Config for background jobs
         node_address = to_checksum_address(self.rest_api.raiden_api.address)
 
-        setup_schedule_config(self, config['explorerendpoint'], config['discoverable'] ,node_address, self.rest_api.raiden_api.raiden)
+        setup_schedule_config(self, config['explorerendpoint'], config['discoverable'], node_address,
+                              self.rest_api.raiden_api.raiden)
 
         self._is_raiden_running()
 
@@ -455,10 +459,10 @@ class APIServer(Runnable):
         lines[0] = "const backendUrl='http://" + self.config['host'] + ":" + str(self.config['port']) + "'; \n"
         lines[1] = "const nodeAddress = '" + to_checksum_address(self.rest_api.raiden_api.address) + "'; \n"
         if self.config['rnsdomain']:
-               lines[2] = "const rnsDomain = '" + self.config['rnsdomain'] + "';\n"
+            lines[2] = "const rnsDomain = '" + self.config['rnsdomain'] + "';\n"
         else:
             lines[2] = "const rnsDomain = null \n"
-        lines[3] = "const chainEndpoint = '" + self.config['rskendpoint'] +"'; \n"
+        lines[3] = "const chainEndpoint = '" + self.config['rskendpoint'] + "'; \n"
 
         with open(self.flask_app.root_path + '/webui/static/endpointConfig.js', "w") as f:
             f.writelines(lines)
@@ -622,40 +626,32 @@ class RestAPI:
             status_code=HTTPStatus.CREATED,
         )
 
-    def open(
+    def open_light(
         self,
         registry_address: typing.PaymentNetworkID,
+        creator_address: typing.Address,
         partner_address: typing.Address,
         token_address: typing.TokenAddress,
+        signed_tx: typing.SignedTransaction,
         settle_timeout: typing.BlockTimeout = None,
         total_deposit: typing.TokenAmount = None,
     ):
         log.debug(
-            "Opening channel",
-            node=pex(self.raiden_api.address),
+            "Opening channel for light client",
+            node=pex(creator_address),
             registry_address=to_checksum_address(registry_address),
             partner_address=to_checksum_address(partner_address),
             token_address=to_checksum_address(token_address),
             settle_timeout=settle_timeout,
         )
 
+        token_exists = ChannelValidator.validate_token_exists(self.raiden_api.raiden.chain, token_address, log)
+        if not token_exists.valid:
+            return token_exists.error
         try:
-            token = self.raiden_api.raiden.chain.token(token_address)
-        except AddressWithoutCode as e:
-            return api_error(errors=str(e), status_code=HTTPStatus.CONFLICT)
-
-        balance = token.balance_of(self.raiden_api.raiden.address)
-
-        if total_deposit is not None and total_deposit > balance:
-            error_msg = "Not enough balance to deposit. {} Available={} Needed={}".format(
-                pex(token_address), balance, total_deposit
-            )
-            return api_error(errors=error_msg, status_code=HTTPStatus.PAYMENT_REQUIRED)
-
-        try:
-            self.raiden_api.channel_open(
-                registry_address, token_address, partner_address, settle_timeout
-            )
+            self.raiden_api.channel_open_light(registry_address, token_address, creator_address, partner_address,
+                                               signed_tx,
+                                               settle_timeout)
         except (
             InvalidAddress,
             InvalidSettleTimeout,
@@ -663,45 +659,25 @@ class RestAPI:
             AddressWithoutCode,
             DuplicatedChannelError,
             TokenNotRegistered,
+            UnhandledLightClient,
+            RaidenRecoverableError
         ) as e:
-            return api_error(errors=str(e), status_code=HTTPStatus.CONFLICT)
-        except (InsufficientFunds, InsufficientGasReserve) as e:
-            return api_error(errors=str(e), status_code=HTTPStatus.PAYMENT_REQUIRED)
-
-        if total_deposit:
-            # make initial deposit
-            log.debug(
-                "Depositing to new channel",
-                node=pex(self.raiden_api.address),
-                registry_address=to_checksum_address(registry_address),
-                token_address=to_checksum_address(token_address),
-                partner_address=to_checksum_address(partner_address),
-                total_deposit=total_deposit,
-            )
-            try:
-                self.raiden_api.set_total_channel_deposit(
-                    registry_address=registry_address,
-                    token_address=token_address,
-                    partner_address=partner_address,
-                    total_deposit=total_deposit,
-                )
-            except InsufficientFunds as e:
-                return api_error(errors=str(e), status_code=HTTPStatus.PAYMENT_REQUIRED)
-            except (DepositOverLimit, DepositMismatch) as e:
-                return api_error(errors=str(e), status_code=HTTPStatus.CONFLICT)
+            return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.CONFLICT, log=log)
+        except RawTransactionFailed as e1:
+            return ApiErrorBuilder.build_and_log_error(errors=str(e1), status_code=HTTPStatus.BAD_REQUEST, log=log)
 
         channel_state = views.get_channelstate_for(
             views.state_from_raiden(self.raiden_api.raiden),
             registry_address,
             token_address,
+            creator_address,
             partner_address,
         )
 
         result = self.channel_schema.dump(channel_state)
-
         return api_response(result=result.data, status_code=HTTPStatus.CREATED)
 
-    def open_lumino(
+    def open(
         self,
         registry_address: typing.PaymentNetworkID,
         partner_address: typing.RnsAddress,
@@ -710,32 +686,22 @@ class RestAPI:
         total_deposit: typing.TokenAmount = None,
     ):
         log.debug(
-            'Opening channel',
+            "Opening channel",
             node=pex(self.raiden_api.address),
             registry_address=to_checksum_address(registry_address),
             partner_address=partner_address,
             token_address=to_checksum_address(token_address),
             settle_timeout=settle_timeout,
         )
-        try:
-            token = self.raiden_api.raiden.chain.token(token_address)
-        except AddressWithoutCode as e:
-            return api_error(
-                errors=str(e),
-                status_code=HTTPStatus.CONFLICT,
-            )
-        balance = token.balance_of(self.raiden_api.raiden.address)
 
-        if total_deposit is not None and total_deposit > balance:
-            error_msg = 'Not enough balance to deposit. {} Available={} Needed={}'.format(
-                pex(token_address),
-                balance,
-                total_deposit,
-            )
-            return api_error(
-                errors=error_msg,
-                status_code=HTTPStatus.PAYMENT_REQUIRED,
-            )
+        token_exists = ChannelValidator.validate_token_exists(self.raiden_api.raiden.chain, token_address, log)
+        if not token_exists.valid:
+            return token_exists.error
+
+        enough_balance = ChannelValidator.enough_balance_to_deposit(total_deposit, self.raiden_api.raiden.address,
+                                                                    token_exists.token, log)
+        if not enough_balance.valid:
+            return enough_balance.error
 
         # First we check if the address received is an RNS address and exists a Hex address
         address_to_send = partner_address
@@ -746,67 +712,56 @@ class RestAPI:
                     errors=str('RNS domain isnt registered'),
                     status_code=HTTPStatus.PAYMENT_REQUIRED,
                 )
-
         try:
             self.raiden_api.channel_open(
-                registry_address,
-                token_address,
-                to_canonical_address(address_to_send),
-                settle_timeout,
+                registry_address, token_address, to_canonical_address(address_to_send), settle_timeout
             )
-        except (InvalidAddress, InvalidSettleTimeout, SamePeerAddress,
-                AddressWithoutCode, DuplicatedChannelError, TokenNotRegistered) as e:
-            return api_error(
-                errors=str(e),
-                status_code=HTTPStatus.CONFLICT,
-            )
+        except (
+            InvalidAddress,
+            InvalidSettleTimeout,
+            SamePeerAddress,
+            AddressWithoutCode,
+            DuplicatedChannelError,
+            TokenNotRegistered,
+        ) as e:
+            return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.CONFLICT, log=log)
         except (InsufficientFunds, InsufficientGasReserve) as e:
-            return api_error(
-                errors=str(e),
-                status_code=HTTPStatus.PAYMENT_REQUIRED,
-            )
+            return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.PAYMENT_REQUIRED, log=log)
 
         if total_deposit:
             # make initial deposit
             log.debug(
-                'Depositing to new channel',
+                "Depositing to new channel",
                 node=pex(self.raiden_api.address),
                 registry_address=to_checksum_address(registry_address),
                 token_address=to_checksum_address(token_address),
-                address_to_send=address_to_send,
+                partner_address=address_to_send,
                 total_deposit=total_deposit,
             )
             try:
                 self.raiden_api.set_total_channel_deposit(
                     registry_address=registry_address,
                     token_address=token_address,
+                    creator_address=to_canonical_address(self.raiden_api.address),
                     partner_address=to_canonical_address(address_to_send),
                     total_deposit=total_deposit,
                 )
             except InsufficientFunds as e:
-                return api_error(
-                    errors=str(e),
-                    status_code=HTTPStatus.PAYMENT_REQUIRED,
-                )
+                return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.PAYMENT_REQUIRED,
+                                                           log=log)
             except (DepositOverLimit, DepositMismatch) as e:
-                return api_error(
-                    errors=str(e),
-                    status_code=HTTPStatus.CONFLICT,
-                )
+                return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.CONFLICT, log=log)
 
         channel_state = views.get_channelstate_for(
             views.state_from_raiden(self.raiden_api.raiden),
             registry_address,
             token_address,
+            self.raiden_api.address,
             to_canonical_address(address_to_send),
         )
 
         result = self.channel_schema.dump(channel_state)
-
-        return api_response(
-            result=result.data,
-            status_code=HTTPStatus.CREATED,
-        )
+        return api_response(result=result.data, status_code=HTTPStatus.CREATED)
 
     def connect(
         self,
@@ -920,9 +875,9 @@ class RestAPI:
         return api_response(result=result)
 
     def get_channel_list_for_tokens(
-            self,
-            registry_address: typing.PaymentNetworkID,
-            token_addresses: typing.ByteString = None
+        self,
+        registry_address: typing.PaymentNetworkID,
+        token_addresses: typing.ByteString = None
     ):
 
         result = self.raiden_api.get_channel_list_for_tokens(
@@ -1117,7 +1072,8 @@ class RestAPI:
             result.append(serialized_event.data)
         return api_response(result=result)
 
-    def get_dashboard_data(self, registry_address: typing.PaymentNetworkID, graph_from_date, graph_to_date, table_limit:int = None):
+    def get_dashboard_data(self, registry_address: typing.PaymentNetworkID, graph_from_date, graph_to_date,
+                           table_limit: int = None):
         result = self.raiden_api.get_dashboard_data(graph_from_date, graph_to_date, table_limit)
         token_list = self.raiden_api.get_tokens_list(registry_address)
 
@@ -1140,7 +1096,6 @@ class RestAPI:
     def _map_data_general_payments(self, data_general_payments):
         result = []
         for general_item in data_general_payments:
-
             general_item_obj = DashboardGeneralItem()
             general_item_obj.event_type_code = general_item[0]
             general_item_obj.event_type_class_name = general_item[1]
@@ -1197,19 +1152,19 @@ class RestAPI:
         result = []
         for graph_item in graph_data:
             graph_item_obj = DashboardGraphItem(graph_item[0],
-                                       graph_item[1],
-                                       graph_item[2],
-                                       graph_item[3],
-                                       graph_item[4],
-                                       graph_item[5],
-                                       graph_item[6])
+                                                graph_item[1],
+                                                graph_item[2],
+                                                graph_item[3],
+                                                graph_item[4],
+                                                graph_item[5],
+                                                graph_item[6])
             result.append(graph_item_obj)
 
         items_group_by_months = self._get_items_group_by_month(result)
         return items_group_by_months
 
     def _get_items_group_by_month(self, data):
-        months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL','AUG', 'SET', 'OCT', 'NOV', 'DIC']
+        months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SET', 'OCT', 'NOV', 'DIC']
 
         result = []
         for month in months:
@@ -1220,11 +1175,10 @@ class RestAPI:
             for event in events_by_month:
                 item[event.event_type_label] = event.quantity
 
-            if len (item) > 0:
+            if len(item) > 0:
                 result.append(item)
 
         return result
-
 
     def _get_events_group_by_month(self, month, data):
         return [dashboardItem for dashboardItem in data if dashboardItem.month_of_year_label == month]
@@ -1282,6 +1236,7 @@ class RestAPI:
             channel_state = self.raiden_api.get_channel(
                 registry_address=registry_address,
                 token_address=token_address,
+                creator_address=self.raiden_api.address,
                 partner_address=partner_address,
             )
             result = self.channel_schema.dump(channel_state)
@@ -1341,16 +1296,16 @@ class RestAPI:
             # Look this when the payment protocol has changed TODO
             data = {"type": InvoiceType.RECEIVED.value,
                     "status": InvoiceStatus.PENDING.value,
-                    "already_coded_invoice" : True,
-                    "payment_hash" : encode_hex(invoice_decoded.paymenthash),
-                    "encode" : coded_invoice,
-                    "expiration_date" : expiration_date.isoformat(),
-                    "secret" : None,
-                    "currency" : invoice_decoded.currency,
-                    "amount" : str(invoice_decoded.amount),
-                    "description" : tags_dict['description'],
-                    "target_address" : encode_hex(unknown_tags_dict['target_address'].bytes),
-                    "token_address" : encode_hex(unknown_tags_dict['token_address'].bytes) ,
+                    "already_coded_invoice": True,
+                    "payment_hash": encode_hex(invoice_decoded.paymenthash),
+                    "encode": coded_invoice,
+                    "expiration_date": expiration_date.isoformat(),
+                    "secret": None,
+                    "currency": invoice_decoded.currency,
+                    "amount": str(invoice_decoded.amount),
+                    "description": tags_dict['description'],
+                    "target_address": encode_hex(unknown_tags_dict['target_address'].bytes),
+                    "token_address": encode_hex(unknown_tags_dict['token_address'].bytes),
                     "created_at": datetime.utcfromtimestamp(invoice_decoded.date).strftime(UTC_FORMAT),
                     "expires": tags_dict['expires']
                     }
@@ -1362,7 +1317,7 @@ class RestAPI:
                 result = self.make_payment_with_invoice(registry_address, new_invoice)
 
         elif persistent_invoice["status"] == InvoiceStatus.PENDING.value and \
-                not is_invoice_expired(persistent_invoice["expiration_date"]):
+            not is_invoice_expired(persistent_invoice["expiration_date"]):
 
             result = self.make_payment_with_invoice(registry_address, persistent_invoice)
         elif persistent_invoice["status"] == InvoiceStatus.PAID.value:
@@ -1410,7 +1365,7 @@ class RestAPI:
         identifier: typing.PaymentID,
         secret: typing.Secret,
         secret_hash: typing.SecretHash,
-        payment_hash_invoice : typing.PaymentHashInvoice
+        payment_hash_invoice: typing.PaymentHashInvoice
     ):
         log.debug(
             "Initiating payment",
@@ -1461,7 +1416,7 @@ class RestAPI:
         if payment_status.payment_done.get() is False:
             return api_error(
                 errors="Payment couldn't be completed "
-                "(insufficient funds, no route to target or target offline).",
+                       "(insufficient funds, no route to target or target offline).",
                 status_code=HTTPStatus.CONFLICT,
             )
 
@@ -1478,6 +1433,57 @@ class RestAPI:
             "secret_hash": sha3(secret),
         }
         result = self.payment_schema.dump(payment)
+        return api_response(result=result.data)
+
+    def _deposit_light(
+        self,
+        registry_address: typing.PaymentNetworkID,
+        channel_state: NettingChannelState,
+        total_deposit: typing.TokenAmount,
+        signed_approval_tx: typing.SignedTransaction,
+        signed_deposit_tx: typing.SignedTransaction,
+
+    ):
+        log.debug(
+            "Depositing to light channel",
+            node=pex(channel_state.our_state.address),
+            registry_address=to_checksum_address(registry_address),
+            channel_identifier=channel_state.identifier,
+            total_deposit=total_deposit,
+        )
+        if channel.get_status(channel_state) != CHANNEL_STATE_OPENED:
+            return api_error(
+                errors="Can't set total deposit on a closed channel",
+                status_code=HTTPStatus.CONFLICT,
+            )
+
+        try:
+            self.raiden_api.set_total_channel_deposit_light(
+                registry_address,
+                channel_state.token_address,
+                channel_state.our_state.address,
+                channel_state.partner_state.address,
+                signed_approval_tx,
+                signed_deposit_tx,
+                total_deposit,
+            )
+        except InsufficientFunds as e:
+            return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.PAYMENT_REQUIRED, log=log)
+        except DepositOverLimit as e:
+            return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.CONFLICT, log=log)
+        except DepositMismatch as e:
+            return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.CONFLICT, log=log)
+        except RawTransactionFailed as e:
+            return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.BAD_REQUEST, log=log)
+        except RaidenRecoverableError as e:
+            return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.BAD_REQUEST, log=log)
+
+        updated_channel_state = self.raiden_api.get_channel(
+            registry_address, channel_state.token_address, channel_state.our_state.address,
+            channel_state.partner_state.address
+        )
+
+        result = self.channel_schema.dump(updated_channel_state)
         return api_response(result=result.data)
 
     def _deposit(
@@ -1504,8 +1510,9 @@ class RestAPI:
             self.raiden_api.set_total_channel_deposit(
                 registry_address,
                 channel_state.token_address,
+                self.raiden_api.address,
                 channel_state.partner_state.address,
-                total_deposit,
+                total_deposit
             )
         except InsufficientFunds as e:
             return api_error(errors=str(e), status_code=HTTPStatus.PAYMENT_REQUIRED)
@@ -1513,9 +1520,12 @@ class RestAPI:
             return api_error(errors=str(e), status_code=HTTPStatus.CONFLICT)
         except DepositMismatch as e:
             return api_error(errors=str(e), status_code=HTTPStatus.CONFLICT)
+        except RaidenRecoverableError as e:
+            return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.BAD_REQUEST, log=log)
 
         updated_channel_state = self.raiden_api.get_channel(
-            registry_address, channel_state.token_address, channel_state.partner_state.address
+            registry_address, channel_state.token_address, channel_state.our_state.address,
+            channel_state.partner_state.address
         )
 
         result = self.channel_schema.dump(updated_channel_state)
@@ -1550,6 +1560,79 @@ class RestAPI:
 
         result = self.channel_schema.dump(updated_channel_state)
         return api_response(result=result.data)
+
+    def patch_light_channel(
+        self,
+        registry_address: typing.PaymentNetworkID,
+        token_address: typing.TokenAddress,
+        creator_address: typing.Address,
+        partner_address: typing.Address,
+        signed_approval_tx: typing.SignedTransaction,
+        signed_deposit_tx: typing.SignedTransaction,
+        total_deposit: typing.TokenAmount = None,
+        state: str = None,
+
+    ):
+        log.debug(
+            "Patching light channel",
+            node=pex(creator_address),
+            registry_address=to_checksum_address(registry_address),
+            token_address=to_checksum_address(token_address),
+            creator_address=to_checksum_address(creator_address),
+            partner_address=to_checksum_address(partner_address),
+            total_deposit=total_deposit,
+            state=state,
+        )
+
+        if total_deposit is not None and state is not None:
+            return api_error(
+                errors="Can not update a channel's total deposit and state at the same time",
+                status_code=HTTPStatus.CONFLICT,
+            )
+
+        if total_deposit is None and state is None:
+            return api_error(
+                errors="Nothing to do. Should either provide 'total_deposit' or 'state' argument",
+                status_code=HTTPStatus.BAD_REQUEST,
+            )
+        if total_deposit and total_deposit < 0:
+            return api_error(
+                errors="Amount to deposit must not be negative.", status_code=HTTPStatus.CONFLICT
+            )
+
+        try:
+            channel_state = self.raiden_api.get_channel(
+                registry_address=registry_address,
+                token_address=token_address,
+                creator_address=creator_address,
+                partner_address=partner_address,
+            )
+
+        except ChannelNotFound:
+            return api_error(
+                errors="Requested channel for token {} between {} and {} not found".format(
+                    to_checksum_address(token_address),
+                    to_checksum_address(creator_address),
+                    to_checksum_address(partner_address)
+                ),
+                status_code=HTTPStatus.CONFLICT,
+            )
+        except InvalidAddress as e:
+            return api_error(errors=str(e), status_code=HTTPStatus.CONFLICT)
+
+        if total_deposit is not None:
+            result = self._deposit_light(registry_address, channel_state, total_deposit, signed_approval_tx,
+                                         signed_deposit_tx)
+
+        elif state == CHANNEL_STATE_CLOSED:
+            log.critical("Not implemented yet!")
+            result = None
+        else:  # should never happen, channel_state is validated in the schema
+            result = api_error(
+                errors="Provided invalid channel state {}".format(state),
+                status_code=HTTPStatus.BAD_REQUEST,
+            )
+        return result
 
     def patch_channel(
         self,
@@ -1589,6 +1672,7 @@ class RestAPI:
             channel_state = self.raiden_api.get_channel(
                 registry_address=registry_address,
                 token_address=token_address,
+                creator_address=self.raiden_api.address,
                 partner_address=partner_address,
             )
 
@@ -1693,16 +1777,15 @@ class RestAPI:
             )
 
         data = {"currency_symbol": currency_symbol,
-                "token_address" : token_address,
-                "partner_address" : partner_address,
-                "amount" : amount,
-                "description" : description,
+                "token_address": token_address,
+                "partner_address": partner_address,
+                "amount": amount,
+                "description": description,
                 "invoice_type": InvoiceType.ISSUED.value,
                 "invoice_status": InvoiceStatus.PENDING.value,
-                "already_coded_invoice" : False,
-                "expires" : expires}
+                "already_coded_invoice": False,
+                "expires": expires}
 
         invoice = self.raiden_api.create_invoice(data)
 
         return api_response(invoice)
-
