@@ -544,9 +544,13 @@ def handle_token_network_action(
             block_number=chain_state.block_number,
             block_hash=chain_state.block_hash,
         )
-        assert iteration.new_state, "No token network state transition leads to None"
 
-        events = iteration.events
+        # Investigate behavior of this @GASPAR MEDINA
+        # assert iteration.new_state, "No token network state transition leads to None"
+
+        events = []
+        if iteration is not None:
+            events = iteration.events
 
     return TransitionResult(chain_state, events)
 
@@ -555,13 +559,14 @@ def handle_contract_receive_channel_closed(
     chain_state: ChainState, state_change: ContractReceiveChannelClosed
 ) -> TransitionResult[ChainState]:
     # cleanup queue for channel
-    channel_state = views.get_channelstate_by_canonical_identifier(
+    channel_state = views.get_channelstate_by_canonical_identifier_and_address(
         chain_state=chain_state,
         canonical_identifier=CanonicalIdentifier(
             chain_identifier=chain_state.chain_id,
             token_network_address=state_change.token_network_identifier,
             channel_identifier=state_change.channel_identifier,
         ),
+        address=chain_state.our_address,
     )
     if channel_state:
         queue_id = QueueIdentifier(

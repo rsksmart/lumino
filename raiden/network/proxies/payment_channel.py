@@ -187,11 +187,30 @@ class PaymentChannel:
         balance_hash: BalanceHash,
         additional_hash: AdditionalHash,
         signature: Signature,
+        block_identifier: BlockSpecification
+    ):
+        """ Closes the channel using the provided balance proof. """
+        self.token_network.close(
+            channel_identifier=self.channel_identifier,
+            partner=self.participant2,
+            balance_hash=balance_hash,
+            nonce=nonce,
+            additional_hash=additional_hash,
+            signature=signature,
+            given_block_identifier=block_identifier
+        )
+
+    def close_light(
+        self,
+        nonce: Nonce,
+        balance_hash: BalanceHash,
+        additional_hash: AdditionalHash,
+        signature: Signature,
         block_identifier: BlockSpecification,
         signed_close_tx: str
     ):
         """ Closes the channel using the provided balance proof. """
-        self.token_network.close(
+        self.token_network.close_light(
             channel_identifier=self.channel_identifier,
             partner=self.participant2,
             balance_hash=balance_hash,
