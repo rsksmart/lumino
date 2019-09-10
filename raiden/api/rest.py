@@ -4,6 +4,7 @@ import logging
 import socket
 
 from http import HTTPStatus
+from random import random
 from typing import Dict
 
 import gevent
@@ -20,7 +21,14 @@ from raiden_webui import RAIDEN_WEBUI_PATH
 from raiden.api.validations.api_error_builder import ApiErrorBuilder
 from raiden.api.validations.api_status_codes import ERROR_STATUS_CODES
 from raiden.api.validations.channel_validator import ChannelValidator
+from raiden.lightclient.light_client_message_handler import LightClientMessageHandler
+from raiden.lightclient.light_client_utils import LightClientUtils
+from raiden.lightclient.lightclientmessages.light_client_payment import LightClientPaymentStatus, LightClientPayment
+from raiden.messages import LockedTransfer
 from raiden.rns_constants import RNS_ADDRESS_ZERO
+from raiden.transfer.mediated_transfer.events import SendLockedTransfer
+from raiden.transfer.mediated_transfer.initiator import get_initial_lock_expiration
+from raiden.transfer.mediated_transfer.state import LockedTransferUnsignedState
 from raiden.utils.rns import is_rns_address
 from webargs.flaskparser import parser
 from raiden.api.objects import DashboardGraphItem
@@ -74,9 +82,10 @@ from raiden.api.v1.resources import (
     InvoiceResource,
     PaymentInvoiceResource,
     ChannelsResourceLight,
-    LightChannelsResourceByTokenAndPartnerAddress)
+    LightChannelsResourceByTokenAndPartnerAddress,
+    PaymentLightResource)
 
-from raiden.constants import GENESIS_BLOCK_NUMBER, UINT256_MAX, Environment
+from raiden.constants import GENESIS_BLOCK_NUMBER, UINT256_MAX, Environment, UINT64_MAX, EMPTY_PAYMENT_HASH_INVOICE
 
 from raiden.exceptions import (
     AddressWithoutCode,
@@ -108,7 +117,8 @@ from raiden.transfer.events import (
     EventPaymentSentFailed,
     EventPaymentSentSuccess,
 )
-from raiden.transfer.state import CHANNEL_STATE_CLOSED, CHANNEL_STATE_OPENED, NettingChannelState
+from raiden.transfer.state import CHANNEL_STATE_CLOSED, CHANNEL_STATE_OPENED, NettingChannelState, \
+    message_identifier_from_prng
 from raiden.utils import (
     create_default_identifier,
     optional_address_to_string,
@@ -116,7 +126,7 @@ from raiden.utils import (
     sha3,
     split_endpoint,
     typing,
-)
+    TokenAddress, random_secret)
 from raiden.utils.runnable import Runnable
 
 from eth_utils import (
@@ -130,6 +140,8 @@ from raiden.billing.invoices.decoder.invoice_decoder import get_tags_dict, get_u
 from dateutil.relativedelta import relativedelta
 from raiden.billing.invoices.util.time_util import is_invoice_expired, UTC_FORMAT
 from raiden.billing.invoices.constants.errors import AUTO_PAY_INVOICE, INVOICE_EXPIRED, INVOICE_PAID
+from raiden.utils.typing import BlockExpiration, SecretHash, InitiatorAddress, TargetAddress, PaymentWithFeeAmount, \
+    MessageID, PaymentID
 
 log = structlog.get_logger(__name__)
 
@@ -137,7 +149,6 @@ URLS_V1 = [
     ("/address", AddressResource),
     ("/channels", ChannelsResource),
     ("/light_channels", ChannelsResourceLight),
-
     ("/channels/<hexaddress:token_address>", ChannelsResourceByTokenAddress),
     (
         "/channels/<hexaddress:token_address>/<hexaddress:partner_address>",
@@ -157,6 +168,8 @@ URLS_V1 = [
         PaymentResource,
         "token_target_paymentresource",
     ),
+    ("/payments_light", PaymentLightResource),
+
     ("/tokens", TokensResource),
     ("/tokens/<hexaddress:token_address>/partners", PartnersResourceByTokenAddress),
     ("/tokens/<hexaddress:token_address>", RegisterTokenResource),
@@ -1789,3 +1802,28 @@ class RestAPI:
         invoice = self.raiden_api.create_invoice(data)
 
         return api_response(invoice)
+
+    def get_light_client_protocol_message(self):
+        return api_response("Should get all the messages")
+
+    def receive_light_client_protocol_message(self):
+        self.raiden_api.raiden.on_message({"fruta": 1})
+        return api_response("Should save all the messages")
+
+    def create_light_client_payment(
+        self,
+        registry_address: typing.PaymentNetworkID,
+        creator_address: typing.AddressHex,
+        partner_address: typing.AddressHex,
+        token_address: typing.TokenAddress,
+        amount: typing.TokenAmount
+    ):
+        try:
+            locked_transfer = self.raiden_api.create_light_client_payment(registry_address, creator_address,
+                                                                      partner_address, token_address, amount)
+            return api_response(locked_transfer.to_dict())
+        except ChannelNotFound as e:
+            return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.NOT_FOUND, log=log)
+
+
+

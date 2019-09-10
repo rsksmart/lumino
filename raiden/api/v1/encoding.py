@@ -358,6 +358,32 @@ class ChannelLightPutSchema(BaseSchema):
         decoding_class = dict
 
 
+class PaymentLightPostSchema(BaseSchema):
+    creator_address = AddressField(required=True)
+    partner_address = AddressField(required=True)
+    token_address = AddressField(required=True)
+    amount = fields.Integer(required=True)
+
+    class Meta:
+        strict = True
+        # decoding to a dict is required by the @use_kwargs decorator from webargs:
+        decoding_class = dict
+
+
+class PaymentLightPutSchema(BaseSchema):
+    class Meta:
+        strict = True
+        # decoding to a dict is required by the @use_kwargs decorator from webargs:
+        decoding_class = dict
+
+
+class PaymentLightGetSchema(BaseSchema):
+    class Meta:
+        strict = True
+        # decoding to a dict is required by the @use_kwargs decorator from webargs:
+        decoding_class = dict
+
+
 class ChannelPutLuminoSchema(BaseSchema):
     token_address = AddressField(required=True)
     partner_address = AddressRnsField(required=True)

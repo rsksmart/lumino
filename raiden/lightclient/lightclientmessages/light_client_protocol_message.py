@@ -1,15 +1,11 @@
 from raiden.messages import Message
 
 
-
-
-
 class LigthClientProtocolMessage:
     """ Representation of light client message send or received. """
 
     def __init__(
         self,
-        identifier: int,
         is_signed: bool,
         message_order: int,
         light_client_payment_id: int,
@@ -17,7 +13,7 @@ class LigthClientProtocolMessage:
         unsigned_message: Message = None,
         signed_message: Message = None
     ):
-        self.identifier = identifier
+        self.identifier = None
         self.is_signed = is_signed
         self.message_order = message_order
         self.unsigned_message = unsigned_message

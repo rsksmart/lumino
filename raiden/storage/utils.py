@@ -96,19 +96,21 @@ CREATE TABLE IF NOT EXISTS client (
 
 DB_CREATE_LIGHT_CLIENT_PAYMENT = """
 CREATE TABLE IF NOT EXISTS light_client_payment(
-    payment_id INTEGER PRIMARY KEY,
-    initiator TEXT NOT NULL, 
-    target TEXT NOT NULL, 
+    payment_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    light_client_address TEXT NOT NULL,
+    partner_address TEXT NOT NULL, 
+    is_lc_initiator INTEGER DEFAULT 1,
     token_network_id TEXT NOT NULL,
     amount INTEGER NOT NULL,
     created_on TEXT NOT NULL, 
-    payment_status  TEXT CHECK  (payment_status in ('InProgress', 'Expired', 'Failed', 'Done', 'Pending', 'Deleted' ) ) NOT NULL DEFAULT 'Pending'
+    payment_status  TEXT CHECK  (payment_status in ('InProgress', 'Expired', 'Failed', 'Done', 'Pending', 'Deleted' ) ) NOT NULL DEFAULT 'Pending',
+    FOREIGN KEY(light_client_address) REFERENCES client(address)
 );
 """
 
 DB_CREATE_LIGHT_CLIENT_PROTOCOL_MESSAGE = """
 CREATE TABLE IF NOT EXISTS light_client_protocol_message (
-    identifier INTEGER PRIMARY KEY,
+    identifier INTEGER PRIMARY KEY AUTOINCREMENT,
     message_order INTEGER NOT NULL, 
     unsigned_message JSON,
     signed_message JSON,

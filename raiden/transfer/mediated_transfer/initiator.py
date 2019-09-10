@@ -1,5 +1,7 @@
 import random
 
+from eth_utils import to_canonical_address
+
 from raiden.constants import EMPTY_SECRET, MAXIMUM_PENDING_TRANSFERS
 from raiden.settings import DEFAULT_WAIT_BEFORE_LOCK_REMOVAL
 from raiden.transfer import channel
@@ -44,7 +46,7 @@ from raiden.utils.typing import (
     Secret,
     SecretHash,
     TokenNetworkID,
-)
+    InitiatorAddress, AddressHex)
 
 
 def events_for_unlock_lock(
@@ -179,14 +181,18 @@ def next_channel_from_routes(
     available_routes: List[RouteState],
     channelidentifiers_to_channels: ChannelMap,
     transfer_amount: PaymentAmount,
+    initiator: AddressHex
 ) -> Optional[NettingChannelState]:
     """ Returns the first channel that can be used to start the transfer.
     The routing service can race with local changes, so the recommended routes
     must be validated.
     """
     for route in available_routes:
-        channel_identifier = route.channel_identifier
-        channel_state = channelidentifiers_to_channels.get(channel_identifier)
+        if channelidentifiers_to_channels.get(initiator) is not None:
+            channel_identifier = route.channel_identifier
+            channel_state = channelidentifiers_to_channels.get(initiator).get(channel_identifier)
+        else:
+            continue
 
         if not channel_state:
             continue
@@ -217,11 +223,11 @@ def try_new_route(
     pseudo_random_generator: random.Random,
     block_number: BlockNumber,
 ) -> TransitionResult[InitiatorTransferState]:
-
     channel_state = next_channel_from_routes(
         available_routes=available_routes,
         channelidentifiers_to_channels=channelidentifiers_to_channels,
         transfer_amount=transfer_description.amount,
+        initiator=to_canonical_address(transfer_description.initiator)
     )
 
     events: List[Event] = list()

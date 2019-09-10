@@ -3,6 +3,8 @@ import threading
 from contextlib import contextmanager
 import datetime
 
+from eth_utils import to_checksum_address
+
 from raiden.constants import RAIDEN_DB_VERSION, SQLITE_MIN_REQUIRED_VERSION
 from raiden.exceptions import InvalidDBData, InvalidNumberInput
 from raiden.storage.serialize import SerializationBase
@@ -151,19 +153,27 @@ class SQLiteStorage:
 
         return last_id
 
-    def write_light_client_protocol_messages(self, msg_dtos):
+    def write_light_client_payment(self, light_client_payment):
         with self.write_lock, self.conn:
-            cursor = self.conn.executemany(
-                "INSERT INTO light_client_protocol_message("
-                "identifier, "
-                "message_order, "
-                "unsigned_message, "
-                "signed_message, "
-                "state_change_id, "
-                "light_client_payment_id "
-                ")"
-                "VALUES(?, ?, ?, ?, ?, ?)",
-                msg_dtos,
+            cursor = self.conn.execute(
+                "INSERT INTO light_client_payment("
+                "payment_id, "
+                "light_client_address, "
+                "partner_address, "
+                "is_lc_initiator, "
+                "token_network_id, "
+                "amount, "
+                "created_on, "
+                "payment_status "
+                ") VALUES(?, ?, ?, ?, ?, ?, ?, ?)",
+                (light_client_payment.payment_id,
+                 to_checksum_address(light_client_payment.light_client_address),
+                 light_client_payment.partner_address,
+                 light_client_payment.is_lc_initiator,
+                 to_checksum_address(light_client_payment.token_network_id),
+                 light_client_payment.amount,
+                 light_client_payment.created_on,
+                 str(light_client_payment.payment_status.value))
             )
             last_id = cursor.lastrowid
         return last_id
@@ -190,6 +200,24 @@ class SQLiteStorage:
             )
             last_id = cursor.lastrowid
         return last_id
+
+    def write_light_client_protocol_messages(self, msg_dtos):
+        with self.write_lock, self.conn:
+            cursor = self.conn.executemany(
+                "INSERT INTO light_client_protocol_message("
+                "identifier, "
+                "message_order, "
+                "unsigned_message, "
+                "signed_message, "
+                "state_change_id, "
+                "light_client_payment_id "
+                ")"
+                "VALUES(?, ?, ?, ?, ?, ?)",
+                msg_dtos,
+            )
+            last_id = cursor.lastrowid
+        return last_id
+
 
     def write_state_snapshot(self, statechange_id, snapshot):
         with self.write_lock, self.conn:

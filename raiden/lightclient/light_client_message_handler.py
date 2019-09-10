@@ -1,3 +1,4 @@
+from raiden.lightclient.lightclientmessages.light_client_payment import LightClientPayment
 from raiden.lightclient.lightclientmessages.light_client_protocol_message import LigthClientProtocolMessage, \
     DbLightClientProtocolMessage
 from raiden.messages import Message
@@ -5,16 +6,22 @@ from raiden.storage.wal import WriteAheadLog
 from typing import List
 
 
-def build_light_client_protocol_message(message: Message) -> LigthClientProtocolMessage:
-    import random
+def build_light_client_protocol_message(message: Message, signed: bool, payment_id: int,
+                                        order: int) -> LigthClientProtocolMessage:
+    if signed:
+        signed_msg = message
+        unsigned_msg = None
+    else:
+        signed_msg = None
+        unsigned_msg = message
     return LigthClientProtocolMessage(
-        random.randint(1, 10000),
-        False,
-        2,
-        2,
+        signed,
+        order,
+        payment_id,
         None,
-        message,
-        None
+        unsigned_msg,
+        signed_msg,
+
     )
 
 
@@ -27,8 +34,17 @@ class LightClientMessageHandler:
         to_store = []
         for msg_dto in protocol_messages:
             to_store.append(DbLightClientProtocolMessage(msg_dto))
-        wal.storage.write_light_client_protocol_messages(to_store)
+        return wal.storage.write_light_client_protocol_messages(to_store)
 
     @classmethod
-    def store_light_client_protocol_message(cls, message: Message, wal: WriteAheadLog):
-        wal.storage.write_light_client_protocol_message(message, build_light_client_protocol_message(message))
+    def store_light_client_protocol_message(cls, message: Message, signed: bool, payment_id: int, order: int,
+                                            wal: WriteAheadLog):
+        return wal.storage.write_light_client_protocol_message(
+            message,
+            build_light_client_protocol_message(message, signed,
+                                                payment_id, order)
+        )
+
+    @classmethod
+    def store_light_client_payment(cls, payment: LightClientPayment, wal: WriteAheadLog):
+        return wal.storage.write_light_client_payment(payment)
