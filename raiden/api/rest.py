@@ -1806,8 +1806,11 @@ class RestAPI:
     def get_light_client_protocol_message(self):
         return api_response("Should get all the messages")
 
-    def receive_light_client_protocol_message(self):
-        self.raiden_api.raiden.on_message({"fruta": 1})
+    def receive_light_client_protocol_message(self,
+                                              message_id: int,
+                                              message_order: int,
+                                              message: Dict):
+      #  self.raiden_api.raiden.on_message({"fruta": 1})
         return api_response("Should save all the messages")
 
     def create_light_client_payment(
@@ -1820,10 +1823,7 @@ class RestAPI:
     ):
         try:
             locked_transfer = self.raiden_api.create_light_client_payment(registry_address, creator_address,
-                                                                      partner_address, token_address, amount)
+                                                                          partner_address, token_address, amount)
             return api_response(locked_transfer.to_dict())
         except ChannelNotFound as e:
             return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.NOT_FOUND, log=log)
-
-
-

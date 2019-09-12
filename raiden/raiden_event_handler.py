@@ -97,6 +97,7 @@ class EventHandler(ABC):
 
 class RaidenEventHandler(EventHandler):
     def on_raiden_event(self, raiden: "RaidenService", chain_state: ChainState, event: Event):
+        print("On raiden event "+str(type(event)))
         # pylint: disable=too-many-branches
         if type(event) == SendLockExpired:
             assert isinstance(event, SendLockExpired), MYPY_ANNOTATION

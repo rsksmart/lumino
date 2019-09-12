@@ -35,7 +35,7 @@ from raiden.utils.typing import (
 )
 
 
-def clear_if_finalized(iteration: TransitionResult,) -> TransitionResult[InitiatorPaymentState]:
+def clear_if_finalized(iteration: TransitionResult, ) -> TransitionResult[InitiatorPaymentState]:
     """ Clear the initiator payment task if all transfers have been finalized
     or expired. """
     state = cast(InitiatorPaymentState, iteration.new_state)
@@ -136,7 +136,8 @@ def subdispatch_to_initiatortransfer(
     pseudo_random_generator: random.Random,
 ) -> TransitionResult[InitiatorTransferState]:
     channel_identifier = initiator_state.channel_identifier
-    channel_state = channelidentifiers_to_channels.get(channel_identifier)
+    channel_state = channelidentifiers_to_channels[initiator_state.transfer_description.initiator].get(
+        channel_identifier)
     if not channel_state:
         return TransitionResult(initiator_state, list())
 
@@ -284,7 +285,7 @@ def handle_transferrefundcancelroute(
     if not is_valid_lock or not is_valid_refund:
         return TransitionResult(payment_state, list())
 
-    is_valid, channel_events, _ = channel.handle_receive_refundtransfercancelroute(
+    is_valid, channel_events, _, _ = channel.handle_receive_refundtransfercancelroute(
         channel_state, refund_transfer
     )
 
@@ -300,6 +301,7 @@ def handle_transferrefundcancelroute(
     transfer_description = TransferDescriptionWithSecretState(
         payment_network_identifier=old_description.payment_network_identifier,
         payment_identifier=old_description.payment_identifier,
+        payment_hash_invoice=old_description.payment_hash_invoice,
         amount=old_description.amount,
         token_network_identifier=old_description.token_network_identifier,
         allocated_fee=old_description.allocated_fee,

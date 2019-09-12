@@ -3,7 +3,7 @@ from typing import Dict, Any
 from raiden.messages import Message
 
 
-class HubMessageResponse:
+class HubMessage:
     """ Representation of response to a LC request """
 
     def __init__(

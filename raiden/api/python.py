@@ -42,7 +42,7 @@ from raiden.exceptions import (
 from raiden.lightclient.light_client_message_handler import LightClientMessageHandler
 from raiden.lightclient.light_client_service import LightClientService
 from raiden.lightclient.light_client_utils import LightClientUtils
-from raiden.lightclient.lightclientmessages.hub_message_response import HubMessageResponse
+from raiden.lightclient.lightclientmessages.hub_message import HubMessage
 from raiden.lightclient.lightclientmessages.light_client_payment import LightClientPayment, LightClientPaymentStatus
 
 from raiden.messages import RequestMonitoring, LockedTransfer
@@ -1438,7 +1438,7 @@ class RaidenAPI:
         partner_address: typing.AddressHex,
         token_address: typing.TokenAddress,
         amount: typing.TokenAmount
-    ) -> HubMessageResponse:
+    ) -> HubMessage:
         channel_state = views.get_channelstate_for(
             views.state_from_raiden(self.raiden),
             registry_address,
@@ -1481,6 +1481,6 @@ class RaidenAPI:
                 self.raiden.wal
             )
 
-            return HubMessageResponse(light_client_message_id, order, locked_transfer)
+            return HubMessage(light_client_message_id, order, locked_transfer)
         else:
             raise ChannelNotFound("Channel with given partner address doesnt exists")

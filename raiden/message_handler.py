@@ -35,6 +35,7 @@ log = structlog.get_logger(__name__)  # pylint: disable=invalid-name
 class MessageHandler:
     def on_message(self, raiden: RaidenService, message: Message) -> None:
         # pylint: disable=unidiomatic-typecheck
+        print("On received message "+str(type(message)))
 
         if type(message) == SecretRequest:
             assert isinstance(message, SecretRequest), MYPY_ANNOTATION
@@ -169,6 +170,7 @@ class MessageHandler:
             )
             return
 
+        # TODO marcosmartinez7: what about lc here?
         if message.target == raiden.address:
             raiden.target_mediated_transfer(message)
         else:

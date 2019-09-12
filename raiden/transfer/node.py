@@ -256,13 +256,14 @@ def subdispatch_to_paymenttask(
             token_network_identifier = sub_task.token_network_identifier
             channel_identifier = sub_task.channel_identifier
 
-            channel_state = views.get_channelstate_by_canonical_identifier(
+            channel_state = views.get_channelstate_by_canonical_identifier_and_address(
                 chain_state=chain_state,
                 canonical_identifier=CanonicalIdentifier(
                     chain_identifier=chain_state.chain_id,
                     token_network_address=token_network_identifier,
                     channel_identifier=channel_identifier,
                 ),
+                address=chain_state.our_address
             )
 
             if channel_state:
@@ -399,13 +400,14 @@ def subdispatch_targettask(
     events: List[Event] = list()
     channel_state = None
     if is_valid_subtask:
-        channel_state = views.get_channelstate_by_canonical_identifier(
+        channel_state = views.get_channelstate_by_canonical_identifier_and_address(
             chain_state=chain_state,
             canonical_identifier=CanonicalIdentifier(
                 chain_identifier=chain_state.chain_id,
                 token_network_address=token_network_identifier,
                 channel_identifier=channel_identifier,
             ),
+            address=chain_state.our_address
         )
 
     if channel_state:
@@ -555,13 +557,14 @@ def handle_contract_receive_channel_closed(
     chain_state: ChainState, state_change: ContractReceiveChannelClosed
 ) -> TransitionResult[ChainState]:
     # cleanup queue for channel
-    channel_state = views.get_channelstate_by_canonical_identifier(
+    channel_state = views.get_channelstate_by_canonical_identifier_and_address(
         chain_state=chain_state,
         canonical_identifier=CanonicalIdentifier(
             chain_identifier=chain_state.chain_id,
             token_network_address=state_change.token_network_identifier,
             channel_identifier=state_change.channel_identifier,
         ),
+        address=chain_state.our_address
     )
     if channel_state:
         queue_id = QueueIdentifier(

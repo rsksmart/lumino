@@ -1,3 +1,5 @@
+from typing import Dict
+
 from flask import Blueprint
 from flask_restful import Resource
 from webargs.flaskparser import use_kwargs
@@ -22,6 +24,7 @@ from raiden.api.v1.encoding import (
     ChannelLightPutSchema,
     ChannelLightPatchSchema,
     PaymentLightGetSchema, PaymentLightPutSchema, PaymentLightPostSchema)
+from raiden.lightclient.lightclientmessages.hub_message import HubMessage
 from raiden.utils import typing
 from raiden.constants import EMPTY_PAYMENT_HASH_INVOICE
 
@@ -279,11 +282,14 @@ class PaymentLightResource(BaseResource):
         return self.rest_api.get_light_client_protocol_message()
 
     @use_kwargs(put_schema, locations=("json",))
-    def put(self):
+    def put(self,
+            message_id: int,
+            message_order: int,
+            message: Dict):
         """
         put a signed message associated with a payment of a light client
         """
-        return self.rest_api.receive_light_client_protocol_message()
+        return self.rest_api.receive_light_client_protocol_message(message_id, message_order, message)
 
     @use_kwargs(post_schema, locations=("json",))
     def post(

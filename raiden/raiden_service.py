@@ -100,7 +100,7 @@ StatusesDict = Dict[TargetAddress, Dict[PaymentID, "PaymentStatus"]]
 ConnectionManagerDict = Dict[TokenNetworkID, ConnectionManager]
 
 
-def _redact_secret(data: Union[Dict, List],) -> Union[Dict, List]:
+def _redact_secret(data: Union[Dict, List]) -> Union[Dict, List]:
     """ Modify `data` in-place and replace keys named `secret`. """
 
     if isinstance(data, dict):
@@ -191,7 +191,7 @@ class PaymentStatus(NamedTuple):
     """
 
     payment_identifier: PaymentID
-    payment_hash_invoice : PaymentHashInvoice
+    payment_hash_invoice: PaymentHashInvoice
     amount: PaymentAmount
     token_network_identifier: TokenNetworkID
     payment_done: AsyncResult
@@ -219,8 +219,9 @@ def update_path_finding_service_from_balance_proof(
     chain_state: "ChainState",
     new_balance_proof: Union[BalanceProofSignedState, BalanceProofUnsignedState],
 ) -> None:
-    channel_state = views.get_channelstate_by_canonical_identifier(
-        chain_state=chain_state, canonical_identifier=new_balance_proof.canonical_identifier
+    channel_state = views.get_channelstate_by_canonical_identifier_and_address(
+        chain_state=chain_state, canonical_identifier=new_balance_proof.canonical_identifier,
+        address=chain_state.our_address
     )
     network_address = new_balance_proof.canonical_identifier.token_network_address
     error_msg = (
@@ -245,8 +246,9 @@ def update_monitoring_service_from_balance_proof(
     if raiden.config["services"]["monitoring_enabled"] is False:
         return
 
-    channel_state = views.get_channelstate_by_canonical_identifier(
-        chain_state=chain_state, canonical_identifier=new_balance_proof.canonical_identifier
+    channel_state = views.get_channelstate_by_canonical_identifier_and_address(
+        chain_state=chain_state, canonical_identifier=new_balance_proof.canonical_identifier,
+        address=chain_state.our_address
     )
 
     msg = (
@@ -669,7 +671,9 @@ class RaidenService(Runnable):
         old_state = views.state_from_raiden(self)
         new_state, raiden_event_list = self.wal.log_and_dispatch(state_change)
 
-        # TODO FIXME cannot work after the lc refactor
+
+
+        # TODO marcosmartinez7 FIXME cannot work after the lc refactor
         # for changed_balance_proof in views.detect_balance_proof_change(old_state, new_state):
         # update_services_from_balance_proof(self, new_state, changed_balance_proof)
 
@@ -754,7 +758,6 @@ class RaidenService(Runnable):
         if self.transport:
             self.transport[0].start_health_check(node_address)
             self.transport[1].start_health_check(node_address)
-
 
     def _callback_new_block(self, latest_block: Dict):
         """Called once a new block is detected by the alarm task.
@@ -872,8 +875,10 @@ class RaidenService(Runnable):
                 target = transfer.target
                 identifier = transfer.payment_identifier
                 balance_proof = transfer.balance_proof
+                payment_hash_invoice = transfer.payment_hash_invoice
                 self.targets_to_identifiers_to_statuses[target][identifier] = PaymentStatus(
                     payment_identifier=identifier,
+                    payment_hash_invoice=payment_hash_invoice,
                     amount=transfer_description.amount,
                     token_network_identifier=TokenNetworkID(
                         balance_proof.token_network_identifier
@@ -895,7 +900,7 @@ class RaidenService(Runnable):
             otherwise queues for channel closed while the node was offline
             won't be properly cleared. It is not bad but it is suboptimal.
         """
-       # assert not self.transport, f"Transport is running. node:{self!r}"
+        # assert not self.transport, f"Transport is running. node:{self!r}"
         assert self.alarm.is_primed(), f"AlarmTask not primed. node:{self!r}"
 
         events_queues = views.get_all_messagequeues(chain_state)
@@ -937,7 +942,7 @@ class RaidenService(Runnable):
             "Transport was started before the monitoring service queue was updated. "
             "This can lead to safety issue. node:{self!r}"
         )
-       # assert not self.transport, msg
+        # assert not self.transport, msg
 
         msg = "The node state was not yet recovered, cant read balance proofs. node:{self!r}"
         assert self.wal, msg
@@ -953,7 +958,6 @@ class RaidenService(Runnable):
             current_state=chain_state,
         )
 
-
     def _initialize_whitelists(self, chain_state: ChainState):
         """ Whitelist neighbors and mediated transfer targets on transport """
 
@@ -962,7 +966,6 @@ class RaidenService(Runnable):
                 continue
             self.transport[0].whitelist(neighbour)
             self.transport[1].whitelist(neighbour)
-
 
         events_queues = views.get_all_messagequeues(chain_state)
 
@@ -973,8 +976,6 @@ class RaidenService(Runnable):
                     if transfer.initiator == self.address:
                         self.transport[0].whitelist(address=transfer.target)
                         self.transport[1].whitelist(address=transfer.target)
-
-
 
     def sign(self, message: Message):
         """ Sign message inplace. """

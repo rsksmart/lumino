@@ -9,6 +9,8 @@ from eth_utils import (
     to_hex,
 )
 from marshmallow import Schema, SchemaOpts, fields, post_dump, post_load, pre_load
+
+from raiden.lightclient.lightclientmessages.hub_message import HubMessage
 from raiden.utils.rns import is_rns_address
 from webargs import validate
 from werkzeug.exceptions import NotFound
@@ -93,6 +95,16 @@ def deserialize_address_helper(self, value, attr, data):  # pylint: disable=unus
     if len(value) != 20:
         self.fail("invalid_size")
     return value
+
+
+class HubMessageField(fields.Field):
+    @staticmethod
+    def _serialize(value, attr, obj):  # pylint: disable=unused-argument
+        return data_encoder(value)
+
+    @staticmethod
+    def _deserialize(value, attr, data):  # pylint: disable=unused-argument
+        return data_decoder(value)
 
 
 class AddressField(fields.Field):
@@ -371,6 +383,10 @@ class PaymentLightPostSchema(BaseSchema):
 
 
 class PaymentLightPutSchema(BaseSchema):
+    message_id = fields.Integer(required=True)
+    message_order = fields.Integer(required=True)
+    message = fields.Dict(required=True)
+
     class Meta:
         strict = True
         # decoding to a dict is required by the @use_kwargs decorator from webargs:

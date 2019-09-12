@@ -852,7 +852,7 @@ class MatrixTransport(Runnable):
         self._raiden_service.on_message(delivered)
 
     def _receive_message(self, message: Union[SignedRetrieableMessage, Processed]):
-        print("Message "+str(message))
+        print("---- Matrix Received Message "+str(message))
         assert self._raiden_service is not None
         self.log.debug(
             "Message received",
@@ -909,6 +909,8 @@ class MatrixTransport(Runnable):
         self.log.debug(
             "Send raw", receiver=pex(receiver_address), room=room, data=data.replace("\n", "\\n")
         )
+        print("---- Matrix Send Message "+data)
+
         room.send_text(data)
 
     def _get_room_for_address(self, address: Address, allow_missing_peers=False) -> Optional[Room]:

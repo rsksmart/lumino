@@ -4,7 +4,7 @@ import gevent
 import pytest
 
 from raiden.api.python import RaidenAPI
-from raiden.constants import UINT64_MAX
+from raiden.constants import UINT64_MAX, EMPTY_PAYMENT_HASH_INVOICE
 from raiden.messages import Lock, LockedTransfer
 from raiden.tests.utils.detect_failure import raise_on_failure
 from raiden.tests.utils.factories import (
@@ -51,7 +51,8 @@ def run_test_failsfast_lockedtransfer_exceeding_distributable(
         views.state_from_app(app0), payment_network_identifier, token_address
     )
     payment_status = app0.raiden.mediated_transfer_async(
-        token_network_identifier, deposit * 2, app1.raiden.address, identifier=1
+        token_network_identifier, deposit * 2, app1.raiden.address, identifier=1,
+        payment_hash_invoice=EMPTY_PAYMENT_HASH_INVOICE
     )
 
     assert payment_status.payment_done.get(timeout=5) is False
@@ -82,7 +83,8 @@ def run_test_failfast_lockedtransfer_nochannel(raiden_network, token_addresses):
         views.state_from_app(app0), payment_network_identifier, token_address
     )
     payment_status = app0.raiden.mediated_transfer_async(
-        token_network_identifier, amount, app1.raiden.address, identifier=1
+        token_network_identifier, amount, app1.raiden.address, identifier=1,
+        payment_hash_invoice=EMPTY_PAYMENT_HASH_INVOICE
     )
     assert payment_status.payment_done.wait() is False
 
@@ -133,6 +135,7 @@ def run_test_receive_lockedtransfer_invalidnonce(
         chain_id=UNIT_CHAIN_ID,
         message_identifier=random.randint(0, UINT64_MAX),
         payment_identifier=payment_identifier,
+        payment_hash_invoice=EMPTY_PAYMENT_HASH_INVOICE,
         nonce=repeated_nonce,
         token_network_address=token_network_identifier,
         token=token_address,
@@ -195,6 +198,7 @@ def run_test_receive_lockedtransfer_invalidsender(
         chain_id=UNIT_CHAIN_ID,
         message_identifier=random.randint(0, UINT64_MAX),
         payment_identifier=1,
+        payment_hash_invoice=EMPTY_PAYMENT_HASH_INVOICE,
         nonce=1,
         token_network_address=token_network_identifier,
         token=token_address,
@@ -248,6 +252,7 @@ def run_test_receive_lockedtransfer_invalidrecipient(
         chain_id=UNIT_CHAIN_ID,
         message_identifier=random.randint(0, UINT64_MAX),
         payment_identifier=payment_identifier,
+        payment_hash_invoice=EMPTY_PAYMENT_HASH_INVOICE,
         nonce=1,
         token_network_address=token_network_identifier,
         token=token_address,
@@ -307,6 +312,7 @@ def run_test_received_lockedtransfer_closedchannel(
         chain_id=UNIT_CHAIN_ID,
         message_identifier=random.randint(0, UINT64_MAX),
         payment_identifier=payment_identifier,
+        payment_hash_invoice=EMPTY_PAYMENT_HASH_INVOICE,
         nonce=1,
         token_network_address=token_network_identifier,
         token=token_address,
