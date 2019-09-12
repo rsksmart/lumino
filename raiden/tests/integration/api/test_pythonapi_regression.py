@@ -4,6 +4,7 @@ import pytest
 from raiden import waiting
 from raiden.api.python import RaidenAPI
 from raiden.tests.utils.detect_failure import raise_on_failure
+from raiden.constants import EMPTY_PAYMENT_HASH_INVOICE
 
 
 @pytest.mark.parametrize("number_of_nodes", [2])
@@ -41,7 +42,8 @@ def run_test_close_regression(raiden_network, deposit, token_addresses):
     amount = 10
     identifier = 42
     assert api1.transfer(
-        registry_address, token_address, amount, api2.address, identifier=identifier
+        registry_address, token_address, amount, api2.address, identifier=identifier,
+        payment_hash_invoice=EMPTY_PAYMENT_HASH_INVOICE
     )
     exception = ValueError("Waiting for transfer received success in the WAL timed out")
     with gevent.Timeout(seconds=5, exception=exception):

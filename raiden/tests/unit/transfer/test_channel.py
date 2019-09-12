@@ -47,11 +47,11 @@ def _channel_and_transfer(merkletree_width):
 def test_handle_receive_lockedtransfer_enforces_transfer_limit():
 
     state, transfer = _channel_and_transfer(merkletree_width=MAXIMUM_PENDING_TRANSFERS - 1)
-    is_valid, _, msg = channel.handle_receive_lockedtransfer(state, transfer)
+    is_valid, _, msg, _ = channel.handle_receive_lockedtransfer(state, transfer, None)
     assert is_valid, msg
 
     state, transfer = _channel_and_transfer(merkletree_width=MAXIMUM_PENDING_TRANSFERS)
-    is_valid, _, _ = handle_receive_lockedtransfer(state, transfer)
+    is_valid, _, _, _ = handle_receive_lockedtransfer(state, transfer, None)
     assert not is_valid
 
 

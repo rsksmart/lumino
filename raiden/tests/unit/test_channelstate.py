@@ -14,6 +14,7 @@ from raiden.tests.utils.factories import (
     HOP1,
     UNIT_CHAIN_ID,
     UNIT_TRANSFER_SENDER,
+    UNIT_PAYMENT_HASH_INVOICE,
     BalanceProofProperties,
     LockedTransferSignedStateProperties,
     LockedTransferUnsignedStateProperties,
@@ -428,6 +429,7 @@ def test_channelstate_send_lockedtransfer():
     lock = HashTimeLockState(lock_amount, lock_expiration, lock_secrethash)
 
     payment_identifier = 1
+    payment_hash_invoice = UNIT_PAYMENT_HASH_INVOICE
     message_identifier = random.randint(0, UINT64_MAX)
     transfer_target = make_address()
     transfer_initiator = make_address()
@@ -439,6 +441,7 @@ def test_channelstate_send_lockedtransfer():
         lock_amount,
         message_identifier,
         payment_identifier,
+        payment_hash_invoice,
         lock_expiration,
         lock_secrethash,
     )
@@ -483,7 +486,7 @@ def test_channelstate_receive_lockedtransfer():
         channel_state, privkey2, nonce, transferred_amount, lock
     )
 
-    is_valid, _, msg = channel.handle_receive_lockedtransfer(channel_state, receive_lockedtransfer)
+    is_valid, _, msg, _ = channel.handle_receive_lockedtransfer(channel_state, receive_lockedtransfer, None)
     assert is_valid, msg
 
     our_model2 = our_model1
@@ -591,7 +594,7 @@ def test_channelstate_lockedtransfer_overspent():
         channel_state, privkey2, nonce, transferred_amount, lock
     )
 
-    is_valid, _, _ = channel.handle_receive_lockedtransfer(channel_state, receive_lockedtransfer)
+    is_valid, _, _, _ = channel.handle_receive_lockedtransfer(channel_state, receive_lockedtransfer, None)
     assert not is_valid, "message is invalid because it is spending more than the distributable"
 
     assert_partner_state(channel_state.our_state, channel_state.partner_state, our_model1)
@@ -619,7 +622,7 @@ def test_channelstate_lockedtransfer_invalid_chainid():
         channel_state, privkey2, nonce, transferred_amount, lock, chain_id=UNIT_CHAIN_ID + 1
     )
 
-    is_valid, _, _ = channel.handle_receive_lockedtransfer(channel_state, receive_lockedtransfer)
+    is_valid, _, _, _ = channel.handle_receive_lockedtransfer(channel_state, receive_lockedtransfer, None)
     assert not is_valid, "message is invalid because it uses different chain_id than the channel"
 
     assert_partner_state(channel_state.our_state, channel_state.partner_state, our_model1)
@@ -647,8 +650,8 @@ def test_channelstate_lockedtransfer_overspend_with_multiple_pending_transfers()
         channel_state, privkey2, nonce1, transferred_amount, lock1
     )
 
-    is_valid, _, msg = channel.handle_receive_lockedtransfer(
-        channel_state, receive_lockedtransfer1
+    is_valid, _, msg, _ = channel.handle_receive_lockedtransfer(
+        channel_state, receive_lockedtransfer1, None
     )
     assert is_valid, msg
 
@@ -678,8 +681,8 @@ def test_channelstate_lockedtransfer_overspend_with_multiple_pending_transfers()
         channel_state, privkey2, nonce2, transferred_amount, lock2, merkletree_leaves=leaves
     )
 
-    is_valid, _, msg = channel.handle_receive_lockedtransfer(
-        channel_state, receive_lockedtransfer2
+    is_valid, _, msg, _ = channel.handle_receive_lockedtransfer(
+        channel_state, receive_lockedtransfer2, None
     )
     assert not is_valid, "message is invalid because its expending more than the distributable"
 
@@ -816,8 +819,8 @@ def test_interwoven_transfers():
             locked_amount=locked_amount,
         )
 
-        is_valid, _, msg = channel.handle_receive_lockedtransfer(
-            channel_state, receive_lockedtransfer
+        is_valid, _, msg, _ = channel.handle_receive_lockedtransfer(
+            channel_state, receive_lockedtransfer, None
         )
         assert is_valid, msg
 
@@ -911,6 +914,7 @@ def test_channel_never_expires_lock_with_secret_onchain():
     )
 
     payment_identifier = 1
+    payment_hash_invoice = UNIT_PAYMENT_HASH_INVOICE
     message_identifier = random.randint(0, UINT64_MAX)
     transfer_target = make_address()
     transfer_initiator = make_address()
@@ -922,6 +926,7 @@ def test_channel_never_expires_lock_with_secret_onchain():
         amount=lock_amount,
         message_identifier=message_identifier,
         payment_identifier=payment_identifier,
+        payment_hash_invoice=payment_hash_invoice,
         expiration=lock_expiration,
         secrethash=lock_secrethash,
     )
@@ -968,8 +973,8 @@ def test_regression_must_update_balanceproof_remove_expired_lock():
         lock=lock,
     )
 
-    is_valid, _, msg = channel.handle_receive_lockedtransfer(
-        channel_state=channel_state, mediated_transfer=receive_lockedtransfer
+    is_valid, _, msg, _ = channel.handle_receive_lockedtransfer(
+        channel_state=channel_state, mediated_transfer=receive_lockedtransfer, storage=None
     )
     assert is_valid, msg
 
@@ -1035,8 +1040,8 @@ def test_channel_must_ignore_remove_expired_locks_if_secret_registered_onchain()
         lock=lock,
     )
 
-    is_valid, _, msg = channel.handle_receive_lockedtransfer(
-        channel_state=channel_state, mediated_transfer=receive_lockedtransfer
+    is_valid, _, msg, _ = channel.handle_receive_lockedtransfer(
+        channel_state=channel_state, mediated_transfer=receive_lockedtransfer, storage=None
     )
     assert is_valid, msg
 
@@ -1106,7 +1111,7 @@ def test_channel_must_accept_expired_locks():
         channel_state, privkey2, nonce, transferred_amount, lock
     )
 
-    is_valid, _, msg = channel.handle_receive_lockedtransfer(channel_state, receive_lockedtransfer)
+    is_valid, _, msg, _ = channel.handle_receive_lockedtransfer(channel_state, receive_lockedtransfer, None)
     assert is_valid, msg
 
     # the locked amount must increase even though the lock is expired, this
@@ -1154,8 +1159,8 @@ def test_channel_rejects_onchain_secret_reveal_with_expired_locks():
         lock=lock,
     )
 
-    is_valid, _, msg = channel.handle_receive_lockedtransfer(
-        channel_state=channel_state, mediated_transfer=receive_lockedtransfer
+    is_valid, _, msg, _ = channel.handle_receive_lockedtransfer(
+        channel_state=channel_state, mediated_transfer=receive_lockedtransfer, storage=None
     )
     assert is_valid, msg
 
@@ -1206,7 +1211,7 @@ def test_receive_lockedtransfer_before_deposit():
         channel_state, privkey2, nonce, transferred_amount, lock
     )
 
-    is_valid, _, msg = channel.handle_receive_lockedtransfer(channel_state, receive_lockedtransfer)
+    is_valid, _, msg, _ = channel.handle_receive_lockedtransfer(channel_state, receive_lockedtransfer, None)
 
     # this node partner has enough balance, the transfer must be accepted
     assert is_valid, msg
@@ -1291,7 +1296,7 @@ def test_channelstate_unlock_unlocked_onchain():
         channel_state, privkey2, nonce, transferred_amount, lock
     )
 
-    is_valid, _, msg = channel.handle_receive_lockedtransfer(channel_state, receive_lockedtransfer)
+    is_valid, _, msg, _ = channel.handle_receive_lockedtransfer(channel_state, receive_lockedtransfer, None)
     assert is_valid, msg
 
     channel.register_onchain_secret(
@@ -1396,7 +1401,7 @@ def test_update_must_be_called_if_close_lost_race():
         channel_state, privkey2, nonce, transferred_amount, lock
     )
 
-    is_valid, _, msg = channel.handle_receive_lockedtransfer(channel_state, receive_lockedtransfer)
+    is_valid, _, msg, _ = channel.handle_receive_lockedtransfer(channel_state, receive_lockedtransfer, None)
     assert is_valid, msg
 
     block_number = 10
@@ -1534,8 +1539,8 @@ def test_valid_lock_expired_for_unlocked_lock():
         lock=lock,
     )
 
-    is_valid, _, msg = channel.handle_receive_lockedtransfer(
-        channel_state=channel_state, mediated_transfer=receive_lockedtransfer
+    is_valid, _, msg, _ = channel.handle_receive_lockedtransfer(
+        channel_state=channel_state, mediated_transfer=receive_lockedtransfer, storage=None
     )
     assert is_valid, msg
 

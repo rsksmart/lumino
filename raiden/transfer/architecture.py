@@ -23,6 +23,8 @@ from raiden.utils.typing import (
     TypeVar,
 )
 
+from raiden.storage.sqlite import SerializedSQLiteStorage
+
 if TYPE_CHECKING:
     # pylint: disable=unused-import
     from raiden.transfer.state import BalanceProofSignedState
@@ -252,7 +254,7 @@ class StateManager(Generic[ST]):
 
     def __init__(
         self,
-        state_transition: Callable[[Optional[ST], StateChange], State],
+        state_transition: Callable[[Optional[ST], StateChange, SerializedSQLiteStorage], State],
         current_state: Optional[ST],
     ) -> None:
         """ Initialize the state manager.
