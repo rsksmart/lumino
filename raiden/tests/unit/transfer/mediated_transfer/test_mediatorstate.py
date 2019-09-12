@@ -333,7 +333,7 @@ def test_events_for_refund():
     )
     received_transfer = create(transfer_data)
 
-    is_valid, _, msg = channel.handle_receive_lockedtransfer(refund_channel, received_transfer)
+    is_valid, _, msg, _ = channel.handle_receive_lockedtransfer(refund_channel, received_transfer, None)
     assert is_valid, msg
 
     transfer_pair, refund_events = mediator.backward_transfer_pair(
@@ -1917,7 +1917,7 @@ def test_backward_transfer_pair_with_fees_deducted():
     )
     received_transfer = create(transfer_data)
 
-    is_valid, _, msg = channel.handle_receive_lockedtransfer(refund_channel, received_transfer)
+    is_valid, _, msg, _ = channel.handle_receive_lockedtransfer(refund_channel, received_transfer, None)
     assert is_valid, msg
 
     transfer_pair, refund_events = mediator.backward_transfer_pair(

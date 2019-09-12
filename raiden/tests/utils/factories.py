@@ -64,6 +64,7 @@ from raiden.utils.typing import (
     Nonce,
     Optional,
     PaymentID,
+    PaymentHashInvoice,
     PaymentNetworkID,
     Secret,
     SecretHash,
@@ -195,6 +196,10 @@ def make_payment_network_identifier() -> PaymentNetworkID:
     return PaymentNetworkID(make_address())
 
 
+def make_payment_hash_invoice() -> PaymentHashInvoice:
+    return PaymentHashInvoice(b"")
+
+
 def make_keccak_hash() -> Keccak256:
     return Keccak256(make_32bytes())
 
@@ -237,6 +242,7 @@ UNIT_TRANSFER_AMOUNT = 10
 UNIT_TRANSFER_FEE = 5
 UNIT_SECRET = b"secretsecretsecretsecretsecretse"
 UNIT_SECRETHASH = sha3(UNIT_SECRET)
+UNIT_PAYMENT_HASH_INVOICE = b""
 UNIT_REGISTRY_IDENTIFIER = b"registryregistryregi"
 UNIT_TOKEN_ADDRESS = b"tokentokentokentoken"
 UNIT_TOKEN_NETWORK_ADDRESS = b"networknetworknetwor"
@@ -409,6 +415,7 @@ NettingChannelStateProperties.DEFAULTS = NettingChannelStateProperties(
 class TransferDescriptionProperties(Properties):
     payment_network_identifier: PaymentNetworkID = EMPTY
     payment_identifier: PaymentID = EMPTY
+    payment_hash_invoice : PaymentHashInvoice = EMPTY
     amount: TokenAmount = EMPTY
     token_network_identifier: TokenNetworkID = EMPTY
     initiator: InitiatorAddress = EMPTY
@@ -421,6 +428,7 @@ class TransferDescriptionProperties(Properties):
 TransferDescriptionProperties.DEFAULTS = TransferDescriptionProperties(
     payment_network_identifier=UNIT_PAYMENT_NETWORK_IDENTIFIER,
     payment_identifier=UNIT_TRANSFER_IDENTIFIER,
+    payment_hash_invoice=UNIT_PAYMENT_HASH_INVOICE,
     amount=UNIT_TRANSFER_AMOUNT,
     token_network_identifier=UNIT_TOKEN_NETWORK_ADDRESS,
     initiator=UNIT_TRANSFER_INITIATOR,
@@ -539,6 +547,7 @@ class LockedTransferUnsignedStateProperties(BalanceProofProperties):
     initiator: InitiatorAddress = EMPTY
     target: TargetAddress = EMPTY
     payment_identifier: PaymentID = EMPTY
+    payment_hash_invoice: PaymentHashInvoice = EMPTY
     token: TokenAddress = EMPTY
     secret: Secret = EMPTY
     TARGET_TYPE = LockedTransferUnsignedState
@@ -553,10 +562,10 @@ LockedTransferUnsignedStateProperties.DEFAULTS = LockedTransferUnsignedStateProp
     initiator=UNIT_TRANSFER_INITIATOR,
     target=UNIT_TRANSFER_TARGET,
     payment_identifier=1,
+    payment_hash_invoice=UNIT_PAYMENT_HASH_INVOICE,
     token=UNIT_TOKEN_ADDRESS,
     secret=UNIT_SECRET,
 )
-
 
 @create.register(LockedTransferUnsignedStateProperties)  # noqa: F811
 def _(properties, defaults=None) -> LockedTransferUnsignedState:
@@ -570,7 +579,7 @@ def _(properties, defaults=None) -> LockedTransferUnsignedState:
     return LockedTransferUnsignedState(
         balance_proof=create(transfer.extract(BalanceProofProperties)),
         lock=lock,
-        **transfer.partial_dict("initiator", "target", "payment_identifier", "token"),
+        **transfer.partial_dict("initiator", "target", "payment_identifier", "payment_hash_invoice", "token"),
     )
 
 
@@ -742,11 +751,12 @@ def make_signed_transfer_for(
     )
 
     if not allow_invalid:
-        is_valid, msg, _ = channel.is_valid_lockedtransfer(
+        is_valid, msg, _, _ = channel.is_valid_lockedtransfer(
             transfer_state=transfer,
             channel_state=channel_state,
             sender_state=channel_state.partner_state,
             receiver_state=channel_state.our_state,
+            storage=None
         )
         assert is_valid, msg
 
@@ -931,8 +941,8 @@ def make_transfers_pair(
             )
         )
 
-        is_valid, _, msg = channel.handle_receive_lockedtransfer(
-            receiver_channel, received_transfer
+        is_valid, _, msg, _ = channel.handle_receive_lockedtransfer(
+            receiver_channel, received_transfer, None
         )
         assert is_valid, msg
 
@@ -944,6 +954,7 @@ def make_transfers_pair(
             amount=amount,
             message_identifier=message_identifier,
             payment_identifier=UNIT_TRANSFER_IDENTIFIER,
+            payment_hash_invoice=UNIT_PAYMENT_HASH_INVOICE,
             expiration=lock_expiration,
             secrethash=UNIT_SECRETHASH,
         )
