@@ -61,7 +61,7 @@ class ContractSendChannelClose(ContractSendEvent):
 
     def __repr__(self) -> str:
         return (
-            "<ContractSendChannelClose channel:{} token:{} token_network:{} "
+            "<ContractSendChannelClose channel:{} token_network:{} "
             "balance_proof:{} triggered_by_block_hash:{} signed_close_tx:{}>"
         ).format(
             self.canonical_identifier.channel_identifier,

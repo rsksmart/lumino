@@ -1238,6 +1238,7 @@ class RestAPI:
                 token_address=token_address,
                 creator_address=self.raiden_api.address,
                 partner_address=partner_address,
+                channel_id_to_check=None
             )
             result = self.channel_schema.dump(channel_state)
             return api_response(result=result.data)
@@ -1480,7 +1481,7 @@ class RestAPI:
 
         updated_channel_state = self.raiden_api.get_channel(
             registry_address, channel_state.token_address, channel_state.our_state.address,
-            channel_state.partner_state.address
+            channel_state.partner_state.address, None
         )
 
         result = self.channel_schema.dump(updated_channel_state)
@@ -1525,7 +1526,7 @@ class RestAPI:
 
         updated_channel_state = self.raiden_api.get_channel(
             registry_address, channel_state.token_address, channel_state.our_state.address,
-            channel_state.partner_state.address
+            channel_state.partner_state.address, None
         )
 
         result = self.channel_schema.dump(updated_channel_state)
@@ -1561,7 +1562,11 @@ class RestAPI:
             return api_error(errors=str(e), status_code=HTTPStatus.PAYMENT_REQUIRED)
 
         updated_channel_state = self.raiden_api.get_channel(
-            registry_address, channel_state.token_address, channel_state.partner_state.address
+            registry_address,
+            channel_state.token_address,
+            channel_state.our_state.address,
+            channel_state.partner_state.address,
+            channel_state.canonical_identifier.channel_identifier
         )
 
         result = self.channel_schema.dump(updated_channel_state)
@@ -1591,7 +1596,7 @@ class RestAPI:
             return api_error(errors=str(e), status_code=HTTPStatus.PAYMENT_REQUIRED)
 
         updated_channel_state = self.raiden_api.get_channel(
-            registry_address, channel_state.token_address, channel_state.partner_state.address
+            registry_address, channel_state.token_address, channel_state.partner_state.address, None
         )
 
         result = self.channel_schema.dump(updated_channel_state)
@@ -1643,6 +1648,7 @@ class RestAPI:
                 token_address=token_address,
                 creator_address=creator_address,
                 partner_address=partner_address,
+                channel_id_to_check=None
             )
 
         except ChannelNotFound:
@@ -1710,6 +1716,7 @@ class RestAPI:
                 token_address=token_address,
                 creator_address=self.raiden_api.address,
                 partner_address=partner_address,
+                channel_id_to_check=None
             )
 
         except ChannelNotFound:

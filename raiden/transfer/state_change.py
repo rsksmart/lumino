@@ -175,10 +175,12 @@ class ActionChannelClose(StateChange):
 
     def __init__(self, canonical_identifier: CanonicalIdentifier,
                  signed_close_tx: str,
-                 participant: AddressHex) -> None:
+                 participant1: AddressHex,
+                 participant2: AddressHex) -> None:
         self.canonical_identifier = canonical_identifier
         self.signed_close_tx = signed_close_tx
-        self.participant = participant
+        self.participant1 = participant1
+        self.participant2 = participant2
 
     @property
     def chain_identifier(self) -> ChainID:
@@ -193,17 +195,19 @@ class ActionChannelClose(StateChange):
         return self.canonical_identifier.channel_identifier
 
     def __repr__(self) -> str:
-        return "<ActionChannelClose channel_identifier:{} signed_close_tx:{} participant:{}>".format(
+        return "<ActionChannelClose channel_identifier:{} signed_close_tx:{} participant1:{} participant2:{}>".format(
             self.channel_identifier,
             self.signed_close_tx,
-            self.participant)
+            self.participant1,
+            self.participant2)
 
     def __eq__(self, other: Any) -> bool:
         return (
             isinstance(other, ActionChannelClose)
             and self.canonical_identifier == other.canonical_identifier
             and self.signed_close_tx == other.signed_close_tx
-            and self.participant == other.participant
+            and self.participant1 == other.participant1
+            and self.participant2 == other.participant2
         )
 
     def __ne__(self, other: Any) -> bool:
@@ -212,18 +216,22 @@ class ActionChannelClose(StateChange):
     def to_dict(self) -> Dict[str, Any]:
         return {"canonical_identifier": self.canonical_identifier.to_dict(),
                 "signed_close_tx": self.signed_close_tx,
-                "participant": to_checksum_address(self.participant)}
+                "participant1": to_checksum_address(self.participant1),
+                "participant2": to_checksum_address(self.participant2)}
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "ActionChannelClose":
 
-        if not "participant" in data:
-            data["participant"] = ""
+        if not "participant1" in data:
+            data["participant1"] = ""
+        if not "participant2" in data:
+            data["participant2"] = ""
 
         return cls(
             canonical_identifier=CanonicalIdentifier.from_dict(data["canonical_identifier"]),
             signed_close_tx=data["signed_close_tx"],
-            participant=AddressHex(data["participant"])
+            participant1=AddressHex(data["participant1"]),
+            participant2=AddressHex(data["participant2"])
         )
 
 

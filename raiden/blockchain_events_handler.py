@@ -484,13 +484,10 @@ def on_blockchain_event(raiden: "RaidenService", event: Event):
         # TODO FIXME MARCOS UNINMPLEMENTED  handle_channel_closed(raiden, event)
         # print("Implement me!")
         handle_channel_closed(raiden, event)
-
     elif event_name == ChannelEvent.SETTLED:
         # TODO FIXME MARCOS UNINMPLEMENTED handle_channel_settled(raiden, event)
         print("Implement me!")
         handle_channel_settled(raiden,event)
-
-
     elif event_name == EVENT_SECRET_REVEALED:
         handle_secret_revealed(raiden, event)
 

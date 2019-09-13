@@ -209,6 +209,35 @@ class RaidenAPI:
         token_address: TokenAddress,
         creator_address: Address,
         partner_address: Address,
+        channel_id_to_check: ChannelID= None
+    ) -> NettingChannelState:
+        if not is_binary_address(token_address):
+            raise InvalidAddress("Expected binary address format for token in get_channel")
+
+        if not is_binary_address(creator_address):
+            raise InvalidAddress("Expected binary address format for creator in get_channel")
+
+        if not is_binary_address(partner_address):
+            raise InvalidAddress("Expected binary address format for partner in get_channel")
+
+        channel_list = self.get_channel_list(registry_address, token_address, creator_address, partner_address, channel_id_to_check)
+        assert len(channel_list) <= 1
+
+        if not channel_list:
+            raise ChannelNotFound(
+                "Channel with partner '{}' for token '{}' could not be found.".format(
+                    to_checksum_address(partner_address), to_checksum_address(token_address)
+                )
+            )
+
+        return channel_list[0]
+
+    def get_channel_for_light_client(
+        self,
+        registry_address: PaymentNetworkID,
+        token_address: TokenAddress,
+        creator_address: Address,
+        partner_address: Address,
     ) -> NettingChannelState:
         if not is_binary_address(token_address):
             raise InvalidAddress("Expected binary address format for token in get_channel")
@@ -760,7 +789,8 @@ class RaidenAPI:
             channel_close = ActionChannelClose(
                 canonical_identifier=channel_state.canonical_identifier,
                 signed_close_tx=signed_close_tx,
-                participant=partner_addresses[0]
+                participant1=channel_state.our_state.address,
+                participant2=channel_state.partner_state.address
             )
 
             greenlets.update(self.raiden.handle_state_change(channel_close))
@@ -836,6 +866,7 @@ class RaidenAPI:
         token_address: TokenAddress = None,
         creator_address: Address = None,
         partner_address: Address = None,
+        channel_id_to_check: ChannelID = None
     ) -> List[NettingChannelState]:
         """Returns a list of channels associated with the optionally given
            `token_address` and/or `partner_address`.
@@ -868,13 +899,24 @@ class RaidenAPI:
                 raise UnknownTokenAddress("Provided a partner address but no token address")
 
         if token_address and partner_address and creator_address:
-            channel_state = views.get_channelstate_for(
-                chain_state=views.state_from_raiden(self.raiden),
-                payment_network_id=registry_address,
-                token_address=token_address,
-                creator_address=creator_address,
-                partner_address=partner_address,
-            )
+
+            if channel_id_to_check is not None:
+                channel_state = views.get_channelstate_for_close_channel(
+                    chain_state=views.state_from_raiden(self.raiden),
+                    payment_network_id=registry_address,
+                    token_address=token_address,
+                    creator_address=creator_address,
+                    partner_address=partner_address,
+                    channel_id_to_check=channel_id_to_check
+                )
+            else:
+                channel_state = views.get_channelstate_for(
+                    chain_state=views.state_from_raiden(self.raiden),
+                    payment_network_id=registry_address,
+                    token_address=token_address,
+                    creator_address=creator_address,
+                    partner_address=partner_address
+                )
 
             if channel_state:
                 result = [channel_state]
@@ -1278,6 +1320,7 @@ class RaidenAPI:
                     token_address=token_address,
                     creator_address=self.address,
                     partner_address=partner_address,
+                    channel_id_to_check=None
                 )
                 channel_id = partner_channel.identifier
 

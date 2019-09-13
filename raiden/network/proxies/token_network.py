@@ -626,12 +626,13 @@ class TokenNetwork:
         if not self.client.can_query_state_for_block(block_identifier):
             raise NoStateForBlockIdentifier()
 
-        self._check_for_outdated_channel(
-            participant1=creator,
-            participant2=partner,
-            block_identifier=block_identifier,
-            channel_identifier=channel_identifier,
-        )
+        # First investigate why closed channels are not removed from the new channel data structure and then uncomment this @GASPAR MEDINA
+        # self._check_for_outdated_channel(
+        #     participant1=creator,
+        #     participant2=partner,
+        #     block_identifier=block_identifier,
+        #     channel_identifier=channel_identifier,
+        # )
 
         amount_to_deposit = total_deposit - previous_total_deposit
 
@@ -1135,6 +1136,7 @@ class TokenNetwork:
                 #     signature=signature,
                 # )
 
+                print("Sending signed_close_tx")
                 transaction_hash = self.proxy.broadcast_signed_transaction(signed_close_tx)
 
                 self.client.poll(transaction_hash)
@@ -1816,12 +1818,13 @@ class TokenNetwork:
         if not self.client.can_query_state_for_block(block_identifier):
             raise NoStateForBlockIdentifier()
 
-        self._check_for_outdated_channel(
-            participant1=self.node_address,
-            participant2=partner,
-            block_identifier=block_identifier,
-            channel_identifier=channel_identifier,
-        )
+        # First investigate why closed channels are not removed from the new channel data structure and then uncomment this @GASPAR MEDINA
+        # self._check_for_outdated_channel(
+        #     participant1=self.node_address,
+        #     participant2=partner,
+        #     block_identifier=block_identifier,
+        #     channel_identifier=channel_identifier,
+        # )
 
     def settle(
         self,
