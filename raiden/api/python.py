@@ -64,6 +64,7 @@ from raiden.utils import pex, typing
 from raiden.utils.gas_reserve import has_enough_gas_reserve
 from raiden.utils.typing import (
     Address,
+    AddressHex,
     Any,
     BlockSpecification,
     BlockTimeout,
@@ -843,7 +844,10 @@ class RaidenAPI:
         greenlets: Set[Greenlet] = set()
         for channel_state in channels_to_close:
             channel_close = ActionChannelClose(
-                canonical_identifier=channel_state.canonical_identifier
+                canonical_identifier=channel_state.canonical_identifier,
+                signed_close_tx=None,
+                participant1=channel_state.our_state.address,
+                participant2=channel_state.partner_state.address
             )
 
             greenlets.update(self.raiden.handle_state_change(channel_close))
@@ -858,6 +862,7 @@ class RaidenAPI:
             token_address=token_address,
             channel_ids=channel_ids,
             retry_timeout=retry_timeout,
+            partner_addresses=partner_addresses,
         )
 
     def get_channel_list(

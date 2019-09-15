@@ -1596,7 +1596,11 @@ class RestAPI:
             return api_error(errors=str(e), status_code=HTTPStatus.PAYMENT_REQUIRED)
 
         updated_channel_state = self.raiden_api.get_channel(
-            registry_address, channel_state.token_address, channel_state.partner_state.address, None
+            registry_address,
+            channel_state.token_address,
+            channel_state.our_state.address,
+            channel_state.partner_state.address,
+            channel_state.canonical_identifier.channel_identifier
         )
 
         result = self.channel_schema.dump(updated_channel_state)

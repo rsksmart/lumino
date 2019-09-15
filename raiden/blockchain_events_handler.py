@@ -296,7 +296,7 @@ def handle_channel_settled(raiden: "RaidenService", event: Event):
             token_network_address=token_network_identifier,
             channel_identifier=channel_identifier,
         ),
-        address=decode_hex(data['address']),
+        address=raiden.address,
     )
 
     # This may happen for two reasons:
@@ -349,7 +349,7 @@ def handle_channel_settled(raiden: "RaidenService", event: Event):
         our_onchain_locksroot=our_locksroot,
         partner_onchain_locksroot=partner_locksroot,
         block_number=block_number,
-        block_hash=block_hash,
+        block_hash=block_hash
     )
     raiden.handle_and_track_state_change(channel_settled)
 

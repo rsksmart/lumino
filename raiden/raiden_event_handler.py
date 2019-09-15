@@ -293,8 +293,7 @@ class RaidenEventHandler(EventHandler):
                 balance_hash=balance_hash,
                 additional_hash=message_hash,
                 signature=signature,
-                block_identifier=channel_close_event.triggered_by_block_hash,
-                signed_close_tx=channel_close_event.signed_close_tx)
+                block_identifier=channel_close_event.triggered_by_block_hash)
         else:
             channel_proxy.close_light(nonce=nonce,
                                       balance_hash=balance_hash,

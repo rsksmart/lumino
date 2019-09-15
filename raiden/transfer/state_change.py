@@ -610,7 +610,7 @@ class ContractReceiveChannelSettled(ContractReceiveStateChange):
         our_onchain_locksroot: Locksroot,
         partner_onchain_locksroot: Locksroot,
         block_number: BlockNumber,
-        block_hash: BlockHash,
+        block_hash: BlockHash
     ) -> None:
         super().__init__(transaction_hash, block_number, block_hash)
 
@@ -644,6 +644,7 @@ class ContractReceiveChannelSettled(ContractReceiveStateChange):
         return not self.__eq__(other)
 
     def to_dict(self) -> Dict[str, Any]:
+
         return {
             "transaction_hash": serialize_bytes(self.transaction_hash),
             "our_onchain_locksroot": serialize_bytes(self.our_onchain_locksroot),
@@ -655,6 +656,7 @@ class ContractReceiveChannelSettled(ContractReceiveStateChange):
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "ContractReceiveChannelSettled":
+
         return cls(
             transaction_hash=deserialize_transactionhash(data["transaction_hash"]),
             canonical_identifier=CanonicalIdentifier.from_dict(data["canonical_identifier"]),
