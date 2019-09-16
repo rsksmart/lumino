@@ -1545,11 +1545,7 @@ class RestAPI:
             channel_identifier=channel_state.identifier
         )
 
-        if channel.get_status(channel_state) != CHANNEL_STATE_OPENED:
-            return api_error(
-                errors="Attempted to close an already closed channel",
-                status_code=HTTPStatus.CONFLICT,
-            )
+        self.validate_channel_status(channel_state)
 
         try:
             self.raiden_api.channel_close_light(
@@ -1561,16 +1557,7 @@ class RestAPI:
         except InsufficientFunds as e:
             return api_error(errors=str(e), status_code=HTTPStatus.PAYMENT_REQUIRED)
 
-        updated_channel_state = self.raiden_api.get_channel(
-            registry_address,
-            channel_state.token_address,
-            channel_state.our_state.address,
-            channel_state.partner_state.address,
-            channel_state.canonical_identifier.channel_identifier
-        )
-
-        result = self.channel_schema.dump(updated_channel_state)
-        return api_response(result=result.data)
+        return self.update_channel_state(registry_address, channel_state)
 
     def _close(
         self, registry_address: typing.PaymentNetworkID, channel_state: NettingChannelState
@@ -1582,11 +1569,7 @@ class RestAPI:
             channel_identifier=channel_state.identifier,
         )
 
-        if channel.get_status(channel_state) != CHANNEL_STATE_OPENED:
-            return api_error(
-                errors="Attempted to close an already closed channel",
-                status_code=HTTPStatus.CONFLICT,
-            )
+        self.validate_channel_status(channel_state)
 
         try:
             self.raiden_api.channel_close(
@@ -1595,6 +1578,16 @@ class RestAPI:
         except InsufficientFunds as e:
             return api_error(errors=str(e), status_code=HTTPStatus.PAYMENT_REQUIRED)
 
+        return self.update_channel_state(registry_address, channel_state)
+
+    def validate_channel_status(self, channel_state):
+        if channel.get_status(channel_state) != CHANNEL_STATE_OPENED:
+            return api_error(
+                errors="Attempted to close an already closed channel",
+                status_code=HTTPStatus.CONFLICT,
+            )
+
+    def update_channel_state(self, registry_address, channel_state):
         updated_channel_state = self.raiden_api.get_channel(
             registry_address,
             channel_state.token_address,

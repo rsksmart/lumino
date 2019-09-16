@@ -92,3 +92,31 @@ class ChannelValidator:
                 )
             )
         return estimated_required_reserve
+
+    @staticmethod
+    def can_close_channel(token_address,
+                          partner_addresses,
+                          registry_address,
+                          raiden):
+
+        if not is_binary_address(token_address):
+            raise InvalidAddress("Expected binary address format for token in channel close")
+
+        if not all(map(is_binary_address, partner_addresses)):
+            raise InvalidAddress("Expected binary address format for partner in channel close")
+
+        valid_tokens = views.get_token_identifiers(
+            chain_state=views.state_from_raiden(raiden), payment_network_id=registry_address
+        )
+        if token_address not in valid_tokens:
+            raise UnknownTokenAddress("Token address is not known.")
+
+        chain_state = views.state_from_raiden(raiden)
+        channels_to_close = views.filter_channels_by_partneraddress(
+            chain_state=chain_state,
+            payment_network_id=registry_address,
+            token_address=token_address,
+            partner_addresses=partner_addresses,
+        )
+
+        return channels_to_close
