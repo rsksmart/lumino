@@ -1,7 +1,7 @@
 from raiden.messages import Message
 
 
-class LigthClientProtocolMessage:
+class LightClientProtocolMessage:
     """ Representation of light client message send or received. """
 
     def __init__(
@@ -11,9 +11,10 @@ class LigthClientProtocolMessage:
         light_client_payment_id: int,
         state_change_id: int = None,
         unsigned_message: Message = None,
-        signed_message: Message = None
+        signed_message: Message = None,
+        identifier: int = None
     ):
-        self.identifier = None
+        self.identifier = identifier
         self.is_signed = is_signed
         self.message_order = message_order
         self.unsigned_message = unsigned_message
@@ -21,12 +22,32 @@ class LigthClientProtocolMessage:
         self.state_change_id = state_change_id
         self.light_client_payment_id = light_client_payment_id
 
+    def to_dict(self):
+        signed_msg_dict = None
+        unsigned_msg_dict = None
+        if self.unsigned_message is not None:
+            unsigned_msg_dict = self.unsigned_message.to_dict()
+        if self.signed_message is not None:
+            signed_msg_dict = self.signed_message.to_dict()
+
+        result = {
+            "identifier": self.identifier,
+            "is_signed": self.is_signed,
+            "message_order": self.message_order,
+            "unsigned_message": unsigned_msg_dict,
+            "signed_message": signed_msg_dict,
+            "state_change_id": self.state_change_id,
+            "light_client_payment_id": self.light_client_payment_id
+        }
+
+        return result
+
 
 class DbLightClientProtocolMessage:
     """ Db representation of light client message """
     def __init__(
         self,
-        light_client_protocol_message: LigthClientProtocolMessage
+        light_client_protocol_message: LightClientProtocolMessage
     ):
         self.identifier = light_client_protocol_message.identifier
         self.message_order = light_client_protocol_message.message_order

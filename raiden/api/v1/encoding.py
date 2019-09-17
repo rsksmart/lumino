@@ -394,6 +394,9 @@ class PaymentLightPutSchema(BaseSchema):
 
 
 class PaymentLightGetSchema(BaseSchema):
+    payment_id = fields.Integer(required=True)
+    message_order = fields.Integer(required=True)
+
     class Meta:
         strict = True
         # decoding to a dict is required by the @use_kwargs decorator from webargs:

@@ -1,5 +1,5 @@
 from raiden.lightclient.lightclientmessages.light_client_payment import LightClientPayment
-from raiden.lightclient.lightclientmessages.light_client_protocol_message import LigthClientProtocolMessage, \
+from raiden.lightclient.lightclientmessages.light_client_protocol_message import LightClientProtocolMessage, \
     DbLightClientProtocolMessage
 from raiden.messages import Message
 from raiden.storage.wal import WriteAheadLog
@@ -7,20 +7,21 @@ from typing import List
 
 
 def build_light_client_protocol_message(message: Message, signed: bool, payment_id: int,
-                                        order: int) -> LigthClientProtocolMessage:
+                                        order: int) -> LightClientProtocolMessage:
     if signed:
         signed_msg = message
         unsigned_msg = None
     else:
         signed_msg = None
         unsigned_msg = message
-    return LigthClientProtocolMessage(
+    return LightClientProtocolMessage(
         signed,
         order,
         payment_id,
         None,
         unsigned_msg,
         signed_msg,
+        None
 
     )
 

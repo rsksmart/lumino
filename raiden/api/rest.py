@@ -4,7 +4,6 @@ import logging
 import socket
 
 from http import HTTPStatus
-from random import random
 from typing import Dict
 
 import gevent
@@ -21,14 +20,9 @@ from raiden_webui import RAIDEN_WEBUI_PATH
 from raiden.api.validations.api_error_builder import ApiErrorBuilder
 from raiden.api.validations.api_status_codes import ERROR_STATUS_CODES
 from raiden.api.validations.channel_validator import ChannelValidator
-from raiden.lightclient.light_client_message_handler import LightClientMessageHandler
-from raiden.lightclient.light_client_utils import LightClientUtils
-from raiden.lightclient.lightclientmessages.light_client_payment import LightClientPaymentStatus, LightClientPayment
+from raiden.lightclient.light_client_service import LightClientService
 from raiden.messages import LockedTransfer
 from raiden.rns_constants import RNS_ADDRESS_ZERO
-from raiden.transfer.mediated_transfer.events import SendLockedTransfer
-from raiden.transfer.mediated_transfer.initiator import get_initial_lock_expiration
-from raiden.transfer.mediated_transfer.state import LockedTransferUnsignedState
 from raiden.utils.rns import is_rns_address
 from webargs.flaskparser import parser
 from raiden.api.objects import DashboardGraphItem
@@ -83,9 +77,9 @@ from raiden.api.v1.resources import (
     PaymentInvoiceResource,
     ChannelsResourceLight,
     LightChannelsResourceByTokenAndPartnerAddress,
-    PaymentLightResource)
+    PaymentLightResource, PaymentLightResourceByPaymentAndOrder)
 
-from raiden.constants import GENESIS_BLOCK_NUMBER, UINT256_MAX, Environment, UINT64_MAX, EMPTY_PAYMENT_HASH_INVOICE
+from raiden.constants import GENESIS_BLOCK_NUMBER, UINT256_MAX, Environment
 
 from raiden.exceptions import (
     AddressWithoutCode,
@@ -117,16 +111,14 @@ from raiden.transfer.events import (
     EventPaymentSentFailed,
     EventPaymentSentSuccess,
 )
-from raiden.transfer.state import CHANNEL_STATE_CLOSED, CHANNEL_STATE_OPENED, NettingChannelState, \
-    message_identifier_from_prng
+from raiden.transfer.state import CHANNEL_STATE_CLOSED, CHANNEL_STATE_OPENED, NettingChannelState
 from raiden.utils import (
     create_default_identifier,
     optional_address_to_string,
     pex,
     sha3,
-    split_endpoint,
     typing,
-    TokenAddress, random_secret)
+    )
 from raiden.utils.runnable import Runnable
 
 from eth_utils import (
@@ -140,8 +132,7 @@ from raiden.billing.invoices.decoder.invoice_decoder import get_tags_dict, get_u
 from dateutil.relativedelta import relativedelta
 from raiden.billing.invoices.util.time_util import is_invoice_expired, UTC_FORMAT
 from raiden.billing.invoices.constants.errors import AUTO_PAY_INVOICE, INVOICE_EXPIRED, INVOICE_PAID
-from raiden.utils.typing import BlockExpiration, SecretHash, InitiatorAddress, TargetAddress, PaymentWithFeeAmount, \
-    MessageID, PaymentID
+
 
 log = structlog.get_logger(__name__)
 
@@ -169,6 +160,7 @@ URLS_V1 = [
         "token_target_paymentresource",
     ),
     ("/payments_light", PaymentLightResource),
+    ("/payments_light/<int:payment_id>/<int:message_order>", PaymentLightResourceByPaymentAndOrder),
 
     ("/tokens", TokensResource),
     ("/tokens/<hexaddress:token_address>/partners", PartnersResourceByTokenAddress),
@@ -1803,14 +1795,31 @@ class RestAPI:
 
         return api_response(invoice)
 
-    def get_light_client_protocol_message(self):
-        return api_response("Should get all the messages")
+    def get_light_client_protocol_message(self, payment_id, message_order):
+        headers = request.headers
+        api_key = headers.get("x-api-key")
+        if not api_key:
+            return ApiErrorBuilder.build_and_log_error(errors="Missing api_key auth header",
+                                                       status_code=HTTPStatus.BAD_REQUEST, log=log)
+
+        light_client = LightClientService.get_by_api_key(api_key, self.raiden_api.raiden.wal)
+        if not light_client:
+            return ApiErrorBuilder.build_and_log_error(
+                errors="There is no light client associated with the api key provided",
+                status_code=HTTPStatus.FORBIDDEN, log=log)
+
+        messages = LightClientService.get_light_client_messages(payment_id, message_order, self.raiden_api.raiden.wal)
+        response = [message.to_dict() for message in messages]
+        return api_response(response)
 
     def receive_light_client_protocol_message(self,
                                               message_id: int,
                                               message_order: int,
                                               message: Dict):
-      #  self.raiden_api.raiden.on_message({"fruta": 1})
+        # TODO check if message is coherent
+        # TODO call from dict will work but we need to validate each parameter in order to know if there are no extra or missing params.
+        # TODO we also need to check if message id an order received make sense
+        lt = LockedTransfer.from_dict(message)
         return api_response("Should save all the messages")
 
     def create_light_client_payment(
@@ -1821,9 +1830,22 @@ class RestAPI:
         token_address: typing.TokenAddress,
         amount: typing.TokenAmount
     ):
+        headers = request.headers
+        api_key = headers.get("x-api-key")
+        if not api_key:
+            return ApiErrorBuilder.build_and_log_error(errors="Missing api_key auth header",
+                                                       status_code=HTTPStatus.BAD_REQUEST, log=log)
+
+        light_client = LightClientService.get_by_api_key(api_key, self.raiden_api.raiden.wal)
+        if not light_client:
+            return ApiErrorBuilder.build_and_log_error(
+                errors="There is no light client associated with the api key provided",
+                status_code=HTTPStatus.FORBIDDEN, log=log)
         try:
             locked_transfer = self.raiden_api.create_light_client_payment(registry_address, creator_address,
                                                                           partner_address, token_address, amount)
             return api_response(locked_transfer.to_dict())
         except ChannelNotFound as e:
             return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.NOT_FOUND, log=log)
+        except UnhandledLightClient as e:
+            return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.FORBIDDEN, log=log)

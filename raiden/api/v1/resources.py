@@ -1,3 +1,4 @@
+import string
 from typing import Dict
 
 from flask import Blueprint
@@ -24,7 +25,6 @@ from raiden.api.v1.encoding import (
     ChannelLightPutSchema,
     ChannelLightPatchSchema,
     PaymentLightGetSchema, PaymentLightPutSchema, PaymentLightPostSchema)
-from raiden.lightclient.lightclientmessages.hub_message import HubMessage
 from raiden.utils import typing
 from raiden.constants import EMPTY_PAYMENT_HASH_INVOICE
 
@@ -269,17 +269,19 @@ class PaymentInvoiceResource(BaseResource):
         )
 
 
-class PaymentLightResource(BaseResource):
+class PaymentLightResourceByPaymentAndOrder(BaseResource):
     get_schema = PaymentLightGetSchema
+
+    def get(self, **kwargs):
+        """
+        this translates to 'get all the messages by payment id'
+        """
+        return self.rest_api.get_light_client_protocol_message(**kwargs)
+
+
+class PaymentLightResource(BaseResource):
     put_schema = PaymentLightPutSchema
     post_schema = PaymentLightPostSchema
-
-    @use_kwargs(get_schema, locations=('query',))
-    def get(self):
-        """
-        get the messages associated with a payment of a light client
-        """
-        return self.rest_api.get_light_client_protocol_message()
 
     @use_kwargs(put_schema, locations=("json",))
     def put(self,
