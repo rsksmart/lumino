@@ -25,7 +25,7 @@ from raiden.api.v1.encoding import (
     ChannelLightPutSchema,
     ChannelLightPatchSchema,
     PaymentLightGetSchema, PaymentLightPutSchema, PaymentLightPostSchema)
-from raiden.utils import typing
+from raiden.utils import typing, Secret
 from raiden.constants import EMPTY_PAYMENT_HASH_INVOICE
 
 
@@ -287,11 +287,12 @@ class PaymentLightResource(BaseResource):
     def put(self,
             message_id: int,
             message_order: int,
+            payment_secret: Secret,
             message: Dict):
         """
         put a signed message associated with a payment of a light client
         """
-        return self.rest_api.receive_light_client_protocol_message(message_id, message_order, message)
+        return self.rest_api.receive_light_client_protocol_message(message_id, message_order, payment_secret, message)
 
     @use_kwargs(post_schema, locations=("json",))
     def post(

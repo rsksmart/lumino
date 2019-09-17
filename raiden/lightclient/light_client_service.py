@@ -1,5 +1,6 @@
 from eth_utils.typing import ChecksumAddress
 
+from raiden.lightclient.lightclientmessages.light_client_payment import LightClientPayment
 from raiden.lightclient.lightclientmessages.light_client_protocol_message import DbLightClientProtocolMessage, \
     LightClientProtocolMessage
 from raiden.storage.wal import WriteAheadLog
@@ -42,3 +43,11 @@ class LightClientService:
                 LightClientProtocolMessage(message[0], message[1], message[2], message[3], message[4], message[5],
                                            message[6]))
         return result
+
+    @classmethod
+    def get_light_client_payment(cls, payment_id, wal: WriteAheadLog):
+        payment = wal.storage.get_light_client_payment(payment_id)
+        if payment:
+            payment = LightClientPayment(payment[1], payment[2], payment[3], payment[4], payment[5],
+                                      payment[6], payment[7], payment[8], payment[0])
+        return payment

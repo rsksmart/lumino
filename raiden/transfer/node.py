@@ -31,7 +31,7 @@ from raiden.transfer.mediated_transfer.state_change import (
     ReceiveSecretReveal,
     ReceiveTransferRefund,
     ReceiveTransferRefundCancelRoute,
-)
+    ActionInitInitiatorLight)
 from raiden.transfer.state import (
     ChainState,
     InitiatorTask,
@@ -864,6 +864,8 @@ def handle_state_change(
     elif type(state_change) == ReceiveLockExpired:
         assert isinstance(state_change, ReceiveLockExpired), MYPY_ANNOTATION
         iteration = handle_receive_lock_expired(chain_state, state_change)
+    elif type(state_change) == ActionInitInitiatorLight:
+        iteration = None
 
     assert chain_state is not None, "chain_state must be set"
     return iteration

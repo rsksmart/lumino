@@ -30,7 +30,7 @@ from raiden.exceptions import (
     PaymentConflict,
     RaidenRecoverableError,
     RaidenUnrecoverableError,
-)
+    InvalidPaymentIdentifier)
 from raiden.messages import (
     LockedTransfer,
     Message,
@@ -57,7 +57,7 @@ from raiden.transfer.mediated_transfer.state_change import (
     ActionInitInitiator,
     ActionInitMediator,
     ActionInitTarget,
-)
+    ActionInitInitiatorLight)
 from raiden.transfer.state import (
     BalanceProofSignedState,
     BalanceProofUnsignedState,
@@ -117,6 +117,48 @@ def _redact_secret(data: Union[Dict, List]) -> Union[Dict, List]:
             stack.extend(value for value in current.values() if isinstance(value, dict))
 
     return data
+
+# TODO this method should receive a signed locked transfer type, not a LockedTransfer
+def initiator_init_light(
+    raiden: "RaidenService",
+    transfer_identifier: PaymentID,
+    payment_hash_invoice: PaymentHashInvoice,
+    transfer_amount: PaymentAmount,
+    transfer_secret: Secret,
+    transfer_secrethash: SecretHash,
+    transfer_fee: FeeAmount,
+    token_network_identifier: TokenNetworkID,
+    target_address: TargetAddress,
+    creator_address: InitiatorAddress,
+    signed_locked_transfer: LockedTransfer
+) -> ActionInitInitiatorLight:
+    assert transfer_secret != constants.EMPTY_HASH, f"Empty secret node:{raiden!r}"
+
+    transfer_state = TransferDescriptionWithSecretState(
+        payment_network_identifier=raiden.default_registry.address,
+        payment_identifier=transfer_identifier,
+        payment_hash_invoice=payment_hash_invoice,
+        amount=transfer_amount,
+        allocated_fee=transfer_fee,
+        token_network_identifier=token_network_identifier,
+        initiator=InitiatorAddress(creator_address),
+        target=target_address,
+        secret=transfer_secret,
+        secrethash=transfer_secrethash,
+    )
+    previous_address = None
+    routes, _ = routing.get_best_routes(
+        chain_state=views.state_from_raiden(raiden),
+        token_network_id=token_network_identifier,
+        one_to_n_address=raiden.default_one_to_n_address,
+        from_address=InitiatorAddress(creator_address),
+        to_address=target_address,
+        amount=transfer_amount,
+        previous_address=previous_address,
+        config=raiden.config,
+        privkey=raiden.privkey,
+    )
+    return ActionInitInitiatorLight(transfer_state, routes, signed_locked_transfer)
 
 
 def initiator_init(
@@ -1036,6 +1078,47 @@ class RaidenService(Runnable):
 
         return manager
 
+    def mediated_transfer_async_light(
+        self,
+        token_network_identifier: TokenNetworkID,
+        amount: PaymentAmount,
+        creator: InitiatorAddress,
+        target: TargetAddress,
+        identifier: PaymentID,
+        secret: Secret,
+        secrethash: SecretHash,
+        signed_locked_transfer: LockedTransfer,
+        fee: FeeAmount = MEDIATION_FEE,
+        payment_hash_invoice: PaymentHashInvoice = None
+    ) -> PaymentStatus:
+        """ Transfer `amount` between this node and `target`.
+
+        This method will start an asynchronous transfer, the transfer might fail
+        or succeed depending on a couple of factors:
+
+            - Existence of a path that can be used, through the usage of direct
+              or intermediary channels.
+            - Network speed, making the transfer sufficiently fast so it doesn't
+              expire.
+        """
+        if secret is None:
+            raise InvalidSecret("There is no secret present")
+
+        payment_status = self.start_mediated_transfer_with_secret_light(
+            token_network_identifier=token_network_identifier,
+            amount=amount,
+            fee=fee,
+            creator=creator,
+            target=target,
+            identifier=identifier,
+            secret=secret,
+            secrethash=secrethash,
+            payment_hash_invoice=payment_hash_invoice,
+            signed_locked_transfer=signed_locked_transfer
+        )
+
+        return None
+
     def mediated_transfer_async(
         self,
         token_network_identifier: TokenNetworkID,
@@ -1073,6 +1156,90 @@ class RaidenService(Runnable):
             secrethash=secrethash,
             payment_hash_invoice=payment_hash_invoice
         )
+
+        return payment_status
+
+    def start_mediated_transfer_with_secret_light(
+        self,
+        token_network_identifier: TokenNetworkID,
+        amount: PaymentAmount,
+        fee: FeeAmount,
+        creator: InitiatorAddress,
+        target: TargetAddress,
+        identifier: PaymentID,
+        secret: Secret,
+        secrethash: SecretHash ,
+        signed_locked_transfer: LockedTransfer,
+        payment_hash_invoice: PaymentHashInvoice = None
+
+    ) -> PaymentStatus:
+
+        if secrethash is None:
+            raise InvalidSecretHash("Secrethash wasnt provided.")
+        elif secrethash != sha3(secret):
+            raise InvalidSecretHash("Provided secret and secret_hash do not match.")
+
+        if len(secret) != SECRET_LENGTH:
+            raise InvalidSecret("secret of invalid length.")
+
+        # We must check if the secret was registered against the latest block,
+        # even if the block is forked away and the transaction that registers
+        # the secret is removed from the blockchain. The rationale here is that
+        # someone else does know the secret, regardless of the chain state, so
+        # the node must not use it to start a payment.
+        #
+        # For this particular case, it's preferable to use `latest` instead of
+        # having a specific block_hash, because it's preferable to know if the secret
+        # was ever known, rather than having a consistent view of the blockchain.
+        secret_registered = self.default_secret_registry.is_secret_registered(
+            secrethash=secrethash, block_identifier="latest"
+        )
+        if secret_registered:
+            raise RaidenUnrecoverableError(
+                f"Attempted to initiate a locked transfer with secrethash {pex(secrethash)}."
+                f" That secret is already registered onchain."
+            )
+
+        self.start_health_check_for(Address(target))
+
+        if identifier is None:
+            raise InvalidPaymentIdentifier("Payment identifier wasnt provided")
+
+        with self.payment_identifier_lock:
+            payment_status = self.targets_to_identifiers_to_statuses[target].get(identifier)
+            if payment_status:
+                payment_status_matches = payment_status.matches(token_network_identifier, amount)
+                if not payment_status_matches:
+                    raise PaymentConflict("Another payment with the same id is in flight")
+
+                return payment_status
+
+            payment_status = PaymentStatus(
+                payment_identifier=identifier,
+                payment_hash_invoice=payment_hash_invoice,
+                amount=amount,
+                token_network_identifier=token_network_identifier,
+                payment_done=AsyncResult(),
+            )
+            self.targets_to_identifiers_to_statuses[target][identifier] = payment_status
+
+        init_initiator_statechange_light = initiator_init_light(
+            raiden=self,
+            transfer_identifier=identifier,
+            payment_hash_invoice=payment_hash_invoice,
+            transfer_amount=amount,
+            transfer_secret=secret,
+            transfer_secrethash=secrethash,
+            transfer_fee=fee,
+            token_network_identifier=token_network_identifier,
+            creator_address = creator,
+            target_address=target,
+            signed_locked_transfer=signed_locked_transfer
+        )
+
+        # Dispatch the state change even if there are no routes to create the
+        # wal entry.
+        self.handle_and_track_state_change(init_initiator_statechange_light)
 
         return payment_status
 

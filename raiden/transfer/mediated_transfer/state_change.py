@@ -2,6 +2,7 @@
 
 from eth_utils import to_canonical_address, to_checksum_address
 
+from raiden.encoding.messages import LockedTransfer
 from raiden.transfer.architecture import (
     AuthenticatedSenderStateChange,
     BalanceProofStateChange,
@@ -26,6 +27,7 @@ from raiden.utils.typing import (
     Secret,
     SecretHash,
 )
+
 
 # Note: The init states must contain all the required data for trying doing
 # useful work, ie. there must /not/ be an event for requesting new data.
@@ -66,6 +68,46 @@ class ActionInitInitiator(StateChange):
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "ActionInitInitiator":
+        return cls(transfer_description=data["transfer"], routes=data["routes"])
+
+
+class ActionInitInitiatorLight(StateChange):
+    """ Initial state of a new mediated transfer.
+
+    Args:
+        transfer_description: A state object containing the transfer light details.
+        routes: A list of possible routes provided by a routing service.
+    """
+
+    def __init__(
+        self, transfer_description: TransferDescriptionWithSecretState, routes: List[RouteState],
+        signed_locked_transfer: LockedTransfer
+    ) -> None:
+        if not isinstance(transfer_description, TransferDescriptionWithSecretState):
+            raise ValueError("transfer must be an TransferDescriptionWithSecretState instance.")
+
+        self.transfer = transfer_description
+        self.routes = routes
+        self.signed_locked_transfer = signed_locked_transfer
+
+    def __repr__(self) -> str:
+        return "<ActionInitInitiatorLight transfer:{}>".format(self.transfer)
+
+    def __eq__(self, other: Any) -> bool:
+        return (
+            isinstance(other, ActionInitInitiatorLight)
+            and self.transfer == other.transfer
+            and self.routes == other.routes
+        )
+
+    def __ne__(self, other: Any) -> bool:
+        return not self.__eq__(other)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {"transfer": self.transfer, "routes": self.routes}
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "ActionInitInitiatorLight":
         return cls(transfer_description=data["transfer"], routes=data["routes"])
 
 
