@@ -74,7 +74,8 @@ from raiden.api.v1.resources import (
     InvoiceResource,
     PaymentInvoiceResource,
     ChannelsResourceLight,
-    LightChannelsResourceByTokenAndPartnerAddress)
+    LightChannelsResourceByTokenAndPartnerAddress,
+    LightRegisterResource)
 
 from raiden.constants import GENESIS_BLOCK_NUMBER, UINT256_MAX, Environment
 
@@ -130,6 +131,20 @@ from raiden.billing.invoices.decoder.invoice_decoder import get_tags_dict, get_u
 from dateutil.relativedelta import relativedelta
 from raiden.billing.invoices.util.time_util import is_invoice_expired, UTC_FORMAT
 from raiden.billing.invoices.constants.errors import AUTO_PAY_INVOICE, INVOICE_EXPIRED, INVOICE_PAID
+
+from raiden.settings import (
+    DEFAULT_MATRIX_KNOWN_SERVERS
+)
+
+from raiden.utils.cli import get_matrix_servers
+
+from raiden.network.transport.matrix.utils import (
+    make_client
+)
+
+from urllib.parse import urlparse
+
+
 
 log = structlog.get_logger(__name__)
 
@@ -213,6 +228,10 @@ URLS_V1 = [
     (
         '/invoice',
         InvoiceResource,
+    ),
+    (
+        '/light_channels/register',
+        LightRegisterResource,
     ),
 
 ]
@@ -1789,3 +1808,12 @@ class RestAPI:
         invoice = self.raiden_api.create_invoice(data)
 
         return api_response(invoice)
+
+    def get_approval_for_registration_request(self, address):
+        # fetch list of known servers from raiden-network/raiden-tranport repo
+        available_servers_url = DEFAULT_MATRIX_KNOWN_SERVERS[self.raiden_api.raiden.config["environment_type"]]
+        available_servers = get_matrix_servers(available_servers_url)
+        client = make_client(available_servers)
+        server_url = client.api.base_url
+        server_name = urlparse(server_url).netloc
+        return api_response({"to_sign": server_name})

@@ -20,7 +20,8 @@ from raiden.api.v1.encoding import (
     InvoiceCreateSchema,
     PaymentInvoiceSchema,
     ChannelLightPutSchema,
-    ChannelLightPatchSchema
+    ChannelLightPatchSchema,
+    RequestRegisterLightGetSchema
 )
 from raiden.utils import typing
 from raiden.constants import EMPTY_PAYMENT_HASH_INVOICE
@@ -327,7 +328,7 @@ class PendingTransfersResourceByTokenAndPartnerAddress(BaseResource):
     def get(self, token_address, partner_address):
         return self.rest_api.get_pending_transfers(token_address, partner_address)
 
-      
+
 class DashboardResource(BaseResource):
     get_schema = DashboardLuminoSchema()
     @use_kwargs(get_schema, locations=('query',))
@@ -345,7 +346,7 @@ class DashboardResource(BaseResource):
             table_limit=table_limit
         )
 
-    
+
 class PaymentResourceLumino(BaseResource):
 
     get_schema = RaidenEventsRequestSchemaV2()
@@ -438,4 +439,17 @@ class InvoiceResource(BaseResource):
             amount=amount,
             description=description,
             expires=expires
+        )
+
+
+class LightRegisterResource(BaseResource):
+    get_schema = RequestRegisterLightGetSchema
+
+    @use_kwargs(get_schema, locations=('query',))
+    def get(self, address: typing.ByteString = None):
+        """
+        This method receives a registration request.
+        """
+        return self.rest_api.get_approval_for_registration_request(
+            address
         )

@@ -379,6 +379,15 @@ class ChannelLuminoGetSchema(BaseSchema):
         decoding_class = dict
 
 
+class RequestRegisterLightGetSchema(BaseSchema):
+    address = AddressField(required=True)
+
+    class Meta:
+        strict = True
+        # decoding to a dict is required by the @use_kwargs decorator from webargs:
+        decoding_class = dict
+
+
 class ChannelPatchSchema(BaseSchema):
     total_deposit = fields.Integer(default=None, missing=None)
     state = fields.String(
