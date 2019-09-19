@@ -270,7 +270,7 @@ def get_channelstate_for(
 
 
 def get_channelstate_by_token_network_and_partner(
-    chain_state: ChainState, token_network_id: TokenNetworkID, partner_address: Address
+    chain_state: ChainState, token_network_id: TokenNetworkID, creator_address: Address, partner_address: Address
 ) -> Optional[NettingChannelState]:
     """ Return the NettingChannelState if it exists, None otherwise. """
     token_network = get_token_network_by_identifier(chain_state, token_network_id)
@@ -279,8 +279,8 @@ def get_channelstate_by_token_network_and_partner(
     if token_network:
         channels = []
         for channel_id in token_network.partneraddresses_to_channelidentifiers[partner_address]:
-            if token_network.channelidentifiers_to_channels[chain_state.our_address].get(channel_id) is not None:
-                channels.append(token_network.channelidentifiers_to_channels[chain_state.our_address][channel_id])
+            if token_network.channelidentifiers_to_channels[creator_address].get(channel_id) is not None:
+                channels.append(token_network.channelidentifiers_to_channels[creator_address][channel_id])
 
         states = filter_channels_by_status(channels, [CHANNEL_STATE_UNUSABLE])
         # If multiple channel states are found, return the last one.

@@ -680,6 +680,18 @@ def handle_init_initiator(
     )
 
 
+def handle_init_initiator_light(
+    chain_state: ChainState, state_change: ActionInitInitiatorLight
+) -> TransitionResult[ChainState]:
+    transfer = state_change.transfer
+    secrethash = transfer.secrethash
+
+    return subdispatch_initiatortask(
+        chain_state, state_change, transfer.token_network_identifier, secrethash
+    )
+
+
+
 def handle_init_mediator(
     chain_state: ChainState, state_change: ActionInitMediator
 ) -> TransitionResult[ChainState]:
@@ -865,7 +877,7 @@ def handle_state_change(
         assert isinstance(state_change, ReceiveLockExpired), MYPY_ANNOTATION
         iteration = handle_receive_lock_expired(chain_state, state_change)
     elif type(state_change) == ActionInitInitiatorLight:
-        iteration = None
+        iteration = handle_init_initiator_light(chain_state, state_change)
 
     assert chain_state is not None, "chain_state must be set"
     return iteration

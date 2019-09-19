@@ -98,17 +98,18 @@ class ActionInitInitiatorLight(StateChange):
             isinstance(other, ActionInitInitiatorLight)
             and self.transfer == other.transfer
             and self.routes == other.routes
+            and self.signed_locked_transfer == other.signed_locked_transfer
         )
 
     def __ne__(self, other: Any) -> bool:
         return not self.__eq__(other)
 
     def to_dict(self) -> Dict[str, Any]:
-        return {"transfer": self.transfer, "routes": self.routes}
+        return {"transfer": self.transfer, "routes": self.routes, "signed_locked_transfer": self.signed_locked_transfer}
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "ActionInitInitiatorLight":
-        return cls(transfer_description=data["transfer"], routes=data["routes"])
+        return cls(transfer_description=data["transfer"], routes=data["routes"], signed_locked_transfer=data["signed_locked_transfer"])
 
 
 class ActionInitMediator(BalanceProofStateChange):

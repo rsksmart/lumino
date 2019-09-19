@@ -29,7 +29,7 @@ from raiden.transfer.mediated_transfer.events import (
     SendRefundTransfer,
     SendSecretRequest,
     SendSecretReveal,
-)
+    SendLockedTransferLight)
 from raiden.transfer.state import BalanceProofSignedState, NettingChannelState
 from raiden.transfer.utils import hash_balance_data
 from raiden.utils import ishash, pex, sha3
@@ -172,6 +172,9 @@ def message_from_sendevent(send_event: SendMessageEvent) -> "Message":
     if type(send_event) == SendLockedTransfer:
         assert isinstance(send_event, SendLockedTransfer), MYPY_ANNOTATION
         message = LockedTransfer.from_event(send_event)
+    elif type(send_event) == SendLockedTransferLight:
+        assert isinstance(send_event, SendLockedTransferLight), MYPY_ANNOTATION
+        # TODO mamrtinez this doesnt makes sense for now since we receive the message directly from the LC. Evaluate.
     elif type(send_event) == SendSecretReveal:
         assert isinstance(send_event, SendSecretReveal), MYPY_ANNOTATION
         message = RevealSecret.from_event(send_event)

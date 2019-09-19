@@ -74,6 +74,7 @@ from raiden.utils.typing import (
     Union,
     cast,
 )
+
 log = structlog.get_logger(__name__)
 
 _RoomID = NewType("_RoomID", str)
@@ -274,7 +275,7 @@ class MatrixTransport(Runnable):
     _room_sep = "_"
     log = log
 
-    def __init__(self, config: dict, lc : bool):
+    def __init__(self, config: dict, lc: bool):
         super().__init__()
         self._config = config
         self._raiden_service: Optional[RaidenService] = None
@@ -364,7 +365,7 @@ class MatrixTransport(Runnable):
             signer=self._raiden_service.signer,
             prev_user_id=prev_user_id,
             prev_access_token=prev_access_token,
-            lc = self._lc
+            lc=self._lc
         )
         self.log = log.bind(current_user=self._user_id, node=pex(self._raiden_service.address))
 
@@ -637,8 +638,8 @@ class MatrixTransport(Runnable):
             event
             for event in state["events"]
             if event["type"] == "m.room.member"
-            and event["content"].get("membership") == "invite"
-            and event["state_key"] == self._user_id
+               and event["content"].get("membership") == "invite"
+               and event["state_key"] == self._user_id
         ]
         if not invite_events:
             self.log.debug("Invite: no invite event found", room_id=room_id)
@@ -650,8 +651,8 @@ class MatrixTransport(Runnable):
             event
             for event in state["events"]
             if event["type"] == "m.room.member"
-            and event["content"].get("membership") == "join"
-            and event["state_key"] == sender
+               and event["content"].get("membership") == "join"
+               and event["state_key"] == sender
         ]
         if not sender_join_events:
             self.log.debug("Invite: no sender join event", room_id=room_id)
@@ -726,18 +727,18 @@ class MatrixTransport(Runnable):
         """ Handle text messages sent to listening rooms """
         log.info("_handle_message. Is LC?: " + str(self._lc))
         if self._lc:
-            #TODO mmartinez fixme this should be moved to event handler probably
-            sender_id = event["sender"]
-            user = self._get_user(sender_id)
-            peer_address = validate_userid_signature(user)
-            can_store = True
-            try:
-                messages = validate_and_parse_message(event["content"]["body"], peer_address)
-            except TypeError:
-                print("Invoice error?")
-                can_store = False
-            if can_store:
-                LightClientMessageHandler.store_light_client_protocol_messages(messages, self._raiden_service.wal)
+            # TODO mmartinez fixme this should be moved to event handler probably
+            # sender_id = event["sender"]
+            # user = self._get_user(sender_id)
+            # peer_address = validate_userid_signature(user)
+            # can_store = True
+            # try:
+            #     messages = validate_and_parse_message(event["content"]["body"], peer_address)
+            # except TypeError:
+            #     print("Invoice error?")
+            #     can_store = False
+            # if can_store:
+            #     LightClientMessageHandler.store_light_client_protocol_messages(messages, self._raiden_service.wal)
             return False
         if (
             event["type"] != "m.room.message"
@@ -852,7 +853,7 @@ class MatrixTransport(Runnable):
         self._raiden_service.on_message(delivered)
 
     def _receive_message(self, message: Union[SignedRetrieableMessage, Processed]):
-        print("---- Matrix Received Message "+str(message))
+        print("---- Matrix Received Message " + str(message))
         assert self._raiden_service is not None
         self.log.debug(
             "Message received",
@@ -909,7 +910,7 @@ class MatrixTransport(Runnable):
         self.log.debug(
             "Send raw", receiver=pex(receiver_address), room=room, data=data.replace("\n", "\\n")
         )
-        print("---- Matrix Send Message "+data)
+        print("---- Matrix Send Message " + data)
 
         room.send_text(data)
 
