@@ -143,9 +143,7 @@ def get_best_routes_internal(
     except networkx.NetworkXError:
         # If `our_address` is not in the graph, no channels opened with the
         # address
-        #return list()
-        all_neighbors = ["0x09fcbe7cEb49c944703b4820e29b0541eDfE7E82"]
-
+        return list()
     for partner_address in all_neighbors:
         # don't send the message backwards
         if partner_address == previous_address:

@@ -727,7 +727,7 @@ class MatrixTransport(Runnable):
         """ Handle text messages sent to listening rooms """
         log.info("_handle_message. Is LC?: " + str(self._lc))
         if self._lc:
-            # TODO mmartinez fixme this should be moved to event handler probably
+            # TODO mmartinez fixme this should be moved to event handler probably and for receivement
             # sender_id = event["sender"]
             # user = self._get_user(sender_id)
             # peer_address = validate_userid_signature(user)
