@@ -28,11 +28,13 @@ def test_initiator_task_view():
     """
     channel_id = factories.UNIT_CHANNEL_ID
     secret = factories.make_secret()
-    transfer = factories.create(factories.LockedTransferUnsignedStateProperties(secret=secret))
+    payment_hash_invoice = factories.make_payment_hash_invoice()
+    transfer = factories.create(factories.LockedTransferUnsignedStateProperties(secret=secret, payment_hash_invoice=payment_hash_invoice))
     secrethash = transfer.lock.secrethash
     transfer_description = TransferDescriptionWithSecretState(
         payment_network_identifier=factories.UNIT_PAYMENT_NETWORK_IDENTIFIER,
         payment_identifier=transfer.payment_identifier,
+        payment_hash_invoice=transfer.payment_hash_invoice,
         amount=transfer.balance_proof.locked_amount,
         allocated_fee=0,
         token_network_identifier=factories.UNIT_TOKEN_NETWORK_ADDRESS,

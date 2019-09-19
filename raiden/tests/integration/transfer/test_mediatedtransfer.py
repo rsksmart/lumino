@@ -19,6 +19,7 @@ from raiden.transfer.state_change import ActionChannelSetFee
 from raiden.utils import sha3
 from raiden.utils.typing import TokenAmount
 from raiden.waiting import wait_for_block
+from raiden.constants import EMPTY_PAYMENT_HASH_INVOICE
 
 
 @pytest.mark.parametrize("channels_per_node", [CHAIN])
@@ -132,6 +133,7 @@ def run_test_locked_transfer_secret_registered_onchain(
             fee=0,
             target=target,
             identifier=identifier,
+            payment_hash_invoice=EMPTY_PAYMENT_HASH_INVOICE,
             secret=transfer_secret,
         )
 
@@ -281,6 +283,7 @@ def run_test_mediated_transfer_messages_out_of_order(
         fee=0,
         target=app2.raiden.address,
         identifier=identifier,
+        payment_hash_invoice=EMPTY_PAYMENT_HASH_INVOICE,
         secret=secret,
     )
 
@@ -351,6 +354,7 @@ def run_test_mediated_transfer_calls_pfs(raiden_network, token_addresses):
             fee=0,
             target=factories.HOP1,
             identifier=1,
+            payment_hash_invoice=EMPTY_PAYMENT_HASH_INVOICE,
             secret=b"1" * 32,
         )
         assert not patched.called
@@ -367,6 +371,7 @@ def run_test_mediated_transfer_calls_pfs(raiden_network, token_addresses):
                 fee=0,
                 target=factories.HOP2,
                 identifier=2,
+                payment_hash_invoice=EMPTY_PAYMENT_HASH_INVOICE,
                 secret=b"2" * 32,
             )
             assert patched.call_count == 1
@@ -583,6 +588,7 @@ def run_test_mediated_transfer_with_node_consuming_more_than_allocated_fee(
         fee=fee,
         target=app2.raiden.address,
         identifier=1,
+        payment_hash_invoice=EMPTY_PAYMENT_HASH_INVOICE,
         secret=secret,
     )
 

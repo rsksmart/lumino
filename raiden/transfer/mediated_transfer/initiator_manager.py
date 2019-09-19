@@ -284,7 +284,7 @@ def handle_transferrefundcancelroute(
     if not is_valid_lock or not is_valid_refund:
         return TransitionResult(payment_state, list())
 
-    is_valid, channel_events, _ = channel.handle_receive_refundtransfercancelroute(
+    is_valid, channel_events, _, _ = channel.handle_receive_refundtransfercancelroute(
         channel_state, refund_transfer
     )
 
@@ -300,6 +300,7 @@ def handle_transferrefundcancelroute(
     transfer_description = TransferDescriptionWithSecretState(
         payment_network_identifier=old_description.payment_network_identifier,
         payment_identifier=old_description.payment_identifier,
+        payment_hash_invoice=old_description.payment_hash_invoice,
         amount=old_description.amount,
         token_network_identifier=old_description.token_network_identifier,
         allocated_fee=old_description.allocated_fee,

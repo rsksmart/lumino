@@ -1190,7 +1190,9 @@ class LockedTransfer(LockedTransferBase):
         packed.message_identifier = self.message_identifier
         packed.payment_identifier = self.payment_identifier
 
-        if hasattr(self, 'payment_hash_invoice') and self.payment_hash_invoice is not None:
+        if hasattr(self, 'payment_hash_invoice') and \
+            self.payment_hash_invoice is not None and \
+            hasattr(packed, 'payment_hash_invoice'):
             packed.payment_hash_invoice = self.payment_hash_invoice
 
         packed.nonce = self.nonce
@@ -1318,6 +1320,7 @@ class RefundTransfer(LockedTransfer):
             chain_id=packed.chain_id,
             message_identifier=packed.message_identifier,
             payment_identifier=packed.payment_identifier,
+            payment_hash_invoice=EMPTY_PAYMENT_HASH_INVOICE,
             nonce=packed.nonce,
             token_network_address=packed.token_network_address,
             token=packed.token,
@@ -1349,6 +1352,7 @@ class RefundTransfer(LockedTransfer):
             chain_id=balance_proof.chain_id,
             message_identifier=event.message_identifier,
             payment_identifier=transfer.payment_identifier,
+            payment_hash_invoice=EMPTY_PAYMENT_HASH_INVOICE,
             nonce=balance_proof.nonce,
             token_network_address=balance_proof.token_network_identifier,
             token=transfer.token,
@@ -1369,6 +1373,7 @@ class RefundTransfer(LockedTransfer):
             "chain_id": self.chain_id,
             "message_identifier": self.message_identifier,
             "payment_identifier": self.payment_identifier,
+            "payment_hash_invoice" : self.payment_hash_invoice,
             "nonce": self.nonce,
             "token_network_address": to_normalized_address(self.token_network_address),
             "token": to_normalized_address(self.token),
@@ -1390,6 +1395,7 @@ class RefundTransfer(LockedTransfer):
             chain_id=data["chain_id"],
             message_identifier=data["message_identifier"],
             payment_identifier=data["payment_identifier"],
+            payment_hash_invoice=data["payment_hash_invoice"],
             nonce=data["nonce"],
             token_network_address=to_canonical_address(data["token_network_address"]),
             token=to_canonical_address(data["token"]),

@@ -872,8 +872,10 @@ class RaidenService(Runnable):
                 target = transfer.target
                 identifier = transfer.payment_identifier
                 balance_proof = transfer.balance_proof
+                payment_hash_invoice = transfer.payment_hash_invoice
                 self.targets_to_identifiers_to_statuses[target][identifier] = PaymentStatus(
                     payment_identifier=identifier,
+                    payment_hash_invoice=payment_hash_invoice,
                     amount=transfer_description.amount,
                     token_network_identifier=TokenNetworkID(
                         balance_proof.token_network_identifier

@@ -51,6 +51,6 @@ def test_is_transaction_effect_satisfied(chain_state, token_network_id, netting_
         block_hash=make_block_hash(),
     )
 
-    iteration = state_transition(chain_state=chain_state, state_change=channel_settled)
+    iteration = state_transition(chain_state=chain_state, state_change=channel_settled, storage=None)
 
     assert is_transaction_effect_satisfied(iteration.new_state, transaction, state_change)
