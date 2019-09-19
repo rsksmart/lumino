@@ -467,6 +467,16 @@ class InvoiceCreateSchema(BaseSchema):
         decoding_class = dict
 
 
+class LightClientSchema(BaseSchema):
+    user = AddressField(required=True)
+    password = fields.String(required=True, missing=None)
+
+    class Meta:
+        strict = True
+        # decoding to a dict is required by the @use_kwargs decorator from webargs
+        decoding_class = dict
+
+
 class TokenActionRequestSchema(BaseSchema):
     token = fields.String(missing=None)
 

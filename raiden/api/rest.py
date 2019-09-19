@@ -75,7 +75,8 @@ from raiden.api.v1.resources import (
     PaymentInvoiceResource,
     ChannelsResourceLight,
     LightChannelsResourceByTokenAndPartnerAddress,
-    LightRegisterResource)
+    LightClientMatrixServerRequestResource,
+    LightClientResource)
 
 from raiden.constants import GENESIS_BLOCK_NUMBER, UINT256_MAX, Environment
 
@@ -230,8 +231,8 @@ URLS_V1 = [
         InvoiceResource,
     ),
     (
-        '/light_channels/register',
-        LightRegisterResource,
+        '/light_clients/matrix/servers',
+        LightClientMatrixServerRequestResource,
     ),
 
 ]
@@ -1809,7 +1810,7 @@ class RestAPI:
 
         return api_response(invoice)
 
-    def get_approval_for_registration_request(self, address):
+    def get_data_for_registration_request(self):
         # fetch list of known servers from raiden-network/raiden-tranport repo
         available_servers_url = DEFAULT_MATRIX_KNOWN_SERVERS[self.raiden_api.raiden.config["environment_type"]]
         available_servers = get_matrix_servers(available_servers_url)
@@ -1817,3 +1818,6 @@ class RestAPI:
         server_url = client.api.base_url
         server_name = urlparse(server_url).netloc
         return api_response({"to_sign": server_name})
+
+    def register_light_client(self, user, password):
+        print("")

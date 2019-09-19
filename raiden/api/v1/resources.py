@@ -21,7 +21,7 @@ from raiden.api.v1.encoding import (
     PaymentInvoiceSchema,
     ChannelLightPutSchema,
     ChannelLightPatchSchema,
-    RequestRegisterLightGetSchema
+    LightClientSchema
 )
 from raiden.utils import typing
 from raiden.constants import EMPTY_PAYMENT_HASH_INVOICE
@@ -442,14 +442,26 @@ class InvoiceResource(BaseResource):
         )
 
 
-class LightRegisterResource(BaseResource):
-    get_schema = RequestRegisterLightGetSchema
+class LightClientMatrixServerRequestResource(BaseResource):
 
-    @use_kwargs(get_schema, locations=('query',))
-    def get(self, address: typing.ByteString = None):
+    def get(self):
         """
         This method receives a registration request.
         """
-        return self.rest_api.get_approval_for_registration_request(
-            address
+        return self.rest_api.get_data_for_registration_request()
+
+
+class LightClientResource(BaseResource):
+    post_schema = LightClientSchema()
+
+    @use_kwargs(post_schema, locations=("json",))
+    def post(
+        self,
+        user: typing.Address = None,
+        password: typing.ByteString = None,
+    ):
+        return self.rest_api.register_light_client(
+            user=user,
+            password=password
         )
+
