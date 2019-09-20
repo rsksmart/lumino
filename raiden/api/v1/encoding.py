@@ -468,8 +468,9 @@ class InvoiceCreateSchema(BaseSchema):
 
 
 class LightClientSchema(BaseSchema):
-    user = AddressField(required=True)
-    password = fields.String(required=True, missing=None)
+    address = AddressField(required=True)
+    signed_data = fields.String(required=True)
+    data = fields.String(required=True)
 
     class Meta:
         strict = True

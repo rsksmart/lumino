@@ -4,6 +4,8 @@ from gevent import Greenlet
 import random
 import string
 import hashlib
+from binascii import hexlify
+import os
 import dateutil.parser
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
@@ -102,6 +104,19 @@ EVENTS_PAYMENT_HISTORY_RELATED = (
     EventPaymentSentFailed,
     EventPaymentReceivedSuccess,
 )
+
+from raiden.settings import (
+    DEFAULT_MATRIX_KNOWN_SERVERS
+)
+
+from raiden.utils.cli import get_matrix_servers
+
+from raiden.network.transport.matrix.utils import (
+    make_client
+)
+
+from urllib.parse import urlparse
+from cryptography.fernet import Fernet
 
 
 def event_filter_for_payments(
@@ -1426,3 +1441,32 @@ class RaidenAPI:
                 node_addresses.append(to_checksum_address("0x" + address.hex()))
 
         return node_addresses
+
+    def get_data_for_registration_request(self):
+        # fetch list of known servers from raiden-network/raiden-tranport repo
+        available_servers_url = DEFAULT_MATRIX_KNOWN_SERVERS[self.raiden_api.raiden.config["environment_type"]]
+        available_servers = get_matrix_servers(available_servers_url)
+        client = make_client(available_servers)
+        server_url = client.api.base_url
+        server_name = urlparse(server_url).netloc
+        data_to_sign = {"to_sign": server_name}
+        return data_to_sign
+
+    def register_light_client(self, address, signed_data):
+
+        light_client = self.raiden.wal.storage.get_light_client(address)
+
+        if light_client is None:
+
+            api_key = hexlify(os.urandom(20))
+            api_key = api_key.decode("utf-8")
+            result = self.raiden.wal.storage.save_light_client(api_key, address, signed_data)
+            if result > 0:
+                result = {"api_key": api_key,
+                          "message": "successfully registered"}
+            else:
+                result = {"message": "An unexpected error has occurred."}
+        else:
+            result = {"message": "The client you are trying to register has already registered."}
+
+        return result

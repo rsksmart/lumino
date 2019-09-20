@@ -457,11 +457,13 @@ class LightClientResource(BaseResource):
     @use_kwargs(post_schema, locations=("json",))
     def post(
         self,
-        user: typing.Address = None,
-        password: typing.ByteString = None,
+        address: typing.Address = None,
+        signed_data: typing.ByteString = None,
+        data: typing.ByteString = None
     ):
         return self.rest_api.register_light_client(
-            user=user,
-            password=password
+            address=address,
+            signed_data=signed_data,
+            data=data
         )
 

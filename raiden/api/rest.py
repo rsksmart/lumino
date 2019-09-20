@@ -122,7 +122,8 @@ from raiden.utils import (
 from raiden.utils.runnable import Runnable
 
 from eth_utils import (
-    to_canonical_address
+    to_canonical_address,
+    to_normalized_address
 )
 
 from raiden.billing.invoices.constants.invoice_type import InvoiceType
@@ -133,19 +134,7 @@ from dateutil.relativedelta import relativedelta
 from raiden.billing.invoices.util.time_util import is_invoice_expired, UTC_FORMAT
 from raiden.billing.invoices.constants.errors import AUTO_PAY_INVOICE, INVOICE_EXPIRED, INVOICE_PAID
 
-from raiden.settings import (
-    DEFAULT_MATRIX_KNOWN_SERVERS
-)
-
-from raiden.utils.cli import get_matrix_servers
-
-from raiden.network.transport.matrix.utils import (
-    make_client
-)
-
-from urllib.parse import urlparse
-
-
+from raiden.utils.signer import recover
 
 log = structlog.get_logger(__name__)
 
@@ -233,6 +222,10 @@ URLS_V1 = [
     (
         '/light_clients/matrix/servers',
         LightClientMatrixServerRequestResource,
+    ),
+    (
+        '/light_clients/',
+        LightClientResource
     ),
 
 ]
@@ -1811,13 +1804,22 @@ class RestAPI:
         return api_response(invoice)
 
     def get_data_for_registration_request(self):
-        # fetch list of known servers from raiden-network/raiden-tranport repo
-        available_servers_url = DEFAULT_MATRIX_KNOWN_SERVERS[self.raiden_api.raiden.config["environment_type"]]
-        available_servers = get_matrix_servers(available_servers_url)
-        client = make_client(available_servers)
-        server_url = client.api.base_url
-        server_name = urlparse(server_url).netloc
-        return api_response({"to_sign": server_name})
+        data_to_sign = self.raiden_api.get_data_for_registration_request()
+        return api_response(data_to_sign)
 
-    def register_light_client(self, user, password):
-        print("")
+    def register_light_client(self, address, signed_data, data):
+        # Recover lighclient address from data and signature
+        address_recovered = recover(data=data.encode(), signature=decode_hex(signed_data))
+
+        if address_recovered != address:
+            return api_error(
+                errors="The signed data provided is not valid.",
+                status_code=HTTPStatus.CONFLICT,
+            )
+
+
+
+
+        light_client = self.raiden_api.register_light_client(to_normalized_address(address), signed_data)
+
+        return api_response(light_client)

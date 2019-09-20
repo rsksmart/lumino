@@ -11,7 +11,7 @@ from raiden.storage.utils import DB_SCRIPT_CREATE_TABLES, TimestampedEvent, DB_U
 from raiden.utils import get_system_spec
 from raiden.utils.typing import Any, Dict, Iterator, List, NamedTuple, Optional, Tuple, Union
 from dateutil.relativedelta import relativedelta
-
+from raiden.lightclient.client_model import ClientType
 
 
 class EventRecord(NamedTuple):
@@ -276,6 +276,49 @@ class SQLiteStorage:
                             "token_address": invoice[11]}
 
         return invoice_dict
+
+    def get_light_client(self, address):
+        cursor = self.conn.cursor()
+
+        cursor.execute(
+            """
+            SELECT 
+                address,
+                password,
+                api_key,
+                type
+            FROM client WHERE address = ?;
+            """,
+            (address,)
+        )
+
+        light_client = cursor.fetchone()
+        light_client_dict = None
+        if light_client is not None:
+            light_client_dict = {"address": light_client[0],
+                            "password": light_client[1],
+                            "api_key": light_client[2],
+                            "type": light_client[3]}
+
+        return light_client_dict
+
+    def save_light_client(self, api_key, address, signed_data):
+        with self.write_lock, self.conn:
+            cursor = self.conn.execute(
+                "INSERT INTO client("
+                "address, "
+                "password, "
+                "api_key, "                               
+                "type)"
+                "VALUES(?, ?, ?, ?)",
+                (address,
+                 signed_data,
+                 api_key,
+                 ClientType.LIGHT.value,),
+            )
+            last_id = cursor.lastrowid
+
+        return last_id
 
     def query_token_action(self, token):
         cursor = self.conn.cursor()
