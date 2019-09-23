@@ -11,7 +11,7 @@ from raiden.transfer.architecture import (
 from raiden.transfer.mediated_transfer.state import (
     LockedTransferSignedState,
     TransferDescriptionWithSecretState,
-)
+    TransferDescriptionWithoutSecretState)
 from raiden.transfer.state import BalanceProofSignedState, RouteState
 from raiden.utils import pex, sha3
 from raiden.utils.serialization import deserialize_bytes, serialize_bytes
@@ -80,11 +80,11 @@ class ActionInitInitiatorLight(StateChange):
     """
 
     def __init__(
-        self, transfer_description: TransferDescriptionWithSecretState, routes: List[RouteState],
+        self, transfer_description: TransferDescriptionWithoutSecretState, routes: List[RouteState],
         signed_locked_transfer: LockedTransfer
     ) -> None:
-        if not isinstance(transfer_description, TransferDescriptionWithSecretState):
-            raise ValueError("transfer must be an TransferDescriptionWithSecretState instance.")
+        if not isinstance(transfer_description, TransferDescriptionWithoutSecretState):
+            raise ValueError("transfer must be an TransferDescriptionWithoutSecretState instance.")
 
         self.transfer = transfer_description
         self.routes = routes

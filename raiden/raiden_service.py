@@ -52,7 +52,7 @@ from raiden.transfer.mediated_transfer.events import SendLockedTransfer
 from raiden.transfer.mediated_transfer.state import (
     TransferDescriptionWithSecretState,
     lockedtransfersigned_from_message,
-)
+    TransferDescriptionWithoutSecretState)
 from raiden.transfer.mediated_transfer.state_change import (
     ActionInitInitiator,
     ActionInitMediator,
@@ -124,7 +124,6 @@ def initiator_init_light(
     transfer_identifier: PaymentID,
     payment_hash_invoice: PaymentHashInvoice,
     transfer_amount: PaymentAmount,
-    transfer_secret: Secret,
     transfer_secrethash: SecretHash,
     transfer_fee: FeeAmount,
     token_network_identifier: TokenNetworkID,
@@ -132,9 +131,8 @@ def initiator_init_light(
     creator_address: InitiatorAddress,
     signed_locked_transfer: LockedTransfer
 ) -> ActionInitInitiatorLight:
-    assert transfer_secret != constants.EMPTY_HASH, f"Empty secret node:{raiden!r}"
 
-    transfer_state = TransferDescriptionWithSecretState(
+    transfer_state = TransferDescriptionWithoutSecretState(
         payment_network_identifier=raiden.default_registry.address,
         payment_identifier=transfer_identifier,
         payment_hash_invoice=payment_hash_invoice,
@@ -143,7 +141,6 @@ def initiator_init_light(
         token_network_identifier=token_network_identifier,
         initiator=InitiatorAddress(creator_address),
         target=target_address,
-        secret=transfer_secret,
         secrethash=transfer_secrethash,
     )
     previous_address = None
@@ -1087,7 +1084,6 @@ class RaidenService(Runnable):
         creator: InitiatorAddress,
         target: TargetAddress,
         identifier: PaymentID,
-        secret: Secret,
         secrethash: SecretHash,
         signed_locked_transfer: LockedTransfer,
         fee: FeeAmount = MEDIATION_FEE,
@@ -1103,8 +1099,6 @@ class RaidenService(Runnable):
             - Network speed, making the transfer sufficiently fast so it doesn't
               expire.
         """
-        if secret is None:
-            raise InvalidSecret("There is no secret present")
 
         payment_status = self.start_mediated_transfer_with_secret_light(
             token_network_identifier=token_network_identifier,
@@ -1113,7 +1107,6 @@ class RaidenService(Runnable):
             creator=creator,
             target=target,
             identifier=identifier,
-            secret=secret,
             secrethash=secrethash,
             payment_hash_invoice=payment_hash_invoice,
             signed_locked_transfer=signed_locked_transfer
@@ -1169,7 +1162,6 @@ class RaidenService(Runnable):
         creator: InitiatorAddress,
         target: TargetAddress,
         identifier: PaymentID,
-        secret: Secret,
         secrethash: SecretHash ,
         signed_locked_transfer: LockedTransfer,
         payment_hash_invoice: PaymentHashInvoice = None
@@ -1178,11 +1170,6 @@ class RaidenService(Runnable):
 
         if secrethash is None:
             raise InvalidSecretHash("Secrethash wasnt provided.")
-        elif secrethash != sha3(secret):
-            raise InvalidSecretHash("Provided secret and secret_hash do not match.")
-
-        if len(secret) != SECRET_LENGTH:
-            raise InvalidSecret("secret of invalid length.")
 
         # We must check if the secret was registered against the latest block,
         # even if the block is forked away and the transaction that registers
@@ -1230,7 +1217,6 @@ class RaidenService(Runnable):
             transfer_identifier=identifier,
             payment_hash_invoice=payment_hash_invoice,
             transfer_amount=amount,
-            transfer_secret=secret,
             transfer_secrethash=secrethash,
             transfer_fee=fee,
             token_network_identifier=token_network_identifier,

@@ -988,7 +988,6 @@ class RaidenAPI:
         creator: Address,
         target: Address,
         identifier: PaymentID,
-        secret: Secret,
         secrethash: SecretHash,
         signed_locked_transfer: LockedTransfer,
         payment_hash_invoice: PaymentHashInvoice = None
@@ -1020,9 +1019,6 @@ class RaidenAPI:
         if token_address not in valid_tokens:
             raise UnknownTokenAddress("Token address is not known.")
 
-        if secret is not None and not isinstance(secret, typing.T_Secret):
-            raise InvalidSecret("secret is not valid.")
-
         if secrethash is not None and not isinstance(secrethash, typing.T_SecretHash):
             raise InvalidSecretHash("secrethash is not valid.")
 
@@ -1047,7 +1043,6 @@ class RaidenAPI:
             creator=creator,
             target=target,
             identifier=identifier,
-            secret=secret,
             secrethash=secrethash,
             payment_hash_invoice=payment_hash_invoice,
             signed_locked_transfer=signed_locked_transfer

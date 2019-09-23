@@ -287,12 +287,11 @@ class PaymentLightResource(BaseResource):
     def put(self,
             message_id: int,
             message_order: int,
-            payment_secret: Secret,
             message: Dict):
         """
         put a signed message associated with a payment of a light client
         """
-        return self.rest_api.receive_light_client_protocol_message(message_id, message_order, payment_secret, message)
+        return self.rest_api.receive_light_client_protocol_message(message_id, message_order, message)
 
     @use_kwargs(post_schema, locations=("json",))
     def post(

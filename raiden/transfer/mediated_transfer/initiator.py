@@ -19,7 +19,7 @@ from raiden.transfer.mediated_transfer.events import (
 from raiden.transfer.mediated_transfer.state import (
     InitiatorTransferState,
     TransferDescriptionWithSecretState,
-    LockedTransferUnsignedState)
+    LockedTransferUnsignedState, TransferDescriptionWithoutSecretState)
 from raiden.transfer.mediated_transfer.state_change import (
     ReceiveSecretRequest,
     ReceiveSecretReveal,
@@ -220,7 +220,7 @@ def next_channel_from_routes(
 def try_new_route_light(
     channelidentifiers_to_channels: ChannelMap,
     available_routes: List[RouteState],
-    transfer_description: TransferDescriptionWithSecretState,
+    transfer_description: TransferDescriptionWithoutSecretState,
     signed_locked_transfer: LockedTransfer
 ) -> TransitionResult[InitiatorTransferState]:
     channel_state = next_channel_from_routes(

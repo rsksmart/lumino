@@ -385,7 +385,6 @@ class PaymentLightPostSchema(BaseSchema):
 class PaymentLightPutSchema(BaseSchema):
     message_id = fields.Integer(required=True)
     message_order = fields.Integer(required=True)
-    payment_secret = SecretField(required=True)
     message = fields.Dict(required=True)
 
     class Meta:

@@ -1449,7 +1449,6 @@ class RestAPI:
         amount: typing.TokenAmount,
         payment_identifier: typing.PaymentID,
         message_identifier: typing.PaymentID,
-        secret: typing.Secret,
         secret_hash: typing.SecretHash,
         payment_hash_invoice: typing.PaymentHashInvoice,
         signed_locked_transfer: LockedTransfer
@@ -1462,7 +1461,6 @@ class RestAPI:
             target_address=target_address,
             amount=amount,
             payment_identifier=payment_identifier,
-            secret=secret,
             secret_hash=secret_hash,
         )
 
@@ -1480,7 +1478,6 @@ class RestAPI:
                 target=target_address,
                 amount=amount,
                 identifier=payment_identifier,
-                secret=secret,
                 secrethash=secret_hash,
                 payment_hash_invoice=payment_hash_invoice,
                 signed_locked_transfer=signed_locked_transfer
@@ -1488,7 +1485,6 @@ class RestAPI:
         except (
             InvalidAmount,
             InvalidAddress,
-            InvalidSecret,
             InvalidSecretHash,
             PaymentConflict,
             UnknownTokenAddress,
@@ -1896,7 +1892,6 @@ class RestAPI:
     def receive_light_client_protocol_message(self,
                                               message_id: int,
                                               message_order: int,
-                                              payment_secret: Secret,
                                               message: Dict):
         # TODO check if message is coherent
         # TODO call from dict will work but we need to validate each parameter in order to know if there are no extra or missing params.
@@ -1906,9 +1901,8 @@ class RestAPI:
 
         lt = LockedTransfer.from_dict(message)
         payment_request = LightClientService.get_light_client_payment(message_id, self.raiden_api.raiden.wal)
-        secret = payment_request.payment_secret
         self.initiate_payment_light(self.raiden_api.raiden.default_registry.address, lt.token, lt.initiator,
-                                    lt.target, lt.locked_amount, lt.payment_identifier, payment_request.identifier, secret, lt.lock.secrethash,
+                                    lt.target, lt.locked_amount, lt.payment_identifier, payment_request.payment_id, lt.lock.secrethash,
                                     EMPTY_PAYMENT_HASH_INVOICE, lt)
 
         return api_response("Should save all the messages")
