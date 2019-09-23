@@ -1902,11 +1902,13 @@ class RestAPI:
         # TODO call from dict will work but we need to validate each parameter in order to know if there are no extra or missing params.
         # TODO we also need to check if message id an order received make sense
 
+        #FIXME Should take the secret from the message receivend from LC
+
         lt = LockedTransfer.from_dict(message)
         payment_request = LightClientService.get_light_client_payment(message_id, self.raiden_api.raiden.wal)
         secret = payment_request.payment_secret
         self.initiate_payment_light(self.raiden_api.raiden.default_registry.address, lt.token, lt.initiator,
-                                    lt.target, lt.locked_amount, lt.payment_identifier, PaymentID(1), secret, lt.lock.secrethash,
+                                    lt.target, lt.locked_amount, lt.payment_identifier, payment_request.identifier, secret, lt.lock.secrethash,
                                     EMPTY_PAYMENT_HASH_INVOICE, lt)
 
         return api_response("Should save all the messages")

@@ -67,7 +67,7 @@ def random_payment_hash_invoice() -> PaymentHashInvoice:
 
 
 def ishash(data: bytes) -> bool:
-    return isinstance(data, bytes) and len(data) == 32
+    return isinstance(data, bytes) and len(data) == 32 or data is Secret(b"")
 
 
 def address_checksum_and_decode(addr: str) -> Address:

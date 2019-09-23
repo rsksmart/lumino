@@ -1093,7 +1093,7 @@ def create_sendlockedtransfer(
     payment_identifier: PaymentID,
     payment_hash_invoice: PaymentHashInvoice,
     expiration: BlockExpiration,
-    secrethash: SecretHash,
+    secrethash: SecretHash ,
 ) -> Tuple[SendLockedTransfer, MerkleTreeState]:
     our_state = channel_state.our_state
     partner_state = channel_state.partner_state

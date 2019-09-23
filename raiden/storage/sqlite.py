@@ -158,7 +158,6 @@ class SQLiteStorage:
             cursor = self.conn.execute(
                 "INSERT INTO light_client_payment("
                 "payment_id, "
-                "payment_secret,"
                 "light_client_address, "
                 "partner_address, "
                 "is_lc_initiator, "
@@ -166,9 +165,8 @@ class SQLiteStorage:
                 "amount, "
                 "created_on, "
                 "payment_status "
-                ") VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                ") VALUES(?, ?, ?, ?, ?,  ?, ?, ?)",
                 (light_client_payment.payment_id,
-                 light_client_payment.payment_secret,
                  to_checksum_address(light_client_payment.light_client_address),
                  light_client_payment.partner_address,
                  light_client_payment.is_lc_initiator,
@@ -1176,7 +1174,7 @@ class SQLiteStorage:
         cursor = self.conn.cursor()
         cursor.execute(
             """
-            SELECT payment_id, payment_secret, light_client_address, partner_address, is_lc_initiator,
+            SELECT payment_id, light_client_address, partner_address, is_lc_initiator,
             token_network_id, amount, created_on, payment_status
             FROM light_client_payment
             WHERE payment_id = ?

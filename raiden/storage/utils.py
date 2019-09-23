@@ -97,7 +97,6 @@ CREATE TABLE IF NOT EXISTS client (
 DB_CREATE_LIGHT_CLIENT_PAYMENT = """
 CREATE TABLE IF NOT EXISTS light_client_payment(
     payment_id INTEGER PRIMARY KEY AUTOINCREMENT,
-    payment_secret TEXT NOT NULL, 
     light_client_address TEXT NOT NULL,
     partner_address TEXT NOT NULL, 
     is_lc_initiator INTEGER DEFAULT 1,

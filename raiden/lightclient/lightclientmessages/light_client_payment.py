@@ -18,7 +18,6 @@ class LightClientPayment:
 
     def __init__(
         self,
-        payment_secret: Secret,
         light_client_address: AddressHex,
         partner_address: AddressHex,
         is_lc_initiator: int,
@@ -30,7 +29,6 @@ class LightClientPayment:
 
     ):
         self.payment_id = identifier
-        self.payment_secret = payment_secret
         self.light_client_address = light_client_address
         self.partner_address = partner_address
         self.is_lc_initiator = is_lc_initiator
