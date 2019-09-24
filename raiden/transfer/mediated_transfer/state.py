@@ -41,7 +41,7 @@ from raiden.utils.typing import (
     TargetAddress,
     TokenAddress,
     TokenNetworkID,
-)
+    Union)
 
 if TYPE_CHECKING:
     # pylint: disable=unused-import
@@ -130,7 +130,7 @@ class InitiatorTransferState(State):
 
     def __init__(
         self,
-        transfer_description,
+        transfer_description: Union["TransferDescriptionWithSecretState", "TransferDescriptionWithoutSecretState"],
         channel_identifier: ChannelID,
         transfer: "LockedTransferUnsignedState",
         revealsecret: Optional["SendSecretReveal"],

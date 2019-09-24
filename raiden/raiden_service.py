@@ -1100,7 +1100,7 @@ class RaidenService(Runnable):
               expire.
         """
 
-        payment_status = self.start_mediated_transfer_with_secret_light(
+        payment_status = self.start_mediated_transfer_without_secret_light(
             token_network_identifier=token_network_identifier,
             amount=amount,
             fee=fee,
@@ -1154,7 +1154,7 @@ class RaidenService(Runnable):
 
         return payment_status
 
-    def start_mediated_transfer_with_secret_light(
+    def start_mediated_transfer_without_secret_light(
         self,
         token_network_identifier: TokenNetworkID,
         amount: PaymentAmount,
@@ -1220,7 +1220,7 @@ class RaidenService(Runnable):
             transfer_secrethash=secrethash,
             transfer_fee=fee,
             token_network_identifier=token_network_identifier,
-            creator_address = creator,
+            creator_address=creator,
             target_address=target,
             signed_locked_transfer=signed_locked_transfer
         )
