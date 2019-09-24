@@ -12,6 +12,9 @@ from dateutil.relativedelta import relativedelta
 from eth_utils import is_binary_address, to_checksum_address, to_canonical_address, to_normalized_address, decode_hex, \
     encode_hex
 
+from ecies import encrypt, decrypt
+from ecies.utils import generate_eth_key, generate_key
+
 import raiden.blockchain.events as blockchain_events
 from raiden import waiting
 from raiden.api.validations.channel_validator import ChannelValidator
@@ -1444,7 +1447,7 @@ class RaidenAPI:
 
     def get_data_for_registration_request(self):
         # fetch list of known servers from raiden-network/raiden-tranport repo
-        available_servers_url = DEFAULT_MATRIX_KNOWN_SERVERS[self.raiden_api.raiden.config["environment_type"]]
+        available_servers_url = DEFAULT_MATRIX_KNOWN_SERVERS[self.raiden.config["environment_type"]]
         available_servers = get_matrix_servers(available_servers_url)
         client = make_client(available_servers)
         server_url = client.api.base_url
@@ -1460,7 +1463,11 @@ class RaidenAPI:
 
             api_key = hexlify(os.urandom(20))
             api_key = api_key.decode("utf-8")
-            result = self.raiden.wal.storage.save_light_client(api_key, address, signed_data)
+
+            pubhex = self.raiden.config["pubkey"].hex()
+            encrypt_data = encrypt(pubhex, signed_data.encode())
+
+            result = self.raiden.wal.storage.save_light_client(api_key, address, encrypt_data.hex())
             if result > 0:
                 result = {"api_key": api_key,
                           "message": "successfully registered"}

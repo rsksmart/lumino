@@ -1817,9 +1817,6 @@ class RestAPI:
                 status_code=HTTPStatus.CONFLICT,
             )
 
-
-
-
         light_client = self.raiden_api.register_light_client(to_normalized_address(address), signed_data)
 
         return api_response(light_client)

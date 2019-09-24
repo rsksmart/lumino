@@ -43,12 +43,13 @@ def unlock_account_with_passwordfile(
 
 def unlock_account_with_passwordprompt(
     account_manager: AccountManager, address_hex: AddressHex
-) -> PrivateKey:
+) :
     tries = 3
     for current in range(tries):
         try:
             password = getpass.getpass(f"Enter the password to unlock {address_hex}: ")
-            return account_manager.get_privkey(address_hex, password)
+            #return account_manager.get_privkey(address_hex, password)
+            return account_manager.get_privkey_and_pubkey(address_hex, password)
         except ValueError:
             print(
                 f"Incorrect passphrase to unlock the private key. "

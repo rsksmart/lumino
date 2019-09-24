@@ -302,7 +302,7 @@ class SQLiteStorage:
 
         return light_client_dict
 
-    def save_light_client(self, api_key, address, signed_data):
+    def save_light_client(self, api_key, address, encrypt_signed_data):
         with self.write_lock, self.conn:
             cursor = self.conn.execute(
                 "INSERT INTO client("
@@ -312,7 +312,7 @@ class SQLiteStorage:
                 "type)"
                 "VALUES(?, ?, ?, ?)",
                 (address,
-                 signed_data,
+                 encrypt_signed_data,
                  api_key,
                  ClientType.LIGHT.value,),
             )

@@ -124,11 +124,11 @@ def get_account_and_private_key(
             account_manager=account_manager, address_hex=address_hex, password_file=password_file
         )
     else:
-        privatekey_bin = unlock_account_with_passwordprompt(
+        privatekey_bin, pubkey_bin = unlock_account_with_passwordprompt(
             account_manager=account_manager, address_hex=address_hex
         )
 
-    return to_canonical_address(address_hex), privatekey_bin
+    return to_canonical_address(address_hex), privatekey_bin, pubkey_bin
 
 
 def rpc_normalized_endpoint(eth_rpc_endpoint: str) -> str:
@@ -192,13 +192,15 @@ def run_app(
     check_ethereum_client_is_supported(web3)
     check_ethereum_network_id(network_id, web3)
 
-    (address, privatekey_bin) = get_account_and_private_key(
+    (address, privatekey_bin, pubkey_bin) = get_account_and_private_key(
         account_manager, address, password_file
     )
 
     (listen_host, listen_port) = split_endpoint(listen_address)
     (api_host, api_port) = split_endpoint(api_address)
 
+    config["pubkey"] = pubkey_bin
+    config["privatekey"] = privatekey_bin
     config["transport"]["udp"]["host"] = listen_host
     config["transport"]["udp"]["port"] = listen_port
     config["console"] = console
