@@ -515,7 +515,12 @@ class RaidenService(Runnable):
         # - Send pending transactions
         # - Send pending message
         self.alarm.link_exception(self.on_error)
-        self.transport[0].link_exception(self.on_error)
+
+        self.transport.hub_transport.link_exception(self.on_error)
+
+        for light_client_transport in self.transport.light_client_transports:
+            light_client_transport.link_exception(self.on_error)
+
         self._start_transport(chain_state)
         self._start_alarm_task()
 
@@ -603,17 +608,21 @@ class RaidenService(Runnable):
         assert self.alarm.is_primed(), f"AlarmTask not primed. node:{self!r}"
         assert self.ready_to_process_events, f"Event procossing disable. node:{self!r}"
 
-        self.transport[0].start(
+
+        # Start hub transport
+        self.transport.hub_transport.start(
             raiden_service=self,
             message_handler=self.message_handler,
             prev_auth_data=chain_state.last_transport_authdata,
         )
 
-        self.transport[1].start(
-            raiden_service=self,
-            message_handler=self.message_handler,
-            prev_auth_data=chain_state.last_transport_authdata,
-        )
+        # Start lightclient transports
+        for light_client_transport in self.transport.light_client_transports:
+            light_client_transport.start(
+                raiden_service=self,
+                message_handler=self.message_handler,
+                prev_auth_data=chain_state.last_transport_authdata,
+            )
 
         for neighbour in views.all_neighbour_nodes(chain_state):
             if neighbour != ConnectionManager.BOOTSTRAP_ADDR:

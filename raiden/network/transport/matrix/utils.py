@@ -319,10 +319,10 @@ def join_global_room(client: GMatrixClient, name: str, servers: Sequence[str] = 
 
 
 def login_or_register(
-    client: GMatrixClient, signer: Signer, lc: bool, prev_user_id: str = None, prev_access_token: str = None,
+    client: GMatrixClient, signer: Signer, prev_user_id: str = None, prev_access_token: str = None,
 ) -> User:
 
-    print("----- calling TRANSPORT MATRIX UTILS LOGIN OR REGISTER. LC? "+str(lc))
+    print("----- calling TRANSPORT MATRIX UTILS LOGIN OR REGISTER. LC? ")
     """Login to a Raiden matrix server with password and displayname proof-of-keys
 
     - Username is in the format: 0x<eth_address>(.<suffix>)?, where the suffix is not required,
@@ -345,8 +345,7 @@ def login_or_register(
     server_name = urlparse(server_url).netloc
 
     base_username = to_normalized_address(signer.address)
-    if lc:
-        base_username = "0x09fcbe7ceb49c944703b4820e29b0541edfe7e82"
+
     _match_user = False
     if _match_user:  # same user as before
         assert prev_user_id is not None
@@ -377,8 +376,6 @@ def login_or_register(
 
     # password is signed server address
     password = encode_hex(signer.sign(server_name.encode()))
-    if lc:
-        password = '0x51ed5c180b2854f1efe019051203317c74c47ca6618e8dc0b3f3d5f9520acd5b3385291b6ef05eb5bf24838e606cca06b9ccf90dd50baebc1878b1dec55dddce1c'
     rand = None
     # try login and register on first 5 possible accounts
     for i in range(JOIN_RETRIES):

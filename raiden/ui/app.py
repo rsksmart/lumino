@@ -11,6 +11,7 @@ from web3 import HTTPProvider, Web3
 from definitions import ROOT_DIR
 import json
 from eth_utils import encode_hex
+from raiden.storage import serialize, sqlite
 
 from raiden.accounts import AccountManager
 from raiden.constants import (
@@ -25,6 +26,7 @@ from raiden.message_handler import MessageHandler
 from raiden.network.blockchain_service import BlockChainService
 from raiden.network.rpc.client import JSONRPCClient
 from raiden.network.transport import MatrixTransport
+from raiden.network.transport.matrix import MatrixLightClientTransport, NodeTransport
 from raiden.raiden_event_handler import RaidenEventHandler
 from raiden.settings import (
     DEFAULT_MATRIX_KNOWN_SERVERS,
@@ -78,14 +80,28 @@ def _setup_matrix(config):
 
     try:
 
-        transport = MatrixTransport(config["transport"]["matrix"], False)
-        transport2 = MatrixTransport(config["transport"]["matrix"], True)
+        database_path = config["database_path"]
+        storage = sqlite.SerializedSQLiteStorage(
+            database_path=database_path, serializer=serialize.JSONSerializer()
+        )
+
+        light_clients = storage.get_all_light_clients()
+
+        light_client_transports = []
+        for light_client in light_clients:
+            light_client_transport = MatrixLightClientTransport(config["transport"]["matrix"],
+                                                                light_client['password'])
+            light_client_transports.append(light_client_transport)
+
+        hub_transport = MatrixTransport(config["transport"]["matrix"])
+
+        node_transport = NodeTransport(hub_transport, light_client_transports)
 
     except RaidenError as ex:
         click.secho(f"FATAL: {ex}", fg="red")
         sys.exit(1)
 
-    return [transport, transport2]
+    return node_transport
 
 
 def _setup_web3(eth_rpc_endpoint):

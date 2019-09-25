@@ -356,6 +356,8 @@ class MatrixTransport(Runnable):
         else:
             prev_user_id = prev_access_token = None
 
+        print("CHAUUUUUUUUUUUUUUUUUUU")
+
         self._login_or_register(
             prev_user_id=prev_user_id,
             prev_access_token=prev_access_token,

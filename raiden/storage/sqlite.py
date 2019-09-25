@@ -277,6 +277,38 @@ class SQLiteStorage:
 
         return invoice_dict
 
+    def get_all_light_clients(self):
+        cursor = self.conn.cursor()
+
+        cursor.execute(
+            """
+            SELECT 
+                address,
+                password,
+                api_key,
+                type
+            FROM client;
+            """,
+            ()
+        )
+
+        light_clients = cursor.fetchall()
+
+        light_clients = self.light_clients_to_list_of_dicts(light_clients)
+
+        return light_clients
+
+    def light_clients_to_list_of_dicts(self, light_clients):
+        list_of_dicts = []
+        for light_client in light_clients:
+            light_client_dict = {"address": light_client[0],
+                                 "password": light_client[1],
+                                 "api_key": light_client[2],
+                                 "type": light_client[3]}
+            list_of_dicts.append(light_client_dict)
+
+        return list_of_dicts
+
     def get_light_client(self, address):
         cursor = self.conn.cursor()
 

@@ -274,11 +274,10 @@ class MatrixTransport(Runnable):
     _room_sep = "_"
     log = log
 
-    def __init__(self, config: dict, lc : bool):
+    def __init__(self, config: dict):
         super().__init__()
         self._config = config
         self._raiden_service: Optional[RaidenService] = None
-        self._lc = lc
         if config["server"] == "auto":
             available_servers = config["available_servers"]
         elif urlparse(config["server"]).scheme in {"http", "https"}:
@@ -359,12 +358,13 @@ class MatrixTransport(Runnable):
         else:
             prev_user_id = prev_access_token = None
 
+        print("HOLAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
+
         login_or_register(
             client=self._client,
             signer=self._raiden_service.signer,
             prev_user_id=prev_user_id,
-            prev_access_token=prev_access_token,
-            lc = self._lc
+            prev_access_token=prev_access_token
         )
         self.log = log.bind(current_user=self._user_id, node=pex(self._raiden_service.address))
 
@@ -1349,3 +1349,17 @@ class MatrixTransport(Runnable):
                 continue
 
         return True
+
+
+class MatrixLightClientTransport(MatrixTransport):
+
+    def __init__(self, config: dict, _encrypted_light_client_signature: str):
+        super().__init__(config)
+        self._encrypted_light_client_signature = _encrypted_light_client_signature
+
+
+class NodeTransport:
+
+    def __init__(self, hub_transport: MatrixTransport, light_client_transports: List[MatrixTransport]):
+        self.hub_transport = hub_transport
+        self.light_client_transports = light_client_transports
