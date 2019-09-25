@@ -334,6 +334,10 @@ class MatrixTransport(Runnable):
 
         self._message_handler: Optional[MessageHandler] = None
 
+
+    def start_greenlet_for_light_client(self):
+        super().start()
+
     def __repr__(self):
         if self._raiden_service is not None:
             node = f" node:{pex(self._raiden_service.address)}"
@@ -1356,6 +1360,73 @@ class MatrixLightClientTransport(MatrixTransport):
     def __init__(self, config: dict, _encrypted_light_client_signature: str):
         super().__init__(config)
         self._encrypted_light_client_signature = _encrypted_light_client_signature
+
+    def start(  # type: ignore
+        self,
+        raiden_service: RaidenService,
+        message_handler: MessageHandler,
+        prev_auth_data: str,
+
+    ):
+        if not self._stop_event.ready():
+            raise RuntimeError(f"{self!r} already started")
+        self._stop_event.clear()
+        self._raiden_service = raiden_service
+        self._message_handler = message_handler
+
+        prev_user_id: Optional[str]
+        prev_access_token: Optional[str]
+        if prev_auth_data and prev_auth_data.count("/") == 1:
+            prev_user_id, _, prev_access_token = prev_auth_data.partition("/")
+        else:
+            prev_user_id = prev_access_token = None
+
+        print("Start lightlicnet transport is HERE")
+
+        login_or_register(
+            client=self._client,
+            signer=self._raiden_service.signer,
+            prev_user_id=prev_user_id,
+            prev_access_token=prev_access_token,
+            encrypted_light_client_signature=self._encrypted_light_client_signature
+        )
+        self.log = log.bind(current_user=self._user_id, node=pex(self._raiden_service.address))
+
+        self.log.debug("Start: handle thread", handle_thread=self._client._handle_thread)
+        if self._client._handle_thread:
+            # wait on _handle_thread for initial sync
+            # this is needed so the rooms are populated before we _inventory_rooms
+            self._client._handle_thread.get()
+
+        for suffix in self._config["global_rooms"]:
+            room_name = make_room_alias(self.network_id, suffix)  # e.g. raiden_ropsten_discovery
+            room = join_global_room(
+                self._client, room_name, self._config.get("available_servers") or ()
+            )
+            self._global_rooms[room_name] = room
+
+        self._inventory_rooms()
+
+        def on_success(greenlet):
+            if greenlet in self.greenlets:
+                self.greenlets.remove(greenlet)
+
+        self._client.start_listener_thread()
+        self._client.sync_thread.link_exception(self.on_error)
+        self._client.sync_thread.link_value(on_success)
+        self.greenlets = [self._client.sync_thread]
+
+        self._client.set_presence_state(UserPresence.ONLINE.value)
+
+        # (re)start any _RetryQueue which was initialized before start
+        for retrier in self._address_to_retrier.values():
+            if not retrier:
+                self.log.debug("Starting retrier", retrier=retrier)
+                retrier.start()
+
+        self.log.debug("Matrix started", config=self._config)
+        super().start_greenlet_for_light_client()
+        self._started = True
 
 
 class NodeTransport:

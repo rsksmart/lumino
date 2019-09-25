@@ -319,7 +319,11 @@ def join_global_room(client: GMatrixClient, name: str, servers: Sequence[str] = 
 
 
 def login_or_register(
-    client: GMatrixClient, signer: Signer, prev_user_id: str = None, prev_access_token: str = None,
+    client: GMatrixClient,
+    signer: Signer,
+    prev_user_id: str = None,
+    prev_access_token: str = None,
+    encrypted_light_client_signature: str = None
 ) -> User:
 
     print("----- calling TRANSPORT MATRIX UTILS LOGIN OR REGISTER. LC? ")
