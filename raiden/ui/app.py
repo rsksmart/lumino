@@ -81,6 +81,10 @@ def _setup_matrix(config):
     try:
 
         database_path = config["database_path"]
+
+        database_dir = os.path.dirname(config["database_path"])
+        os.makedirs(database_dir, exist_ok=True)
+
         storage = sqlite.SerializedSQLiteStorage(
             database_path=database_path, serializer=serialize.JSONSerializer()
         )
@@ -90,7 +94,9 @@ def _setup_matrix(config):
         light_client_transports = []
         for light_client in light_clients:
             light_client_transport = MatrixLightClientTransport(config["transport"]["matrix"],
-                                                                light_client['password'])
+                                                                light_client['password'],
+                                                                light_client['display_name'],
+                                                                light_client['address'])
             light_client_transports.append(light_client_transport)
 
         hub_transport = MatrixTransport(config["transport"]["matrix"])

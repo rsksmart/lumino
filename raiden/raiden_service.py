@@ -409,12 +409,14 @@ class RaidenService(Runnable):
                 self.config["transport"]["udp"]["external_port"],
             )
 
-        self.maybe_upgrade_db()
-
         storage = sqlite.SerializedSQLiteStorage(
             database_path=self.database_path, serializer=serialize.JSONSerializer()
         )
+
         storage.update_version()
+
+        self.maybe_upgrade_db()
+
         storage.log_run()
         self.wal = wal.restore_to_state_change(
             transition_function=node.state_transition,
@@ -534,6 +536,7 @@ class RaidenService(Runnable):
             self.stop_event.wait()
         except gevent.GreenletExit:  # killed without exception
             self.stop_event.set()
+
             gevent.killall([self.alarm, self.transport])  # kill children
             raise  # re-raise to keep killed status
         except Exception:
@@ -607,7 +610,6 @@ class RaidenService(Runnable):
         """
         assert self.alarm.is_primed(), f"AlarmTask not primed. node:{self!r}"
         assert self.ready_to_process_events, f"Event procossing disable. node:{self!r}"
-
 
         # Start hub transport
         self.transport.hub_transport.start(
@@ -972,9 +974,12 @@ class RaidenService(Runnable):
         for neighbour in views.all_neighbour_nodes(chain_state):
             if neighbour == ConnectionManager.BOOTSTRAP_ADDR:
                 continue
-            self.transport[0].whitelist(neighbour)
-            self.transport[1].whitelist(neighbour)
+            self.transport.hub_transport.whitelist(neighbour)
 
+            # TODO
+            # What mean neigbour, verify this for lightclients
+            # Now set only hub transport
+            # self.transport[1].whitelist(neighbour)
 
         events_queues = views.get_all_messagequeues(chain_state)
 
@@ -983,10 +988,11 @@ class RaidenService(Runnable):
                 if isinstance(event, SendLockedTransfer):
                     transfer = event.transfer
                     if transfer.initiator == self.address:
-                        self.transport[0].whitelist(address=transfer.target)
-                        self.transport[1].whitelist(address=transfer.target)
+                        self.transport.hub_transport.whitelist(address=transfer.target)
 
-
+                        # TODO
+                        # Verify this for lightclients, now set only hub transport
+                        # self.transport[1].whitelist(address=transfer.target)
 
     def sign(self, message: Message):
         """ Sign message inplace. """

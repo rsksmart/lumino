@@ -1449,17 +1449,24 @@ class RaidenAPI:
         light_clients = self.raiden.wal.storage.get_all_light_clients()
         return light_clients
 
-    def get_data_for_registration_request(self):
+    def get_data_for_registration_request(self, address):
         # fetch list of known servers from raiden-network/raiden-tranport repo
         available_servers_url = DEFAULT_MATRIX_KNOWN_SERVERS[self.raiden.config["environment_type"]]
         available_servers = get_matrix_servers(available_servers_url)
         client = make_client(available_servers)
         server_url = client.api.base_url
         server_name = urlparse(server_url).netloc
-        data_to_sign = {"to_sign": server_name}
+        data_to_sign = {
+            "display_name_to_sign": "@" + encode_hex(address) + ":" + server_name,
+            "password_to_sign": server_name}
         return data_to_sign
 
-    def register_light_client(self, address, signed_data):
+    def register_light_client(self,
+                              address,
+                              signed_password,
+                              signed_display_name,
+                              password,
+                              display_name):
 
         light_client = self.raiden.wal.storage.get_light_client(address)
 
@@ -1469,9 +1476,15 @@ class RaidenAPI:
             api_key = api_key.decode("utf-8")
 
             pubhex = self.raiden.config["pubkey"].hex()
-            encrypt_data = encrypt(pubhex, signed_data.encode())
+            encrypt_signed_password = encrypt(pubhex, signed_password.encode())
+            encrypt_signed_display_name = encrypt(pubhex,signed_display_name.encode())
 
-            result = self.raiden.wal.storage.save_light_client(api_key, address, encrypt_data.hex())
+            result = self.raiden.wal.storage.save_light_client(
+                api_key=api_key,
+                address=address,
+                encrypt_signed_password=encrypt_signed_password.hex(),
+                encrypt_signed_display_name=encrypt_signed_display_name.hex())
+
             if result > 0:
                 result = {"api_key": api_key,
                           "message": "successfully registered"}

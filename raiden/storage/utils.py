@@ -88,7 +88,8 @@ CREATE TABLE IF NOT EXISTS invoices_payments (
 DB_CREATE_CLIENT = """
 CREATE TABLE IF NOT EXISTS client (
     address TEXT PRIMARY KEY,
-    password TEXT NOT NULL, 
+    password TEXT NOT NULL,
+    display_name TEXT NOT NULL, 
     api_key TEXT NOT NULL,
     type TEXT CHECK ( type IN ('HUB','FULL','LIGHT') ) NOT NULL DEFAULT 'FULL'
 );

@@ -469,8 +469,10 @@ class InvoiceCreateSchema(BaseSchema):
 
 class LightClientSchema(BaseSchema):
     address = AddressField(required=True)
-    signed_data = fields.String(required=True)
-    data = fields.String(required=True)
+    signed_password = fields.String(required=True)
+    signed_display_name = fields.String(required=True)
+    password = fields.String(required=True)
+    display_name = fields.String(required=True)
 
     class Meta:
         strict = True
@@ -480,6 +482,15 @@ class LightClientSchema(BaseSchema):
 
 class TokenActionRequestSchema(BaseSchema):
     token = fields.String(missing=None)
+
+    class Meta:
+        strict = True
+        # decoding to a dict is required by the @use_kwargs decorator from webargs
+        decoding_class = dict
+
+
+class LightClientMatrixCredentialsBuildSchema(BaseSchema):
+    address = AddressField()
 
     class Meta:
         strict = True

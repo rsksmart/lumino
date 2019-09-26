@@ -286,7 +286,8 @@ class SQLiteStorage:
                 address,
                 password,
                 api_key,
-                type
+                type,
+                display_name
             FROM client;
             """,
             ()
@@ -304,7 +305,8 @@ class SQLiteStorage:
             light_client_dict = {"address": light_client[0],
                                  "password": light_client[1],
                                  "api_key": light_client[2],
-                                 "type": light_client[3]}
+                                 "type": light_client[3],
+                                 "display_name": light_client[4]}
             list_of_dicts.append(light_client_dict)
 
         return list_of_dicts
@@ -318,7 +320,8 @@ class SQLiteStorage:
                 address,
                 password,
                 api_key,
-                type
+                type,
+                display_name
             FROM client WHERE address = ?;
             """,
             (address,)
@@ -328,25 +331,28 @@ class SQLiteStorage:
         light_client_dict = None
         if light_client is not None:
             light_client_dict = {"address": light_client[0],
-                            "password": light_client[1],
-                            "api_key": light_client[2],
-                            "type": light_client[3]}
+                                 "password": light_client[1],
+                                 "api_key": light_client[2],
+                                 "type": light_client[3],
+                                 "display_name": light_client[4]}
 
         return light_client_dict
 
-    def save_light_client(self, api_key, address, encrypt_signed_data):
+    def save_light_client(self, **kwargs):
         with self.write_lock, self.conn:
             cursor = self.conn.execute(
                 "INSERT INTO client("
                 "address, "
                 "password, "
                 "api_key, "                               
-                "type)"
-                "VALUES(?, ?, ?, ?)",
-                (address,
-                 encrypt_signed_data,
-                 api_key,
-                 ClientType.LIGHT.value,),
+                "type, "
+                "display_name)"                                
+                "VALUES(?, ?, ?, ?, ?)",
+                (kwargs['address'],
+                 kwargs['encrypt_signed_password'],
+                 kwargs['api_key'],
+                 ClientType.LIGHT.value,
+                 kwargs['encrypt_signed_display_name'],),
             )
             last_id = cursor.lastrowid
 

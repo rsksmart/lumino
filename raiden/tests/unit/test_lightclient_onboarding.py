@@ -3,6 +3,37 @@ from raiden.utils.signer import LocalSigner, Signer, recover
 from ecies import encrypt, decrypt
 
 
+def test_signer_sign_display_user_matrix_client():
+    # Rsk Address 0x67a03d727b61a4ffd3721f79d52a3baea1b63ea0
+    privkey = decode_hex('0x3f5d3cda6320fd57f4d47e50c3404e7e43cfb60968d7ef13eb6873760b445e47')
+
+    message = '@0x67a03d727b61a4ffd3721f79d52a3baea1b63ea0:transport02.raiden.network'
+
+    # generated with Metamask's web3.personal.sign
+    signature = decode_hex(
+        "0x3453863b075da3349de25a79ff2237cc28d0e0b23660754e80bdeb2cb348c8333"
+        "65a570291992748234756e8a00d241040c517c40c051d1363f1f6c65701ed041c"
+    )
+
+    signer: Signer = LocalSigner(privkey)
+
+    result = signer.sign(message.encode())
+
+    assert result == signature
+
+
+def test_recover_address_from_display_user_and_signature():
+    account = to_canonical_address("0x67a03d727b61a4ffd3721f79d52a3baea1b63ea0")
+    message = '@0x67a03d727b61a4ffd3721f79d52a3baea1b63ea0:transport02.raiden.network'
+    # generated with Metamask's web3.personal.sign
+    signature = decode_hex(
+        "0x3453863b075da3349de25a79ff2237cc28d0e0b23660754e80bdeb2cb348c8333"
+        "65a570291992748234756e8a00d241040c517c40c051d1363f1f6c65701ed041c"
+    )
+
+    assert recover(data=message.encode(), signature=signature) == account
+
+
 def test_signer_sign_matrix_server_domain():
     #Rsk Address 0x67a03d727b61a4ffd3721f79d52a3baea1b63ea0
     privkey = decode_hex('0x3f5d3cda6320fd57f4d47e50c3404e7e43cfb60968d7ef13eb6873760b445e47')

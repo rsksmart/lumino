@@ -75,7 +75,7 @@ from raiden.api.v1.resources import (
     PaymentInvoiceResource,
     ChannelsResourceLight,
     LightChannelsResourceByTokenAndPartnerAddress,
-    LightClientMatrixServerRequestResource,
+    LightClientMatrixCredentialsBuildResource,
     LightClientResource)
 
 from raiden.constants import GENESIS_BLOCK_NUMBER, UINT256_MAX, Environment
@@ -220,8 +220,8 @@ URLS_V1 = [
         InvoiceResource,
     ),
     (
-        '/light_clients/matrix/servers',
-        LightClientMatrixServerRequestResource,
+        '/light_clients/matrix/credentials',
+        LightClientMatrixCredentialsBuildResource,
     ),
     (
         '/light_clients/',
@@ -1803,20 +1803,29 @@ class RestAPI:
 
         return api_response(invoice)
 
-    def get_data_for_registration_request(self):
-        data_to_sign = self.raiden_api.get_data_for_registration_request()
+    def get_data_for_registration_request(self, address):
+        data_to_sign = self.raiden_api.get_data_for_registration_request(address)
         return api_response(data_to_sign)
 
-    def register_light_client(self, address, signed_data, data):
-        # Recover lighclient address from data and signature
-        address_recovered = recover(data=data.encode(), signature=decode_hex(signed_data))
+    def register_light_client(self, address, signed_password, signed_display_name, password, display_name):
+        # Recover lighclient address from password and signed_password
+        address_recovered_from_signed_password = recover(data=password.encode(), signature=decode_hex(signed_password))
 
-        if address_recovered != address:
+        # Recover lighclient address from display and signed_display_name
+        address_recovered_from_signed_display_name = recover(data=display_name.encode(), signature=decode_hex(signed_display_name))
+
+        if address_recovered_from_signed_password != address or \
+                address_recovered_from_signed_display_name != address:
             return api_error(
                 errors="The signed data provided is not valid.",
                 status_code=HTTPStatus.CONFLICT,
             )
 
-        light_client = self.raiden_api.register_light_client(to_normalized_address(address), signed_data)
+        light_client = self.raiden_api.register_light_client(
+            to_normalized_address(address),
+            signed_password,
+            signed_display_name,
+            password,
+            display_name)
 
         return api_response(light_client)

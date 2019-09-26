@@ -41,6 +41,8 @@ from raiden.utils import pex
 from raiden.utils.signer import Signer, recover
 from raiden.utils.typing import Address, ChainID
 from raiden_contracts.constants import ID_TO_NETWORKNAME
+from ecies import decrypt
+
 
 log = structlog.get_logger(__name__)
 
@@ -318,15 +320,84 @@ def join_global_room(client: GMatrixClient, name: str, servers: Sequence[str] = 
     return global_room
 
 
+def login_or_register_light_client(client: GMatrixClient,
+    signer: Signer,
+    prev_user_id: str = None,
+    prev_access_token: str = None,
+    encrypted_light_client_password_signature: str = None,
+    encrypted_light_client_display_name_signature: str = None,
+    private_key_hub: str = None,
+    light_client_address: str = None):
+    print("")
+
+    if encrypted_light_client_password_signature is not None:
+        descrypt_light_client_password_signature = decrypt(private_key_hub, bytes.fromhex(encrypted_light_client_password_signature))
+
+    if encrypted_light_client_display_name_signature is not None:
+        descrypt_light_client_display_name_signature = decrypt(private_key_hub, bytes.fromhex(encrypted_light_client_display_name_signature))
+
+    server_url = client.api.base_url
+    server_name = urlparse(server_url).netloc
+
+    base_username = to_normalized_address(signer.address)
+    base_username = to_normalized_address(light_client_address)
+
+    # password is signed server address
+    password = descrypt_light_client_password_signature.decode("utf-8")
+    rand = None
+    # try login and register on first 5 possible accounts
+    for i in range(JOIN_RETRIES):
+        username = base_username
+        if i:
+            if not rand:
+                rand = Random()  # deterministic, random secret for username suffixes
+                # initialize rand for seed (which requires a signature) only if/when needed
+                rand.seed(int.from_bytes(signer.sign(b"seed")[-32:], "big"))
+            username = f"{username}.{rand.randint(0, 0xffffffff):08x}"
+
+        try:
+            client.login(username, password, sync=False)
+            prev_sync_limit = client.set_sync_limit(0)
+            client._sync()  # when logging, do initial_sync with limit=0
+            client.set_sync_limit(prev_sync_limit)
+            log.info("Login", homeserver=server_name, server_url=server_url, username=username)
+            break
+        except MatrixRequestError as ex:
+            if ex.code != 403:
+                raise
+            log.debug(
+                "Could not login. Trying register",
+                homeserver=server_name,
+                server_url=server_url,
+                username=username,
+            )
+            try:
+                client.register_with_password(username, password)
+                log.debug(
+                    "Register", homeserver=server_name, server_url=server_url, username=username
+                )
+                break
+            except MatrixRequestError as ex:
+                if ex.code != 400:
+                    raise
+                log.debug("Username taken. Continuing")
+                continue
+    else:
+        raise ValueError("Could not register or login!")
+
+    name = descrypt_light_client_display_name_signature.decode("utf-8")
+    user = client.get_user(client.user_id)
+    user.set_display_name(name)
+    return user
+
+
 def login_or_register(
     client: GMatrixClient,
     signer: Signer,
     prev_user_id: str = None,
-    prev_access_token: str = None,
-    encrypted_light_client_signature: str = None
+    prev_access_token: str = None
 ) -> User:
 
-    print("----- calling TRANSPORT MATRIX UTILS LOGIN OR REGISTER. LC? ")
     """Login to a Raiden matrix server with password and displayname proof-of-keys
 
     - Username is in the format: 0x<eth_address>(.<suffix>)?, where the suffix is not required,
@@ -345,12 +416,14 @@ def login_or_register(
     Returns:
         Own matrix_client.User
     """
+
     server_url = client.api.base_url
     server_name = urlparse(server_url).netloc
 
     base_username = to_normalized_address(signer.address)
-
-    _match_user = False
+    _match_user = re.match(
+        f"^@{re.escape(base_username)}.*:{re.escape(server_name)}$", prev_user_id or ""
+    )
     if _match_user:  # same user as before
         assert prev_user_id is not None
         log.debug("Trying previous user login", user_id=prev_user_id)
@@ -396,7 +469,7 @@ def login_or_register(
             prev_sync_limit = client.set_sync_limit(0)
             client._sync()  # when logging, do initial_sync with limit=0
             client.set_sync_limit(prev_sync_limit)
-            log.debug("Login", homeserver=server_name, server_url=server_url, username=username)
+            log.info("Login", homeserver=server_name, server_url=server_url, username=username)
             break
         except MatrixRequestError as ex:
             if ex.code != 403:

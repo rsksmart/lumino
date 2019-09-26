@@ -33,6 +33,7 @@ from raiden.network.transport.matrix.utils import (
     UserPresence,
     join_global_room,
     login_or_register,
+    login_or_register_light_client,
     make_client,
     make_room_alias,
     validate_and_parse_message,
@@ -370,6 +371,7 @@ class MatrixTransport(Runnable):
             prev_user_id=prev_user_id,
             prev_access_token=prev_access_token
         )
+
         self.log = log.bind(current_user=self._user_id, node=pex(self._raiden_service.address))
 
         self.log.debug("Start: handle thread", handle_thread=self._client._handle_thread)
@@ -1357,9 +1359,15 @@ class MatrixTransport(Runnable):
 
 class MatrixLightClientTransport(MatrixTransport):
 
-    def __init__(self, config: dict, _encrypted_light_client_signature: str):
+    def __init__(self,
+                 config: dict,
+                 _encrypted_light_client_password_signature: str,
+                 _encrypted_light_client_display_name_signature: str,
+                 _address: str):
         super().__init__(config)
-        self._encrypted_light_client_signature = _encrypted_light_client_signature
+        self._encrypted_light_client_password_signature = _encrypted_light_client_password_signature
+        self._encrypted_light_client_display_name_signature = _encrypted_light_client_display_name_signature
+        self._address = _address
 
     def start(  # type: ignore
         self,
@@ -1383,13 +1391,17 @@ class MatrixLightClientTransport(MatrixTransport):
 
         print("Start lightlicnet transport is HERE")
 
-        login_or_register(
+        login_or_register_light_client(
             client=self._client,
             signer=self._raiden_service.signer,
             prev_user_id=prev_user_id,
             prev_access_token=prev_access_token,
-            encrypted_light_client_signature=self._encrypted_light_client_signature
+            encrypted_light_client_password_signature=self._encrypted_light_client_password_signature,
+            encrypted_light_client_display_name_signature=self._encrypted_light_client_display_name_signature,
+            private_key_hub=self._raiden_service.config["privatekey"].hex(),
+            light_client_address=self._address
         )
+
         self.log = log.bind(current_user=self._user_id, node=pex(self._raiden_service.address))
 
         self.log.debug("Start: handle thread", handle_thread=self._client._handle_thread)
