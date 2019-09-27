@@ -1301,6 +1301,32 @@ class LockedTransfer(LockedTransferBase):
         message.signature = decode_hex(data["signature"])
         return message
 
+    @classmethod
+    def from_dict_unsigned(cls, data):
+        if "payment_hash_invoice" not in data:
+            data["payment_hash_invoice"] = EMPTY_PAYMENT_HASH_INVOICE
+
+        message = cls(
+            chain_id=data["chain_id"],
+            message_identifier=data["message_identifier"],
+            payment_identifier=data["payment_identifier"],
+            payment_hash_invoice=decode_hex(data["payment_hash_invoice"]),
+            nonce=data["nonce"],
+            token_network_address=to_canonical_address(data["token_network_address"]),
+            token=to_canonical_address(data["token"]),
+            channel_identifier=data["channel_identifier"],
+            transferred_amount=data["transferred_amount"],
+            locked_amount=data["locked_amount"],
+            recipient=to_canonical_address(data["recipient"]),
+            locksroot=decode_hex(data["locksroot"]),
+            lock=Lock.from_dict(data["lock"]),
+            target=to_canonical_address(data["target"]),
+            initiator=to_canonical_address(data["initiator"]),
+            fee=data["fee"]
+        )
+
+        return message
+
 
 class RefundTransfer(LockedTransfer):
     """ A special LockedTransfer sent from a payee to a payer indicating that
