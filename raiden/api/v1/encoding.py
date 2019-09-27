@@ -375,6 +375,7 @@ class PaymentLightPostSchema(BaseSchema):
     partner_address = AddressField(required=True)
     token_address = AddressField(required=True)
     amount = fields.Integer(required=True)
+    secrethash = SecretHashField(required=True)
 
     class Meta:
         strict = True

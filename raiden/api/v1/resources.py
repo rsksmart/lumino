@@ -299,14 +299,16 @@ class PaymentLightResource(BaseResource):
         creator_address: typing.Address,
         partner_address: typing.Address,
         token_address: typing.TokenAddress,
-        amount: typing.TokenAmount
+        amount: typing.TokenAmount,
+        secrethash: typing.SecretHash
     ):
         return self.rest_api.create_light_client_payment(
             registry_address=self.rest_api.raiden_api.raiden.default_registry.address,
             creator_address=creator_address,
             partner_address=partner_address,
             token_address=token_address,
-            amount=amount
+            amount=amount,
+            secrethash=secrethash
         )
 
 

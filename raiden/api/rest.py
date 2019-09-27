@@ -1913,7 +1913,8 @@ class RestAPI:
         creator_address: typing.AddressHex,
         partner_address: typing.AddressHex,
         token_address: typing.TokenAddress,
-        amount: typing.TokenAmount
+        amount: typing.TokenAmount,
+        secrethash: typing.SecretHash
     ):
         headers = request.headers
         api_key = headers.get("x-api-key")
@@ -1929,7 +1930,7 @@ class RestAPI:
         try:
             locked_transfer_wrapper = self.raiden_api.create_light_client_payment(registry_address, creator_address,
                                                                                   partner_address, token_address,
-                                                                                  amount)
+                                                                                  amount, secrethash)
             return api_response(locked_transfer_wrapper.to_dict())
         except ChannelNotFound as e:
             return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.NOT_FOUND, log=log)
