@@ -320,30 +320,88 @@ def join_global_room(client: GMatrixClient, name: str, servers: Sequence[str] = 
     return global_room
 
 
-def login_or_register_light_client(client: GMatrixClient,
-    signer: Signer,
-    prev_user_id: str = None,
-    prev_access_token: str = None,
-    encrypted_light_client_password_signature: str = None,
-    encrypted_light_client_display_name_signature: str = None,
-    private_key_hub: str = None,
-    light_client_address: str = None):
-    print("")
+def login_or_register_light_client(client: GMatrixClient, **kwargs):
 
-    if encrypted_light_client_password_signature is not None:
-        descrypt_light_client_password_signature = decrypt(private_key_hub, bytes.fromhex(encrypted_light_client_password_signature))
+    if kwargs['encrypted_light_client_password_signature'] is not None:
+        descrypt_light_client_password_signature = \
+            decrypt(kwargs['private_key_hub'],
+                    bytes.fromhex(kwargs['encrypted_light_client_password_signature']))
 
-    if encrypted_light_client_display_name_signature is not None:
-        descrypt_light_client_display_name_signature = decrypt(private_key_hub, bytes.fromhex(encrypted_light_client_display_name_signature))
+    if kwargs['encrypted_light_client_display_name_signature'] is not None:
+        descrypt_light_client_display_name_signature = \
+            decrypt(kwargs['private_key_hub'],
+                    bytes.fromhex(kwargs['encrypted_light_client_display_name_signature']))
+
+    if kwargs['encrypted_light_client_seed_for_retry_signature'] is not None:
+        desctypt_seed_retry_signature = \
+            decrypt(kwargs['private_key_hub'],
+                    bytes.fromhex(kwargs['encrypted_light_client_seed_for_retry_signature']))
 
     server_url = client.api.base_url
     server_name = urlparse(server_url).netloc
 
-    base_username = to_normalized_address(signer.address)
-    base_username = to_normalized_address(light_client_address)
+    base_username = to_normalized_address(kwargs['light_client_address'])
 
-    # password is signed server address
-    password = descrypt_light_client_password_signature.decode("utf-8")
+    user = _check_previous_login(client, kwargs['prev_user_id'], kwargs['prev_access_token'],
+                                 base_username, server_name)
+
+    if user is None:
+        # password is signed server address
+        password = descrypt_light_client_password_signature.decode("utf-8")
+        seed = decode_hex(desctypt_seed_retry_signature.decode("utf-8"))
+
+        _try_login_or_register(client, base_username, password, server_name, server_url, seed)
+
+        name = descrypt_light_client_display_name_signature.decode("utf-8")
+        user = client.get_user(client.user_id)
+        user.set_display_name(name)
+
+    return user
+
+
+def _check_previous_login(client: GMatrixClient,
+                          prev_user_id: str = None,
+                          prev_access_token: str = None,
+                          base_username: str = None,
+                          server_name: str = None):
+    _match_user = re.match(
+        f"^@{re.escape(base_username)}.*:{re.escape(server_name)}$", prev_user_id or ""
+    )
+    if _match_user:  # same user as before
+        assert prev_user_id is not None
+        log.info("Trying previous user login", user_id=prev_user_id)
+        client.set_access_token(user_id=prev_user_id, token=prev_access_token)
+
+        try:
+            client.api.get_devices()
+        except MatrixRequestError as ex:
+            log.debug(
+                "Couldn't use previous login credentials, discarding",
+                prev_user_id=prev_user_id,
+                _exception=ex,
+            )
+        else:
+            prev_sync_limit = client.set_sync_limit(0)
+            client._sync()  # initial_sync
+            client.set_sync_limit(prev_sync_limit)
+            log.info("Success. Valid previous credentials", user_id=prev_user_id)
+            return client.get_user(client.user_id)
+    elif prev_user_id:
+        log.debug(
+            "Different server or account, discarding",
+            prev_user_id=prev_user_id,
+            current_address=base_username,
+            current_server=server_name,
+        )
+
+
+def _try_login_or_register(client: GMatrixClient,
+                           base_username: str,
+                           password: str,
+                           server_name: str,
+                           server_url,
+                           seed):
+
     rand = None
     # try login and register on first 5 possible accounts
     for i in range(JOIN_RETRIES):
@@ -352,7 +410,7 @@ def login_or_register_light_client(client: GMatrixClient,
             if not rand:
                 rand = Random()  # deterministic, random secret for username suffixes
                 # initialize rand for seed (which requires a signature) only if/when needed
-                rand.seed(int.from_bytes(signer.sign(b"seed")[-32:], "big"))
+                rand.seed(int.from_bytes(seed, "big"))
             username = f"{username}.{rand.randint(0, 0xffffffff):08x}"
 
         try:
@@ -365,7 +423,7 @@ def login_or_register_light_client(client: GMatrixClient,
         except MatrixRequestError as ex:
             if ex.code != 403:
                 raise
-            log.debug(
+            log.info(
                 "Could not login. Trying register",
                 homeserver=server_name,
                 server_url=server_url,
@@ -384,11 +442,6 @@ def login_or_register_light_client(client: GMatrixClient,
                 continue
     else:
         raise ValueError("Could not register or login!")
-
-    name = descrypt_light_client_display_name_signature.decode("utf-8")
-    user = client.get_user(client.user_id)
-    user.set_display_name(name)
-    return user
 
 
 def login_or_register(
@@ -421,82 +474,20 @@ def login_or_register(
     server_name = urlparse(server_url).netloc
 
     base_username = to_normalized_address(signer.address)
-    _match_user = re.match(
-        f"^@{re.escape(base_username)}.*:{re.escape(server_name)}$", prev_user_id or ""
-    )
-    if _match_user:  # same user as before
-        assert prev_user_id is not None
-        log.info("Trying previous user login", user_id=prev_user_id)
-        client.set_access_token(user_id=prev_user_id, token=prev_access_token)
 
-        try:
-            client.api.get_devices()
-        except MatrixRequestError as ex:
-            log.debug(
-                "Couldn't use previous login credentials, discarding",
-                prev_user_id=prev_user_id,
-                _exception=ex,
-            )
-        else:
-            prev_sync_limit = client.set_sync_limit(0)
-            client._sync()  # initial_sync
-            client.set_sync_limit(prev_sync_limit)
-            log.info("Success. Valid previous credentials", user_id=prev_user_id)
-            return client.get_user(client.user_id)
-    elif prev_user_id:
-        log.debug(
-            "Different server or account, discarding",
-            prev_user_id=prev_user_id,
-            current_address=base_username,
-            current_server=server_name,
-        )
+    user = _check_previous_login(client, prev_user_id, prev_access_token, base_username, server_name)
 
-    # password is signed server address
-    password = encode_hex(signer.sign(server_name.encode()))
-    rand = None
-    # try login and register on first 5 possible accounts
-    for i in range(JOIN_RETRIES):
-        username = base_username
-        if i:
-            if not rand:
-                rand = Random()  # deterministic, random secret for username suffixes
-                # initialize rand for seed (which requires a signature) only if/when needed
-                rand.seed(int.from_bytes(signer.sign(b"seed")[-32:], "big"))
-            username = f"{username}.{rand.randint(0, 0xffffffff):08x}"
+    if user is None:
+        # password is signed server address
+        password = encode_hex(signer.sign(server_name.encode()))
+        seed = signer.sign(b"seed")[-32:]
 
-        try:
-            client.login(username, password, sync=False)
-            prev_sync_limit = client.set_sync_limit(0)
-            client._sync()  # when logging, do initial_sync with limit=0
-            client.set_sync_limit(prev_sync_limit)
-            log.info("Login", homeserver=server_name, server_url=server_url, username=username)
-            break
-        except MatrixRequestError as ex:
-            if ex.code != 403:
-                raise
-            log.debug(
-                "Could not login. Trying register",
-                homeserver=server_name,
-                server_url=server_url,
-                username=username,
-            )
-            try:
-                client.register_with_password(username, password)
-                log.debug(
-                    "Register", homeserver=server_name, server_url=server_url, username=username
-                )
-                break
-            except MatrixRequestError as ex:
-                if ex.code != 400:
-                    raise
-                log.debug("Username taken. Continuing")
-                continue
-    else:
-        raise ValueError("Could not register or login!")
+        _try_login_or_register(client, base_username, password, server_name, server_url, seed)
 
-    name = encode_hex(signer.sign(client.user_id.encode()))
-    user = client.get_user(client.user_id)
-    user.set_display_name(name)
+        name = encode_hex(signer.sign(client.user_id.encode()))
+        user = client.get_user(client.user_id)
+        user.set_display_name(name)
+
     return user
 
 

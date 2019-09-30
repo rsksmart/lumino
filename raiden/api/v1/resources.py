@@ -464,14 +464,18 @@ class LightClientResource(BaseResource):
         address: typing.Address = None,
         signed_password: typing.ByteString = None,
         signed_display_name: typing.ByteString = None,
+        signed_seed_retry: typing.ByteString = None,
         password: typing.ByteString = None,
-        display_name: typing.ByteString = None
+        display_name: typing.ByteString = None,
+        seed_retry: typing.ByteString = None
     ):
         return self.rest_api.register_light_client(
             address=address,
             signed_password=signed_password,
             signed_display_name=signed_display_name,
+            signed_seed_retry=signed_seed_retry,
             password=password,
-            display_name=display_name
+            display_name=display_name,
+            seed_retry=seed_retry
         )
 

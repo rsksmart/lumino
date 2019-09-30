@@ -3,6 +3,23 @@ from raiden.utils.signer import LocalSigner, Signer, recover
 from ecies import encrypt, decrypt
 
 
+def test_signer_sign_seed_retry():
+    # Rsk Address 0x67a03d727b61a4ffd3721f79d52a3baea1b63ea0
+    privkey = decode_hex('0x3f5d3cda6320fd57f4d47e50c3404e7e43cfb60968d7ef13eb6873760b445e47')
+    message = 'seed'
+
+    # generated with Metamask's web3.personal.sign
+    signature = decode_hex(
+        "0x5ec735da2aae8adb3dc9e0f40c9f3316e9decaa755fced709c30bb1347975f1c"
+    )
+
+    signer: Signer = LocalSigner(privkey)
+
+    result = signer.sign(message.encode())[-32:]
+
+    assert result == signature
+
+
 def test_signer_sign_display_user_matrix_client():
     # Rsk Address 0x67a03d727b61a4ffd3721f79d52a3baea1b63ea0
     privkey = decode_hex('0x3f5d3cda6320fd57f4d47e50c3404e7e43cfb60968d7ef13eb6873760b445e47')

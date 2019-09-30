@@ -1458,15 +1458,15 @@ class RaidenAPI:
         server_name = urlparse(server_url).netloc
         data_to_sign = {
             "display_name_to_sign": "@" + encode_hex(address) + ":" + server_name,
-            "password_to_sign": server_name}
+            "password_to_sign": server_name,
+            "seed_retry": "seed"}
         return data_to_sign
 
     def register_light_client(self,
                               address,
                               signed_password,
                               signed_display_name,
-                              password,
-                              display_name):
+                              signed_seed_retry):
 
         light_client = self.raiden.wal.storage.get_light_client(address)
 

@@ -89,7 +89,8 @@ DB_CREATE_CLIENT = """
 CREATE TABLE IF NOT EXISTS client (
     address TEXT PRIMARY KEY,
     password TEXT NOT NULL,
-    display_name TEXT NOT NULL, 
+    display_name TEXT NOT NULL,
+    seed_retry TEXT NOT NULL, 
     api_key TEXT NOT NULL,
     type TEXT CHECK ( type IN ('HUB','FULL','LIGHT') ) NOT NULL DEFAULT 'FULL'
 );

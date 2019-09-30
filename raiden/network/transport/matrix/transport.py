@@ -1365,10 +1365,12 @@ class MatrixLightClientTransport(MatrixTransport):
                  config: dict,
                  _encrypted_light_client_password_signature: str,
                  _encrypted_light_client_display_name_signature: str,
+                 _encrypted_light_client_seed_for_retry_signature: str,
                  _address: str):
         super().__init__(config)
         self._encrypted_light_client_password_signature = _encrypted_light_client_password_signature
         self._encrypted_light_client_display_name_signature = _encrypted_light_client_display_name_signature
+        self._encrypted_light_client_seed_for_retry_signature = _encrypted_light_client_seed_for_retry_signature
         self._address = _address
 
     def start(  # type: ignore
@@ -1395,7 +1397,6 @@ class MatrixLightClientTransport(MatrixTransport):
 
         login_or_register_light_client(
             client=self._client,
-            signer=self._raiden_service.signer,
             prev_user_id=prev_user_id,
             prev_access_token=prev_access_token,
             encrypted_light_client_password_signature=self._encrypted_light_client_password_signature,
@@ -1446,9 +1447,8 @@ class MatrixLightClientTransport(MatrixTransport):
         """ Runnable main method, perform wait on long-running subtasks """
         # dispatch auth data on first scheduling after start
         print("HOLA ESTOY EN EL RUN DE MATRIX LIGHT CLIENT TRANSPORT!")
-        state_change = ActionUpdateTransportAuthData(f"{self._user_id}/{self._client.api.token}",
-                                                     self._address)
-        self.greenlet.name = f"MatrixTransport._run node:{pex(self._raiden_service.address)}"
+        state_change = ActionUpdateTransportAuthData(f"{self._user_id}/{self._client.api.token}", self._address)
+        self.greenlet.name = f"MatrixLightClientTransport._run light_client:{pex(self._address)}"
         self._raiden_service.handle_and_track_state_change(state_change)
         try:
             # waits on _stop_event.ready()
@@ -1461,6 +1461,7 @@ class MatrixLightClientTransport(MatrixTransport):
         except Exception:
             self.stop()  # ensure cleanup and wait on subtasks
             raise
+
 
 class NodeTransport:
 

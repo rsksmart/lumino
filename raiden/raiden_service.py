@@ -559,13 +559,16 @@ class RaidenService(Runnable):
         #
         # We need a timeout to prevent an endless loop from trying to
         # contact the disconnected client
-        self.transport[0].stop()
-        self.transport[1].stop()
+        self.transport.hub_transport.stop()
+
+        for light_client_transport in self.transport.light_client_transports:
+            light_client_transport.stop()
 
         self.alarm.stop()
 
-        self.transport[0].join()
-        self.transport[1].join()
+        self.transport.hub_transport.join()
+        for light_client_transport in self.transport.light_client_transports:
+            light_client_transport.join()
 
         self.alarm.join()
 

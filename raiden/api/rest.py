@@ -1807,15 +1807,30 @@ class RestAPI:
         data_to_sign = self.raiden_api.get_data_for_registration_request(address)
         return api_response(data_to_sign)
 
-    def register_light_client(self, address, signed_password, signed_display_name, password, display_name):
+    def register_light_client(self,
+                              address,
+                              signed_password,
+                              signed_display_name,
+                              signed_seed_retry,
+                              password,
+                              display_name,
+                              seed_retry):
+
         # Recover lighclient address from password and signed_password
-        address_recovered_from_signed_password = recover(data=password.encode(), signature=decode_hex(signed_password))
+        address_recovered_from_signed_password = recover(data=password.encode(),
+                                                         signature=decode_hex(signed_password))
 
         # Recover lighclient address from display and signed_display_name
-        address_recovered_from_signed_display_name = recover(data=display_name.encode(), signature=decode_hex(signed_display_name))
+        address_recovered_from_signed_display_name = recover(data=display_name.encode(),
+                                                             signature=decode_hex(signed_display_name))
+
+        # Recover lightclient addres from seed retry and signed_seed_retry
+        address_recovered_from_signed_seed_retry = recover(data=seed_retry.encode(),
+                                                           signature=decode_hex(signed_seed_retry))
 
         if address_recovered_from_signed_password != address or \
-                address_recovered_from_signed_display_name != address:
+            address_recovered_from_signed_display_name != address or \
+            address_recovered_from_signed_seed_retry:
             return api_error(
                 errors="The signed data provided is not valid.",
                 status_code=HTTPStatus.CONFLICT,
@@ -1825,6 +1840,7 @@ class RestAPI:
             to_normalized_address(address),
             signed_password,
             signed_display_name,
+            signed_seed_retry,
             password,
             display_name)
 
