@@ -1183,19 +1183,18 @@ class SQLiteStorage:
         )
         return cursor.fetchone()
 
-    def get_light_client_messages(self, payment_id, from_order):
+    def get_light_client_messages(self, offset):
         cursor = self.conn.cursor()
         cursor.execute(
             """
             SELECT identifier, message_order, unsigned_message, signed_message, state_change_id, light_client_payment_id
             FROM light_client_protocol_message
-            WHERE light_client_payment_id = ? AND message_order >= ?
+            WHERE identifier  >= ?
             ORDER BY identifier ASC
             """,
-            (payment_id, from_order),
+            (offset,),
         )
         return cursor.fetchall()
-
 
     def __del__(self):
         self.conn.close()
@@ -1207,8 +1206,8 @@ class SerializedSQLiteStorage(SQLiteStorage):
 
         self.serializer = serializer
 
-    def get_light_client_messages(self, payment_id, from_order):
-        messages = super().get_light_client_messages(payment_id, from_order)
+    def get_light_client_messages(self, offset):
+        messages = super().get_light_client_messages(offset)
         result = []
         if messages:
             for message in messages:

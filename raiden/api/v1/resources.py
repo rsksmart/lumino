@@ -268,8 +268,9 @@ class PaymentInvoiceResource(BaseResource):
             coded_invoice=coded_invoice
         )
 
-
-class PaymentLightResourceByPaymentAndOrder(BaseResource):
+class PaymentLightResource(BaseResource):
+    put_schema = PaymentLightPutSchema
+    post_schema = PaymentLightPostSchema
     get_schema = PaymentLightGetSchema
 
     def get(self, **kwargs):
@@ -277,11 +278,6 @@ class PaymentLightResourceByPaymentAndOrder(BaseResource):
         this translates to 'get all the messages by payment id'
         """
         return self.rest_api.get_light_client_protocol_message(**kwargs)
-
-
-class PaymentLightResource(BaseResource):
-    put_schema = PaymentLightPutSchema
-    post_schema = PaymentLightPostSchema
 
     @use_kwargs(put_schema, locations=("json",))
     def put(self,

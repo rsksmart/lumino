@@ -395,8 +395,7 @@ class PaymentLightPutSchema(BaseSchema):
 
 
 class PaymentLightGetSchema(BaseSchema):
-    payment_id = fields.Integer(required=True)
-    message_order = fields.Integer(required=True)
+    offset = fields.Integer(required=True)
 
     class Meta:
         strict = True

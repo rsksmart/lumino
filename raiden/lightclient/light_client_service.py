@@ -35,8 +35,8 @@ class LightClientService:
         return result
 
     @classmethod
-    def get_light_client_messages(cls, payment_id, message_order, wal: WriteAheadLog):
-        messages = wal.storage.get_light_client_messages(payment_id, message_order)
+    def get_light_client_messages(cls, offset, wal: WriteAheadLog):
+        messages = wal.storage.get_light_client_messages(offset)
         result: List[LightClientProtocolMessage] = []
         for message in messages:
             result.append(

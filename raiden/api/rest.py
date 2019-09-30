@@ -77,7 +77,8 @@ from raiden.api.v1.resources import (
     PaymentInvoiceResource,
     ChannelsResourceLight,
     LightChannelsResourceByTokenAndPartnerAddress,
-    PaymentLightResource, PaymentLightResourceByPaymentAndOrder)
+    PaymentLightResource
+)
 
 from raiden.constants import GENESIS_BLOCK_NUMBER, UINT256_MAX, Environment, EMPTY_PAYMENT_HASH_INVOICE
 
@@ -160,7 +161,7 @@ URLS_V1 = [
         "token_target_paymentresource",
     ),
     ("/payments_light", PaymentLightResource),
-    ("/payments_light/<int:payment_id>/<int:message_order>", PaymentLightResourceByPaymentAndOrder),
+    ("/payments_light/<int:offset>", PaymentLightResource, "get_paymentmessageresource"),
 
     ("/tokens", TokensResource),
     ("/tokens/<hexaddress:token_address>/partners", PartnersResourceByTokenAddress),
@@ -1872,7 +1873,7 @@ class RestAPI:
 
         return api_response(invoice)
 
-    def get_light_client_protocol_message(self, payment_id, message_order):
+    def get_light_client_protocol_message(self, offset):
         headers = request.headers
         api_key = headers.get("x-api-key")
         if not api_key:
@@ -1885,7 +1886,7 @@ class RestAPI:
                 errors="There is no light client associated with the api key provided",
                 status_code=HTTPStatus.FORBIDDEN, log=log)
 
-        messages = LightClientService.get_light_client_messages(payment_id, message_order, self.raiden_api.raiden.wal)
+        messages = LightClientService.get_light_client_messages(offset, self.raiden_api.raiden.wal)
         response = [message.to_dict() for message in messages]
         return api_response(response)
 
