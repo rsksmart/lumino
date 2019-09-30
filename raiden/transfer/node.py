@@ -39,7 +39,8 @@ from raiden.transfer.state import (
     PaymentNetworkState,
     TargetTask,
     TokenNetworkState,
-    NettingChannelState)
+    NettingChannelState,
+    LightClientTransportState)
 from raiden.transfer.state_change import (
     ActionChangeNodeNetworkState,
     ActionChannelClose,
@@ -79,6 +80,8 @@ from raiden.utils.typing import (
     Tuple,
     Union,
 )
+
+from eth_utils import to_canonical_address
 
 # All State changes that are subdispatched as token network actions
 TokenNetworkStateChange = Union[
@@ -758,7 +761,24 @@ def handle_update_transport_authdata(
     chain_state: ChainState, state_change: ActionUpdateTransportAuthData
 ) -> TransitionResult[ChainState]:
     assert chain_state is not None, "chain_state must be set"
-    chain_state.last_transport_authdata = state_change.auth_data
+
+    if state_change.address == b'00000000000000000000' or state_change.address == chain_state.our_address:
+        chain_state.last_node_transport_state_authdata.hub_last_transport_authdata = state_change.auth_data
+    else:
+        if len(chain_state.last_node_transport_state_authdata.clients_last_transport_authdata) == 0:
+            light_client_transport_state = LightClientTransportState(state_change.address, state_change.auth_data)
+            chain_state.last_node_transport_state_authdata \
+                .clients_last_transport_authdata.append(light_client_transport_state)
+        else:
+            for client_last_transport_authdata in chain_state.last_node_transport_state_authdata.clients_last_transport_authdata:
+                if to_canonical_address(state_change.address) == client_last_transport_authdata.address:
+                    client_last_transport_authdata.auth_data = state_change.auth_data
+                else:
+                    light_client_transport_state = LightClientTransportState(state_change.address,
+                                                                             state_change.auth_data)
+                    chain_state.last_node_transport_state_authdata.clients_last_transport_authdata.append(
+                        light_client_transport_state)
+
     return TransitionResult(chain_state, list())
 
 

@@ -118,26 +118,38 @@ class ActionUpdateTransportAuthData(StateChange):
     Can be used later to filter the messages which have not been processed.
     """
 
-    def __init__(self, auth_data: str):
+    def __init__(self, auth_data: str, address: Address):
         self.auth_data = auth_data
+        self.address = address
 
     def __repr__(self) -> str:
-        return "<ActionUpdateTransportAuthData value:{}>".format(self.auth_data)
+        return "<ActionUpdateTransportAuthData value:{} address:{}>".format(self.auth_data, self.address)
 
     def __eq__(self, other: Any) -> bool:
         return (
-            isinstance(other, ActionUpdateTransportAuthData) and self.auth_data == other.auth_data
+            isinstance(other, ActionUpdateTransportAuthData)
+            and self.auth_data == other.auth_data
+            and self.address == other.address
         )
 
     def __ne__(self, other: Any) -> bool:
         return not self.__eq__(other)
 
     def to_dict(self) -> Dict[str, Any]:
-        return {"auth_data": str(self.auth_data)}
+        return {
+            "auth_data": str(self.auth_data),
+            "address": to_checksum_address(self.address),
+        }
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "ActionUpdateTransportAuthData":
-        return cls(auth_data=data["auth_data"])
+        if "address" not in data:
+            data["address"] = b'00000000000000000000'
+
+        return cls(
+            auth_data=data["auth_data"],
+            address=to_canonical_address(data["address"])
+        )
 
 
 class ActionCancelPayment(StateChange):

@@ -413,7 +413,9 @@ class MatrixTransport(Runnable):
     def _run(self):
         """ Runnable main method, perform wait on long-running subtasks """
         # dispatch auth data on first scheduling after start
-        state_change = ActionUpdateTransportAuthData(f"{self._user_id}/{self._client.api.token}")
+        print("HOLA ESTOY EN EL RUN DE MATRIXTRANSPORT")
+        state_change = ActionUpdateTransportAuthData(f"{self._user_id}/{self._client.api.token}",
+                                                     self._raiden_service.address)
         self.greenlet.name = f"MatrixTransport._run node:{pex(self._raiden_service.address)}"
         self._raiden_service.handle_and_track_state_change(state_change)
         try:
@@ -1440,6 +1442,25 @@ class MatrixLightClientTransport(MatrixTransport):
         super().start_greenlet_for_light_client()
         self._started = True
 
+    def _run(self):
+        """ Runnable main method, perform wait on long-running subtasks """
+        # dispatch auth data on first scheduling after start
+        print("HOLA ESTOY EN EL RUN DE MATRIX LIGHT CLIENT TRANSPORT!")
+        state_change = ActionUpdateTransportAuthData(f"{self._user_id}/{self._client.api.token}",
+                                                     self._address)
+        self.greenlet.name = f"MatrixTransport._run node:{pex(self._raiden_service.address)}"
+        self._raiden_service.handle_and_track_state_change(state_change)
+        try:
+            # waits on _stop_event.ready()
+            self._global_send_worker()
+            # children crashes should throw an exception here
+        except gevent.GreenletExit:  # killed without exception
+            self._stop_event.set()
+            gevent.killall(self.greenlets)  # kill children
+            raise  # re-raise to keep killed status
+        except Exception:
+            self.stop()  # ensure cleanup and wait on subtasks
+            raise
 
 class NodeTransport:
 

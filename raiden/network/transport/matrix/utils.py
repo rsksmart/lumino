@@ -426,7 +426,7 @@ def login_or_register(
     )
     if _match_user:  # same user as before
         assert prev_user_id is not None
-        log.debug("Trying previous user login", user_id=prev_user_id)
+        log.info("Trying previous user login", user_id=prev_user_id)
         client.set_access_token(user_id=prev_user_id, token=prev_access_token)
 
         try:
@@ -441,7 +441,7 @@ def login_or_register(
             prev_sync_limit = client.set_sync_limit(0)
             client._sync()  # initial_sync
             client.set_sync_limit(prev_sync_limit)
-            log.debug("Success. Valid previous credentials", user_id=prev_user_id)
+            log.info("Success. Valid previous credentials", user_id=prev_user_id)
             return client.get_user(client.user_id)
     elif prev_user_id:
         log.debug(
