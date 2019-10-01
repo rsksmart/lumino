@@ -477,7 +477,8 @@ class NodeTransportState(State):
 
     def to_dict(self) -> Dict[str, Any]:
         if self.clients_last_transport_authdata is None:
-            self.clients_last_transport_authdata = []
+            light_client_transport_state = LightClientTransportState(b'00000000000000000000', "")
+            self.clients_last_transport_authdata.append(light_client_transport_state)
         return {
             "hub_last_transport_authdata": self.hub_last_transport_authdata,
             "clients_last_transport_authdata": [

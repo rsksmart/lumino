@@ -929,7 +929,7 @@ class RaidenService(Runnable):
             for event in event_queue:
                 message = message_from_sendevent(event)
                 self.sign(message)
-                self.transport[0].send_async(queue_identifier, message)
+                self.transport.hub_transport.send_async(queue_identifier, message)
 
     def _initialize_monitoring_services_queue(self, chain_state: ChainState):
         """Send the monitoring requests for all current balance proofs.

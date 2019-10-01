@@ -160,7 +160,7 @@ class RaidenEventHandler(EventHandler):
     ):
         mediated_transfer_message = message_from_sendevent(send_locked_transfer)
         raiden.sign(mediated_transfer_message)
-        raiden.transport[0].send_async(
+        raiden.transport.hub_transport.send_async(
             send_locked_transfer.queue_identifier, mediated_transfer_message
         )
 
@@ -168,13 +168,13 @@ class RaidenEventHandler(EventHandler):
     def handle_send_secretreveal(raiden: "RaidenService", reveal_secret_event: SendSecretReveal):
         reveal_secret_message = message_from_sendevent(reveal_secret_event)
         raiden.sign(reveal_secret_message)
-        raiden.transport[0].send_async(reveal_secret_event.queue_identifier, reveal_secret_message)
+        raiden.transport.hub_transport.send_async(reveal_secret_event.queue_identifier, reveal_secret_message)
 
     @staticmethod
     def handle_send_balanceproof(raiden: "RaidenService", balance_proof_event: SendBalanceProof):
         unlock_message = message_from_sendevent(balance_proof_event)
         raiden.sign(unlock_message)
-        raiden.transport[0].send_async(balance_proof_event.queue_identifier, unlock_message)
+        raiden.transport.hub_transport.send_async(balance_proof_event.queue_identifier, unlock_message)
 
     @staticmethod
     def handle_send_secretrequest(
@@ -185,7 +185,7 @@ class RaidenEventHandler(EventHandler):
 
         secret_request_message = message_from_sendevent(secret_request_event)
         raiden.sign(secret_request_message)
-        raiden.transport[0].send_async(secret_request_event.queue_identifier, secret_request_message)
+        raiden.transport.hub_transport.send_async(secret_request_event.queue_identifier, secret_request_message)
 
     @staticmethod
     def handle_send_refundtransfer(
@@ -193,7 +193,7 @@ class RaidenEventHandler(EventHandler):
     ):
         refund_transfer_message = message_from_sendevent(refund_transfer_event)
         raiden.sign(refund_transfer_message)
-        raiden.transport[0].send_async(
+        raiden.transport.hub_transport.send_async(
             refund_transfer_event.queue_identifier, refund_transfer_message
         )
 
@@ -201,7 +201,7 @@ class RaidenEventHandler(EventHandler):
     def handle_send_processed(raiden: "RaidenService", processed_event: SendProcessed):
         processed_message = message_from_sendevent(processed_event)
         raiden.sign(processed_message)
-        raiden.transport[0].send_async(processed_event.queue_identifier, processed_message)
+        raiden.transport.hub_transport.send_async(processed_event.queue_identifier, processed_message)
 
     @staticmethod
     def handle_paymentsentsuccess(
