@@ -96,8 +96,8 @@ def _setup_matrix(config):
             light_client_transport = MatrixLightClientTransport(config["transport"]["matrix"],
                                                                 light_client['password'],
                                                                 light_client['display_name'],
-                                                                light_client['address'],
-                                                                "")
+                                                                light_client['seed_retry'],
+                                                                light_client['address'])
             light_client_transports.append(light_client_transport)
 
         hub_transport = MatrixTransport(config["transport"]["matrix"])

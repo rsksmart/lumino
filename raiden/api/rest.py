@@ -1830,7 +1830,7 @@ class RestAPI:
 
         if address_recovered_from_signed_password != address or \
             address_recovered_from_signed_display_name != address or \
-            address_recovered_from_signed_seed_retry:
+            address_recovered_from_signed_seed_retry != address:
             return api_error(
                 errors="The signed data provided is not valid.",
                 status_code=HTTPStatus.CONFLICT,
@@ -1840,8 +1840,6 @@ class RestAPI:
             to_normalized_address(address),
             signed_password,
             signed_display_name,
-            signed_seed_retry,
-            password,
-            display_name)
+            signed_seed_retry)
 
         return api_response(light_client)

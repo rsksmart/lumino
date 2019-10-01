@@ -471,8 +471,10 @@ class LightClientSchema(BaseSchema):
     address = AddressField(required=True)
     signed_password = fields.String(required=True)
     signed_display_name = fields.String(required=True)
+    signed_seed_retry = fields.String(required=True)
     password = fields.String(required=True)
     display_name = fields.String(required=True)
+    seed_retry = fields.String(required=True)
 
     class Meta:
         strict = True

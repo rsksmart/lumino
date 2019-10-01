@@ -348,7 +348,7 @@ def login_or_register_light_client(client: GMatrixClient, **kwargs):
     if user is None:
         # password is signed server address
         password = descrypt_light_client_password_signature.decode("utf-8")
-        seed = decode_hex(desctypt_seed_retry_signature.decode("utf-8"))
+        seed = decode_hex(desctypt_seed_retry_signature.decode("utf-8"))[-32:]
 
         _try_login_or_register(client, base_username, password, server_name, server_url, seed)
 

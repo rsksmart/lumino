@@ -476,6 +476,8 @@ class NodeTransportState(State):
         return not self.__eq__(other)
 
     def to_dict(self) -> Dict[str, Any]:
+        if self.clients_last_transport_authdata is None:
+            self.clients_last_transport_authdata = []
         return {
             "hub_last_transport_authdata": self.hub_last_transport_authdata,
             "clients_last_transport_authdata": [

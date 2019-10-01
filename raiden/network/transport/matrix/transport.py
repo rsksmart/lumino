@@ -5,7 +5,7 @@ from urllib.parse import urlparse
 
 import gevent
 import structlog
-from eth_utils import is_binary_address, to_checksum_address, to_normalized_address
+from eth_utils import is_binary_address, to_checksum_address, to_normalized_address, to_canonical_address
 from gevent.event import Event
 from gevent.lock import Semaphore
 from gevent.queue import JoinableQueue
@@ -1401,6 +1401,7 @@ class MatrixLightClientTransport(MatrixTransport):
             prev_access_token=prev_access_token,
             encrypted_light_client_password_signature=self._encrypted_light_client_password_signature,
             encrypted_light_client_display_name_signature=self._encrypted_light_client_display_name_signature,
+            encrypted_light_client_seed_for_retry_signature=self._encrypted_light_client_seed_for_retry_signature,
             private_key_hub=self._raiden_service.config["privatekey"].hex(),
             light_client_address=self._address
         )
@@ -1448,7 +1449,7 @@ class MatrixLightClientTransport(MatrixTransport):
         # dispatch auth data on first scheduling after start
         print("HOLA ESTOY EN EL RUN DE MATRIX LIGHT CLIENT TRANSPORT!")
         state_change = ActionUpdateTransportAuthData(f"{self._user_id}/{self._client.api.token}", self._address)
-        self.greenlet.name = f"MatrixLightClientTransport._run light_client:{pex(self._address)}"
+        self.greenlet.name = f"MatrixLightClientTransport._run light_client:{to_canonical_address(self._address)}"
         self._raiden_service.handle_and_track_state_change(state_change)
         try:
             # waits on _stop_event.ready()

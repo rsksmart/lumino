@@ -1477,13 +1477,15 @@ class RaidenAPI:
 
             pubhex = self.raiden.config["pubkey"].hex()
             encrypt_signed_password = encrypt(pubhex, signed_password.encode())
-            encrypt_signed_display_name = encrypt(pubhex,signed_display_name.encode())
+            encrypt_signed_display_name = encrypt(pubhex, signed_display_name.encode())
+            encrypt_signed_seed_retry = encrypt(pubhex, signed_seed_retry.encode())
 
             result = self.raiden.wal.storage.save_light_client(
                 api_key=api_key,
                 address=address,
                 encrypt_signed_password=encrypt_signed_password.hex(),
-                encrypt_signed_display_name=encrypt_signed_display_name.hex())
+                encrypt_signed_display_name=encrypt_signed_display_name.hex(),
+                encrypt_signed_seed_retry=encrypt_signed_seed_retry.hex())
 
             if result > 0:
                 result = {"api_key": api_key,
