@@ -139,6 +139,7 @@ from raiden.billing.invoices.constants.errors import AUTO_PAY_INVOICE, INVOICE_E
 from raiden.utils.typing import PaymentID
 
 from raiden.utils.signer import recover
+from raiden.ui.app import get_matrix_light_client_instance
 
 log = structlog.get_logger(__name__)
 
@@ -1925,6 +1926,20 @@ class RestAPI:
             signed_password,
             signed_display_name,
             signed_seed_retry)
+
+        if light_client is not None and light_client["result_code"] == 0:
+            matrix_light_client_transport_instance = get_matrix_light_client_instance(
+                self.raiden_api.raiden.config["transport"]["matrix"],
+                password=light_client["encrypt_signed_password"],
+                display_name=light_client["encrypt_signed_display_name"],
+                seed_retry=light_client["encrypt_signed_seed_retry"],
+                address=light_client["address"])
+
+            self.raiden_api.raiden.start_transport_in_runtime(transport=matrix_light_client_transport_instance,
+                                                              chain_state=views.state_from_raiden(
+                                                                  self.raiden_api.raiden))
+
+            self.raiden_api.raiden.transport.light_client_transports.append(matrix_light_client_transport_instance)
 
         return api_response(light_client)
 

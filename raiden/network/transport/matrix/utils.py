@@ -356,6 +356,8 @@ def login_or_register_light_client(client: GMatrixClient, **kwargs):
         user = client.get_user(client.user_id)
         user.set_display_name(name)
 
+    log.info("Login or register for LightCLient with address " + base_username + " is successfully run")
+
     return user
 
 
@@ -488,6 +490,7 @@ def login_or_register(
         user = client.get_user(client.user_id)
         user.set_display_name(name)
 
+    log.info("Login or register for Hub Node is successfully run")
     return user
 
 

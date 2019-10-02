@@ -644,6 +644,14 @@ class RaidenService(Runnable):
     def __repr__(self):
         return f"<{self.__class__.__name__} node:{pex(self.address)}>"
 
+    def start_transport_in_runtime(self, transport, chain_state: ChainState):
+        # Start hub transport
+        transport.start(
+            raiden_service=self,
+            message_handler=self.message_handler,
+            prev_auth_data=chain_state.last_node_transport_state_authdata.hub_last_transport_authdata,
+        )
+
     def _start_transport(self, chain_state: ChainState):
         """ Initialize the transport and related facilities.
 

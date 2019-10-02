@@ -364,8 +364,6 @@ class MatrixTransport(Runnable):
         else:
             prev_user_id = prev_access_token = None
 
-        print("HOLAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
-
         login_or_register(
             client=self._client,
             signer=self._raiden_service.signer,
@@ -414,7 +412,6 @@ class MatrixTransport(Runnable):
     def _run(self):
         """ Runnable main method, perform wait on long-running subtasks """
         # dispatch auth data on first scheduling after start
-        print("HOLA ESTOY EN EL RUN DE MATRIXTRANSPORT")
         state_change = ActionUpdateTransportAuthData(f"{self._user_id}/{self._client.api.token}",
                                                      self._raiden_service.address)
         self.greenlet.name = f"MatrixTransport._run node:{pex(self._raiden_service.address)}"
@@ -1392,8 +1389,6 @@ class MatrixLightClientTransport(MatrixTransport):
         else:
             prev_user_id = prev_access_token = None
 
-        print("Start lightlicnet transport is HERE")
-
         login_or_register_light_client(
             client=self._client,
             prev_user_id=prev_user_id,
@@ -1446,7 +1441,6 @@ class MatrixLightClientTransport(MatrixTransport):
     def _run(self):
         """ Runnable main method, perform wait on long-running subtasks """
         # dispatch auth data on first scheduling after start
-        print("HOLA ESTOY EN EL RUN DE MATRIX LIGHT CLIENT TRANSPORT!")
         state_change = ActionUpdateTransportAuthData(f"{self._user_id}/{self._client.api.token}", self._address)
         self.greenlet.name = f"MatrixLightClientTransport._run light_client:{to_canonical_address(self._address)}"
         self._raiden_service.handle_and_track_state_change(state_change)
