@@ -123,8 +123,7 @@ from raiden.network.transport.matrix.utils import (
 )
 
 from urllib.parse import urlparse
-from cryptography.fernet import Fernet
-
+from raiden.ui.app import get_matrix_light_client_instance
 
 def event_filter_for_payments(
     event: architecture.Event,
@@ -1559,6 +1558,35 @@ class RaidenAPI:
                 encrypt_signed_password=encrypt_signed_password.hex(),
                 encrypt_signed_display_name=encrypt_signed_display_name.hex(),
                 encrypt_signed_seed_retry=encrypt_signed_seed_retry.hex())
+
+            matrix_light_client_instance = get_matrix_light_client_instance(self.raiden.config["transport"]["matrix"],
+                                                                            password=signed_password.encode(),
+                                                                            display_name=signed_display_name.encode(),
+                                                                            seed_retry=signed_seed_retry.encode(),
+                                                                            address=address)
+
+            # light_client_transport = MatrixLightClientTransport(self.raiden.config["transport"]["matrix"],
+            #                                                     light_client['password'],
+            #                                                     light_client['display_name'],
+            #                                                     light_client['seed_retry'],
+            #                                                     light_client['address'])
+
+            # Start hub transport
+            # self.transport.hub_transport.start(
+            #     raiden_service=self,
+            #     message_handler=self.message_handler,
+            #     prev_auth_data=chain_state.last_node_transport_state_authdata.hub_last_transport_authdata,
+            # )
+
+            chain_state = views.state_from_raiden(self.raiden)
+
+            # light_client_transport.start(
+            #     raiden_service=self.raiden,
+            #     message_handler=self.raiden.message_handler,
+            #     prev_auth_data=None
+            # )
+            #
+            # self.transport.light_client_transports.append(light_client_transport)
 
             if result > 0:
                 result = {"api_key": api_key,

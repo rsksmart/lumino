@@ -93,11 +93,12 @@ def _setup_matrix(config):
 
         light_client_transports = []
         for light_client in light_clients:
-            light_client_transport = MatrixLightClientTransport(config["transport"]["matrix"],
-                                                                light_client['password'],
-                                                                light_client['display_name'],
-                                                                light_client['seed_retry'],
-                                                                light_client['address'])
+            light_client_transport = get_matrix_light_client_instance(config["transport"]["matrix"],
+                                             light_client['password'],
+                                             light_client['display_name'],
+                                             light_client['seed_retry'],
+                                             light_client['address'])
+
             light_client_transports.append(light_client_transport)
 
         hub_transport = MatrixTransport(config["transport"]["matrix"])
@@ -109,6 +110,11 @@ def _setup_matrix(config):
         sys.exit(1)
 
     return node_transport
+
+
+def get_matrix_light_client_instance(config, password, display_name, seed_retry, address):
+    light_client_transport = MatrixLightClientTransport(config, password, display_name, seed_retry, address)
+    return light_client_transport
 
 
 def _setup_web3(eth_rpc_endpoint):
