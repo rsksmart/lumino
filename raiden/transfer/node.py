@@ -31,7 +31,7 @@ from raiden.transfer.mediated_transfer.state_change import (
     ReceiveSecretReveal,
     ReceiveTransferRefund,
     ReceiveTransferRefundCancelRoute,
-)
+    ActionInitInitiatorLight)
 from raiden.transfer.state import (
     ChainState,
     InitiatorTask,
@@ -410,7 +410,7 @@ def subdispatch_targettask(
                 token_network_address=token_network_identifier,
                 channel_identifier=channel_identifier,
             ),
-            address=state_change.transfer.target
+            address=chain_state.our_address
         )
 
     if channel_state:
@@ -560,13 +560,14 @@ def handle_contract_receive_channel_closed(
     chain_state: ChainState, state_change: ContractReceiveChannelClosed
 ) -> TransitionResult[ChainState]:
     # cleanup queue for channel
-    channel_state = views.get_channelstate_by_canonical_identifier(
+    channel_state = views.get_channelstate_by_canonical_identifier_and_address(
         chain_state=chain_state,
         canonical_identifier=CanonicalIdentifier(
             chain_identifier=chain_state.chain_id,
             token_network_address=state_change.token_network_identifier,
             channel_identifier=state_change.channel_identifier,
         ),
+        address=chain_state.our_address
     )
     if channel_state:
         queue_id = QueueIdentifier(
@@ -680,6 +681,18 @@ def handle_init_initiator(
     return subdispatch_initiatortask(
         chain_state, state_change, transfer.token_network_identifier, secrethash
     )
+
+
+def handle_init_initiator_light(
+    chain_state: ChainState, state_change: ActionInitInitiatorLight
+) -> TransitionResult[ChainState]:
+    transfer = state_change.transfer
+    secrethash = transfer.secrethash
+
+    return subdispatch_initiatortask(
+        chain_state, state_change, transfer.token_network_identifier, secrethash
+    )
+
 
 
 def handle_init_mediator(
@@ -886,6 +899,8 @@ def handle_state_change(
     elif type(state_change) == ReceiveLockExpired:
         assert isinstance(state_change, ReceiveLockExpired), MYPY_ANNOTATION
         iteration = handle_receive_lock_expired(chain_state, state_change)
+    elif type(state_change) == ActionInitInitiatorLight:
+        iteration = handle_init_initiator_light(chain_state, state_change)
 
     assert chain_state is not None, "chain_state must be set"
     return iteration

@@ -503,7 +503,7 @@ def validate_userid_signature(user: User) -> Optional[Address]:
     address: Address = to_canonical_address(encoded_address)
 
     try:
-        displayname = user.get_display_name()
+        displayname ="0xe38cc21ba7285fce079ae74a1137ee9f0c874e266ef5212d4ea0ece35dd1baf64c9a8bd53acddfc9308b326220ec834e7758d155620afa3dc189029fa1de43671b"
         recovered = recover(data=user.user_id.encode(), signature=decode_hex(displayname))
         if not (address and recovered and recovered == address):
             return None

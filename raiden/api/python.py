@@ -7,7 +7,7 @@ import hashlib
 from binascii import hexlify
 import os
 import dateutil.parser
-from datetime import datetime
+from datetime import datetime, date
 from dateutil.relativedelta import relativedelta
 from eth_utils import is_binary_address, to_checksum_address, to_canonical_address, to_normalized_address, decode_hex, \
     encode_hex
@@ -23,7 +23,7 @@ from raiden.constants import (
     RED_EYES_PER_TOKEN_NETWORK_LIMIT,
     UINT256_MAX,
     Environment,
-)
+    EMPTY_PAYMENT_HASH_INVOICE)
 from raiden.exceptions import (
     AlreadyRegisteredTokenAddress,
     ChannelNotFound,
@@ -44,11 +44,15 @@ from raiden.exceptions import (
     UnknownTokenAddress,
     InvoiceCoding,
     UnhandledLightClient)
+from raiden.lightclient.light_client_message_handler import LightClientMessageHandler
 from raiden.lightclient.light_client_service import LightClientService
+from raiden.lightclient.light_client_utils import LightClientUtils
+from raiden.lightclient.lightclientmessages.hub_message import HubMessage
+from raiden.lightclient.lightclientmessages.light_client_payment import LightClientPayment, LightClientPaymentStatus
 
-from raiden.messages import RequestMonitoring
+from raiden.messages import RequestMonitoring, LockedTransfer
 from raiden.settings import DEFAULT_RETRY_TIMEOUT, DEVELOPMENT_CONTRACT_VERSION
-from raiden.transfer import architecture, views
+from raiden.transfer import architecture, views, channel
 from raiden.transfer.events import (
     EventPaymentReceivedSuccess,
     EventPaymentSentFailed,
@@ -89,7 +93,7 @@ from raiden.utils.typing import (
     TokenNetworkAddress,
     TokenNetworkID,
     Tuple,
-    SignedTransaction)
+    SignedTransaction, InitiatorAddress, TargetAddress, PaymentWithFeeAmount)
 
 from raiden.rns_constants import RNS_ADDRESS_ZERO
 from raiden.utils.rns import is_rns_address
@@ -994,6 +998,75 @@ class RaidenAPI:
         )
         return payment_status
 
+    def transfer_async_light(
+        self,
+        registry_address: PaymentNetworkID,
+        token_address: TokenAddress,
+        amount: TokenAmount,
+        creator: Address,
+        target: Address,
+        identifier: PaymentID,
+        secrethash: SecretHash,
+        signed_locked_transfer: LockedTransfer,
+        payment_hash_invoice: PaymentHashInvoice = None
+    ):
+        current_state = views.state_from_raiden(self.raiden)
+        payment_network_identifier = self.raiden.default_registry.address
+
+        if not isinstance(amount, int):
+            raise InvalidAmount("Amount not a number")
+
+        if amount <= 0:
+            raise InvalidAmount("Amount negative")
+
+        if amount > UINT256_MAX:
+            raise InvalidAmount("Amount too large")
+
+        if not is_binary_address(token_address):
+            raise InvalidAddress("token address is not valid.")
+
+        if token_address not in views.get_token_identifiers(current_state, registry_address):
+            raise UnknownTokenAddress("Token address is not known.")
+
+        if not is_binary_address(target):
+            raise InvalidAddress("target address is not valid.")
+
+        valid_tokens = views.get_token_identifiers(
+            views.state_from_raiden(self.raiden), registry_address
+        )
+        if token_address not in valid_tokens:
+            raise UnknownTokenAddress("Token address is not known.")
+
+        if secrethash is not None and not isinstance(secrethash, typing.T_SecretHash):
+            raise InvalidSecretHash("secrethash is not valid.")
+
+        log.debug(
+            "Initiating transfer light",
+            initiator=pex(creator),
+            target=pex(target),
+            token=pex(token_address),
+            amount=amount,
+            identifier=identifier,
+            payment_hash_invoice=payment_hash_invoice
+        )
+
+        token_network_identifier = views.get_token_network_identifier_by_token_address(
+            chain_state=current_state,
+            payment_network_id=payment_network_identifier,
+            token_address=token_address,
+        )
+        payment_status = self.raiden.mediated_transfer_async_light(
+            token_network_identifier=token_network_identifier,
+            amount=amount,
+            creator=creator,
+            target=target,
+            identifier=identifier,
+            secrethash=secrethash,
+            payment_hash_invoice=payment_hash_invoice,
+            signed_locked_transfer=signed_locked_transfer
+        )
+        return None
+
     def get_raiden_events_payment_history_with_timestamps_v2(
         self,
         token_network_identifier: typing.Address = None,
@@ -1496,3 +1569,60 @@ class RaidenAPI:
             result = {"message": "The client you are trying to register has already registered."}
 
         return result
+
+    def create_light_client_payment(
+        self,
+        registry_address: typing.PaymentNetworkID,
+        creator_address: typing.AddressHex,
+        partner_address: typing.AddressHex,
+        token_address: typing.TokenAddress,
+        amount: typing.TokenAmount,
+        secrethash: typing.SecretHash
+    ) -> HubMessage:
+        channel_state = views.get_channelstate_for(
+            views.state_from_raiden(self.raiden),
+            registry_address,
+            token_address,
+            creator_address,
+            partner_address,
+        )
+        if channel_state:
+            chain_state = views.state_from_raiden(self.raiden)
+            # Build autogenerated values
+            lt_autogenerated_values = LightClientUtils.build_lt_autogen_values(chain_state, channel_state)
+            # Create locked transfer event
+            locked_transfer, merkle_tree_state = channel.create_sendlockedtransfer(
+                channel_state,
+                InitiatorAddress(creator_address),
+                TargetAddress(partner_address),
+                PaymentWithFeeAmount(amount),
+                lt_autogenerated_values.message_identifier,
+                lt_autogenerated_values.payment_identifier,
+                EMPTY_PAYMENT_HASH_INVOICE,
+                lt_autogenerated_values.lock_expiration,
+                secrethash)
+
+            # Get the LockedTransfer message
+            locked_transfer = LockedTransfer.from_event(locked_transfer)
+            # Create the light_client_payment
+            is_lc_initiator = 1
+            payment = LightClientPayment(creator_address, partner_address,
+                                         is_lc_initiator, channel_state.token_network_identifier,
+                                         amount,
+                                         str(date.today()),
+                                         LightClientPaymentStatus.Pending)
+            # Persist the light_client_protocol_message associated
+            order = 0
+            payment_id = LightClientMessageHandler.store_light_client_payment(payment, self.raiden.wal)
+            light_client_message_id = LightClientMessageHandler.store_light_client_protocol_message(
+                locked_transfer,
+                False,
+                payment_id,
+                order,
+                self.raiden.wal
+            )
+
+            return HubMessage(light_client_message_id, order, locked_transfer)
+        else:
+            raise ChannelNotFound("Channel with given partner address doesnt exists")
+

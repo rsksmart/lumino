@@ -20,6 +20,8 @@ from raiden_webui import RAIDEN_WEBUI_PATH
 from raiden.api.validations.api_error_builder import ApiErrorBuilder
 from raiden.api.validations.api_status_codes import ERROR_STATUS_CODES
 from raiden.api.validations.channel_validator import ChannelValidator
+from raiden.lightclient.light_client_service import LightClientService
+from raiden.messages import LockedTransfer
 from raiden.rns_constants import RNS_ADDRESS_ZERO
 from raiden.utils.rns import is_rns_address
 from webargs.flaskparser import parser
@@ -76,9 +78,11 @@ from raiden.api.v1.resources import (
     ChannelsResourceLight,
     LightChannelsResourceByTokenAndPartnerAddress,
     LightClientMatrixCredentialsBuildResource,
-    LightClientResource)
+    LightClientResource,
+    PaymentLightResource
+)
 
-from raiden.constants import GENESIS_BLOCK_NUMBER, UINT256_MAX, Environment
+from raiden.constants import GENESIS_BLOCK_NUMBER, UINT256_MAX, Environment, EMPTY_PAYMENT_HASH_INVOICE
 
 from raiden.exceptions import (
     AddressWithoutCode,
@@ -103,7 +107,7 @@ from raiden.exceptions import (
     TokenNotRegistered,
     TransactionThrew,
     UnknownTokenAddress,
-    RawTransactionFailed, UnhandledLightClient, RaidenRecoverableError)
+    RawTransactionFailed, UnhandledLightClient, RaidenRecoverableError, InvalidPaymentIdentifier)
 from raiden.transfer import channel, views
 from raiden.transfer.events import (
     EventPaymentReceivedSuccess,
@@ -116,9 +120,8 @@ from raiden.utils import (
     optional_address_to_string,
     pex,
     sha3,
-    split_endpoint,
     typing,
-)
+    random_secret, Secret)
 from raiden.utils.runnable import Runnable
 
 from eth_utils import (
@@ -133,6 +136,7 @@ from raiden.billing.invoices.decoder.invoice_decoder import get_tags_dict, get_u
 from dateutil.relativedelta import relativedelta
 from raiden.billing.invoices.util.time_util import is_invoice_expired, UTC_FORMAT
 from raiden.billing.invoices.constants.errors import AUTO_PAY_INVOICE, INVOICE_EXPIRED, INVOICE_PAID
+from raiden.utils.typing import PaymentID
 
 from raiden.utils.signer import recover
 
@@ -142,7 +146,6 @@ URLS_V1 = [
     ("/address", AddressResource),
     ("/channels", ChannelsResource),
     ("/light_channels", ChannelsResourceLight),
-
     ("/channels/<hexaddress:token_address>", ChannelsResourceByTokenAddress),
     (
         "/channels/<hexaddress:token_address>/<hexaddress:partner_address>",
@@ -162,6 +165,9 @@ URLS_V1 = [
         PaymentResource,
         "token_target_paymentresource",
     ),
+    ("/payments_light", PaymentLightResource),
+    ("/payments_light/<int:offset>", PaymentLightResource, "get_paymentmessageresource"),
+
     ("/tokens", TokensResource),
     ("/tokens/<hexaddress:token_address>/partners", PartnersResourceByTokenAddress),
     ("/tokens/<hexaddress:token_address>", RegisterTokenResource),
@@ -1448,6 +1454,83 @@ class RestAPI:
         result = self.payment_schema.dump(payment)
         return api_response(result=result.data)
 
+    def initiate_payment_light(
+        self,
+        registry_address: typing.PaymentNetworkID,
+        token_address: typing.TokenAddress,
+        creator_address: typing.Address,
+        target_address: typing.Address,
+        amount: typing.TokenAmount,
+        payment_identifier: typing.PaymentID,
+        message_identifier: typing.PaymentID,
+        secret_hash: typing.SecretHash,
+        payment_hash_invoice: typing.PaymentHashInvoice,
+        signed_locked_transfer: LockedTransfer
+    ):
+        log.debug(
+            "Initiating payment light",
+            registry_address=to_checksum_address(registry_address),
+            token_address=to_checksum_address(token_address),
+            creator_address=creator_address,
+            target_address=target_address,
+            amount=amount,
+            payment_identifier=payment_identifier,
+            secret_hash=secret_hash,
+        )
+
+        if payment_identifier is None:
+            raise InvalidPaymentIdentifier("Payment identifier isnt present")
+
+        if message_identifier is None:
+            raise InvalidPaymentIdentifier("Message identifier isnt present")
+
+        try:
+            self.raiden_api.transfer_async_light(
+                registry_address=registry_address,
+                token_address=token_address,
+                creator=creator_address,
+                target=target_address,
+                amount=amount,
+                identifier=payment_identifier,
+                secrethash=secret_hash,
+                payment_hash_invoice=payment_hash_invoice,
+                signed_locked_transfer=signed_locked_transfer
+            )
+        except (
+            InvalidAmount,
+            InvalidAddress,
+            InvalidSecretHash,
+            PaymentConflict,
+            UnknownTokenAddress,
+            InvalidPaymentIdentifier
+        ) as e:
+            return api_error(errors=str(e), status_code=HTTPStatus.CONFLICT)
+        except InsufficientFunds as e:
+            return api_error(errors=str(e), status_code=HTTPStatus.PAYMENT_REQUIRED)
+
+        # if payment_status.payment_done.get() is False:
+        #     return api_error(
+        #         errors="Payment couldn't be completed "
+        #                "(insufficient funds, no route to target or target offline).",
+        #         status_code=HTTPStatus.CONFLICT,
+        #     )
+        #
+        # secret = payment_status.payment_done.get()
+        #
+        # payment = {
+        #     "initiator_address": self.raiden_api.address,
+        #     "registry_address": registry_address,
+        #     "token_address": token_address,
+        #     "target_address": target_address,
+        #     "amount": amount,
+        #     "identifier": identifier,
+        #     "secret": secret,
+        #     "secret_hash": sha3(secret),
+        # }
+        # result = self.payment_schema.dump(payment)
+        # return api_response(result=result.data)
+        return None
+
     def _deposit_light(
         self,
         registry_address: typing.PaymentNetworkID,
@@ -1803,6 +1886,7 @@ class RestAPI:
 
         return api_response(invoice)
 
+
     def get_data_for_registration_request(self, address):
         data_to_sign = self.raiden_api.get_data_for_registration_request(address)
         return api_response(data_to_sign)
@@ -1843,3 +1927,69 @@ class RestAPI:
             signed_seed_retry)
 
         return api_response(light_client)
+
+    def get_light_client_protocol_message(self, offset):
+        headers = request.headers
+        api_key = headers.get("x-api-key")
+        if not api_key:
+            return ApiErrorBuilder.build_and_log_error(errors="Missing api_key auth header",
+                                                       status_code=HTTPStatus.BAD_REQUEST, log=log)
+
+        light_client = LightClientService.get_by_api_key(api_key, self.raiden_api.raiden.wal)
+        if not light_client:
+            return ApiErrorBuilder.build_and_log_error(
+                errors="There is no light client associated with the api key provided",
+                status_code=HTTPStatus.FORBIDDEN, log=log)
+
+        messages = LightClientService.get_light_client_messages(offset, self.raiden_api.raiden.wal)
+        response = [message.to_dict() for message in messages]
+        return api_response(response)
+
+    def receive_light_client_protocol_message(self,
+                                              message_id: int,
+                                              message_order: int,
+                                              message: Dict):
+        # TODO check if message is coherent
+        # TODO call from dict will work but we need to validate each parameter in order to know if there are no extra or missing params.
+        # TODO we also need to check if message id an order received make sense
+
+        #FIXME Should take the secret from the message receivend from LC
+
+        lt = LockedTransfer.from_dict(message)
+        payment_request = LightClientService.get_light_client_payment(message_id, self.raiden_api.raiden.wal)
+        self.initiate_payment_light(self.raiden_api.raiden.default_registry.address, lt.token, lt.initiator,
+                                    lt.target, lt.locked_amount, lt.payment_identifier, payment_request.payment_id, lt.lock.secrethash,
+                                    EMPTY_PAYMENT_HASH_INVOICE, lt)
+
+        return api_response("Should save all the messages")
+
+    def create_light_client_payment(
+        self,
+        registry_address: typing.PaymentNetworkID,
+        creator_address: typing.AddressHex,
+        partner_address: typing.AddressHex,
+        token_address: typing.TokenAddress,
+        amount: typing.TokenAmount,
+        secrethash: typing.SecretHash
+    ):
+        headers = request.headers
+        api_key = headers.get("x-api-key")
+        if not api_key:
+            return ApiErrorBuilder.build_and_log_error(errors="Missing api_key auth header",
+                                                       status_code=HTTPStatus.BAD_REQUEST, log=log)
+
+        light_client = LightClientService.get_by_api_key(api_key, self.raiden_api.raiden.wal)
+        if not light_client:
+            return ApiErrorBuilder.build_and_log_error(
+                errors="There is no light client associated with the api key provided",
+                status_code=HTTPStatus.FORBIDDEN, log=log)
+        try:
+            locked_transfer_wrapper = self.raiden_api.create_light_client_payment(registry_address, creator_address,
+                                                                                  partner_address, token_address,
+                                                                                  amount, secrethash)
+            return api_response(locked_transfer_wrapper.to_dict())
+        except ChannelNotFound as e:
+            return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.NOT_FOUND, log=log)
+        except UnhandledLightClient as e:
+            return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.FORBIDDEN, log=log)
+

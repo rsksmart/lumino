@@ -42,7 +42,7 @@ from raiden.transfer.mediated_transfer.events import (
     SendRefundTransfer,
     SendSecretRequest,
     SendSecretReveal,
-)
+    SendLockedTransferLight)
 from raiden.transfer.state import ChainState, NettingChannelEndState
 from raiden.transfer.utils import (
     get_event_with_balance_proof_by_balance_hash,
@@ -97,6 +97,7 @@ class EventHandler(ABC):
 
 class RaidenEventHandler(EventHandler):
     def on_raiden_event(self, raiden: "RaidenService", chain_state: ChainState, event: Event):
+        print("On raiden event "+str(type(event)))
         # pylint: disable=too-many-branches
         if type(event) == SendLockExpired:
             assert isinstance(event, SendLockExpired), MYPY_ANNOTATION
@@ -104,6 +105,9 @@ class RaidenEventHandler(EventHandler):
         elif type(event) == SendLockedTransfer:
             assert isinstance(event, SendLockedTransfer), MYPY_ANNOTATION
             self.handle_send_lockedtransfer(raiden, event)
+        elif type(event) == SendLockedTransferLight:
+            assert isinstance(event, SendLockedTransferLight), MYPY_ANNOTATION
+            self.handle_send_lockedtransfer_light(raiden, event)
         elif type(event) == SendSecretReveal:
             assert isinstance(event, SendSecretReveal), MYPY_ANNOTATION
             self.handle_send_secretreveal(raiden, event)
@@ -163,6 +167,19 @@ class RaidenEventHandler(EventHandler):
         raiden.transport.hub_transport.send_async(
             send_locked_transfer.queue_identifier, mediated_transfer_message
         )
+
+    @staticmethod
+    def handle_send_lockedtransfer_light(
+        raiden: "RaidenService", send_locked_transfer_light: SendLockedTransferLight
+    ):
+        mediated_transfer_message = send_locked_transfer_light.signed_locked_transfer
+        raiden.transport[1].send_async(
+            send_locked_transfer_light.queue_identifier, mediated_transfer_message
+        )
+
+
+
+
 
     @staticmethod
     def handle_send_secretreveal(raiden: "RaidenService", reveal_secret_event: SendSecretReveal):

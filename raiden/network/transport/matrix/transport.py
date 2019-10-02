@@ -13,6 +13,7 @@ from matrix_client.errors import MatrixRequestError
 
 from raiden.constants import DISCOVERY_DEFAULT_ROOM
 from raiden.exceptions import InvalidAddress, TransportError, UnknownAddress, UnknownTokenAddress
+from raiden.lightclient.light_client_message_handler import LightClientMessageHandler
 from raiden.message_handler import MessageHandler
 from raiden.messages import (
     Delivered,
@@ -531,7 +532,7 @@ class MatrixTransport(Runnable):
                 "Do not use send_async for {} messages".format(message.__class__.__name__)
             )
 
-        self.log.debug(
+        self.log.info(
             "Send async",
             receiver_address=pex(receiver_address),
             message=message,
@@ -645,8 +646,8 @@ class MatrixTransport(Runnable):
             event
             for event in state["events"]
             if event["type"] == "m.room.member"
-            and event["content"].get("membership") == "invite"
-            and event["state_key"] == self._user_id
+               and event["content"].get("membership") == "invite"
+               and event["state_key"] == self._user_id
         ]
         if not invite_events:
             self.log.debug("Invite: no invite event found", room_id=room_id)
@@ -658,8 +659,8 @@ class MatrixTransport(Runnable):
             event
             for event in state["events"]
             if event["type"] == "m.room.member"
-            and event["content"].get("membership") == "join"
-            and event["state_key"] == sender
+               and event["content"].get("membership") == "join"
+               and event["state_key"] == sender
         ]
         if not sender_join_events:
             self.log.debug("Invite: no sender join event", room_id=room_id)
@@ -732,7 +733,6 @@ class MatrixTransport(Runnable):
 
     def _handle_message(self, room, event) -> bool:
         """ Handle text messages sent to listening rooms """
-
         if (
             event["type"] != "m.room.message"
             or event["content"]["msgtype"] != "m.text"
@@ -846,7 +846,7 @@ class MatrixTransport(Runnable):
         self._raiden_service.on_message(delivered)
 
     def _receive_message(self, message: Union[SignedRetrieableMessage, Processed]):
-        print("Message "+str(message))
+        print("---- Matrix Received Message " + str(message))
         assert self._raiden_service is not None
         self.log.debug(
             "Message received",
@@ -903,6 +903,8 @@ class MatrixTransport(Runnable):
         self.log.debug(
             "Send raw", receiver=pex(receiver_address), room=room, data=data.replace("\n", "\\n")
         )
+        print("---- Matrix Send Message " + data)
+
         room.send_text(data)
 
     def _get_room_for_address(self, address: Address, allow_missing_peers=False) -> Optional[Room]:

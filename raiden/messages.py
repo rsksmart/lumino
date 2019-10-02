@@ -29,7 +29,7 @@ from raiden.transfer.mediated_transfer.events import (
     SendRefundTransfer,
     SendSecretRequest,
     SendSecretReveal,
-)
+    SendLockedTransferLight)
 from raiden.transfer.state import BalanceProofSignedState, NettingChannelState
 from raiden.transfer.utils import hash_balance_data
 from raiden.utils import ishash, pex, sha3
@@ -172,6 +172,9 @@ def message_from_sendevent(send_event: SendMessageEvent) -> "Message":
     if type(send_event) == SendLockedTransfer:
         assert isinstance(send_event, SendLockedTransfer), MYPY_ANNOTATION
         message = LockedTransfer.from_event(send_event)
+    elif type(send_event) == SendLockedTransferLight:
+        assert isinstance(send_event, SendLockedTransferLight), MYPY_ANNOTATION
+        # TODO mamrtinez this doesnt makes sense for now since we receive the message directly from the LC. Evaluate.
     elif type(send_event) == SendSecretReveal:
         assert isinstance(send_event, SendSecretReveal), MYPY_ANNOTATION
         message = RevealSecret.from_event(send_event)
@@ -1296,6 +1299,32 @@ class LockedTransfer(LockedTransferBase):
         )
 
         message.signature = decode_hex(data["signature"])
+        return message
+
+    @classmethod
+    def from_dict_unsigned(cls, data):
+        if "payment_hash_invoice" not in data:
+            data["payment_hash_invoice"] = EMPTY_PAYMENT_HASH_INVOICE
+
+        message = cls(
+            chain_id=data["chain_id"],
+            message_identifier=data["message_identifier"],
+            payment_identifier=data["payment_identifier"],
+            payment_hash_invoice=decode_hex(data["payment_hash_invoice"]),
+            nonce=data["nonce"],
+            token_network_address=to_canonical_address(data["token_network_address"]),
+            token=to_canonical_address(data["token"]),
+            channel_identifier=data["channel_identifier"],
+            transferred_amount=data["transferred_amount"],
+            locked_amount=data["locked_amount"],
+            recipient=to_canonical_address(data["recipient"]),
+            locksroot=decode_hex(data["locksroot"]),
+            lock=Lock.from_dict(data["lock"]),
+            target=to_canonical_address(data["target"]),
+            initiator=to_canonical_address(data["initiator"]),
+            fee=data["fee"]
+        )
+
         return message
 
 

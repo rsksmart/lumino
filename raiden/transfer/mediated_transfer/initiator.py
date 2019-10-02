@@ -1,6 +1,9 @@
 import random
 
+from eth_utils import to_canonical_address
+
 from raiden.constants import EMPTY_SECRET, MAXIMUM_PENDING_TRANSFERS
+from raiden.messages import LockedTransfer
 from raiden.settings import DEFAULT_WAIT_BEFORE_LOCK_REMOVAL
 from raiden.transfer import channel
 from raiden.transfer.architecture import Event, TransitionResult
@@ -12,11 +15,11 @@ from raiden.transfer.mediated_transfer.events import (
     EventUnlockSuccess,
     SendLockedTransfer,
     SendSecretReveal,
-)
+    SendLockedTransferLight)
 from raiden.transfer.mediated_transfer.state import (
     InitiatorTransferState,
     TransferDescriptionWithSecretState,
-)
+    LockedTransferUnsignedState, TransferDescriptionWithoutSecretState)
 from raiden.transfer.mediated_transfer.state_change import (
     ReceiveSecretRequest,
     ReceiveSecretReveal,
@@ -26,7 +29,7 @@ from raiden.transfer.state import (
     NettingChannelState,
     RouteState,
     message_identifier_from_prng,
-)
+    BalanceProofUnsignedState, HashTimeLockState)
 from raiden.transfer.state_change import Block, ContractReceiveSecretReveal, StateChange
 from raiden.transfer.utils import is_valid_secret_reveal
 from raiden.utils.typing import (
@@ -44,7 +47,7 @@ from raiden.utils.typing import (
     Secret,
     SecretHash,
     TokenNetworkID,
-)
+    InitiatorAddress, AddressHex)
 
 
 def events_for_unlock_lock(
@@ -179,14 +182,18 @@ def next_channel_from_routes(
     available_routes: List[RouteState],
     channelidentifiers_to_channels: ChannelMap,
     transfer_amount: PaymentAmount,
+    initiator: AddressHex
 ) -> Optional[NettingChannelState]:
     """ Returns the first channel that can be used to start the transfer.
     The routing service can race with local changes, so the recommended routes
     must be validated.
     """
     for route in available_routes:
-        channel_identifier = route.channel_identifier
-        channel_state = channelidentifiers_to_channels.get(channel_identifier)
+        if channelidentifiers_to_channels.get(initiator) is not None:
+            channel_identifier = route.channel_identifier
+            channel_state = channelidentifiers_to_channels.get(initiator).get(channel_identifier)
+        else:
+            continue
 
         if not channel_state:
             continue
@@ -210,6 +217,72 @@ def next_channel_from_routes(
     return None
 
 
+def try_new_route_light(
+    channelidentifiers_to_channels: ChannelMap,
+    available_routes: List[RouteState],
+    transfer_description: TransferDescriptionWithoutSecretState,
+    signed_locked_transfer: LockedTransfer
+) -> TransitionResult[InitiatorTransferState]:
+    channel_state = next_channel_from_routes(
+        available_routes=available_routes,
+        channelidentifiers_to_channels=channelidentifiers_to_channels,
+        transfer_amount=transfer_description.amount,
+        initiator=to_canonical_address(transfer_description.initiator)
+    )
+
+    events: List[Event] = list()
+    if channel_state is None:
+        if not available_routes:
+            reason = "there is no route available"
+        else:
+            reason = "none of the available routes could be used"
+
+        transfer_failed = EventPaymentSentFailed(
+            payment_network_identifier=transfer_description.payment_network_identifier,
+            token_network_identifier=transfer_description.token_network_identifier,
+            identifier=transfer_description.payment_identifier,
+            target=transfer_description.target,
+            reason=reason,
+        )
+        events.append(transfer_failed)
+
+        initiator_state = None
+
+    else:
+        # TODO mmartinez this doesnt make sense.. why we need this? Maybe we should have a InitiatorTransferStateLight
+        balance_proof = BalanceProofUnsignedState(
+            nonce=signed_locked_transfer.nonce,
+            transferred_amount=signed_locked_transfer.transferred_amount,
+            locked_amount=signed_locked_transfer.locked_amount,
+            locksroot=signed_locked_transfer.locksroot,
+            canonical_identifier=channel_state.canonical_identifier,
+        )
+        lock_amount = signed_locked_transfer.lock.amount
+        lock_expiration = signed_locked_transfer.lock.expiration
+        lock_secret_hash= signed_locked_transfer.lock.secrethash
+        lock = HashTimeLockState(lock_amount, lock_expiration, lock_secret_hash)
+        locked_transfer = LockedTransferUnsignedState(
+            signed_locked_transfer.payment_identifier, signed_locked_transfer.payment_hash_invoice,
+            signed_locked_transfer.token, balance_proof, lock, signed_locked_transfer.initiator,
+            signed_locked_transfer.target)
+
+        lockedtransfer_event = SendLockedTransferLight(signed_locked_transfer.recipient,
+                                                       signed_locked_transfer.channel_identifier,
+                                                       signed_locked_transfer.message_identifier,
+                                                       signed_locked_transfer)
+        assert lockedtransfer_event
+
+        initiator_state = InitiatorTransferState(
+            transfer_description=transfer_description,
+            channel_identifier=channel_state.identifier,
+            transfer=locked_transfer,
+            revealsecret=None,
+        )
+        events.append(lockedtransfer_event)
+
+    return TransitionResult(initiator_state, events)
+
+
 def try_new_route(
     channelidentifiers_to_channels: ChannelMap,
     available_routes: List[RouteState],
@@ -217,11 +290,11 @@ def try_new_route(
     pseudo_random_generator: random.Random,
     block_number: BlockNumber,
 ) -> TransitionResult[InitiatorTransferState]:
-
     channel_state = next_channel_from_routes(
         available_routes=available_routes,
         channelidentifiers_to_channels=channelidentifiers_to_channels,
         transfer_amount=transfer_description.amount,
+        initiator=to_canonical_address(transfer_description.initiator)
     )
 
     events: List[Event] = list()
@@ -301,7 +374,6 @@ def handle_secretrequest(
     channel_state: NettingChannelState,
     pseudo_random_generator: random.Random,
 ) -> TransitionResult[InitiatorTransferState]:
-
     is_message_from_target = (
         state_change.sender == initiator_state.transfer_description.target
         and state_change.secrethash == initiator_state.transfer_description.secrethash
