@@ -482,7 +482,7 @@ class NodeTransportState(State):
         return {
             "hub_last_transport_authdata": self.hub_last_transport_authdata,
             "clients_last_transport_authdata": [
-                client_last_transport_authdata for client_last_transport_authdata in self.clients_last_transport_authdata.values()
+                client_last_transport_authdata for client_last_transport_authdata in self.clients_last_transport_authdata
             ],
         }
 

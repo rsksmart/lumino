@@ -813,7 +813,7 @@ class MatrixTransport(Runnable):
         if not messages:
             return False
 
-        self.log.debug(
+        self.log.info(
             "Incoming messages",
             messages=messages,
             sender=pex(peer_address),
