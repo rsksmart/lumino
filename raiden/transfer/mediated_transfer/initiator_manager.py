@@ -20,7 +20,7 @@ from raiden.transfer.mediated_transfer.state_change import (
     ReceiveSecretRequest,
     ReceiveSecretReveal,
     ReceiveTransferRefundCancelRoute,
-)
+    ActionInitInitiatorLight)
 from raiden.transfer.state import RouteState
 from raiden.transfer.state_change import ActionCancelPayment, Block, ContractReceiveSecretReveal
 from raiden.utils.typing import (
@@ -35,7 +35,7 @@ from raiden.utils.typing import (
 )
 
 
-def clear_if_finalized(iteration: TransitionResult,) -> TransitionResult[InitiatorPaymentState]:
+def clear_if_finalized(iteration: TransitionResult, ) -> TransitionResult[InitiatorPaymentState]:
     """ Clear the initiator payment task if all transfers have been finalized
     or expired. """
     state = cast(InitiatorPaymentState, iteration.new_state)
@@ -136,7 +136,8 @@ def subdispatch_to_initiatortransfer(
     pseudo_random_generator: random.Random,
 ) -> TransitionResult[InitiatorTransferState]:
     channel_identifier = initiator_state.channel_identifier
-    channel_state = channelidentifiers_to_channels.get(channel_identifier)
+    channel_state = channelidentifiers_to_channels[initiator_state.transfer_description.initiator].get(
+        channel_identifier)
     if not channel_state:
         return TransitionResult(initiator_state, list())
 
@@ -219,6 +220,31 @@ def handle_init(
     return TransitionResult(payment_state, events)
 
 
+def handle_init_light(
+    payment_state: Optional[InitiatorPaymentState],
+    state_change: ActionInitInitiatorLight,
+    channelidentifiers_to_channels: ChannelMap,
+) -> TransitionResult[InitiatorPaymentState]:
+    events: List[Event] = list()
+    if payment_state is None:
+        sub_iteration = initiator.try_new_route_light(
+            channelidentifiers_to_channels=channelidentifiers_to_channels,
+            available_routes=state_change.routes,
+            transfer_description=state_change.transfer,
+            signed_locked_transfer=state_change.signed_locked_transfer
+        )
+
+        events = sub_iteration.events
+        if sub_iteration.new_state:
+            payment_state = InitiatorPaymentState(
+                initiator_transfers={
+                    sub_iteration.new_state.transfer.lock.secrethash: sub_iteration.new_state
+                }
+            )
+
+    return TransitionResult(payment_state, events)
+
+
 def handle_cancelpayment(
     payment_state: InitiatorPaymentState, channelidentifiers_to_channels: ChannelMap
 ) -> TransitionResult[InitiatorPaymentState]:
@@ -284,7 +310,7 @@ def handle_transferrefundcancelroute(
     if not is_valid_lock or not is_valid_refund:
         return TransitionResult(payment_state, list())
 
-    is_valid, channel_events, _ = channel.handle_receive_refundtransfercancelroute(
+    is_valid, channel_events, _, _ = channel.handle_receive_refundtransfercancelroute(
         channel_state, refund_transfer
     )
 
@@ -300,6 +326,7 @@ def handle_transferrefundcancelroute(
     transfer_description = TransferDescriptionWithSecretState(
         payment_network_identifier=old_description.payment_network_identifier,
         payment_identifier=old_description.payment_identifier,
+        payment_hash_invoice=old_description.payment_hash_invoice,
         amount=old_description.amount,
         token_network_identifier=old_description.token_network_identifier,
         allocated_fee=old_description.allocated_fee,
@@ -475,6 +502,13 @@ def state_transition(
             channelidentifiers_to_channels=channelidentifiers_to_channels,
             pseudo_random_generator=pseudo_random_generator,
             block_number=block_number,
+        )
+    elif type(state_change) == ActionInitInitiatorLight:
+        assert isinstance(state_change, ActionInitInitiatorLight), MYPY_ANNOTATION
+        iteration = handle_init_light(
+            payment_state=payment_state,
+            state_change=state_change,
+            channelidentifiers_to_channels=channelidentifiers_to_channels
         )
     elif type(state_change) == ReceiveSecretRequest:
         assert isinstance(state_change, ReceiveSecretRequest), MYPY_ANNOTATION

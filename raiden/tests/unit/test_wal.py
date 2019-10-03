@@ -20,7 +20,7 @@ class Empty(State):
     pass
 
 
-def state_transition_noop(state, state_change):  # pylint: disable=unused-argument
+def state_transition_noop(state, state_change, storage):  # pylint: disable=unused-argument
     return TransitionResult(Empty(), list())
 
 
@@ -38,7 +38,7 @@ class AccState(State):
         return result
 
 
-def state_transtion_acc(state, state_change):
+def state_transtion_acc(state, state_change, storage):
     state = state or AccState()
     state.state_changes.append(state_change)
     return TransitionResult(state, list())

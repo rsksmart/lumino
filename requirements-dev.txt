@@ -30,4 +30,5 @@ coverage==4.5.1
 bump2version==0.5.8
 
 # Test support
-matrix-synapse==0.33.9
+#matrix-synapse==0.33.9
+matrix-synapse==1.3.1

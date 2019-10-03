@@ -30,7 +30,7 @@ from raiden.exceptions import (
     PaymentConflict,
     RaidenRecoverableError,
     RaidenUnrecoverableError,
-)
+    InvalidPaymentIdentifier)
 from raiden.messages import (
     LockedTransfer,
     Message,
@@ -52,12 +52,12 @@ from raiden.transfer.mediated_transfer.events import SendLockedTransfer
 from raiden.transfer.mediated_transfer.state import (
     TransferDescriptionWithSecretState,
     lockedtransfersigned_from_message,
-)
+    TransferDescriptionWithoutSecretState)
 from raiden.transfer.mediated_transfer.state_change import (
     ActionInitInitiator,
     ActionInitMediator,
     ActionInitTarget,
-)
+    ActionInitInitiatorLight)
 from raiden.transfer.state import (
     BalanceProofSignedState,
     BalanceProofUnsignedState,
@@ -94,13 +94,14 @@ from raiden.utils.typing import (
 
 from raiden.utils.upgrades import UpgradeManager
 from raiden_contracts.contract_manager import ContractManager
+from eth_utils import to_canonical_address
 
 log = structlog.get_logger(__name__)  # pylint: disable=invalid-name
 StatusesDict = Dict[TargetAddress, Dict[PaymentID, "PaymentStatus"]]
 ConnectionManagerDict = Dict[TokenNetworkID, ConnectionManager]
 
 
-def _redact_secret(data: Union[Dict, List],) -> Union[Dict, List]:
+def _redact_secret(data: Union[Dict, List]) -> Union[Dict, List]:
     """ Modify `data` in-place and replace keys named `secret`. """
 
     if isinstance(data, dict):
@@ -117,6 +118,45 @@ def _redact_secret(data: Union[Dict, List],) -> Union[Dict, List]:
             stack.extend(value for value in current.values() if isinstance(value, dict))
 
     return data
+
+# TODO this method should receive a signed locked transfer type, not a LockedTransfer
+def initiator_init_light(
+    raiden: "RaidenService",
+    transfer_identifier: PaymentID,
+    payment_hash_invoice: PaymentHashInvoice,
+    transfer_amount: PaymentAmount,
+    transfer_secrethash: SecretHash,
+    transfer_fee: FeeAmount,
+    token_network_identifier: TokenNetworkID,
+    target_address: TargetAddress,
+    creator_address: InitiatorAddress,
+    signed_locked_transfer: LockedTransfer
+) -> ActionInitInitiatorLight:
+
+    transfer_state = TransferDescriptionWithoutSecretState(
+        payment_network_identifier=raiden.default_registry.address,
+        payment_identifier=transfer_identifier,
+        payment_hash_invoice=payment_hash_invoice,
+        amount=transfer_amount,
+        allocated_fee=transfer_fee,
+        token_network_identifier=token_network_identifier,
+        initiator=InitiatorAddress(creator_address),
+        target=target_address,
+        secrethash=transfer_secrethash,
+    )
+    previous_address = None
+    routes, _ = routing.get_best_routes(
+        chain_state=views.state_from_raiden(raiden),
+        token_network_id=token_network_identifier,
+        one_to_n_address=raiden.default_one_to_n_address,
+        from_address=InitiatorAddress(creator_address),
+        to_address=target_address,
+        amount=transfer_amount,
+        previous_address=previous_address,
+        config=raiden.config,
+        privkey=raiden.privkey,
+    )
+    return ActionInitInitiatorLight(transfer_state, routes, signed_locked_transfer)
 
 
 def initiator_init(
@@ -191,7 +231,7 @@ class PaymentStatus(NamedTuple):
     """
 
     payment_identifier: PaymentID
-    payment_hash_invoice : PaymentHashInvoice
+    payment_hash_invoice: PaymentHashInvoice
     amount: PaymentAmount
     token_network_identifier: TokenNetworkID
     payment_done: AsyncResult
@@ -219,8 +259,9 @@ def update_path_finding_service_from_balance_proof(
     chain_state: "ChainState",
     new_balance_proof: Union[BalanceProofSignedState, BalanceProofUnsignedState],
 ) -> None:
-    channel_state = views.get_channelstate_by_canonical_identifier(
-        chain_state=chain_state, canonical_identifier=new_balance_proof.canonical_identifier
+    channel_state = views.get_channelstate_by_canonical_identifier_and_address(
+        chain_state=chain_state, canonical_identifier=new_balance_proof.canonical_identifier,
+        address=chain_state.our_address
     )
     network_address = new_balance_proof.canonical_identifier.token_network_address
     error_msg = (
@@ -245,8 +286,9 @@ def update_monitoring_service_from_balance_proof(
     if raiden.config["services"]["monitoring_enabled"] is False:
         return
 
-    channel_state = views.get_channelstate_by_canonical_identifier(
-        chain_state=chain_state, canonical_identifier=new_balance_proof.canonical_identifier
+    channel_state = views.get_channelstate_by_canonical_identifier_and_address(
+        chain_state=chain_state, canonical_identifier=new_balance_proof.canonical_identifier,
+        address=chain_state.our_address
     )
 
     msg = (
@@ -409,12 +451,14 @@ class RaidenService(Runnable):
                 self.config["transport"]["udp"]["external_port"],
             )
 
-        self.maybe_upgrade_db()
-
         storage = sqlite.SerializedSQLiteStorage(
             database_path=self.database_path, serializer=serialize.JSONSerializer()
         )
+
         storage.update_version()
+
+        self.maybe_upgrade_db()
+
         storage.log_run()
         self.wal = wal.restore_to_state_change(
             transition_function=node.state_transition,
@@ -515,7 +559,12 @@ class RaidenService(Runnable):
         # - Send pending transactions
         # - Send pending message
         self.alarm.link_exception(self.on_error)
-        self.transport[0].link_exception(self.on_error)
+
+        self.transport.hub_transport.link_exception(self.on_error)
+
+        for light_client_transport in self.transport.light_client_transports:
+            light_client_transport.link_exception(self.on_error)
+
         self._start_transport(chain_state)
         self._start_alarm_task()
 
@@ -529,6 +578,7 @@ class RaidenService(Runnable):
             self.stop_event.wait()
         except gevent.GreenletExit:  # killed without exception
             self.stop_event.set()
+
             gevent.killall([self.alarm, self.transport])  # kill children
             raise  # re-raise to keep killed status
         except Exception:
@@ -550,13 +600,16 @@ class RaidenService(Runnable):
         #
         # We need a timeout to prevent an endless loop from trying to
         # contact the disconnected client
-        self.transport[0].stop()
-        self.transport[1].stop()
+        self.transport.hub_transport.stop()
+
+        for light_client_transport in self.transport.light_client_transports:
+            light_client_transport.stop()
 
         self.alarm.stop()
 
-        self.transport[0].join()
-        self.transport[1].join()
+        self.transport.hub_transport.join()
+        for light_client_transport in self.transport.light_client_transports:
+            light_client_transport.join()
 
         self.alarm.join()
 
@@ -591,6 +644,14 @@ class RaidenService(Runnable):
     def __repr__(self):
         return f"<{self.__class__.__name__} node:{pex(self.address)}>"
 
+    def start_transport_in_runtime(self, transport, chain_state: ChainState):
+        # Start hub transport
+        transport.start(
+            raiden_service=self,
+            message_handler=self.message_handler,
+            prev_auth_data=chain_state.last_node_transport_state_authdata.hub_last_transport_authdata,
+        )
+
     def _start_transport(self, chain_state: ChainState):
         """ Initialize the transport and related facilities.
 
@@ -603,17 +664,26 @@ class RaidenService(Runnable):
         assert self.alarm.is_primed(), f"AlarmTask not primed. node:{self!r}"
         assert self.ready_to_process_events, f"Event procossing disable. node:{self!r}"
 
-        self.transport[0].start(
+        # Start hub transport
+        self.transport.hub_transport.start(
             raiden_service=self,
             message_handler=self.message_handler,
-            prev_auth_data=chain_state.last_transport_authdata,
+            prev_auth_data=chain_state.last_node_transport_state_authdata.hub_last_transport_authdata,
         )
 
-        self.transport[1].start(
-            raiden_service=self,
-            message_handler=self.message_handler,
-            prev_auth_data=chain_state.last_transport_authdata,
-        )
+        # Start lightclient transports
+        selected_prev_auth_data = None
+        for light_client_transport in self.transport.light_client_transports:
+            for client_last_transport_authdata in chain_state.last_node_transport_state_authdata.clients_last_transport_authdata:
+                if client_last_transport_authdata.address == to_canonical_address(light_client_transport._address):
+                    selected_prev_auth_data = client_last_transport_authdata.auth_data
+
+            light_client_transport.start(
+                raiden_service=self,
+                message_handler=self.message_handler,
+                prev_auth_data=selected_prev_auth_data,
+
+            )
 
         for neighbour in views.all_neighbour_nodes(chain_state):
             if neighbour != ConnectionManager.BOOTSTRAP_ADDR:
@@ -669,7 +739,9 @@ class RaidenService(Runnable):
         old_state = views.state_from_raiden(self)
         new_state, raiden_event_list = self.wal.log_and_dispatch(state_change)
 
-        # TODO FIXME cannot work after the lc refactor
+
+
+        # TODO marcosmartinez7 FIXME cannot work after the lc refactor
         # for changed_balance_proof in views.detect_balance_proof_change(old_state, new_state):
         # update_services_from_balance_proof(self, new_state, changed_balance_proof)
 
@@ -751,10 +823,9 @@ class RaidenService(Runnable):
         these cases the healthcheck will be started by
         `start_neighbours_healthcheck`.
         """
+        # TODO se here if is necsesary for lightclients transports @GasparMedina
         if self.transport:
-            self.transport[0].start_health_check(node_address)
-            self.transport[1].start_health_check(node_address)
-
+            self.transport.hub_transport.start_health_check(node_address)
 
     def _callback_new_block(self, latest_block: Dict):
         """Called once a new block is detected by the alarm task.
@@ -872,8 +943,10 @@ class RaidenService(Runnable):
                 target = transfer.target
                 identifier = transfer.payment_identifier
                 balance_proof = transfer.balance_proof
+                payment_hash_invoice = transfer.payment_hash_invoice
                 self.targets_to_identifiers_to_statuses[target][identifier] = PaymentStatus(
                     payment_identifier=identifier,
+                    payment_hash_invoice=payment_hash_invoice,
                     amount=transfer_description.amount,
                     token_network_identifier=TokenNetworkID(
                         balance_proof.token_network_identifier
@@ -895,7 +968,7 @@ class RaidenService(Runnable):
             otherwise queues for channel closed while the node was offline
             won't be properly cleared. It is not bad but it is suboptimal.
         """
-       # assert not self.transport, f"Transport is running. node:{self!r}"
+        # assert not self.transport, f"Transport is running. node:{self!r}"
         assert self.alarm.is_primed(), f"AlarmTask not primed. node:{self!r}"
 
         events_queues = views.get_all_messagequeues(chain_state)
@@ -904,9 +977,11 @@ class RaidenService(Runnable):
             self.start_health_check_for(queue_identifier.recipient)
 
             for event in event_queue:
-                message = message_from_sendevent(event)
-                self.sign(message)
-                self.transport[0].send_async(queue_identifier, message)
+                print("Fixme")
+                #TODO mmartinez FIXME
+               # message = message_from_sendevent(event)
+               # self.sign(message)
+               # self.transport[0].send_async(queue_identifier, message)
 
     def _initialize_monitoring_services_queue(self, chain_state: ChainState):
         """Send the monitoring requests for all current balance proofs.
@@ -937,7 +1012,7 @@ class RaidenService(Runnable):
             "Transport was started before the monitoring service queue was updated. "
             "This can lead to safety issue. node:{self!r}"
         )
-       # assert not self.transport, msg
+        # assert not self.transport, msg
 
         msg = "The node state was not yet recovered, cant read balance proofs. node:{self!r}"
         assert self.wal, msg
@@ -953,16 +1028,13 @@ class RaidenService(Runnable):
             current_state=chain_state,
         )
 
-
     def _initialize_whitelists(self, chain_state: ChainState):
         """ Whitelist neighbors and mediated transfer targets on transport """
 
         for neighbour in views.all_neighbour_nodes(chain_state):
             if neighbour == ConnectionManager.BOOTSTRAP_ADDR:
                 continue
-            self.transport[0].whitelist(neighbour)
-            self.transport[1].whitelist(neighbour)
-
+            self.transport.hub_transport.whitelist(neighbour)
 
         events_queues = views.get_all_messagequeues(chain_state)
 
@@ -971,10 +1043,11 @@ class RaidenService(Runnable):
                 if isinstance(event, SendLockedTransfer):
                     transfer = event.transfer
                     if transfer.initiator == self.address:
-                        self.transport[0].whitelist(address=transfer.target)
-                        self.transport[1].whitelist(address=transfer.target)
-
-
+                        self.transport.hub_transport.whitelist(address=transfer.target)
+                        self.transport.light_client_transports[0].whitelist(address=transfer.target)
+                        # TODO
+                        # Verify this for lightclients, now set only hub transport
+                        # self.transport[1].whitelist(address=transfer.target)
 
     def sign(self, message: Message):
         """ Sign message inplace. """
@@ -1035,6 +1108,43 @@ class RaidenService(Runnable):
 
         return manager
 
+    def mediated_transfer_async_light(
+        self,
+        token_network_identifier: TokenNetworkID,
+        amount: PaymentAmount,
+        creator: InitiatorAddress,
+        target: TargetAddress,
+        identifier: PaymentID,
+        secrethash: SecretHash,
+        signed_locked_transfer: LockedTransfer,
+        fee: FeeAmount = MEDIATION_FEE,
+        payment_hash_invoice: PaymentHashInvoice = None
+    ) -> PaymentStatus:
+        """ Transfer `amount` between this node and `target`.
+
+        This method will start an asynchronous transfer, the transfer might fail
+        or succeed depending on a couple of factors:
+
+            - Existence of a path that can be used, through the usage of direct
+              or intermediary channels.
+            - Network speed, making the transfer sufficiently fast so it doesn't
+              expire.
+        """
+
+        payment_status = self.start_mediated_transfer_without_secret_light(
+            token_network_identifier=token_network_identifier,
+            amount=amount,
+            fee=fee,
+            creator=creator,
+            target=target,
+            identifier=identifier,
+            secrethash=secrethash,
+            payment_hash_invoice=payment_hash_invoice,
+            signed_locked_transfer=signed_locked_transfer
+        )
+
+        return None
+
     def mediated_transfer_async(
         self,
         token_network_identifier: TokenNetworkID,
@@ -1072,6 +1182,83 @@ class RaidenService(Runnable):
             secrethash=secrethash,
             payment_hash_invoice=payment_hash_invoice
         )
+
+        return payment_status
+
+    def start_mediated_transfer_without_secret_light(
+        self,
+        token_network_identifier: TokenNetworkID,
+        amount: PaymentAmount,
+        fee: FeeAmount,
+        creator: InitiatorAddress,
+        target: TargetAddress,
+        identifier: PaymentID,
+        secrethash: SecretHash ,
+        signed_locked_transfer: LockedTransfer,
+        payment_hash_invoice: PaymentHashInvoice = None
+
+    ) -> PaymentStatus:
+
+        if secrethash is None:
+            raise InvalidSecretHash("Secrethash wasnt provided.")
+
+        # We must check if the secret was registered against the latest block,
+        # even if the block is forked away and the transaction that registers
+        # the secret is removed from the blockchain. The rationale here is that
+        # someone else does know the secret, regardless of the chain state, so
+        # the node must not use it to start a payment.
+        #
+        # For this particular case, it's preferable to use `latest` instead of
+        # having a specific block_hash, because it's preferable to know if the secret
+        # was ever known, rather than having a consistent view of the blockchain.
+        secret_registered = self.default_secret_registry.is_secret_registered(
+            secrethash=secrethash, block_identifier="latest"
+        )
+        if secret_registered:
+            raise RaidenUnrecoverableError(
+                f"Attempted to initiate a locked transfer with secrethash {pex(secrethash)}."
+                f" That secret is already registered onchain."
+            )
+
+        self.start_health_check_for(Address(target))
+
+        if identifier is None:
+            raise InvalidPaymentIdentifier("Payment identifier wasnt provided")
+
+        with self.payment_identifier_lock:
+            payment_status = self.targets_to_identifiers_to_statuses[target].get(identifier)
+            if payment_status:
+                payment_status_matches = payment_status.matches(token_network_identifier, amount)
+                if not payment_status_matches:
+                    raise PaymentConflict("Another payment with the same id is in flight")
+
+                return payment_status
+
+            payment_status = PaymentStatus(
+                payment_identifier=identifier,
+                payment_hash_invoice=payment_hash_invoice,
+                amount=amount,
+                token_network_identifier=token_network_identifier,
+                payment_done=AsyncResult(),
+            )
+            self.targets_to_identifiers_to_statuses[target][identifier] = payment_status
+
+        init_initiator_statechange_light = initiator_init_light(
+            raiden=self,
+            transfer_identifier=identifier,
+            payment_hash_invoice=payment_hash_invoice,
+            transfer_amount=amount,
+            transfer_secrethash=secrethash,
+            transfer_fee=fee,
+            token_network_identifier=token_network_identifier,
+            creator_address=creator,
+            target_address=target,
+            signed_locked_transfer=signed_locked_transfer
+        )
+
+        # Dispatch the state change even if there are no routes to create the
+        # wal entry.
+        self.handle_and_track_state_change(init_initiator_statechange_light)
 
         return payment_status
 

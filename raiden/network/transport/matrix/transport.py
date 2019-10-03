@@ -5,7 +5,7 @@ from urllib.parse import urlparse
 
 import gevent
 import structlog
-from eth_utils import is_binary_address, to_checksum_address, to_normalized_address
+from eth_utils import is_binary_address, to_checksum_address, to_normalized_address, to_canonical_address
 from gevent.event import Event
 from gevent.lock import Semaphore
 from gevent.queue import JoinableQueue
@@ -13,6 +13,7 @@ from matrix_client.errors import MatrixRequestError
 
 from raiden.constants import DISCOVERY_DEFAULT_ROOM
 from raiden.exceptions import InvalidAddress, TransportError, UnknownAddress, UnknownTokenAddress
+from raiden.lightclient.light_client_message_handler import LightClientMessageHandler
 from raiden.message_handler import MessageHandler
 from raiden.messages import (
     Delivered,
@@ -33,6 +34,7 @@ from raiden.network.transport.matrix.utils import (
     UserPresence,
     join_global_room,
     login_or_register,
+    login_or_register_light_client,
     make_client,
     make_room_alias,
     validate_and_parse_message,
@@ -274,11 +276,10 @@ class MatrixTransport(Runnable):
     _room_sep = "_"
     log = log
 
-    def __init__(self, config: dict, lc : bool):
+    def __init__(self, config: dict):
         super().__init__()
         self._config = config
         self._raiden_service: Optional[RaidenService] = None
-        self._lc = lc
         if config["server"] == "auto":
             available_servers = config["available_servers"]
         elif urlparse(config["server"]).scheme in {"http", "https"}:
@@ -335,6 +336,10 @@ class MatrixTransport(Runnable):
 
         self._message_handler: Optional[MessageHandler] = None
 
+
+    def start_greenlet_for_light_client(self):
+        super().start()
+
     def __repr__(self):
         if self._raiden_service is not None:
             node = f" node:{pex(self._raiden_service.address)}"
@@ -363,9 +368,9 @@ class MatrixTransport(Runnable):
             client=self._client,
             signer=self._raiden_service.signer,
             prev_user_id=prev_user_id,
-            prev_access_token=prev_access_token,
-            lc = self._lc
+            prev_access_token=prev_access_token
         )
+
         self.log = log.bind(current_user=self._user_id, node=pex(self._raiden_service.address))
 
         self.log.debug("Start: handle thread", handle_thread=self._client._handle_thread)
@@ -407,7 +412,8 @@ class MatrixTransport(Runnable):
     def _run(self):
         """ Runnable main method, perform wait on long-running subtasks """
         # dispatch auth data on first scheduling after start
-        state_change = ActionUpdateTransportAuthData(f"{self._user_id}/{self._client.api.token}")
+        state_change = ActionUpdateTransportAuthData(f"{self._user_id}/{self._client.api.token}",
+                                                     self._raiden_service.address)
         self.greenlet.name = f"MatrixTransport._run node:{pex(self._raiden_service.address)}"
         self._raiden_service.handle_and_track_state_change(state_change)
         try:
@@ -523,7 +529,7 @@ class MatrixTransport(Runnable):
                 "Do not use send_async for {} messages".format(message.__class__.__name__)
             )
 
-        self.log.debug(
+        self.log.info(
             "Send async",
             receiver_address=pex(receiver_address),
             message=message,
@@ -637,8 +643,8 @@ class MatrixTransport(Runnable):
             event
             for event in state["events"]
             if event["type"] == "m.room.member"
-            and event["content"].get("membership") == "invite"
-            and event["state_key"] == self._user_id
+               and event["content"].get("membership") == "invite"
+               and event["state_key"] == self._user_id
         ]
         if not invite_events:
             self.log.debug("Invite: no invite event found", room_id=room_id)
@@ -650,8 +656,8 @@ class MatrixTransport(Runnable):
             event
             for event in state["events"]
             if event["type"] == "m.room.member"
-            and event["content"].get("membership") == "join"
-            and event["state_key"] == sender
+               and event["content"].get("membership") == "join"
+               and event["state_key"] == sender
         ]
         if not sender_join_events:
             self.log.debug("Invite: no sender join event", room_id=room_id)
@@ -724,10 +730,6 @@ class MatrixTransport(Runnable):
 
     def _handle_message(self, room, event) -> bool:
         """ Handle text messages sent to listening rooms """
-        log.debug("_handle_message. Is LC?: " + str(self._lc))
-
-        if self._lc:
-            return False
         if (
             event["type"] != "m.room.message"
             or event["content"]["msgtype"] != "m.text"
@@ -811,7 +813,7 @@ class MatrixTransport(Runnable):
         if not messages:
             return False
 
-        self.log.debug(
+        self.log.info(
             "Incoming messages",
             messages=messages,
             sender=pex(peer_address),
@@ -841,7 +843,7 @@ class MatrixTransport(Runnable):
         self._raiden_service.on_message(delivered)
 
     def _receive_message(self, message: Union[SignedRetrieableMessage, Processed]):
-        print("Message "+str(message))
+        print("---- Matrix Received Message " + str(message))
         assert self._raiden_service is not None
         self.log.debug(
             "Message received",
@@ -898,6 +900,8 @@ class MatrixTransport(Runnable):
         self.log.debug(
             "Send raw", receiver=pex(receiver_address), room=room, data=data.replace("\n", "\\n")
         )
+        print("---- Matrix Send Message " + data)
+
         room.send_text(data)
 
     def _get_room_for_address(self, address: Address, allow_missing_peers=False) -> Optional[Room]:
@@ -1349,3 +1353,112 @@ class MatrixTransport(Runnable):
                 continue
 
         return True
+
+
+class MatrixLightClientTransport(MatrixTransport):
+
+    def __init__(self,
+                 config: dict,
+                 _encrypted_light_client_password_signature: str,
+                 _encrypted_light_client_display_name_signature: str,
+                 _encrypted_light_client_seed_for_retry_signature: str,
+                 _address: str):
+        super().__init__(config)
+        self._encrypted_light_client_password_signature = _encrypted_light_client_password_signature
+        self._encrypted_light_client_display_name_signature = _encrypted_light_client_display_name_signature
+        self._encrypted_light_client_seed_for_retry_signature = _encrypted_light_client_seed_for_retry_signature
+        self._address = _address
+
+    def start(  # type: ignore
+        self,
+        raiden_service: RaidenService,
+        message_handler: MessageHandler,
+        prev_auth_data: str,
+
+    ):
+        if not self._stop_event.ready():
+            raise RuntimeError(f"{self!r} already started")
+        self._stop_event.clear()
+        self._raiden_service = raiden_service
+        self._message_handler = message_handler
+
+        prev_user_id: Optional[str]
+        prev_access_token: Optional[str]
+        if prev_auth_data and prev_auth_data.count("/") == 1:
+            prev_user_id, _, prev_access_token = prev_auth_data.partition("/")
+        else:
+            prev_user_id = prev_access_token = None
+
+        login_or_register_light_client(
+            client=self._client,
+            prev_user_id=prev_user_id,
+            prev_access_token=prev_access_token,
+            encrypted_light_client_password_signature=self._encrypted_light_client_password_signature,
+            encrypted_light_client_display_name_signature=self._encrypted_light_client_display_name_signature,
+            encrypted_light_client_seed_for_retry_signature=self._encrypted_light_client_seed_for_retry_signature,
+            private_key_hub=self._raiden_service.config["privatekey"].hex(),
+            light_client_address=self._address
+        )
+
+        self.log = log.bind(current_user=self._user_id, node=pex(self._raiden_service.address))
+
+        self.log.debug("Start: handle thread", handle_thread=self._client._handle_thread)
+        if self._client._handle_thread:
+            # wait on _handle_thread for initial sync
+            # this is needed so the rooms are populated before we _inventory_rooms
+            self._client._handle_thread.get()
+
+        for suffix in self._config["global_rooms"]:
+            room_name = make_room_alias(self.network_id, suffix)  # e.g. raiden_ropsten_discovery
+            room = join_global_room(
+                self._client, room_name, self._config.get("available_servers") or ()
+            )
+            self._global_rooms[room_name] = room
+
+        self._inventory_rooms()
+
+        def on_success(greenlet):
+            if greenlet in self.greenlets:
+                self.greenlets.remove(greenlet)
+
+        self._client.start_listener_thread()
+        self._client.sync_thread.link_exception(self.on_error)
+        self._client.sync_thread.link_value(on_success)
+        self.greenlets = [self._client.sync_thread]
+
+        self._client.set_presence_state(UserPresence.ONLINE.value)
+
+        # (re)start any _RetryQueue which was initialized before start
+        for retrier in self._address_to_retrier.values():
+            if not retrier:
+                self.log.debug("Starting retrier", retrier=retrier)
+                retrier.start()
+
+        self.log.debug("Matrix started", config=self._config)
+        super().start_greenlet_for_light_client()
+        self._started = True
+
+    def _run(self):
+        """ Runnable main method, perform wait on long-running subtasks """
+        # dispatch auth data on first scheduling after start
+        state_change = ActionUpdateTransportAuthData(f"{self._user_id}/{self._client.api.token}", self._address)
+        self.greenlet.name = f"MatrixLightClientTransport._run light_client:{to_canonical_address(self._address)}"
+        self._raiden_service.handle_and_track_state_change(state_change)
+        try:
+            # waits on _stop_event.ready()
+            self._global_send_worker()
+            # children crashes should throw an exception here
+        except gevent.GreenletExit:  # killed without exception
+            self._stop_event.set()
+            gevent.killall(self.greenlets)  # kill children
+            raise  # re-raise to keep killed status
+        except Exception:
+            self.stop()  # ensure cleanup and wait on subtasks
+            raise
+
+
+class NodeTransport:
+
+    def __init__(self, hub_transport: MatrixTransport, light_client_transports: List[MatrixTransport]):
+        self.hub_transport = hub_transport
+        self.light_client_transports = light_client_transports

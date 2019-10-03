@@ -1,3 +1,6 @@
+import string
+from typing import Dict
+
 from flask import Blueprint
 from flask_restful import Resource
 from webargs.flaskparser import use_kwargs
@@ -20,10 +23,18 @@ from raiden.api.v1.encoding import (
     InvoiceCreateSchema,
     PaymentInvoiceSchema,
     ChannelLightPutSchema,
-    ChannelLightPatchSchema
+    ChannelLightPatchSchema,
+    LightClientSchema,
+    LightClientMatrixCredentialsBuildSchema,
+    PaymentLightGetSchema,
+    PaymentLightPutSchema,
+    PaymentLightPostSchema
 )
+
 from raiden.utils import typing
+
 from raiden.constants import EMPTY_PAYMENT_HASH_INVOICE
+
 
 def create_blueprint():
     # Take a look at this SO question on hints how to organize versioned
@@ -44,7 +55,6 @@ class AddressResource(BaseResource):
 
 
 class ChannelsResource(BaseResource):
-
     put_schema = ChannelPutSchema
 
     def get(self):
@@ -63,7 +73,6 @@ class ChannelsResource(BaseResource):
 
 
 class ChannelsResourceLight(BaseResource):
-
     put_schema = ChannelLightPutSchema
 
     def get(self):
@@ -114,7 +123,6 @@ class ChannelsResourceByTokenAddress(BaseResource):
 
 
 class ChannelsResourceByTokenAndPartnerAddress(BaseResource):
-
     patch_schema = ChannelPatchSchema
 
     @use_kwargs(patch_schema, locations=("json",))
@@ -130,7 +138,6 @@ class ChannelsResourceByTokenAndPartnerAddress(BaseResource):
 
 
 class LightChannelsResourceByTokenAndPartnerAddress(BaseResource):
-
     patch_schema = ChannelLightPatchSchema
 
     @use_kwargs(patch_schema, locations=("json",))
@@ -163,7 +170,6 @@ class PartnersResourceByTokenAddress(BaseResource):
 
 
 class BlockchainEventsNetworkResource(BaseResource):
-
     get_schema = BlockchainEventsRequestSchema()
 
     @use_kwargs(get_schema, locations=("query",))
@@ -179,7 +185,6 @@ class BlockchainEventsNetworkResource(BaseResource):
 
 
 class BlockchainEventsTokenResource(BaseResource):
-
     get_schema = BlockchainEventsRequestSchema()
 
     @use_kwargs(get_schema, locations=("query",))
@@ -193,7 +198,6 @@ class BlockchainEventsTokenResource(BaseResource):
 
 
 class ChannelBlockchainEventsResource(BaseResource):
-
     get_schema = BlockchainEventsRequestSchema()
 
     @use_kwargs(get_schema, locations=("query",))
@@ -210,7 +214,6 @@ class ChannelBlockchainEventsResource(BaseResource):
 
 
 class RaidenInternalEventsResource(BaseResource):
-
     get_schema = RaidenEventsRequestSchema()
 
     @use_kwargs(get_schema, locations=("query",))
@@ -231,7 +234,6 @@ class RegisterTokenResource(BaseResource):
 
 
 class ConnectionsResource(BaseResource):
-
     put_schema = ConnectionsConnectSchema()
     delete_schema = ConnectionsLeaveSchema()
 
@@ -273,9 +275,47 @@ class PaymentInvoiceResource(BaseResource):
             coded_invoice=coded_invoice
         )
 
+class PaymentLightResource(BaseResource):
+    put_schema = PaymentLightPutSchema
+    post_schema = PaymentLightPostSchema
+    get_schema = PaymentLightGetSchema
+
+    def get(self, **kwargs):
+        """
+        this translates to 'get all the messages by payment id'
+        """
+        return self.rest_api.get_light_client_protocol_message(**kwargs)
+
+    @use_kwargs(put_schema, locations=("json",))
+    def put(self,
+            message_id: int,
+            message_order: int,
+            message: Dict):
+        """
+        put a signed message associated with a payment of a light client
+        """
+        return self.rest_api.receive_light_client_protocol_message(message_id, message_order, message)
+
+    @use_kwargs(post_schema, locations=("json",))
+    def post(
+        self,
+        creator_address: typing.Address,
+        partner_address: typing.Address,
+        token_address: typing.TokenAddress,
+        amount: typing.TokenAmount,
+        secrethash: typing.SecretHash
+    ):
+        return self.rest_api.create_light_client_payment(
+            registry_address=self.rest_api.raiden_api.raiden.default_registry.address,
+            creator_address=creator_address,
+            partner_address=partner_address,
+            token_address=token_address,
+            amount=amount,
+            secrethash=secrethash
+        )
+
 
 class PaymentResource(BaseResource):
-
     post_schema = PaymentSchema(only=("amount", "identifier", "secret", "secret_hash"))
     get_schema = RaidenEventsRequestSchema()
 
@@ -327,15 +367,16 @@ class PendingTransfersResourceByTokenAndPartnerAddress(BaseResource):
     def get(self, token_address, partner_address):
         return self.rest_api.get_pending_transfers(token_address, partner_address)
 
-      
+
 class DashboardResource(BaseResource):
     get_schema = DashboardLuminoSchema()
+
     @use_kwargs(get_schema, locations=('query',))
     def get(
-            self,
-            graph_from_date: typing.LogTime = None,
-            graph_to_date: typing.LogTime = None,
-            table_limit: int = None
+        self,
+        graph_from_date: typing.LogTime = None,
+        graph_to_date: typing.LogTime = None,
+        table_limit: int = None
 
     ):
         return self.rest_api.get_dashboard_data(
@@ -345,22 +386,20 @@ class DashboardResource(BaseResource):
             table_limit=table_limit
         )
 
-    
 class PaymentResourceLumino(BaseResource):
-
     get_schema = RaidenEventsRequestSchemaV2()
 
     @use_kwargs(get_schema, locations=('query',))
     def get(
-            self,
-            token_network_identifier: typing.Address = None,
-            initiator_address: typing.Address = None,
-            target_address: typing.Address = None,
-            from_date: typing.LogTime = None,
-            to_date: typing.LogTime = None,
-            event_type: int = None,
-            limit: int = None,
-            offset: int = None,
+        self,
+        token_network_identifier: typing.Address = None,
+        initiator_address: typing.Address = None,
+        target_address: typing.Address = None,
+        from_date: typing.LogTime = None,
+        to_date: typing.LogTime = None,
+        event_type: int = None,
+        limit: int = None,
+        offset: int = None,
     ):
         return self.rest_api.get_raiden_events_payment_history_with_timestamps_v2(
             token_network_identifier=token_network_identifier,
@@ -381,14 +420,13 @@ class NetworkResource(BaseResource):
 
 
 class SearchLuminoResource(BaseResource):
-
     get_schema = SearchLuminoRequestSchema()
 
     @use_kwargs(get_schema, locations=('query',))
     def get(
-            self,
-            query: typing.ByteString = None,
-            only_receivers: bool = None
+        self,
+        query: typing.ByteString = None,
+        only_receivers: bool = None
     ):
         return self.rest_api.search_lumino(
             self.rest_api.raiden_api.raiden.default_registry.address,
@@ -439,3 +477,41 @@ class InvoiceResource(BaseResource):
             description=description,
             expires=expires
         )
+
+
+class LightClientMatrixCredentialsBuildResource(BaseResource):
+    get_schema = LightClientMatrixCredentialsBuildSchema()
+
+    @use_kwargs(get_schema, locations=("query",))
+    def get(self,
+            address: typing.Address = None):
+        """
+        This method receives a registration request.
+        """
+        return self.rest_api.get_data_for_registration_request(address)
+
+
+class LightClientResource(BaseResource):
+    post_schema = LightClientSchema()
+
+    @use_kwargs(post_schema, locations=("json",))
+    def post(
+        self,
+        address: typing.Address = None,
+        signed_password: typing.ByteString = None,
+        signed_display_name: typing.ByteString = None,
+        signed_seed_retry: typing.ByteString = None,
+        password: typing.ByteString = None,
+        display_name: typing.ByteString = None,
+        seed_retry: typing.ByteString = None
+    ):
+        return self.rest_api.register_light_client(
+            address=address,
+            signed_password=signed_password,
+            signed_display_name=signed_display_name,
+            signed_seed_retry=signed_seed_retry,
+            password=password,
+            display_name=display_name,
+            seed_retry=seed_retry
+        )
+

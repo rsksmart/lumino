@@ -38,6 +38,7 @@ from raiden.utils.typing import (
     PrivateKey,
     PublicKey,
     Secret,
+    PaymentHashInvoice,
     T_BlockHash,
     T_BlockNumber,
     TokenAddress,
@@ -55,8 +56,18 @@ def random_secret() -> Secret:
             return Secret(secret)
 
 
+def random_payment_hash_invoice() -> PaymentHashInvoice:
+    """ Return a random 32 byte secret except the 0 secret since it's not accepted in the contracts
+        """
+    while True:
+        secret = os.urandom(constants.SECRETHASH_LENGTH)
+        if secret != constants.EMPTY_HASH:
+            secret = Secret(secret)
+            return sha3(secret)
+
+
 def ishash(data: bytes) -> bool:
-    return isinstance(data, bytes) and len(data) == 32
+    return isinstance(data, bytes) and len(data) == 32 or data is Secret(b"")
 
 
 def address_checksum_and_decode(addr: str) -> Address:

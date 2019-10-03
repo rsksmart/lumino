@@ -31,7 +31,7 @@ from raiden.transfer.mediated_transfer.state_change import (
     ReceiveSecretReveal,
     ReceiveTransferRefund,
     ReceiveTransferRefundCancelRoute,
-)
+    ActionInitInitiatorLight)
 from raiden.transfer.state import (
     ChainState,
     InitiatorTask,
@@ -39,7 +39,8 @@ from raiden.transfer.state import (
     PaymentNetworkState,
     TargetTask,
     TokenNetworkState,
-    NettingChannelState)
+    NettingChannelState,
+    LightClientTransportState)
 from raiden.transfer.state_change import (
     ActionChangeNodeNetworkState,
     ActionChannelClose,
@@ -79,6 +80,8 @@ from raiden.utils.typing import (
     Tuple,
     Union,
 )
+
+from eth_utils import to_canonical_address
 
 # All State changes that are subdispatched as token network actions
 TokenNetworkStateChange = Union[
@@ -256,13 +259,14 @@ def subdispatch_to_paymenttask(
             token_network_identifier = sub_task.token_network_identifier
             channel_identifier = sub_task.channel_identifier
 
-            channel_state = views.get_channelstate_by_canonical_identifier(
+            channel_state = views.get_channelstate_by_canonical_identifier_and_address(
                 chain_state=chain_state,
                 canonical_identifier=CanonicalIdentifier(
                     chain_identifier=chain_state.chain_id,
                     token_network_address=token_network_identifier,
                     channel_identifier=channel_identifier,
                 ),
+                address=chain_state.our_address
             )
 
             if channel_state:
@@ -399,13 +403,14 @@ def subdispatch_targettask(
     events: List[Event] = list()
     channel_state = None
     if is_valid_subtask:
-        channel_state = views.get_channelstate_by_canonical_identifier(
+        channel_state = views.get_channelstate_by_canonical_identifier_and_address(
             chain_state=chain_state,
             canonical_identifier=CanonicalIdentifier(
                 chain_identifier=chain_state.chain_id,
                 token_network_address=token_network_identifier,
                 channel_identifier=channel_identifier,
             ),
+            address=chain_state.our_address
         )
 
     if channel_state:
@@ -544,9 +549,13 @@ def handle_token_network_action(
             block_number=chain_state.block_number,
             block_hash=chain_state.block_hash,
         )
-        assert iteration.new_state, "No token network state transition leads to None"
 
-        events = iteration.events
+        # Investigate behavior of this @GASPAR MEDINA
+        # assert iteration.new_state, "No token network state transition leads to None"
+
+        events = []
+        if iteration is not None:
+            events = iteration.events
 
     return TransitionResult(chain_state, events)
 
@@ -555,13 +564,15 @@ def handle_contract_receive_channel_closed(
     chain_state: ChainState, state_change: ContractReceiveChannelClosed
 ) -> TransitionResult[ChainState]:
     # cleanup queue for channel
-    channel_state = views.get_channelstate_by_canonical_identifier(
+    channel_state = views.get_channelstate_by_canonical_identifier_and_address(
         chain_state=chain_state,
         canonical_identifier=CanonicalIdentifier(
             chain_identifier=chain_state.chain_id,
             token_network_address=state_change.token_network_identifier,
             channel_identifier=state_change.channel_identifier,
         ),
+
+        address=chain_state.our_address
     )
     if channel_state:
         queue_id = QueueIdentifier(
@@ -677,6 +688,18 @@ def handle_init_initiator(
     )
 
 
+def handle_init_initiator_light(
+    chain_state: ChainState, state_change: ActionInitInitiatorLight
+) -> TransitionResult[ChainState]:
+    transfer = state_change.transfer
+    secrethash = transfer.secrethash
+
+    return subdispatch_initiatortask(
+        chain_state, state_change, transfer.token_network_identifier, secrethash
+    )
+
+
+
 def handle_init_mediator(
     chain_state: ChainState, state_change: ActionInitMediator
 ) -> TransitionResult[ChainState]:
@@ -758,7 +781,27 @@ def handle_update_transport_authdata(
     chain_state: ChainState, state_change: ActionUpdateTransportAuthData
 ) -> TransitionResult[ChainState]:
     assert chain_state is not None, "chain_state must be set"
-    chain_state.last_transport_authdata = state_change.auth_data
+
+    if state_change.address == b'00000000000000000000' or state_change.address == chain_state.our_address:
+        chain_state.last_node_transport_state_authdata.hub_last_transport_authdata = state_change.auth_data
+    else:
+        if len(chain_state.last_node_transport_state_authdata.clients_last_transport_authdata) == 0:
+            light_client_transport_state = \
+                LightClientTransportState(to_canonical_address(state_change.address), state_change.auth_data)
+            chain_state.last_node_transport_state_authdata \
+                .clients_last_transport_authdata.append(light_client_transport_state)
+        else:
+            for client_last_transport_authdata in \
+                    chain_state.last_node_transport_state_authdata.clients_last_transport_authdata:
+                if to_canonical_address(state_change.address) == client_last_transport_authdata.address:
+                    client_last_transport_authdata.auth_data = state_change.auth_data
+                else:
+                    light_client_transport_state = \
+                        LightClientTransportState(to_canonical_address(state_change.address),
+                                                  state_change.auth_data)
+                    chain_state.last_node_transport_state_authdata.clients_last_transport_authdata.append(
+                        light_client_transport_state)
+
     return TransitionResult(chain_state, list())
 
 
@@ -861,6 +904,8 @@ def handle_state_change(
     elif type(state_change) == ReceiveLockExpired:
         assert isinstance(state_change, ReceiveLockExpired), MYPY_ANNOTATION
         iteration = handle_receive_lock_expired(chain_state, state_change)
+    elif type(state_change) == ActionInitInitiatorLight:
+        iteration = handle_init_initiator_light(chain_state, state_change)
 
     assert chain_state is not None, "chain_state must be set"
     return iteration

@@ -9,6 +9,7 @@ from raiden.constants import (
     EMPTY_MERKLE_ROOT,
     MAXIMUM_PENDING_TRANSFERS,
     UINT256_MAX,
+    EMPTY_PAYMENT_HASH_INVOICE
 )
 from raiden.settings import DEFAULT_NUMBER_OF_BLOCK_CONFIRMATIONS
 from raiden.transfer.architecture import Event, StateChange, TransitionResult
@@ -564,22 +565,22 @@ def valid_lockedtransfer_check(
         sender_state=sender_state,
     )
 
-    result: MerkletreeOrError = (False, None, None)
+    result: MerkletreeOrError = (False, None, None, None)
 
     if not is_balance_proof_usable:
         msg = f"Invalid {message_name} message. {invalid_balance_proof_msg}"
-        result = (False, msg, None)
+        result = (False, msg, None, None)
 
     elif merkletree is None:
         msg = "Invalid {} message. Same lockhash handled twice.".format(message_name)
-        result = (False, msg, None)
+        result = (False, msg, None, None)
 
     elif _merkletree_width(merkletree) > MAXIMUM_PENDING_TRANSFERS:
         msg = (
             f"Invalid {message_name} message. Adding the transfer would exceed the allowed "
             f"limit of {MAXIMUM_PENDING_TRANSFERS} pending transfers per channel."
         )
-        result = (False, msg, None)
+        result = (False, msg, None, None)
 
     else:
         locksroot_with_lock = merkleroot(merkletree)
@@ -595,7 +596,7 @@ def valid_lockedtransfer_check(
                 encode_hex(received_balance_proof.locksroot),
             )
 
-            result = (False, msg, None)
+            result = (False, msg, None, None)
 
         elif received_balance_proof.transferred_amount != current_transferred_amount:
             # Mediated transfers must not change transferred_amount
@@ -606,7 +607,7 @@ def valid_lockedtransfer_check(
                 message_name, current_transferred_amount, received_balance_proof.transferred_amount
             )
 
-            result = (False, msg, None)
+            result = (False, msg, None, None)
 
         elif received_balance_proof.locked_amount != expected_locked_amount:
             # Mediated transfers must increase the locked_amount by lock.amount
@@ -615,7 +616,7 @@ def valid_lockedtransfer_check(
                 "Balance proof's locked_amount is invalid, expected: {} got: {}."
             ).format(message_name, expected_locked_amount, received_balance_proof.locked_amount)
 
-            result = (False, msg, None)
+            result = (False, msg, None, None)
 
         # the locked amount is limited to the current available balance, otherwise
         # the sender is attempting to game the protocol and do a double spend
@@ -626,7 +627,7 @@ def valid_lockedtransfer_check(
                 "lock amount: {} maximum distributable: {}"
             ).format(message_name, lock.amount, distributable)
 
-            result = (False, msg, None)
+            result = (False, msg, None, None)
 
         # if the message contains the keccak of the empty hash it will never be
         # usable onchain https://github.com/raiden-network/raiden/issues/3091
@@ -635,7 +636,7 @@ def valid_lockedtransfer_check(
                 f"Invalid {message_name} message. "
                 "The secrethash is the keccak of 0x0 and will not be usable onchain"
             )
-            result = (False, msg, None)
+            result = (False, msg, None, None)
         else:
             result = (True, None, merkletree, handle_invoice_result)
 
@@ -672,13 +673,15 @@ def is_valid_refund(
     receiver_state: NettingChannelEndState,
     received_transfer: LockedTransferUnsignedState,
 ) -> MerkletreeOrError:
-    is_valid_locked_transfer, msg, merkletree = valid_lockedtransfer_check(
+    is_valid_locked_transfer, msg, merkletree, _ = valid_lockedtransfer_check(
         channel_state,
         sender_state,
         receiver_state,
         "RefundTransfer",
         refund.transfer.balance_proof,
         refund.transfer.lock,
+        EMPTY_PAYMENT_HASH_INVOICE,
+        None
     )
 
     if not is_valid_locked_transfer:
@@ -1090,7 +1093,7 @@ def create_sendlockedtransfer(
     payment_identifier: PaymentID,
     payment_hash_invoice: PaymentHashInvoice,
     expiration: BlockExpiration,
-    secrethash: SecretHash,
+    secrethash: SecretHash ,
 ) -> Tuple[SendLockedTransfer, MerkleTreeState]:
     our_state = channel_state.our_state
     partner_state = channel_state.partner_state
@@ -1254,6 +1257,7 @@ def send_refundtransfer(
         amount,
         message_identifier,
         payment_identifier,
+        EMPTY_PAYMENT_HASH_INVOICE,
         expiration,
         secrethash,
     )
@@ -1292,7 +1296,8 @@ def send_unlock(
 
 
 def events_for_close(
-    channel_state: NettingChannelState, block_number: BlockNumber, block_hash: BlockHash
+    channel_state: NettingChannelState, block_number: BlockNumber, block_hash: BlockHash,
+    signed_close_tx: str
 ) -> List[Event]:
     events: List[Event] = list()
 
@@ -1307,6 +1312,7 @@ def events_for_close(
             canonical_identifier=channel_state.canonical_identifier,
             balance_proof=balance_proof,
             triggered_by_block_hash=block_hash,
+            signed_close_tx=signed_close_tx
         )
 
         events.append(close_event)
@@ -1483,7 +1489,8 @@ def handle_action_close(
     assert channel_state.identifier == close.channel_identifier, msg
 
     events = events_for_close(
-        channel_state=channel_state, block_number=block_number, block_hash=block_hash
+        channel_state=channel_state, block_number=block_number, block_hash=block_hash,
+        signed_close_tx=close.signed_close_tx
     )
     return TransitionResult(channel_state, events)
 
@@ -1612,7 +1619,7 @@ def handle_receive_lockedtransfer(
 def handle_receive_refundtransfercancelroute(
     channel_state: NettingChannelState, refund_transfer: LockedTransferSignedState
 ) -> EventsOrError:
-    return handle_receive_lockedtransfer(channel_state, refund_transfer)
+    return handle_receive_lockedtransfer(channel_state, refund_transfer, None)
 
 
 def handle_unlock(channel_state: NettingChannelState, unlock: ReceiveUnlock) -> EventsOrError:

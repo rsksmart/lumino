@@ -7,6 +7,7 @@ from raiden.exceptions import InvalidAmount
 from raiden.tests.utils.detect_failure import raise_on_failure
 from raiden.transfer import channel, views
 from raiden.transfer.state import CHANNEL_STATE_OPENED
+from raiden.constants import EMPTY_PAYMENT_HASH_INVOICE
 
 
 def wait_for_transaction(receiver, registry_address, token_address, sender_address):
@@ -204,7 +205,9 @@ def run_test_participant_selection(raiden_network, token_addresses):
 
     amount = 1
     RaidenAPI(sender).transfer_and_wait(
-        registry_address, token_address, amount, receiver.address, transfer_timeout=10
+        registry_address, token_address, amount, receiver.address,
+        transfer_timeout=10,
+        payment_hash_invoice=EMPTY_PAYMENT_HASH_INVOICE
     )
 
     exception = ValueError("timeout while waiting for incoming transaction")

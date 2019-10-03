@@ -4,6 +4,7 @@ from raiden.constants import UINT64_MAX, UINT256_MAX
 from raiden.messages import LockedTransfer, RefundTransfer
 from raiden.tests.utils import factories
 from raiden.utils.signer import LocalSigner
+from raiden.constants import EMPTY_PAYMENT_HASH_INVOICE
 
 PRIVKEY, ADDRESS = factories.make_privkey_address()
 signer = LocalSigner(PRIVKEY)
@@ -36,6 +37,7 @@ def test_refund_transfer_min_max(amount, payment_identifier, nonce, transferred_
         factories.RefundTransferProperties(
             amount=amount,
             payment_identifier=payment_identifier,
+            payment_hash_invoice=EMPTY_PAYMENT_HASH_INVOICE,
             nonce=nonce,
             transferred_amount=transferred_amount,
         )

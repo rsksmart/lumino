@@ -170,7 +170,7 @@ def construct_time_based_gas_price_strategy(max_wait_seconds,
         gas_price = _compute_gas_price(probabilities, probability / 100)
 
         max_gas = max(gas_price, int(latest_block_gas_price))
-        print(max_gas)
+        print("Rsk gas price strategy max gas: " + str(max_gas))
         return max_gas
     return time_based_gas_price_strategy
 

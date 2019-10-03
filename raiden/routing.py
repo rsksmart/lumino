@@ -50,6 +50,7 @@ def get_best_routes(
         channel_state = views.get_channelstate_by_token_network_and_partner(
             chain_state=chain_state,
             token_network_id=token_network_id,
+            creator_address=Address(from_address),
             partner_address=Address(to_address),
         )
 
@@ -142,16 +143,14 @@ def get_best_routes_internal(
     except networkx.NetworkXError:
         # If `our_address` is not in the graph, no channels opened with the
         # address
-        #return list()
-        all_neighbors = ["0x09fcbe7cEb49c944703b4820e29b0541eDfE7E82"]
-
+        return list()
     for partner_address in all_neighbors:
         # don't send the message backwards
         if partner_address == previous_address:
             continue
 
         channel_state = views.get_channelstate_by_token_network_and_partner(
-            chain_state, token_network_id, partner_address
+            chain_state, token_network_id, from_address, partner_address
         )
 
         if not channel_state:
@@ -247,6 +246,7 @@ def get_best_routes_pfs(
         channel_state = views.get_channelstate_by_token_network_and_partner(
             chain_state=chain_state,
             token_network_id=token_network_id,
+            creator_address=from_address,
             partner_address=partner_address,
         )
 

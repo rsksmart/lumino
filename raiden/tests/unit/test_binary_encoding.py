@@ -104,6 +104,7 @@ def test_refund_transfer_min_max(amount, payment_identifier, nonce, transferred_
         factories.RefundTransferProperties(
             amount=amount,
             payment_identifier=payment_identifier,
+            payment_hash_invoice=b"",
             nonce=nonce,
             transferred_amount=transferred_amount,
         )
