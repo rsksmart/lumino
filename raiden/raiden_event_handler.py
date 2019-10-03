@@ -304,13 +304,22 @@ class RaidenEventHandler(EventHandler):
             )
         )
 
-        channel_proxy.close(
-            nonce=nonce,
-            balance_hash=balance_hash,
-            additional_hash=message_hash,
-            signature=signature,
-            block_identifier=channel_close_event.triggered_by_block_hash,
-        )
+        if channel_close_event.signed_close_tx is None:
+            channel_proxy.close(
+                nonce=nonce,
+                balance_hash=balance_hash,
+                additional_hash=message_hash,
+                signature=signature,
+                block_identifier=channel_close_event.triggered_by_block_hash)
+        else:
+            channel_proxy.close_light(nonce=nonce,
+                                      balance_hash=balance_hash,
+                                      additional_hash=message_hash,
+                                      signature=signature,
+                                      block_identifier=channel_close_event.triggered_by_block_hash,
+                                      signed_close_tx=channel_close_event.signed_close_tx)
+
+
 
     @staticmethod
     def handle_contract_send_channelupdate(

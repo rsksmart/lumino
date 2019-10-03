@@ -1258,6 +1258,7 @@ class RestAPI:
                 token_address=token_address,
                 creator_address=self.raiden_api.address,
                 partner_address=partner_address,
+                channel_id_to_check=None
             )
             result = self.channel_schema.dump(channel_state)
             return api_response(result=result.data)
@@ -1577,7 +1578,7 @@ class RestAPI:
 
         updated_channel_state = self.raiden_api.get_channel(
             registry_address, channel_state.token_address, channel_state.our_state.address,
-            channel_state.partner_state.address
+            channel_state.partner_state.address, None
         )
 
         result = self.channel_schema.dump(updated_channel_state)
@@ -1622,11 +1623,38 @@ class RestAPI:
 
         updated_channel_state = self.raiden_api.get_channel(
             registry_address, channel_state.token_address, channel_state.our_state.address,
-            channel_state.partner_state.address
+            channel_state.partner_state.address, None
         )
 
         result = self.channel_schema.dump(updated_channel_state)
         return api_response(result=result.data)
+
+    def _close_light(
+        self,
+        registry_address: typing.PaymentNetworkID,
+        channel_state: NettingChannelState,
+        signed_close_tx: typing.SignedTransaction):
+
+        log.debug(
+            "Closing light channel",
+            node=pex(self.raiden_api.address),
+            registry_address=to_checksum_address(registry_address),
+            channel_identifier=channel_state.identifier
+        )
+
+        self.validate_channel_status(channel_state)
+
+        try:
+            self.raiden_api.channel_close_light(
+                registry_address,
+                channel_state.token_address,
+                channel_state.partner_state.address,
+                signed_close_tx=signed_close_tx
+            )
+        except InsufficientFunds as e:
+            return api_error(errors=str(e), status_code=HTTPStatus.PAYMENT_REQUIRED)
+
+        return self.update_channel_state(registry_address, channel_state)
 
     def _close(
         self, registry_address: typing.PaymentNetworkID, channel_state: NettingChannelState
@@ -1638,11 +1666,7 @@ class RestAPI:
             channel_identifier=channel_state.identifier,
         )
 
-        if channel.get_status(channel_state) != CHANNEL_STATE_OPENED:
-            return api_error(
-                errors="Attempted to close an already closed channel",
-                status_code=HTTPStatus.CONFLICT,
-            )
+        self.validate_channel_status(channel_state)
 
         try:
             self.raiden_api.channel_close(
@@ -1651,8 +1675,22 @@ class RestAPI:
         except InsufficientFunds as e:
             return api_error(errors=str(e), status_code=HTTPStatus.PAYMENT_REQUIRED)
 
+        return self.update_channel_state(registry_address, channel_state)
+
+    def validate_channel_status(self, channel_state):
+        if channel.get_status(channel_state) != CHANNEL_STATE_OPENED:
+            return api_error(
+                errors="Attempted to close an already closed channel",
+                status_code=HTTPStatus.CONFLICT,
+            )
+
+    def update_channel_state(self, registry_address, channel_state):
         updated_channel_state = self.raiden_api.get_channel(
-            registry_address, channel_state.token_address, channel_state.partner_state.address
+            registry_address,
+            channel_state.token_address,
+            channel_state.our_state.address,
+            channel_state.partner_state.address,
+            channel_state.canonical_identifier.channel_identifier
         )
 
         result = self.channel_schema.dump(updated_channel_state)
@@ -1666,6 +1704,7 @@ class RestAPI:
         partner_address: typing.Address,
         signed_approval_tx: typing.SignedTransaction,
         signed_deposit_tx: typing.SignedTransaction,
+        signed_close_tx:typing.SignedTransaction,
         total_deposit: typing.TokenAmount = None,
         state: str = None,
 
@@ -1703,6 +1742,7 @@ class RestAPI:
                 token_address=token_address,
                 creator_address=creator_address,
                 partner_address=partner_address,
+                channel_id_to_check=None
             )
 
         except ChannelNotFound:
@@ -1722,8 +1762,7 @@ class RestAPI:
                                          signed_deposit_tx)
 
         elif state == CHANNEL_STATE_CLOSED:
-            log.critical("Not implemented yet!")
-            result = None
+            result = self._close_light(registry_address, channel_state, signed_close_tx)
         else:  # should never happen, channel_state is validated in the schema
             result = api_error(
                 errors="Provided invalid channel state {}".format(state),
@@ -1771,6 +1810,7 @@ class RestAPI:
                 token_address=token_address,
                 creator_address=self.raiden_api.address,
                 partner_address=partner_address,
+                channel_id_to_check=None
             )
 
         except ChannelNotFound:

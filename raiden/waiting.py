@@ -175,6 +175,7 @@ def wait_for_channel_in_states(
     channel_ids: List[ChannelID],
     retry_timeout: float,
     target_states: Sequence[str],
+    partner_addresses: List[Address]
 ) -> None:
     """Wait until all channels are in `target_states`.
 
@@ -213,8 +214,8 @@ def wait_for_channel_in_states(
         canonical_id = list_cannonical_ids[-1]
         chain_state = views.state_from_raiden(raiden)
 
-        channel_state = views.get_channelstate_by_canonical_identifier(
-            chain_state=chain_state, canonical_identifier=canonical_id
+        channel_state = views.get_channelstate_by_canonical_identifier_and_address(
+            chain_state=chain_state, canonical_identifier=canonical_id, address=partner_addresses[0]
         )
 
         channel_is_settled = (
@@ -233,6 +234,7 @@ def wait_for_close(
     token_address: TokenAddress,
     channel_ids: List[ChannelID],
     retry_timeout: float,
+    partner_addresses: List[Address]
 ) -> None:
     """Wait until all channels are closed.
 
@@ -246,6 +248,7 @@ def wait_for_close(
         channel_ids=channel_ids,
         retry_timeout=retry_timeout,
         target_states=CHANNEL_AFTER_CLOSE_STATES,
+        partner_addresses=partner_addresses
     )
 
 

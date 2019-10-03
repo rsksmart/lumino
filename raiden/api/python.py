@@ -73,6 +73,7 @@ from raiden.utils import pex, typing
 from raiden.utils.gas_reserve import has_enough_gas_reserve
 from raiden.utils.typing import (
     Address,
+    AddressHex,
     Any,
     BlockSpecification,
     BlockTimeout,
@@ -230,6 +231,7 @@ class RaidenAPI:
         token_address: TokenAddress,
         creator_address: Address,
         partner_address: Address,
+        channel_id_to_check: ChannelID= None
     ) -> NettingChannelState:
         if not is_binary_address(token_address):
             raise InvalidAddress("Expected binary address format for token in get_channel")
@@ -240,7 +242,7 @@ class RaidenAPI:
         if not is_binary_address(partner_address):
             raise InvalidAddress("Expected binary address format for partner in get_channel")
 
-        channel_list = self.get_channel_list(registry_address, token_address, creator_address, partner_address)
+        channel_list = self.get_channel_list(registry_address, token_address, creator_address, partner_address, channel_id_to_check)
         assert len(channel_list) <= 1
 
         if not channel_list:
@@ -723,6 +725,72 @@ class RaidenAPI:
             retry_timeout=retry_timeout,
         )
 
+    def channel_close_light(
+        self,
+        registry_address: PaymentNetworkID,
+        token_address: TokenAddress,
+        partner_address: Address,
+        retry_timeout: NetworkTimeout = DEFAULT_RETRY_TIMEOUT,
+        signed_close_tx: typing.SignedTransaction = None,
+    ):
+        """Close a channel opened with `partner_address` for the given
+        `token_address`.
+        Race condition, this can fail if channel was closed externally.
+        """
+        self.channel_batch_close_light(
+            registry_address=registry_address,
+            token_address=token_address,
+            partner_addresses=[partner_address],
+            retry_timeout=retry_timeout,
+            signed_close_tx=signed_close_tx
+        )
+
+    def channel_batch_close_light(
+        self,
+        registry_address: PaymentNetworkID,
+        token_address: TokenAddress,
+        partner_addresses: List[Address],
+        retry_timeout: NetworkTimeout = DEFAULT_RETRY_TIMEOUT,
+        signed_close_tx: typing.SignedTransaction = None,
+    ):
+        """Close a channel opened with `partner_address` for the given
+        `token_address`.
+        Race condition, this can fail if channel was closed externally.
+        """
+
+        channels_to_close = ChannelValidator.can_close_channel(
+            token_address,
+            partner_addresses,
+            registry_address,
+            self.raiden)
+
+        self.delegate_channel_close_task(channels_to_close, signed_close_tx)
+
+        channel_ids = [channel_state.identifier for channel_state in channels_to_close]
+
+        waiting.wait_for_close(
+            raiden=self.raiden,
+            payment_network_id=registry_address,
+            token_address=token_address,
+            channel_ids=channel_ids,
+            retry_timeout=retry_timeout,
+            partner_addresses=partner_addresses
+        )
+
+    def delegate_channel_close_task(self, channels_to_close, signed_close_tx=None):
+        greenlets: Set[Greenlet] = set()
+        for channel_state in channels_to_close:
+            channel_close = ActionChannelClose(
+                canonical_identifier=channel_state.canonical_identifier,
+                signed_close_tx=signed_close_tx,
+                participant1=channel_state.our_state.address,
+                participant2=channel_state.partner_state.address
+            )
+
+            greenlets.update(self.raiden.handle_state_change(channel_close))
+
+        gevent.joinall(greenlets, raise_error=True)
+
     def channel_batch_close(
         self,
         registry_address: PaymentNetworkID,
@@ -735,35 +803,13 @@ class RaidenAPI:
         Race condition, this can fail if channel was closed externally.
         """
 
-        if not is_binary_address(token_address):
-            raise InvalidAddress("Expected binary address format for token in channel close")
+        channels_to_close = ChannelValidator.can_close_channel(
+            token_address,
+            partner_addresses,
+            registry_address,
+            self.raiden)
 
-        if not all(map(is_binary_address, partner_addresses)):
-            raise InvalidAddress("Expected binary address format for partner in channel close")
-
-        valid_tokens = views.get_token_identifiers(
-            chain_state=views.state_from_raiden(self.raiden), payment_network_id=registry_address
-        )
-        if token_address not in valid_tokens:
-            raise UnknownTokenAddress("Token address is not known.")
-
-        chain_state = views.state_from_raiden(self.raiden)
-        channels_to_close = views.filter_channels_by_partneraddress(
-            chain_state=chain_state,
-            payment_network_id=registry_address,
-            token_address=token_address,
-            partner_addresses=partner_addresses,
-        )
-
-        greenlets: Set[Greenlet] = set()
-        for channel_state in channels_to_close:
-            channel_close = ActionChannelClose(
-                canonical_identifier=channel_state.canonical_identifier
-            )
-
-            greenlets.update(self.raiden.handle_state_change(channel_close))
-
-        gevent.joinall(greenlets, raise_error=True)
+        self.delegate_channel_close_task(channels_to_close)
 
         channel_ids = [channel_state.identifier for channel_state in channels_to_close]
 
@@ -773,6 +819,7 @@ class RaidenAPI:
             token_address=token_address,
             channel_ids=channel_ids,
             retry_timeout=retry_timeout,
+            partner_addresses=partner_addresses,
         )
 
     def get_channel_list(
@@ -781,6 +828,7 @@ class RaidenAPI:
         token_address: TokenAddress = None,
         creator_address: Address = None,
         partner_address: Address = None,
+        channel_id_to_check: ChannelID = None
     ) -> List[NettingChannelState]:
         """Returns a list of channels associated with the optionally given
            `token_address` and/or `partner_address`.
@@ -813,13 +861,24 @@ class RaidenAPI:
                 raise UnknownTokenAddress("Provided a partner address but no token address")
 
         if token_address and partner_address and creator_address:
-            channel_state = views.get_channelstate_for(
-                chain_state=views.state_from_raiden(self.raiden),
-                payment_network_id=registry_address,
-                token_address=token_address,
-                creator_address=creator_address,
-                partner_address=partner_address,
-            )
+
+            if channel_id_to_check is not None:
+                channel_state = views.get_channelstate_for_close_channel(
+                    chain_state=views.state_from_raiden(self.raiden),
+                    payment_network_id=registry_address,
+                    token_address=token_address,
+                    creator_address=creator_address,
+                    partner_address=partner_address,
+                    channel_id_to_check=channel_id_to_check
+                )
+            else:
+                channel_state = views.get_channelstate_for(
+                    chain_state=views.state_from_raiden(self.raiden),
+                    payment_network_id=registry_address,
+                    token_address=token_address,
+                    creator_address=creator_address,
+                    partner_address=partner_address
+                )
 
             if channel_state:
                 result = [channel_state]
@@ -1292,6 +1351,7 @@ class RaidenAPI:
                     token_address=token_address,
                     creator_address=self.address,
                     partner_address=partner_address,
+                    channel_id_to_check=None
                 )
                 channel_id = partner_channel.identifier
 
