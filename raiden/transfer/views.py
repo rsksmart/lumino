@@ -332,18 +332,11 @@ def get_channelstate_by_token_network_and_partner(
     token_network = get_token_network_by_identifier(chain_state, token_network_id)
 
     channel_state = None
-    channels = []
     if token_network:
-        for address in token_network.partneraddresses_to_channelidentifiers:
-            if address is not None:
-                if address in token_network.channelidentifiers_to_channels:
-                    channel_state_dict = token_network.channelidentifiers_to_channels[address]
-                    for channel_id in token_network.partneraddresses_to_channelidentifiers[partner_address]:
-                        channel_state_tmp = channel_state_dict[channel_id]
-                        if channel_state_tmp is not None:
-                            if channel_state_tmp.partner_state.address == partner_address and \
-                                    channel_state_tmp.identifier == channel_id:
-                                channels.append(channel_state_tmp)
+        channels = []
+        for channel_id in token_network.partneraddresses_to_channelidentifiers[partner_address]:
+            if token_network.channelidentifiers_to_channels[creator_address].get(channel_id) is not None:
+                channels.append(token_network.channelidentifiers_to_channels[creator_address][channel_id])
 
         states = filter_channels_by_status(channels, [CHANNEL_STATE_UNUSABLE])
         # If multiple channel states are found, return the last one.
@@ -351,6 +344,7 @@ def get_channelstate_by_token_network_and_partner(
             channel_state = states[-1]
 
     return channel_state
+
 
 
 def get_channelstate_by_canonical_identifier_and_address(

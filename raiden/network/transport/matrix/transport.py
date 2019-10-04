@@ -189,12 +189,12 @@ class _RetryQueue(Runnable):
 
         self.log.debug("Retrying message", receiver=to_normalized_address(self.receiver))
         status = self.transport._address_mgr.get_address_reachability(self.receiver)
-        if status is not AddressReachability.REACHABLE:
-            # if partner is not reachable, return
-            self.log.debug(
-                "Partner not reachable. Skipping.", partner=pex(self.receiver), status=status
-            )
-            return
+        # if status is not AddressReachability.REACHABLE:
+        #     # if partner is not reachable, return
+        #     self.log.debug(
+        #         "Partner not reachable. Skipping.", partner=pex(self.receiver), status=status
+        #     )
+        #     return
         # sort output by channel_identifier (so global/unordered queue goes first)
         # inside queue, preserve order in which messages were enqueued
         ordered_queue = sorted(
@@ -754,16 +754,16 @@ class MatrixTransport(Runnable):
             )
             return False
 
-        # don't proceed if user isn't whitelisted (yet)
-        if not self._address_mgr.is_address_known(peer_address):
-            # user not whitelisted
-            self.log.debug(
-                "Message from non-whitelisted peer - ignoring",
-                sender=user,
-                sender_address=pex(peer_address),
-                room=room,
-            )
-            return False
+        # # don't proceed if user isn't whitelisted (yet)
+        # if not self._address_mgr.is_address_known(peer_address):
+        #     # user not whitelisted
+        #     self.log.debug(
+        #         "Message from non-whitelisted peer - ignoring",
+        #         sender=user,
+        #         sender_address=pex(peer_address),
+        #         room=room,
+        #     )
+        #     return False
 
         # rooms we created and invited user, or were invited specifically by them
         room_ids = self._get_room_ids_for_address(peer_address)
@@ -909,7 +909,7 @@ class MatrixTransport(Runnable):
             return None
         address_hex = to_normalized_address(address)
         msg = f"address not health checked: me: {self._user_id}, peer: {address_hex}"
-        assert address and self._address_mgr.is_address_known(address), msg
+      #  assert address and self._address_mgr.is_address_known(address), msg
 
         # filter_private is done in _get_room_ids_for_address
         room_ids = self._get_room_ids_for_address(address)
