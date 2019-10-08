@@ -118,7 +118,8 @@ def handle_block(
     )
 
     events: List[Event] = list()
-
+    #FIXME mmartinez7
+    lock_has_expired = False
     if lock_has_expired and initiator_state.transfer_state != "transfer_expired":
         is_channel_open = channel.get_status(channel_state) == CHANNEL_STATE_OPENED
         if is_channel_open:
@@ -398,7 +399,7 @@ def handle_secretrequest(
         state_change.amount <= lock.amount
         and state_change.amount >= initiator_state.transfer_description.amount
         and state_change.expiration == lock.expiration
-        and initiator_state.transfer_description.secret != EMPTY_SECRET
+       ## and initiator_state.transfer_description.secret != EMPTY_SECRET
     )
 
     if already_received_secret_request and is_message_from_target:
@@ -416,6 +417,8 @@ def handle_secretrequest(
         message_identifier = message_identifier_from_prng(pseudo_random_generator)
         transfer_description = initiator_state.transfer_description
         recipient = transfer_description.target
+        #FIXME mmartinez what about secret for light clients?
+        #secret = Secret(b"0x213")
         revealsecret = SendSecretReveal(
             recipient=Address(recipient),
             channel_identifier=CHANNEL_IDENTIFIER_GLOBAL_QUEUE,

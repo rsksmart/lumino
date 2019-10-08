@@ -156,7 +156,7 @@ class RaidenEventHandler(EventHandler):
     def handle_send_lockexpired(raiden: "RaidenService", send_lock_expired: SendLockExpired):
         lock_expired_message = message_from_sendevent(send_lock_expired)
         raiden.sign(lock_expired_message)
-        raiden.transport.send_async(send_lock_expired.queue_identifier, lock_expired_message)
+        raiden.transport.hub_transport.send_async(send_lock_expired.queue_identifier, lock_expired_message)
 
     @staticmethod
     def handle_send_lockedtransfer(
@@ -173,7 +173,7 @@ class RaidenEventHandler(EventHandler):
         raiden: "RaidenService", send_locked_transfer_light: SendLockedTransferLight
     ):
         mediated_transfer_message = send_locked_transfer_light.signed_locked_transfer
-        raiden.transport[1].send_async(
+        raiden.transport.light_client_transports[0].send_async(
             send_locked_transfer_light.queue_identifier, mediated_transfer_message
         )
 
