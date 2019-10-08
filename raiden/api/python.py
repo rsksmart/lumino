@@ -1589,7 +1589,7 @@ class RaidenAPI:
         server_url = client.api.base_url
         server_name = urlparse(server_url).netloc
         data_to_sign = {
-            "display_name_to_sign": "@" + encode_hex(address) + ":" + server_name,
+            "display_name_to_sign": "@" + to_checksum_address(address) + ":" + server_name,
             "password_to_sign": server_name,
             "seed_retry": "seed"}
         return data_to_sign
@@ -1599,6 +1599,8 @@ class RaidenAPI:
                               signed_password,
                               signed_display_name,
                               signed_seed_retry):
+
+        address = to_checksum_address(address)
 
         light_client = self.raiden.wal.storage.get_light_client(address)
 
