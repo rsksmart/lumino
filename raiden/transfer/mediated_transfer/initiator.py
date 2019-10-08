@@ -418,12 +418,12 @@ def handle_secretrequest(
         transfer_description = initiator_state.transfer_description
         recipient = transfer_description.target
         #FIXME mmartinez what about secret for light clients?
-        #secret = Secret(b"0x213")
+        secret = Secret(b"0x213")
         revealsecret = SendSecretReveal(
             recipient=Address(recipient),
             channel_identifier=CHANNEL_IDENTIFIER_GLOBAL_QUEUE,
             message_identifier=message_identifier,
-            secret=transfer_description.secret,
+            secret=secret,
         )
 
         initiator_state.revealsecret = revealsecret

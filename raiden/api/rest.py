@@ -21,7 +21,7 @@ from raiden.api.validations.api_error_builder import ApiErrorBuilder
 from raiden.api.validations.api_status_codes import ERROR_STATUS_CODES
 from raiden.api.validations.channel_validator import ChannelValidator
 from raiden.lightclient.light_client_service import LightClientService
-from raiden.messages import LockedTransfer
+from raiden.messages import LockedTransfer, Delivered
 from raiden.rns_constants import RNS_ADDRESS_ZERO
 from raiden.utils.rns import is_rns_address
 from webargs.flaskparser import parser
@@ -1704,7 +1704,7 @@ class RestAPI:
         partner_address: typing.Address,
         signed_approval_tx: typing.SignedTransaction,
         signed_deposit_tx: typing.SignedTransaction,
-        signed_close_tx:typing.SignedTransaction,
+        signed_close_tx: typing.SignedTransaction,
         total_deposit: typing.TokenAmount = None,
         state: str = None,
 
@@ -1927,7 +1927,6 @@ class RestAPI:
 
         return api_response(invoice)
 
-
     def get_data_for_registration_request(self, address):
         data_to_sign = self.raiden_api.get_data_for_registration_request(address)
         return api_response(data_to_sign)
@@ -2003,20 +2002,28 @@ class RestAPI:
     def receive_light_client_protocol_message(self,
                                               message_id: int,
                                               message_order: int,
+                                              sender: typing.AddressHex,
+                                              receiver: typing.AddressHex,
                                               message: Dict):
         # TODO check if message is coherent
         # TODO call from dict will work but we need to validate each parameter in order to know if there are no extra or missing params.
         # TODO we also need to check if message id an order received make sense
 
-        #FIXME Should take the secret from the message receivend from LC
+        # FIXME Should take the secret from the message receivend from LC
 
-        lt = LockedTransfer.from_dict(message)
-        payment_request = LightClientService.get_light_client_payment(message_id, self.raiden_api.raiden.wal)
-        self.initiate_payment_light(self.raiden_api.raiden.default_registry.address, lt.token, lt.initiator,
-                                    lt.target, lt.locked_amount, lt.payment_identifier, payment_request.payment_id, lt.lock.secrethash,
-                                    EMPTY_PAYMENT_HASH_INVOICE, lt)
+        if message["type"] == "LockedTransfer":
+            lt = LockedTransfer.from_dict(message)
+            payment_request = LightClientService.get_light_client_payment(message_id, self.raiden_api.raiden.wal)
+            self.initiate_payment_light(self.raiden_api.raiden.default_registry.address, lt.token, lt.initiator,
+                                        lt.target, lt.locked_amount, lt.payment_identifier, payment_request.payment_id,
+                                        lt.lock.secrethash,
+                                        EMPTY_PAYMENT_HASH_INVOICE, lt)
+        elif message["type"] == "Delivered":
+            delivered = Delivered.from_dict(message)
+            lc_transport = self.raiden_api.raiden.transport.light_client_transports[0]
+            lc_transport.send_for_light_client_with_retry(receiver, delivered)
 
-        return api_response("Should save all the messages")
+        return api_response("Should respond accordly to the message received")
 
     def create_light_client_payment(
         self,
@@ -2047,4 +2054,3 @@ class RestAPI:
             return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.NOT_FOUND, log=log)
         except UnhandledLightClient as e:
             return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.FORBIDDEN, log=log)
-

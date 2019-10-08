@@ -1,6 +1,7 @@
 import structlog
 
-from raiden.constants import EMPTY_SECRET
+from raiden.constants import EMPTY_SECRET, TEST_PAYMENT_ID
+from raiden.lightclient.light_client_message_handler import LightClientMessageHandler
 from raiden.messages import (
     Delivered,
     LockedTransfer,
@@ -33,13 +34,13 @@ log = structlog.get_logger(__name__)  # pylint: disable=invalid-name
 
 
 class MessageHandler:
-    def on_message(self, raiden: RaidenService, message: Message) -> None:
+    def on_message(self, raiden: RaidenService, message: Message, is_light_client: bool = False) -> None:
         # pylint: disable=unidiomatic-typecheck
-        print("On received message "+str(type(message)))
+        print("On received message " + str(type(message)))
 
         if type(message) == SecretRequest:
             assert isinstance(message, SecretRequest), MYPY_ANNOTATION
-            self.handle_message_secretrequest(raiden, message)
+            self.handle_message_secretrequest(raiden, message, is_light_client)
 
         elif type(message) == RevealSecret:
             assert isinstance(message, RevealSecret), MYPY_ANNOTATION
@@ -63,16 +64,16 @@ class MessageHandler:
 
         elif type(message) == Delivered:
             assert isinstance(message, Delivered), MYPY_ANNOTATION
-            self.handle_message_delivered(raiden, message)
+            self.handle_message_delivered(raiden, message, is_light_client)
 
         elif type(message) == Processed:
             assert isinstance(message, Processed), MYPY_ANNOTATION
-            self.handle_message_processed(raiden, message)
+            self.handle_message_processed(raiden, message, is_light_client)
         else:
             log.error("Unknown message cmdid {}".format(message.cmdid))
 
     @staticmethod
-    def handle_message_secretrequest(raiden: RaidenService, message: SecretRequest) -> None:
+    def handle_message_secretrequest(raiden: RaidenService, message: SecretRequest, is_light_client: bool = False) -> None:
         secret_request = ReceiveSecretRequest(
             message.payment_identifier,
             message.amount,
@@ -81,6 +82,11 @@ class MessageHandler:
             message.sender,
         )
         raiden.handle_and_track_state_change(secret_request)
+        if is_light_client:
+            # FIXME mmartinez7 payment id does not travel on the protocol messages
+            LightClientMessageHandler.store_light_client_protocol_message(message, True, TEST_PAYMENT_ID, 4, raiden.wal)
+
+
 
     @staticmethod
     def handle_message_revealsecret(raiden: RaidenService, message: RevealSecret) -> None:
@@ -170,18 +176,26 @@ class MessageHandler:
             )
             return
 
-        # TODO marcosmartinez7: what about lc here?
+        # TODO marcosmartinez7: what about lc reception here?
         if message.target == raiden.address:
             raiden.target_mediated_transfer(message)
         else:
             raiden.mediate_mediated_transfer(message)
 
     @staticmethod
-    def handle_message_processed(raiden: RaidenService, message: Processed) -> None:
+    def handle_message_processed(raiden: RaidenService, message: Processed, is_light_client: bool = False) -> None:
         processed = ReceiveProcessed(message.sender, message.message_identifier)
         raiden.handle_and_track_state_change(processed)
+        if is_light_client:
+            # FIXME mmartinez7 payment id does not travel on the protocol messages
+            LightClientMessageHandler.store_light_client_protocol_message(message, True, TEST_PAYMENT_ID, 3, raiden.wal)
 
     @staticmethod
-    def handle_message_delivered(raiden: RaidenService, message: Delivered) -> None:
+    def handle_message_delivered(raiden: RaidenService, message: Delivered, is_light_client: bool = False) -> None:
         delivered = ReceiveDelivered(message.sender, message.delivered_message_identifier)
         raiden.handle_and_track_state_change(delivered)
+        if is_light_client:
+            #FIXME mmartinez7 payment id does not travel on the protocol messages
+            LightClientMessageHandler.store_light_client_protocol_message(message, True, TEST_PAYMENT_ID, 2, raiden.wal)
+
+

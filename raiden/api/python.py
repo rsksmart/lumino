@@ -1694,7 +1694,7 @@ class RaidenAPI:
                 self.raiden.wal
             )
 
-            return HubMessage(light_client_message_id, order, locked_transfer)
+            return HubMessage(payment_id, order, locked_transfer)
         else:
             raise ChannelNotFound("Channel with given partner address doesnt exists")
 

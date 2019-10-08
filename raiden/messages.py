@@ -516,6 +516,13 @@ class Delivered(SignedMessage):
         delivered.signature = decode_hex(data["signature"])
         return delivered
 
+    @classmethod
+    def from_dict_unsigned(cls, data):
+        msg = f'Cannot decode data. Provided type is {data["type"]}, expected {cls.__name__}'
+        assert data["type"] == cls.__name__, msg
+        delivered = cls(delivered_message_identifier=data["delivered_message_identifier"])
+        return delivered
+
 
 class Pong(SignedMessage):
     """ Response to a Ping message. """
