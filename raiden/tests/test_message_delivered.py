@@ -11,7 +11,7 @@ from raiden.messages import (
 def test_signature_without_secret():
     dict_msg = {
         "type": "Delivered",
-        "delivered_message_identifier": 11664036996360797390
+        "delivered_message_identifier": 15646344508401696016
     }
     message = Delivered.from_dict_unsigned(dict_msg)
     message.sign(signer)

@@ -2,7 +2,7 @@ import random
 
 from eth_utils import to_canonical_address
 
-from raiden.constants import EMPTY_SECRET, MAXIMUM_PENDING_TRANSFERS
+from raiden.constants import EMPTY_SECRET, MAXIMUM_PENDING_TRANSFERS, IS_LIGHT_CLIENT_TEST_PAYMENT
 from raiden.messages import LockedTransfer
 from raiden.settings import DEFAULT_WAIT_BEFORE_LOCK_REMOVAL
 from raiden.transfer import channel
@@ -23,7 +23,7 @@ from raiden.transfer.mediated_transfer.state import (
 from raiden.transfer.mediated_transfer.state_change import (
     ReceiveSecretRequest,
     ReceiveSecretReveal,
-)
+    ReceiveSecretRequestLight)
 from raiden.transfer.state import (
     CHANNEL_STATE_OPENED,
     NettingChannelState,
@@ -118,7 +118,7 @@ def handle_block(
     )
 
     events: List[Event] = list()
-    #FIXME mmartinez7
+    # FIXME mmartinez7
     lock_has_expired = False
     if lock_has_expired and initiator_state.transfer_state != "transfer_expired":
         is_channel_open = channel.get_status(channel_state) == CHANNEL_STATE_OPENED
@@ -260,7 +260,7 @@ def try_new_route_light(
         )
         lock_amount = signed_locked_transfer.lock.amount
         lock_expiration = signed_locked_transfer.lock.expiration
-        lock_secret_hash= signed_locked_transfer.lock.secrethash
+        lock_secret_hash = signed_locked_transfer.lock.secrethash
         lock = HashTimeLockState(lock_amount, lock_expiration, lock_secret_hash)
         locked_transfer = LockedTransferUnsignedState(
             signed_locked_transfer.payment_identifier, signed_locked_transfer.payment_hash_invoice,
@@ -399,7 +399,7 @@ def handle_secretrequest(
         state_change.amount <= lock.amount
         and state_change.amount >= initiator_state.transfer_description.amount
         and state_change.expiration == lock.expiration
-       ## and initiator_state.transfer_description.secret != EMPTY_SECRET
+        ## and initiator_state.transfer_description.secret != EMPTY_SECRET
     )
 
     if already_received_secret_request and is_message_from_target:
@@ -417,8 +417,10 @@ def handle_secretrequest(
         message_identifier = message_identifier_from_prng(pseudo_random_generator)
         transfer_description = initiator_state.transfer_description
         recipient = transfer_description.target
-        #FIXME mmartinez what about secret for light clients?
         secret = Secret(b"0x213")
+        # FIXME mmartinez what about secret for light clients?
+        if not IS_LIGHT_CLIENT_TEST_PAYMENT:
+            secret = transfer_description.secret
         revealsecret = SendSecretReveal(
             recipient=Address(recipient),
             channel_identifier=CHANNEL_IDENTIFIER_GLOBAL_QUEUE,
@@ -438,6 +440,66 @@ def handle_secretrequest(
         iteration = TransitionResult(initiator_state, list())
 
     return iteration
+
+
+def handle_secretrequest_light(
+    initiator_state: InitiatorTransferState,
+    state_change: ReceiveSecretRequestLight,
+    channel_state: NettingChannelState
+) -> TransitionResult[InitiatorTransferState]:
+    print("Inicio")
+    is_message_from_target = (
+        state_change.sender == initiator_state.transfer_description.target
+        and state_change.secrethash == initiator_state.transfer_description.secrethash
+        and state_change.payment_identifier
+        == initiator_state.transfer_description.payment_identifier
+    )
+
+    lock = channel.get_lock(
+        channel_state.our_state, initiator_state.transfer_description.secrethash
+    )
+
+    # This should not ever happen. This task clears itself when the lock is
+    # removed.
+    assert lock is not None, "channel is does not have the transfer's lock"
+
+    already_received_secret_request = initiator_state.received_secret_request
+
+    # lock.amount includes the fees, transfer_description.amount is the actual
+    # payment amount, for the transfer to be valid and the unlock allowed the
+    # target must receive an amount between these values.
+    is_valid_secretrequest = (
+        state_change.amount <= lock.amount
+        and state_change.amount >= initiator_state.transfer_description.amount
+        and state_change.expiration == lock.expiration
+        ## and initiator_state.transfer_description.secret != EMPTY_SECRET
+    )
+
+    if already_received_secret_request and is_message_from_target:
+        # A secret request was received earlier, all subsequent are ignored
+        # as it might be an attack
+        print("Already")
+
+        iteration = TransitionResult(initiator_state, list())
+
+    elif is_valid_secretrequest and is_message_from_target:
+        print("Valid")
+
+        initiator_state.received_secret_request = True
+        iteration = TransitionResult(initiator_state, list())
+
+    elif not is_valid_secretrequest and is_message_from_target:
+        print("Not valid")
+
+        initiator_state.received_secret_request = True
+        iteration = TransitionResult(initiator_state, list())
+
+    else:
+        iteration = TransitionResult(initiator_state, list())
+    print("Fin")
+
+    return iteration
+
 
 
 def handle_offchain_secretreveal(
@@ -541,6 +603,11 @@ def state_transition(
         assert isinstance(state_change, ReceiveSecretRequest), MYPY_ANNOTATION
         iteration = handle_secretrequest(
             initiator_state, state_change, channel_state, pseudo_random_generator
+        )
+    elif type(state_change) == ReceiveSecretRequestLight:
+        assert isinstance(state_change, ReceiveSecretRequestLight), MYPY_ANNOTATION
+        iteration = handle_secretrequest_light(
+            initiator_state, state_change, channel_state
         )
     elif type(state_change) == ReceiveSecretReveal:
         assert isinstance(state_change, ReceiveSecretReveal), MYPY_ANNOTATION

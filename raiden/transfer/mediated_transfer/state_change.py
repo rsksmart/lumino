@@ -321,6 +321,66 @@ class ReceiveSecretRequest(AuthenticatedSenderStateChange):
         return instance
 
 
+class ReceiveSecretRequestLight(AuthenticatedSenderStateChange):
+    """ A secret request message received for a light client """
+
+    def __init__(
+        self,
+        payment_identifier: PaymentID,
+        amount: PaymentAmount,
+        expiration: BlockExpiration,
+        secrethash: SecretHash,
+        sender: Address,
+    ) -> None:
+        super().__init__(sender)
+        self.payment_identifier = payment_identifier
+        self.amount = amount
+        self.expiration = expiration
+        self.secrethash = secrethash
+        self.revealsecret = None
+
+    def __repr__(self) -> str:
+        return "<ReceiveSecretRequestLight paymentid:{} amount:{} secrethash:{} sender:{}>".format(
+            self.payment_identifier, self.amount, pex(self.secrethash), pex(self.sender)
+        )
+
+    def __eq__(self, other: Any) -> bool:
+        return (
+            isinstance(other, ReceiveSecretRequestLight)
+            and self.payment_identifier == other.payment_identifier
+            and self.amount == other.amount
+            and self.secrethash == other.secrethash
+            and self.sender == other.sender
+            and self.revealsecret == other.revealsecret
+            and super().__eq__(other)
+        )
+
+    def __ne__(self, other: Any) -> bool:
+        return not self.__eq__(other)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "payment_identifier": str(self.payment_identifier),
+            "amount": str(self.amount),
+            "expiration": str(self.expiration),
+            "secrethash": serialize_bytes(self.secrethash),
+            "sender": to_checksum_address(self.sender),
+            "revealsecret": self.revealsecret,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "ReceiveSecretRequestLight":
+        instance = cls(
+            payment_identifier=PaymentID(int(data["payment_identifier"])),
+            amount=PaymentAmount(int(data["amount"])),
+            expiration=BlockExpiration(int(data["expiration"])),
+            secrethash=SecretHash(deserialize_bytes(data["secrethash"])),
+            sender=to_canonical_address(data["sender"]),
+        )
+        instance.revealsecret = data["revealsecret"]
+        return instance
+
+
 class ReceiveSecretReveal(AuthenticatedSenderStateChange):
     """ A SecretReveal message received. """
 

@@ -11,7 +11,7 @@ from gevent.lock import Semaphore
 from gevent.queue import JoinableQueue
 from matrix_client.errors import MatrixRequestError
 
-from raiden.constants import DISCOVERY_DEFAULT_ROOM
+from raiden.constants import DISCOVERY_DEFAULT_ROOM, IS_LIGHT_CLIENT_TEST_PAYMENT
 from raiden.exceptions import InvalidAddress, TransportError, UnknownAddress, UnknownTokenAddress
 from raiden.lightclient.light_client_message_handler import LightClientMessageHandler
 from raiden.message_handler import MessageHandler
@@ -738,6 +738,10 @@ class MatrixTransport(Runnable):
             # Ignore non-messages and non-text messages
             return False
 
+        #FIXME mmartinez7 this return false cause there is a bug : the hub is present at the matrix room
+        if IS_LIGHT_CLIENT_TEST_PAYMENT:
+            return False
+
 
         sender_id = event["sender"]
 
@@ -901,7 +905,7 @@ class MatrixTransport(Runnable):
         self.log.debug(
             "Send raw", receiver=pex(receiver_address), room=room, data=data.replace("\n", "\\n")
         )
-        print("---- Matrix Send Message " + data)
+        print("---->> Matrix Send Message " + data)
 
         room.send_text(data)
 
@@ -910,6 +914,7 @@ class MatrixTransport(Runnable):
             return None
         address_hex = to_normalized_address(address)
         msg = f"address not health checked: me: {self._user_id}, peer: {address_hex}"
+        #FIXME mmartinez
       #  assert address and self._address_mgr.is_address_known(address), msg
 
         # filter_private is done in _get_room_ids_for_address
@@ -1572,7 +1577,7 @@ class MatrixLightClientTransport(MatrixTransport):
         self._raiden_service.on_message(delivered, True)
 
     def _receive_message_to_lc(self, message: Union[SignedRetrieableMessage, Processed]):
-        print("---- Matrix Received Message LC transport" + str(message))
+        print("<<---- Matrix Received Message LC transport" + str(message))
         assert self._raiden_service is not None
         self.log.debug(
             "Message received",

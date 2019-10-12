@@ -122,8 +122,8 @@ def test_signature_without_secret():
     dict_msg = {
         "type": "LockedTransfer",
         "chain_id": 33,
-        "message_identifier": 4603368540680623987,
-        "payment_identifier": 8403976256240848301,
+        "message_identifier": 15646344508401696016,
+        "payment_identifier": 11565195055784257403,
         "payment_hash_invoice": "0x",
         "nonce": 1,
         "token_network_address": "0x877ec5961d18d3413fabbd67696b758fe95408d6",
@@ -132,11 +132,11 @@ def test_signature_without_secret():
         "transferred_amount": 0,
         "locked_amount": 100000000000000,
         "recipient": "0x29021129f5d038897f01bd4bc050525ca01a4758",
-        "locksroot": "0x0e496225d998dbe8c9dca47083e023b655de8f8ef96c792b68a775ad335fabdc",
+        "locksroot": "0x18c3adada74ee7fbb8681ecde56e929f6ba3adb21ba75150cb28095ef1df01e3",
         "lock": {
             "type": "Lock",
             "amount": 100000000000000,
-            "expiration": 480183,
+            "expiration": 507288,
             "secrethash": "0x3e6d58ba381898cf1a0ff6fbe65a3805419063ea9eb6ff6bc6f0dde45032d0dc"
         },
         "target": "0x29021129f5d038897f01bd4bc050525ca01a4758",

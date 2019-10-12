@@ -7,6 +7,7 @@ from raiden.transfer.architecture import (
     StateChange,
     TransitionResult,
 )
+from raiden.transfer.channel import compute_merkletree_with, create_sendlockedtransfer
 from raiden.transfer.events import (
     ContractSendChannelBatchUnlock,
     ContractSendChannelClose,
@@ -31,7 +32,7 @@ from raiden.transfer.mediated_transfer.state_change import (
     ReceiveSecretReveal,
     ReceiveTransferRefund,
     ReceiveTransferRefundCancelRoute,
-    ActionInitInitiatorLight)
+    ActionInitInitiatorLight, ReceiveSecretRequestLight)
 from raiden.transfer.state import (
     ChainState,
     InitiatorTask,
@@ -79,7 +80,7 @@ from raiden.utils.typing import (
     TokenNetworkID,
     Tuple,
     Union,
-)
+    Address)
 
 from eth_utils import to_canonical_address
 
@@ -688,15 +689,45 @@ def handle_init_initiator(
     )
 
 
+
 def handle_init_initiator_light(
     chain_state: ChainState, state_change: ActionInitInitiatorLight
 ) -> TransitionResult[ChainState]:
-    transfer = state_change.transfer
-    secrethash = transfer.secrethash
+    received_transfer = state_change.transfer
+    secrethash = received_transfer.secrethash
+
+    signed_transfer = state_change.signed_locked_transfer
+    received_lock = signed_transfer.lock
+
+    channel_state = views.get_channelstate_by_token_network_and_partner(
+        chain_state=chain_state,
+        token_network_id=received_transfer.token_network_identifier,
+        creator_address=Address(received_transfer.initiator),
+        partner_address=Address(received_transfer.target),
+    )
+    #FIXME mmartinez must asser that the event produces the same locked transfer object as the LC sent. Maybe we should move this to the validations and include all the info into the ActionInitInitiatorLight state
+    calculated_lt_event, merkletree = create_sendlockedtransfer(
+        channel_state,
+        signed_transfer.initiator,
+        signed_transfer.target,
+        signed_transfer.locked_amount,
+        signed_transfer.message_identifier,
+        signed_transfer.payment_identifier,
+        signed_transfer.payment_hash_invoice,
+        received_lock.expiration,
+        received_lock.secrethash,
+    )
+
+    calculated_transfer = calculated_lt_event.transfer
+    lock = calculated_transfer.lock
+    channel_state.our_state.balance_proof = calculated_transfer.balance_proof
+    channel_state.our_state.merkletree = merkletree
+    channel_state.our_state.secrethashes_to_lockedlocks[lock.secrethash] = lock
 
     return subdispatch_initiatortask(
-        chain_state, state_change, transfer.token_network_identifier, secrethash
+        chain_state, state_change, received_transfer.token_network_identifier, secrethash
     )
+
 
 
 
@@ -754,6 +785,13 @@ def handle_receive_transfer_refund_cancel_route(
 
 def handle_receive_secret_request(
     chain_state: ChainState, state_change: ReceiveSecretRequest
+) -> TransitionResult[ChainState]:
+    secrethash = state_change.secrethash
+    return subdispatch_to_paymenttask(chain_state, state_change, secrethash)
+
+
+def handle_receive_secret_request_light(
+    chain_state: ChainState, state_change: ReceiveSecretRequestLight
 ) -> TransitionResult[ChainState]:
     secrethash = state_change.secrethash
     return subdispatch_to_paymenttask(chain_state, state_change, secrethash)
@@ -895,6 +933,9 @@ def handle_state_change(
     elif type(state_change) == ReceiveSecretRequest:
         assert isinstance(state_change, ReceiveSecretRequest), MYPY_ANNOTATION
         iteration = handle_receive_secret_request(chain_state, state_change)
+    elif type(state_change) == ReceiveSecretRequestLight:
+        assert isinstance(state_change, ReceiveSecretRequestLight), MYPY_ANNOTATION
+        iteration = handle_receive_secret_request_light(chain_state, state_change)
     elif type(state_change) == ReceiveProcessed:
         assert isinstance(state_change, ReceiveProcessed), MYPY_ANNOTATION
         iteration = handle_processed(chain_state, state_change)

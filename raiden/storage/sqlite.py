@@ -218,6 +218,17 @@ class SQLiteStorage:
             last_id = cursor.lastrowid
         return last_id
 
+    def is_light_client_protocol_message_already_stored(self, payment_id: int, order: int):
+        cursor = self.conn.cursor()
+        cursor.execute(
+            """
+            SELECT *
+                FROM light_client_protocol_message WHERE light_client_payment_id = ? and message_order = ?;
+            """,
+            (payment_id, order)
+        )
+
+        return cursor.fetchone()
 
     def write_state_snapshot(self, statechange_id, snapshot):
         with self.write_lock, self.conn:

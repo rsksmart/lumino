@@ -24,7 +24,7 @@ from raiden.transfer.mediated_transfer.state_change import (
     ReceiveSecretReveal,
     ReceiveTransferRefund,
     ReceiveTransferRefundCancelRoute,
-)
+    ReceiveSecretRequestLight)
 from raiden.transfer.state import balanceproof_from_envelope
 from raiden.transfer.state_change import ReceiveDelivered, ReceiveProcessed, ReceiveUnlock
 from raiden.utils import pex, random_secret
@@ -73,20 +73,37 @@ class MessageHandler:
             log.error("Unknown message cmdid {}".format(message.cmdid))
 
     @staticmethod
-    def handle_message_secretrequest(raiden: RaidenService, message: SecretRequest, is_light_client: bool = False) -> None:
-        secret_request = ReceiveSecretRequest(
-            message.payment_identifier,
-            message.amount,
-            message.expiration,
-            message.secrethash,
-            message.sender,
-        )
-        raiden.handle_and_track_state_change(secret_request)
+    def handle_message_secretrequest(raiden: RaidenService, message: SecretRequest,
+                                     is_light_client: bool = False) -> None:
+
         if is_light_client:
-            # FIXME mmartinez7 payment id does not travel on the protocol messages
-            LightClientMessageHandler.store_light_client_protocol_message(message, True, TEST_PAYMENT_ID, 4, raiden.wal)
+            secret_request_light = ReceiveSecretRequestLight(
+                message.payment_identifier,
+                message.amount,
+                message.expiration,
+                message.secrethash,
+                message.sender,
+            )
+            raiden.handle_and_track_state_change(secret_request_light)
 
+            exists = LightClientMessageHandler.is_light_client_protocol_message_already_stored(TEST_PAYMENT_ID, 4,
+                                                                                               raiden.wal)
+            if not exists:
+                # FIXME mmartinez7 payment id does not travel on the protocol messages. Fix TEST_PAYMENT_ID
+                LightClientMessageHandler.store_light_client_protocol_message(message, True, TEST_PAYMENT_ID, 4,
+                                                                              raiden.wal)
+            else:
+                log.info("Message for lc already received, ignoring db storage")
 
+        else:
+            secret_request = ReceiveSecretRequest(
+                message.payment_identifier,
+                message.amount,
+                message.expiration,
+                message.secrethash,
+                message.sender,
+            )
+            raiden.handle_and_track_state_change(secret_request)
 
     @staticmethod
     def handle_message_revealsecret(raiden: RaidenService, message: RevealSecret) -> None:
@@ -187,15 +204,27 @@ class MessageHandler:
         processed = ReceiveProcessed(message.sender, message.message_identifier)
         raiden.handle_and_track_state_change(processed)
         if is_light_client:
-            # FIXME mmartinez7 payment id does not travel on the protocol messages
-            LightClientMessageHandler.store_light_client_protocol_message(message, True, TEST_PAYMENT_ID, 3, raiden.wal)
+            # If exists for that payment, the same message by the order, then discard it.
+            exists = LightClientMessageHandler.is_light_client_protocol_message_already_stored(TEST_PAYMENT_ID, 3,
+                                                                                               raiden.wal)
+            if not exists:
+                # FIXME mmartinez7 payment id does not travel on the protocol messages. Fix TEST_PAYMENT_ID
+                LightClientMessageHandler.store_light_client_protocol_message(message, True, TEST_PAYMENT_ID, 3,
+                                                                              raiden.wal)
+            else:
+                log.info("Message for lc already received, ignoring db storage")
 
     @staticmethod
     def handle_message_delivered(raiden: RaidenService, message: Delivered, is_light_client: bool = False) -> None:
         delivered = ReceiveDelivered(message.sender, message.delivered_message_identifier)
         raiden.handle_and_track_state_change(delivered)
         if is_light_client:
-            #FIXME mmartinez7 payment id does not travel on the protocol messages
-            LightClientMessageHandler.store_light_client_protocol_message(message, True, TEST_PAYMENT_ID, 2, raiden.wal)
-
+            exists = LightClientMessageHandler.is_light_client_protocol_message_already_stored(TEST_PAYMENT_ID, 2,
+                                                                                               raiden.wal)
+            if not exists:
+                # FIXME mmartinez7 payment id does not travel on the protocol messages. Fix TEST_PAYMENT_ID
+                LightClientMessageHandler.store_light_client_protocol_message(message, True, TEST_PAYMENT_ID, 2,
+                                                                              raiden.wal)
+            else:
+                log.info("Message for lc already received, ignoring db storage")
 
