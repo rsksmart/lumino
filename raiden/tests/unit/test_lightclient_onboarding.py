@@ -26,7 +26,7 @@ def test_signer_sign_display_user_matrix_client():
 
     rsk_address = "0x6d369723521B4080A19457D5Fdd2194d633B0c3A"
     rsk_address_normalized = to_normalized_address(rsk_address)
-    matrix_server_domain = "transport02.raiden.network"
+    matrix_server_domain = "transport04.raiden.network"
 
     message_to_sign = f'@{rsk_address_normalized}:{matrix_server_domain}'
 
@@ -62,7 +62,7 @@ def test_signer_sign_matrix_server_domain():
     #Rsk Address 0x6d369723521B4080A19457D5Fdd2194d633B0c3A
     privkey = decode_hex('0x51dd3591fb7ce95b0bd77ca14a5236a4989d399c80b8150d3799dd0afcb14282')
 
-    message = 'transport02.raiden.network'
+    message = 'transport04.raiden.network'
 
     # generated with Metamask's web3.personal.sign
     signature = decode_hex(

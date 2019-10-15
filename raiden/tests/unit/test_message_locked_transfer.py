@@ -1,8 +1,11 @@
+from _operator import attrgetter
+
+from cachetools import LRUCache, cached
 from eth_utils import decode_hex, to_canonical_address
 
 from raiden.utils.signer import LocalSigner, recover
 
-PRIVKEY = decode_hex("0xb8948740e32ba130afec6817c12fcaa716d5a8831554e974f1e40e3e95fe87c2")
+PRIVKEY = decode_hex("0x51dd3591fb7ce95b0bd77ca14a5236a4989d399c80b8150d3799dd0afcb14282")
 signer = LocalSigner(PRIVKEY)
 
 from raiden.messages import (
@@ -122,25 +125,25 @@ def test_signature_without_secret():
     dict_msg = {
         "type": "LockedTransfer",
         "chain_id": 33,
-        "message_identifier": 11664036996360797390,
-        "payment_identifier": 7007579308130245242,
+        "message_identifier": 4866396930453443504,
+        "payment_identifier": 11034824030700382613,
         "payment_hash_invoice": "0x",
         "nonce": 1,
-        "token_network_address": "0x877ec5961d18d3413fabbd67696b758fe95408d6",
-        "token": "0xff10e500973a0b0071e2263421e4af60425834a6",
-        "channel_identifier": 1,
+        "token_network_address": "0x2864a97e7701a08d53f24f9e9fa6727988733f12",
+        "token": "0x58cf17e106686e1554177030980829cfd4cb7196",
+        "channel_identifier": 13,
         "transferred_amount": 0,
-        "locked_amount": 100000000000000,
-        "recipient": "0x29021129f5d038897f01bd4bc050525ca01a4758",
-        "locksroot": "0xe46c8269174683c13276266ae2db1b3040f9d85f728afb3e3a5f3332b71b16f3",
+        "locked_amount": 100000000000000000,
+        "recipient": "0x8e1fb8214fcd0989eab681992f06cb09c86f3d69",
+        "locksroot": "0xa0662574b6a68fbdf906f86b75065b696d59ccb4a4fd8fe3130d89487ff30375",
         "lock": {
             "type": "Lock",
-            "amount": 100000000000000,
-            "expiration": 466560,
+            "amount": 100000000000000000,
+            "expiration": 265077,
             "secrethash": "0x3e6d58ba381898cf1a0ff6fbe65a3805419063ea9eb6ff6bc6f0dde45032d0dc"
         },
-        "target": "0x29021129f5d038897f01bd4bc050525ca01a4758",
-        "initiator": "0x09fcbe7ceb49c944703b4820e29b0541edfe7e82",
+        "target": "0x8e1fb8214fcd0989eab681992f06cb09c86f3d69",
+        "initiator": "0x6d369723521b4080a19457d5fdd2194d633b0c3a",
         "fee": 0
     }
 
@@ -150,3 +153,29 @@ def test_signature_without_secret():
     print(message.signature.hex())
     assert recover(data_was_signed, message.signature) == to_canonical_address(
         "0x09fcbe7ceb49c944703b4820e29b0541edfe7e82")
+
+
+_senders_cache = LRUCache(maxsize=1)
+
+
+class MyCache():
+
+    def __init__(self, **kwargs):
+        self.signature = kwargs['signature']
+
+
+    @property  # type: ignore
+    @cached(_senders_cache, key=attrgetter("signature"))
+    def sender(self):
+        if self.signature == b"":
+            return 1
+        else:
+            return 2
+
+
+def test_cache():
+    c = MyCache(signature="shit")
+    for a in [1, 2, 3]:
+        test = c.sender
+        print(test)
+

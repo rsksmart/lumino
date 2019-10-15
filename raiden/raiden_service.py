@@ -94,7 +94,7 @@ from raiden.utils.typing import (
 
 from raiden.utils.upgrades import UpgradeManager
 from raiden_contracts.contract_manager import ContractManager
-from eth_utils import to_canonical_address
+from eth_utils import to_canonical_address, to_checksum_address
 
 log = structlog.get_logger(__name__)  # pylint: disable=invalid-name
 StatusesDict = Dict[TargetAddress, Dict[PaymentID, "PaymentStatus"]]
@@ -815,7 +815,7 @@ class RaidenService(Runnable):
         state_change = ActionChangeNodeNetworkState(node_address, network_state)
         self.handle_and_track_state_change(state_change)
 
-    def start_health_check_for(self, node_address: Address):
+    def start_health_check_for(self, node_address: Address = None, creator_address: Address = None):
         """Start health checking `node_address`.
 
         This function is a noop during initialization, because health checking
@@ -825,7 +825,14 @@ class RaidenService(Runnable):
         """
         # TODO se here if is necsesary for lightclients transports @GasparMedina
         if self.transport:
-            self.transport.hub_transport.start_health_check(node_address)
+
+            if creator_address is not None:
+                if self.transport.light_client_transports is not None:
+                    for light_client_transport in self.transport.light_client_transports:
+                        if to_checksum_address(creator_address) == light_client_transport.get_address():
+                            light_client_transport.start_health_check(node_address)
+            else:
+                self.transport.hub_transport.start_health_check(node_address)
 
     def _callback_new_block(self, latest_block: Dict):
         """Called once a new block is detected by the alarm task.
@@ -1220,7 +1227,7 @@ class RaidenService(Runnable):
                 f" That secret is already registered onchain."
             )
 
-        self.start_health_check_for(Address(target))
+        self.start_health_check_for(Address(target), Address(creator))
 
         if identifier is None:
             raise InvalidPaymentIdentifier("Payment identifier wasnt provided")

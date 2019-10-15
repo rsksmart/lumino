@@ -1927,7 +1927,6 @@ class RestAPI:
 
         return api_response(invoice)
 
-
     def get_data_for_registration_request(self, address):
         data_to_sign = self.raiden_api.get_data_for_registration_request(address)
         return api_response(data_to_sign)

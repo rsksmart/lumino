@@ -275,6 +275,7 @@ class PaymentInvoiceResource(BaseResource):
             coded_invoice=coded_invoice
         )
 
+
 class PaymentLightResource(BaseResource):
     put_schema = PaymentLightPutSchema
     post_schema = PaymentLightPostSchema
