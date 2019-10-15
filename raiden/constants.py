@@ -16,7 +16,7 @@ from raiden.utils.typing import (
     PaymentHashInvoice,
 )
 
-TEST_PAYMENT_ID = 43
+TEST_PAYMENT_ID = 56
 IS_LIGHT_CLIENT_TEST_PAYMENT = True
 
 LATEST = "https://api.github.com/repos/rsksmart/lumino/releases/latest"

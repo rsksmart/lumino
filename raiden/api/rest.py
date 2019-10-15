@@ -21,7 +21,7 @@ from raiden.api.validations.api_error_builder import ApiErrorBuilder
 from raiden.api.validations.api_status_codes import ERROR_STATUS_CODES
 from raiden.api.validations.channel_validator import ChannelValidator
 from raiden.lightclient.light_client_service import LightClientService
-from raiden.messages import LockedTransfer, Delivered
+from raiden.messages import LockedTransfer, Delivered, RevealSecret
 from raiden.rns_constants import RNS_ADDRESS_ZERO
 from raiden.utils.rns import is_rns_address
 from webargs.flaskparser import parser
@@ -1456,6 +1456,10 @@ class RestAPI:
         result = self.payment_schema.dump(payment)
         return api_response(result=result.data)
 
+    def initiate_send_secret_reveal_light(self, reveal_secret: RevealSecret):
+        print("Unimplemented")
+
+
     def initiate_payment_light(
         self,
         registry_address: typing.PaymentNetworkID,
@@ -1510,6 +1514,7 @@ class RestAPI:
         except InsufficientFunds as e:
             return api_error(errors=str(e), status_code=HTTPStatus.PAYMENT_REQUIRED)
 
+        # FIXME mmartinez return correctly and check when the payment schema must be dumped
         # if payment_status.payment_done.get() is False:
         #     return api_error(
         #         errors="Payment couldn't be completed "
@@ -2009,19 +2014,26 @@ class RestAPI:
         # TODO call from dict will work but we need to validate each parameter in order to know if there are no extra or missing params.
         # TODO we also need to check if message id an order received make sense
 
-        # FIXME Should take the secret from the message receivend from LC
+        payment_request = LightClientService.get_light_client_payment(message_id, self.raiden_api.raiden.wal)
+        if not payment_request:
+            return api_response("No payment associated")
 
         if message["type"] == "LockedTransfer":
             lt = LockedTransfer.from_dict(message)
-            payment_request = LightClientService.get_light_client_payment(message_id, self.raiden_api.raiden.wal)
             self.initiate_payment_light(self.raiden_api.raiden.default_registry.address, lt.token, lt.initiator,
                                         lt.target, lt.locked_amount, lt.payment_identifier, payment_request.payment_id,
                                         lt.lock.secrethash,
                                         EMPTY_PAYMENT_HASH_INVOICE, lt)
         elif message["type"] == "Delivered":
+            # TODO mamrtinez make this a function, encapsulate.
             delivered = Delivered.from_dict(message)
             lc_transport = self.raiden_api.raiden.transport.light_client_transports[0]
+            # TODO mmartinez store the message on the hub.
             lc_transport.send_for_light_client_with_retry(receiver, delivered)
+        elif message["type"] == "RevealSecret":
+            reveal_secret = RevealSecret.from_dict(message)
+            self.initiate_send_secret_reveal_light(reveal_secret)
+
 
         return api_response("Should respond accordly to the message received")
 

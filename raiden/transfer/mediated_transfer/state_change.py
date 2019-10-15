@@ -3,6 +3,7 @@
 from eth_utils import to_canonical_address, to_checksum_address
 
 from raiden.encoding.messages import LockedTransfer
+from raiden.encoding.messages import RevealSecret
 from raiden.transfer.architecture import (
     AuthenticatedSenderStateChange,
     BalanceProofStateChange,
@@ -517,4 +518,41 @@ class ReceiveTransferRefund(BalanceProofStateChange):
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "ReceiveTransferRefund":
         instance = cls(routes=data["routes"], transfer=data["transfer"])
+        return instance
+
+
+class SendSecretRevealLight(AuthenticatedSenderStateChange):
+    """ A SecretReveal message must be sent to a light client. """
+
+    def __init__(self, reveal_secret: RevealSecret, sender: Address) -> None:
+        super().__init__(sender)
+        self.reveal_secret = reveal_secret
+
+    def __repr__(self) -> str:
+        return "<SendSecretRevealLight reveal_secret:{} sender:{}>".format(
+            pex(self.reveal_secret.__repr__()), pex(self.sender)
+        )
+
+    def __eq__(self, other: Any) -> bool:
+        return (
+            isinstance(other, SendSecretRevealLight)
+            and self.reveal_secret.__eq__(other.reveal_secret)
+            and super().__eq__(other)
+        )
+
+    def __ne__(self, other: Any) -> bool:
+        return not self.__eq__(other)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "reveal_secret": self.reveal_secret.to_dict(),
+            "sender": to_checksum_address(self.sender),
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "SendSecretRevealLight":
+        instance = cls(
+            reveal_secret= RevealSecret.from_dict(data["reveal_secret"]),
+            sender=to_canonical_address(data["sender"]),
+        )
         return instance

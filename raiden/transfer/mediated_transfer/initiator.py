@@ -7,6 +7,7 @@ from raiden.messages import LockedTransfer
 from raiden.settings import DEFAULT_WAIT_BEFORE_LOCK_REMOVAL
 from raiden.transfer import channel
 from raiden.transfer.architecture import Event, TransitionResult
+from raiden.transfer.channel import create_sendlockedtransfer
 from raiden.transfer.events import EventPaymentSentFailed, EventPaymentSentSuccess
 from raiden.transfer.mediated_transfer.events import (
     CHANNEL_IDENTIFIER_GLOBAL_QUEUE,
@@ -24,6 +25,7 @@ from raiden.transfer.mediated_transfer.state_change import (
     ReceiveSecretRequest,
     ReceiveSecretReveal,
     ReceiveSecretRequestLight)
+from raiden.transfer.merkle_tree import merkleroot
 from raiden.transfer.state import (
     CHANNEL_STATE_OPENED,
     NettingChannelState,
@@ -48,6 +50,7 @@ from raiden.utils.typing import (
     SecretHash,
     TokenNetworkID,
     InitiatorAddress, AddressHex)
+from raiden_contracts.utils import get_merkle_root
 
 
 def events_for_unlock_lock(
@@ -250,22 +253,25 @@ def try_new_route_light(
         initiator_state = None
 
     else:
-        # TODO mmartinez this doesnt make sense.. why we need this? Maybe we should have a InitiatorTransferStateLight
-        balance_proof = BalanceProofUnsignedState(
-            nonce=signed_locked_transfer.nonce,
-            transferred_amount=signed_locked_transfer.transferred_amount,
-            locked_amount=signed_locked_transfer.locked_amount,
-            locksroot=signed_locked_transfer.locksroot,
-            canonical_identifier=channel_state.canonical_identifier,
+        received_lock = signed_locked_transfer.lock
+
+        calculated_lt_event, merkletree = create_sendlockedtransfer(
+            channel_state,
+            signed_locked_transfer.initiator,
+            signed_locked_transfer.target,
+            signed_locked_transfer.locked_amount,
+            signed_locked_transfer.message_identifier,
+            signed_locked_transfer.payment_identifier,
+            signed_locked_transfer.payment_hash_invoice,
+            received_lock.expiration,
+            received_lock.secrethash,
         )
-        lock_amount = signed_locked_transfer.lock.amount
-        lock_expiration = signed_locked_transfer.lock.expiration
-        lock_secret_hash = signed_locked_transfer.lock.secrethash
-        lock = HashTimeLockState(lock_amount, lock_expiration, lock_secret_hash)
-        locked_transfer = LockedTransferUnsignedState(
-            signed_locked_transfer.payment_identifier, signed_locked_transfer.payment_hash_invoice,
-            signed_locked_transfer.token, balance_proof, lock, signed_locked_transfer.initiator,
-            signed_locked_transfer.target)
+
+        calculated_transfer = calculated_lt_event.transfer
+        lock = calculated_transfer.lock
+        channel_state.our_state.balance_proof = calculated_transfer.balance_proof
+        channel_state.our_state.merkletree = merkletree
+        channel_state.our_state.secrethashes_to_lockedlocks[lock.secrethash] = lock
 
         lockedtransfer_event = SendLockedTransferLight(signed_locked_transfer.recipient,
                                                        signed_locked_transfer.channel_identifier,
@@ -273,13 +279,28 @@ def try_new_route_light(
                                                        signed_locked_transfer)
         assert lockedtransfer_event
 
-        initiator_state = InitiatorTransferState(
-            transfer_description=transfer_description,
-            channel_identifier=channel_state.identifier,
-            transfer=locked_transfer,
-            revealsecret=None,
-        )
-        events.append(lockedtransfer_event)
+        # Check that the constructed merkletree is equals to the sent by the light client.
+        calculated_locksroot = merkleroot(merkletree)
+        if signed_locked_transfer.locksroot.__eq__(calculated_locksroot):
+            initiator_state = InitiatorTransferState(
+                transfer_description=transfer_description,
+                channel_identifier=channel_state.identifier,
+                transfer=calculated_transfer,
+                revealsecret=None,
+            )
+            events.append(lockedtransfer_event)
+        else:
+            transfer_failed = EventPaymentSentFailed(
+                payment_network_identifier=transfer_description.payment_network_identifier,
+                token_network_identifier=transfer_description.token_network_identifier,
+                identifier=transfer_description.payment_identifier,
+                target=transfer_description.target,
+                reason="Received locksroot {} doesnt match with expected one {}".format(
+                    signed_locked_transfer.locksroot.hex(), calculated_locksroot.hex()),
+            )
+            events.append(transfer_failed)
+
+            initiator_state = None
 
     return TransitionResult(initiator_state, events)
 
@@ -499,7 +520,6 @@ def handle_secretrequest_light(
     print("Fin")
 
     return iteration
-
 
 
 def handle_offchain_secretreveal(

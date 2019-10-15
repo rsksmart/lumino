@@ -232,6 +232,7 @@ def subdispatch_to_paymenttask(
                 events = sub_iteration.events
 
                 if sub_iteration.new_state is None:
+                    print("Deleted initiator")
                     del chain_state.payment_mapping.secrethashes_to_task[secrethash]
 
         elif isinstance(sub_task, MediatorTask):
@@ -327,6 +328,7 @@ def subdispatch_initiatortask(
                 sub_task = InitiatorTask(token_network_identifier, iteration.new_state)
                 chain_state.payment_mapping.secrethashes_to_task[secrethash] = sub_task
             elif secrethash in chain_state.payment_mapping.secrethashes_to_task:
+                print("Deleted")
                 del chain_state.payment_mapping.secrethashes_to_task[secrethash]
 
     return TransitionResult(chain_state, events)
@@ -689,46 +691,15 @@ def handle_init_initiator(
     )
 
 
-
 def handle_init_initiator_light(
     chain_state: ChainState, state_change: ActionInitInitiatorLight
 ) -> TransitionResult[ChainState]:
     received_transfer = state_change.transfer
     secrethash = received_transfer.secrethash
 
-    signed_transfer = state_change.signed_locked_transfer
-    received_lock = signed_transfer.lock
-
-    channel_state = views.get_channelstate_by_token_network_and_partner(
-        chain_state=chain_state,
-        token_network_id=received_transfer.token_network_identifier,
-        creator_address=Address(received_transfer.initiator),
-        partner_address=Address(received_transfer.target),
-    )
-    #FIXME mmartinez must asser that the event produces the same locked transfer object as the LC sent. Maybe we should move this to the validations and include all the info into the ActionInitInitiatorLight state
-    calculated_lt_event, merkletree = create_sendlockedtransfer(
-        channel_state,
-        signed_transfer.initiator,
-        signed_transfer.target,
-        signed_transfer.locked_amount,
-        signed_transfer.message_identifier,
-        signed_transfer.payment_identifier,
-        signed_transfer.payment_hash_invoice,
-        received_lock.expiration,
-        received_lock.secrethash,
-    )
-
-    calculated_transfer = calculated_lt_event.transfer
-    lock = calculated_transfer.lock
-    channel_state.our_state.balance_proof = calculated_transfer.balance_proof
-    channel_state.our_state.merkletree = merkletree
-    channel_state.our_state.secrethashes_to_lockedlocks[lock.secrethash] = lock
-
     return subdispatch_initiatortask(
         chain_state, state_change, received_transfer.token_network_identifier, secrethash
     )
-
-
 
 
 def handle_init_mediator(
