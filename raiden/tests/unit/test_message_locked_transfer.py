@@ -1,6 +1,3 @@
-from _operator import attrgetter
-
-from cachetools import LRUCache, cached
 from eth_utils import decode_hex, to_canonical_address
 
 from raiden.utils.signer import LocalSigner, recover
@@ -153,29 +150,3 @@ def test_signature_without_secret():
     print(message.signature.hex())
     assert recover(data_was_signed, message.signature) == to_canonical_address(
         "0x09fcbe7ceb49c944703b4820e29b0541edfe7e82")
-
-
-_senders_cache = LRUCache(maxsize=1)
-
-
-class MyCache():
-
-    def __init__(self, **kwargs):
-        self.signature = kwargs['signature']
-
-
-    @property  # type: ignore
-    @cached(_senders_cache, key=attrgetter("signature"))
-    def sender(self):
-        if self.signature == b"":
-            return 1
-        else:
-            return 2
-
-
-def test_cache():
-    c = MyCache(signature="shit")
-    for a in [1, 2, 3]:
-        test = c.sender
-        print(test)
-
