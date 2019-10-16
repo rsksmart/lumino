@@ -1,9 +1,5 @@
 from typing import Dict, Any
-
-from eth_utils import encode_hex
-
 from raiden.messages import Message
-from raiden.utils import Secret
 
 
 class HubMessage:

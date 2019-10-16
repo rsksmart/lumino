@@ -7,6 +7,7 @@ from raiden.transfer.architecture import (
     StateChange,
     TransitionResult,
 )
+from raiden.transfer.channel import compute_merkletree_with, create_sendlockedtransfer
 from raiden.transfer.events import (
     ContractSendChannelBatchUnlock,
     ContractSendChannelClose,
@@ -31,7 +32,7 @@ from raiden.transfer.mediated_transfer.state_change import (
     ReceiveSecretReveal,
     ReceiveTransferRefund,
     ReceiveTransferRefundCancelRoute,
-    ActionInitInitiatorLight)
+    ActionInitInitiatorLight, ReceiveSecretRequestLight)
 from raiden.transfer.state import (
     ChainState,
     InitiatorTask,
@@ -79,7 +80,7 @@ from raiden.utils.typing import (
     TokenNetworkID,
     Tuple,
     Union,
-)
+    Address)
 
 from eth_utils import to_canonical_address
 
@@ -231,6 +232,7 @@ def subdispatch_to_paymenttask(
                 events = sub_iteration.events
 
                 if sub_iteration.new_state is None:
+                    print("Deleted initiator")
                     del chain_state.payment_mapping.secrethashes_to_task[secrethash]
 
         elif isinstance(sub_task, MediatorTask):
@@ -326,6 +328,7 @@ def subdispatch_initiatortask(
                 sub_task = InitiatorTask(token_network_identifier, iteration.new_state)
                 chain_state.payment_mapping.secrethashes_to_task[secrethash] = sub_task
             elif secrethash in chain_state.payment_mapping.secrethashes_to_task:
+                print("Deleted")
                 del chain_state.payment_mapping.secrethashes_to_task[secrethash]
 
     return TransitionResult(chain_state, events)
@@ -691,13 +694,12 @@ def handle_init_initiator(
 def handle_init_initiator_light(
     chain_state: ChainState, state_change: ActionInitInitiatorLight
 ) -> TransitionResult[ChainState]:
-    transfer = state_change.transfer
-    secrethash = transfer.secrethash
+    received_transfer = state_change.transfer
+    secrethash = received_transfer.secrethash
 
     return subdispatch_initiatortask(
-        chain_state, state_change, transfer.token_network_identifier, secrethash
+        chain_state, state_change, received_transfer.token_network_identifier, secrethash
     )
-
 
 
 def handle_init_mediator(
@@ -754,6 +756,13 @@ def handle_receive_transfer_refund_cancel_route(
 
 def handle_receive_secret_request(
     chain_state: ChainState, state_change: ReceiveSecretRequest
+) -> TransitionResult[ChainState]:
+    secrethash = state_change.secrethash
+    return subdispatch_to_paymenttask(chain_state, state_change, secrethash)
+
+
+def handle_receive_secret_request_light(
+    chain_state: ChainState, state_change: ReceiveSecretRequestLight
 ) -> TransitionResult[ChainState]:
     secrethash = state_change.secrethash
     return subdispatch_to_paymenttask(chain_state, state_change, secrethash)
@@ -895,6 +904,9 @@ def handle_state_change(
     elif type(state_change) == ReceiveSecretRequest:
         assert isinstance(state_change, ReceiveSecretRequest), MYPY_ANNOTATION
         iteration = handle_receive_secret_request(chain_state, state_change)
+    elif type(state_change) == ReceiveSecretRequestLight:
+        assert isinstance(state_change, ReceiveSecretRequestLight), MYPY_ANNOTATION
+        iteration = handle_receive_secret_request_light(chain_state, state_change)
     elif type(state_change) == ReceiveProcessed:
         assert isinstance(state_change, ReceiveProcessed), MYPY_ANNOTATION
         iteration = handle_processed(chain_state, state_change)

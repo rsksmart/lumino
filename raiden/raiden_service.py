@@ -711,8 +711,8 @@ class RaidenService(Runnable):
         assert self.wal, f"WAL object not yet initialized. node:{self!r}"
         return views.block_number(self.wal.state_manager.current_state)
 
-    def on_message(self, message: Message):
-        self.message_handler.on_message(self, message)
+    def on_message(self, message: Message, is_light_client: bool = False):
+        self.message_handler.on_message(self, message, is_light_client)
 
     def handle_and_track_state_change(self, state_change: StateChange):
         """ Dispatch the state change and does not handle the exceptions.
@@ -763,10 +763,11 @@ class RaidenService(Runnable):
 
             state_changes_count = self.wal.storage.count_state_changes()
             new_snapshot_group = state_changes_count // SNAPSHOT_STATE_CHANGES_COUNT
-            if new_snapshot_group > self.snapshot_group:
-                log.debug("Storing snapshot", snapshot_id=new_snapshot_group)
-                self.wal.snapshot()
-                self.snapshot_group = new_snapshot_group
+            #FIXME mmartinez
+            # if new_snapshot_group > self.snapshot_group:
+            #     log.debug("Storing snapshot", snapshot_id=new_snapshot_group)
+            #     self.wal.snapshot()
+            #     self.snapshot_group = new_snapshot_group
 
         return greenlets
 

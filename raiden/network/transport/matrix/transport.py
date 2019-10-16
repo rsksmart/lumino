@@ -11,7 +11,7 @@ from gevent.lock import Semaphore
 from gevent.queue import JoinableQueue
 from matrix_client.errors import MatrixRequestError
 
-from raiden.constants import DISCOVERY_DEFAULT_ROOM
+from raiden.constants import DISCOVERY_DEFAULT_ROOM, IS_LIGHT_CLIENT_TEST_PAYMENT
 from raiden.exceptions import InvalidAddress, TransportError, UnknownAddress, UnknownTokenAddress
 from raiden.lightclient.light_client_message_handler import LightClientMessageHandler
 from raiden.message_handler import MessageHandler
@@ -843,7 +843,7 @@ class MatrixTransport(Runnable):
         self._raiden_service.on_message(delivered)
 
     def _receive_message(self, message: Union[SignedRetrieableMessage, Processed]):
-        print("---- Matrix Received Message " + str(message))
+        print("---- Matrix Received Message HUB Transport" + str(message))
         assert self._raiden_service is not None
         self.log.info(
             "Message received",
@@ -900,7 +900,7 @@ class MatrixTransport(Runnable):
         self.log.debug(
             "Send raw", receiver=pex(receiver_address), room=room, data=data.replace("\n", "\\n")
         )
-        print("---- Matrix Send Message " + data)
+        print("---->> Matrix Send Message " + data)
 
         room.send_text(data)
 
@@ -909,6 +909,7 @@ class MatrixTransport(Runnable):
             return None
         address_hex = to_normalized_address(address)
         msg = f"address not health checked: me: {self._user_id}, peer: {address_hex}"
+        #FIXME mmartinez
       #  assert address and self._address_mgr.is_address_known(address), msg
 
         # filter_private is done in _get_room_ids_for_address
@@ -1456,6 +1457,7 @@ class MatrixLightClientTransport(MatrixTransport):
             self.stop()  # ensure cleanup and wait on subtasks
             raise
 
+
     def _send_raw(self, receiver_address: Address, data: str):
         with self._getroom_lock:
             room = self._get_room_for_address(receiver_address)
@@ -1618,6 +1620,143 @@ class MatrixLightClientTransport(MatrixTransport):
 
     def get_address(self):
         return self._address
+
+    def _handle_message(self, room, event) -> bool:
+        """ Handle text messages sent to listening rooms """
+        if (
+            event["type"] != "m.room.message"
+            or event["content"]["msgtype"] != "m.text"
+            or self._stop_event.ready()
+        ):
+            # Ignore non-messages and non-text messages
+            return False
+
+        sender_id = event["sender"]
+
+        if sender_id == self._user_id:
+            # Ignore our own messages
+            return False
+
+        user = self._get_user(sender_id)
+        peer_address = validate_userid_signature(user)
+        if not peer_address:
+            self.log.debug(
+                "Message from invalid user displayName signature",
+                peer_user=user.user_id,
+                room=room,
+            )
+            return False
+
+        # # don't proceed if user isn't whitelisted (yet)
+        # if not self._address_mgr.is_address_known(peer_address):
+        #     # user not whitelisted
+        #     self.log.debug(
+        #         "Message from non-whitelisted peer - ignoring",
+        #         sender=user,
+        #         sender_address=pex(peer_address),
+        #         room=room,
+        #     )
+        #     return False
+
+        # rooms we created and invited user, or were invited specifically by them
+        room_ids = self._get_room_ids_for_address(peer_address)
+
+        # TODO: Remove clause after `and` and check if things still don't hang
+        if room.room_id not in room_ids and (self._private_rooms and not room.invite_only):
+            # this should not happen, but is not fatal, as we may not know user yet
+            if self._private_rooms and not room.invite_only:
+                reason = "required private room, but received message in a public"
+            else:
+                reason = "unknown room for user"
+            self.log.debug(
+                "Ignoring invalid message",
+                peer_user=user.user_id,
+                peer_address=pex(peer_address),
+                room=room,
+                expected_room_ids=room_ids,
+                reason=reason,
+            )
+            return False
+
+        # TODO: With the condition in the TODO above restored this one won't have an effect, check
+        #       if it can be removed after the above is solved
+        if not room_ids or room.room_id != room_ids[0]:
+            if self._is_room_global(room):
+                # This must not happen. Nodes must not listen on global rooms.
+                raise RuntimeError(f"Received message in global room {room.aliases}.")
+            self.log.debug(
+                "Received message triggered new comms room for peer",
+                peer_user=user.user_id,
+                peer_address=pex(peer_address),
+                known_user_rooms=room_ids,
+                room=room,
+            )
+            self._set_room_id_for_address(peer_address, room.room_id)
+
+        is_peer_reachable = self._address_mgr.get_address_reachability(peer_address) is (
+            AddressReachability.REACHABLE
+        )
+        if not is_peer_reachable:
+            self.log.debug("Forcing presence update", peer_address=peer_address, user_id=sender_id)
+            self._address_mgr.force_user_presence(user, UserPresence.ONLINE)
+            self._address_mgr.refresh_address_presence(peer_address)
+
+        messages = validate_and_parse_message(event["content"]["body"], peer_address)
+
+        if not messages:
+            return False
+
+        self.log.info(
+            "Incoming messages",
+            messages=messages,
+            sender=pex(peer_address),
+            sender_user=user,
+            room=room,
+        )
+
+        for message in messages:
+            if not isinstance(message, (SignedRetrieableMessage, SignedMessage)):
+                self.log.warning("Received invalid message", message=message)
+            if isinstance(message, Delivered):
+                self._receive_delivered_to_lc(message)
+            elif isinstance(message, Processed):
+                self._receive_message_to_lc(message)
+            else:
+                assert isinstance(message, SignedRetrieableMessage)
+                self._receive_message_to_lc(message)
+
+        return True
+
+    def _receive_delivered_to_lc(self, delivered: Delivered):
+        self.log.debug(
+            "Delivered message received", sender=pex(delivered.sender), message=delivered
+        )
+
+        assert self._raiden_service is not None
+        self._raiden_service.on_message(delivered, True)
+
+    def _receive_message_to_lc(self, message: Union[SignedRetrieableMessage, Processed]):
+        print("<<---- Matrix Received Message LC transport" + str(message))
+        assert self._raiden_service is not None
+        self.log.debug(
+            "Message received",
+            node=pex(self._raiden_service.address),
+            message=message,
+            sender=pex(message.sender),
+        )
+
+        try:
+            # Just manage the message, the Delivered response will be initiated by the LightClient invoking
+            # send_for_light_client_with_retry
+            self._raiden_service.on_message(message, True)
+
+        except (InvalidAddress, UnknownAddress, UnknownTokenAddress):
+            self.log.warning("Exception while processing message", exc_info=True)
+            return
+
+    def send_for_light_client_with_retry(self, receiver: Address, message: Message):
+        retrier = self._get_retrier(receiver)
+        retrier.enqueue_global(message)
 
 
 class NodeTransport:

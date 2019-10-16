@@ -20,7 +20,7 @@ from raiden.transfer.mediated_transfer.state_change import (
     ReceiveSecretRequest,
     ReceiveSecretReveal,
     ReceiveTransferRefundCancelRoute,
-    ActionInitInitiatorLight)
+    ActionInitInitiatorLight, ReceiveSecretRequestLight)
 from raiden.transfer.state import RouteState
 from raiden.transfer.state_change import ActionCancelPayment, Block, ContractReceiveSecretReveal
 from raiden.utils.typing import (
@@ -477,6 +477,33 @@ def handle_secretrequest(
     return TransitionResult(payment_state, sub_iteration.events)
 
 
+def handle_secretrequest_light(
+    payment_state: InitiatorPaymentState,
+    state_change: ReceiveSecretRequestLight,
+    channelidentifiers_to_channels: ChannelMap,
+    pseudo_random_generator: random.Random,
+) -> TransitionResult[InitiatorPaymentState]:
+    initiator_state = payment_state.initiator_transfers.get(state_change.secrethash)
+
+    if not initiator_state:
+        return TransitionResult(payment_state, list())
+
+    if initiator_state.transfer_state == "transfer_cancelled":
+        return TransitionResult(payment_state, list())
+
+    sub_iteration = subdispatch_to_initiatortransfer(
+        payment_state=payment_state,
+        initiator_state=initiator_state,
+        state_change=state_change,
+        channelidentifiers_to_channels=channelidentifiers_to_channels,
+        pseudo_random_generator=pseudo_random_generator,
+    )
+
+    return TransitionResult(payment_state, sub_iteration.events)
+
+
+
+
 def state_transition(
     payment_state: Optional[InitiatorPaymentState],
     state_change: StateChange,
@@ -514,6 +541,15 @@ def state_transition(
         assert isinstance(state_change, ReceiveSecretRequest), MYPY_ANNOTATION
         assert payment_state, "ReceiveSecretRequest should be accompanied by a valid payment state"
         iteration = handle_secretrequest(
+            payment_state=payment_state,
+            state_change=state_change,
+            channelidentifiers_to_channels=channelidentifiers_to_channels,
+            pseudo_random_generator=pseudo_random_generator,
+        )
+    elif type(state_change) == ReceiveSecretRequestLight:
+        assert isinstance(state_change, ReceiveSecretRequestLight), MYPY_ANNOTATION
+        assert payment_state, "ReceiveSecretRequestLight should be accompanied by a valid payment state"
+        iteration = handle_secretrequest_light(
             payment_state=payment_state,
             state_change=state_change,
             channelidentifiers_to_channels=channelidentifiers_to_channels,

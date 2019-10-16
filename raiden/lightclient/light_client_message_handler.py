@@ -49,3 +49,12 @@ class LightClientMessageHandler:
     @classmethod
     def store_light_client_payment(cls, payment: LightClientPayment, wal: WriteAheadLog):
         return wal.storage.write_light_client_payment(payment)
+
+    @classmethod
+    def store_light_client_payment(cls, payment: LightClientPayment, wal: WriteAheadLog):
+        return wal.storage.write_light_client_payment(payment)
+
+    @classmethod
+    def is_light_client_protocol_message_already_stored(cls, payment_id: int, order: int, wal: WriteAheadLog):
+        return wal.storage.is_light_client_protocol_message_already_stored(payment_id, order)
+
