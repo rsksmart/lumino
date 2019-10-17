@@ -83,17 +83,9 @@ class MessageHandler:
                 message.expiration,
                 message.secrethash,
                 message.sender,
+                message
             )
             raiden.handle_and_track_state_change(secret_request_light)
-
-            exists = LightClientMessageHandler.is_light_client_protocol_message_already_stored(TEST_PAYMENT_ID, 4,
-                                                                                               raiden.wal)
-            if not exists:
-                # FIXME mmartinez7 payment id does not travel on the protocol messages. Fix TEST_PAYMENT_ID
-                LightClientMessageHandler.store_light_client_protocol_message(message, True, TEST_PAYMENT_ID, 4,
-                                                                              raiden.wal)
-            else:
-                log.info("Message for lc already received, ignoring db storage")
 
         else:
             secret_request = ReceiveSecretRequest(

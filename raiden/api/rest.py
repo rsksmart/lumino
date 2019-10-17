@@ -1456,8 +1456,10 @@ class RestAPI:
         result = self.payment_schema.dump(payment)
         return api_response(result=result.data)
 
-    def initiate_send_secret_reveal_light(self, reveal_secret: RevealSecret):
-        print("Unimplemented")
+    def initiate_send_secret_reveal_light(self, sender_address: typing.Address, receiver_address: typing.Address,
+                                          reveal_secret: RevealSecret):
+        self.raiden_api.initiate_send_secret_reveal_light(sender_address, receiver_address, reveal_secret)
+
 
 
     def initiate_payment_light(
@@ -2032,8 +2034,7 @@ class RestAPI:
             lc_transport.send_for_light_client_with_retry(receiver, delivered)
         elif message["type"] == "RevealSecret":
             reveal_secret = RevealSecret.from_dict(message)
-            self.initiate_send_secret_reveal_light(reveal_secret)
-
+            self.initiate_send_secret_reveal_light(sender, receiver, reveal_secret)
 
         return api_response("Should respond accordly to the message received")
 

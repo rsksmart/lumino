@@ -332,6 +332,7 @@ class ReceiveSecretRequestLight(AuthenticatedSenderStateChange):
         expiration: BlockExpiration,
         secrethash: SecretHash,
         sender: Address,
+        secret_request_message
     ) -> None:
         super().__init__(sender)
         self.payment_identifier = payment_identifier
@@ -339,6 +340,7 @@ class ReceiveSecretRequestLight(AuthenticatedSenderStateChange):
         self.expiration = expiration
         self.secrethash = secrethash
         self.revealsecret = None
+        self.secret_request_message = secret_request_message
 
     def __repr__(self) -> str:
         return "<ReceiveSecretRequestLight paymentid:{} amount:{} secrethash:{} sender:{}>".format(
@@ -521,21 +523,22 @@ class ReceiveTransferRefund(BalanceProofStateChange):
         return instance
 
 
-class SendSecretRevealLight(AuthenticatedSenderStateChange):
+class ActionSendSecretRevealLight(AuthenticatedSenderStateChange):
     """ A SecretReveal message must be sent to a light client. """
 
-    def __init__(self, reveal_secret: RevealSecret, sender: Address) -> None:
+    def __init__(self, reveal_secret: RevealSecret, sender: Address, receiver: Address) -> None:
         super().__init__(sender)
+        self.receiver = receiver
         self.reveal_secret = reveal_secret
 
     def __repr__(self) -> str:
-        return "<SendSecretRevealLight reveal_secret:{} sender:{}>".format(
+        return "<ActionSendSecretRevealLight reveal_secret:{} sender:{}>".format(
             pex(self.reveal_secret.__repr__()), pex(self.sender)
         )
 
     def __eq__(self, other: Any) -> bool:
         return (
-            isinstance(other, SendSecretRevealLight)
+            isinstance(other, ActionSendSecretRevealLight)
             and self.reveal_secret.__eq__(other.reveal_secret)
             and super().__eq__(other)
         )
@@ -547,12 +550,14 @@ class SendSecretRevealLight(AuthenticatedSenderStateChange):
         return {
             "reveal_secret": self.reveal_secret.to_dict(),
             "sender": to_checksum_address(self.sender),
+            "receiver": to_checksum_address(self.receiver)
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "SendSecretRevealLight":
+    def from_dict(cls, data: Dict[str, Any]) -> "ActionSendSecretRevealLight":
         instance = cls(
             reveal_secret= RevealSecret.from_dict(data["reveal_secret"]),
             sender=to_canonical_address(data["sender"]),
+            receiver=to_canonical_address(data["receiver"])
         )
         return instance

@@ -39,6 +39,44 @@ def refund_from_sendmediated(
     )
 
 
+class StoreMessageEvent(Event):
+    """ Marker used for events which represent database persistance of light client messages
+
+    """
+
+    def __init__(
+        self, payment_id: int, message_order: int, message: Any
+    ) -> None:
+        self.payment_id = payment_id,
+        self.message_order = message_order,
+        self.message = message
+
+    def __eq__(self, other: Any) -> bool:
+        return (
+            isinstance(other, StoreMessageEvent)
+            and self.payment_id == other.payment_id
+            and self.message_order == other.message_order
+            and self.message == other.message
+        )
+
+    def __ne__(self, other: Any) -> bool:
+        return not self.__eq__(other)
+
+    def to_dict(self) -> Dict[str, Any]:
+        result = {
+            "payment_id": str(self.payment_id),
+            "message_order": str(self.message_order)
+        }
+        return result
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "StoreMessageEvent":
+        restored = cls(
+            payment_id=int(data["payment_id"]),
+            message_order=int(data["message_order"])
+        )
+
+
 class SendLockExpired(SendMessageEvent):
     def __init__(
         self,
@@ -101,7 +139,6 @@ class SendLockedTransferLight(SendMessageEvent):
         message_identifier: MessageID,
         signed_locked_transfer: LockedTransferUnsignedState
     ) -> None:
-
         super().__init__(recipient, channel_identifier, message_identifier)
 
         self.signed_locked_transfer = signed_locked_transfer
@@ -272,6 +309,64 @@ class SendSecretReveal(SendMessageEvent):
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "SendSecretReveal":
+        restored = cls(
+            recipient=to_canonical_address(data["recipient"]),
+            channel_identifier=ChannelID(int(data["channel_identifier"])),
+            message_identifier=MessageID(int(data["message_identifier"])),
+            secret=deserialize_secret(data["secret"]),
+        )
+
+        return restored
+
+
+class SendSecretRevealLight(SendMessageEvent):
+    """ Sends a signed SecretReveal to another node.
+    """
+
+    def __init__(
+        self,
+        recipient: Address,
+        channel_identifier: ChannelID,
+        message_identifier: MessageID,
+        secret: Secret,
+        signed_secret_reveal: Any
+    ) -> None:
+        secrethash = sha3(secret)
+
+        super().__init__(recipient, channel_identifier, message_identifier)
+
+        self.secret = secret
+        self.secrethash = secrethash
+        self.signed_secret_reveal = signed_secret_reveal
+
+    def __repr__(self) -> str:
+        return "<SendSecretRevealLight msgid:{} secrethash:{} recipient:{}>".format(
+            self.message_identifier, pex(self.secrethash), pex(self.recipient)
+        )
+
+    def __eq__(self, other: Any) -> bool:
+        return (
+            isinstance(other, SendSecretRevealLight)
+            and self.secret == other.secret
+            and self.secrethash == other.secrethash
+            and super().__eq__(other)
+        )
+
+    def __ne__(self, other: Any) -> bool:
+        return not self.__eq__(other)
+
+    def to_dict(self) -> Dict[str, Any]:
+        result = {
+            "recipient": to_checksum_address(self.recipient),
+            "channel_identifier": str(self.queue_identifier.channel_identifier),
+            "message_identifier": str(self.message_identifier),
+            "secret": serialize_bytes(self.secret),
+        }
+
+        return result
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "SendSecretRevealLight":
         restored = cls(
             recipient=to_canonical_address(data["recipient"]),
             channel_identifier=ChannelID(int(data["channel_identifier"])),

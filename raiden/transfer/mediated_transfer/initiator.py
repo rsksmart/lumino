@@ -2,7 +2,7 @@ import random
 
 from eth_utils import to_canonical_address
 
-from raiden.constants import EMPTY_SECRET, MAXIMUM_PENDING_TRANSFERS, IS_LIGHT_CLIENT_TEST_PAYMENT
+from raiden.constants import EMPTY_SECRET, MAXIMUM_PENDING_TRANSFERS, IS_LIGHT_CLIENT_TEST_PAYMENT, TEST_PAYMENT_ID
 from raiden.messages import LockedTransfer
 from raiden.settings import DEFAULT_WAIT_BEFORE_LOCK_REMOVAL
 from raiden.transfer import channel
@@ -16,7 +16,7 @@ from raiden.transfer.mediated_transfer.events import (
     EventUnlockSuccess,
     SendLockedTransfer,
     SendSecretReveal,
-    SendLockedTransferLight)
+    SendLockedTransferLight, StoreMessageEvent, SendSecretRevealLight)
 from raiden.transfer.mediated_transfer.state import (
     InitiatorTransferState,
     TransferDescriptionWithSecretState,
@@ -24,7 +24,7 @@ from raiden.transfer.mediated_transfer.state import (
 from raiden.transfer.mediated_transfer.state_change import (
     ReceiveSecretRequest,
     ReceiveSecretReveal,
-    ReceiveSecretRequestLight)
+    ReceiveSecretRequestLight, ActionSendSecretRevealLight)
 from raiden.transfer.merkle_tree import merkleroot
 from raiden.transfer.state import (
     CHANNEL_STATE_OPENED,
@@ -438,10 +438,7 @@ def handle_secretrequest(
         message_identifier = message_identifier_from_prng(pseudo_random_generator)
         transfer_description = initiator_state.transfer_description
         recipient = transfer_description.target
-        secret = Secret(b"0x213")
-        # FIXME mmartinez what about secret for light clients?
-        if not IS_LIGHT_CLIENT_TEST_PAYMENT:
-            secret = transfer_description.secret
+        secret = transfer_description.secret
         revealsecret = SendSecretReveal(
             recipient=Address(recipient),
             channel_identifier=CHANNEL_IDENTIFIER_GLOBAL_QUEUE,
@@ -468,7 +465,6 @@ def handle_secretrequest_light(
     state_change: ReceiveSecretRequestLight,
     channel_state: NettingChannelState
 ) -> TransitionResult[InitiatorTransferState]:
-    print("Inicio")
     is_message_from_target = (
         state_change.sender == initiator_state.transfer_description.target
         and state_change.secrethash == initiator_state.transfer_description.secrethash
@@ -499,26 +495,49 @@ def handle_secretrequest_light(
     if already_received_secret_request and is_message_from_target:
         # A secret request was received earlier, all subsequent are ignored
         # as it might be an attack
-        print("Already")
-
         iteration = TransitionResult(initiator_state, list())
 
     elif is_valid_secretrequest and is_message_from_target:
-        print("Valid")
-
+        store_event = StoreMessageEvent(TEST_PAYMENT_ID, 4, state_change.secret_request_message)
         initiator_state.received_secret_request = True
-        iteration = TransitionResult(initiator_state, list())
+        iteration = TransitionResult(initiator_state, [store_event])
 
     elif not is_valid_secretrequest and is_message_from_target:
-        print("Not valid")
-
         initiator_state.received_secret_request = True
         iteration = TransitionResult(initiator_state, list())
 
     else:
         iteration = TransitionResult(initiator_state, list())
-    print("Fin")
 
+    return iteration
+
+
+def handle_send_secret_reveal_light(
+    initiator_state: InitiatorTransferState,
+    state_change: ActionSendSecretRevealLight,
+    channel_state: NettingChannelState,
+    pseudo_random_generator: random.Random,
+) -> TransitionResult[InitiatorTransferState]:
+    # Reveal the secret to the target node and wait for its confirmation.
+    # At this point the transfer is not cancellable anymore as either the lock
+    # timeouts or a secret reveal is received.
+    #
+    # Note: The target might be the first hop
+    #
+    message_identifier = message_identifier_from_prng(pseudo_random_generator)
+    transfer_description = initiator_state.transfer_description
+    recipient = transfer_description.target
+    revealsecret = SendSecretRevealLight(
+        recipient=Address(recipient),
+        channel_identifier=CHANNEL_IDENTIFIER_GLOBAL_QUEUE,
+        message_identifier=message_identifier,
+        secret=state_change.reveal_secret.secret,
+        signed_secret_reveal=state_change.reveal_secret
+    )
+
+    initiator_state.revealsecret = revealsecret
+    initiator_state.received_secret_request = True
+    iteration = TransitionResult(initiator_state, [revealsecret])
     return iteration
 
 
@@ -637,6 +656,11 @@ def state_transition(
     elif type(state_change) == ContractReceiveSecretReveal:
         assert isinstance(state_change, ContractReceiveSecretReveal), MYPY_ANNOTATION
         iteration = handle_onchain_secretreveal(
+            initiator_state, state_change, channel_state, pseudo_random_generator
+        )
+    elif type(state_change) == ActionSendSecretRevealLight:
+        assert isinstance(state_change, ActionSendSecretRevealLight), MYPY_ANNOTATION
+        iteration = handle_send_secret_reveal_light(
             initiator_state, state_change, channel_state, pseudo_random_generator
         )
     else:

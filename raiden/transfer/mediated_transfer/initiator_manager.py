@@ -1,5 +1,7 @@
 import random
 
+from eth_utils import keccak
+
 from raiden.transfer import channel
 from raiden.transfer.architecture import Event, StateChange, TransitionResult
 from raiden.transfer.events import EventPaymentSentFailed
@@ -20,7 +22,7 @@ from raiden.transfer.mediated_transfer.state_change import (
     ReceiveSecretRequest,
     ReceiveSecretReveal,
     ReceiveTransferRefundCancelRoute,
-    ActionInitInitiatorLight, ReceiveSecretRequestLight)
+    ActionInitInitiatorLight, ReceiveSecretRequestLight, ActionSendSecretRevealLight)
 from raiden.transfer.state import RouteState
 from raiden.transfer.state_change import ActionCancelPayment, Block, ContractReceiveSecretReveal
 from raiden.utils.typing import (
@@ -477,6 +479,33 @@ def handle_secretrequest(
     return TransitionResult(payment_state, sub_iteration.events)
 
 
+def handle_send_secret_reveal_light(
+    payment_state: InitiatorPaymentState,
+    state_change: ActionSendSecretRevealLight,
+    channelidentifiers_to_channels: ChannelMap,
+    pseudo_random_generator: random.Random,
+) -> TransitionResult[InitiatorPaymentState]:
+    secrethash = keccak(state_change.reveal_secret.secret)
+
+    initiator_state = payment_state.initiator_transfers.get(secrethash)
+
+    if not initiator_state:
+        return TransitionResult(payment_state, list())
+
+    if initiator_state.transfer_state == "transfer_cancelled":
+        return TransitionResult(payment_state, list())
+
+    sub_iteration = subdispatch_to_initiatortransfer(
+        payment_state=payment_state,
+        initiator_state=initiator_state,
+        state_change=state_change,
+        channelidentifiers_to_channels=channelidentifiers_to_channels,
+        pseudo_random_generator=pseudo_random_generator,
+    )
+
+    return TransitionResult(payment_state, sub_iteration.events)
+
+
 def handle_secretrequest_light(
     payment_state: InitiatorPaymentState,
     state_change: ReceiveSecretRequestLight,
@@ -502,6 +531,29 @@ def handle_secretrequest_light(
     return TransitionResult(payment_state, sub_iteration.events)
 
 
+def handle_secretreveal_light(
+    payment_state: InitiatorPaymentState,
+    state_change: ReceiveSecretRequestLight,
+    channelidentifiers_to_channels: ChannelMap,
+    pseudo_random_generator: random.Random,
+) -> TransitionResult[InitiatorPaymentState]:
+    initiator_state = payment_state.initiator_transfers.get(state_change.secrethash)
+
+    if not initiator_state:
+        return TransitionResult(payment_state, list())
+
+    if initiator_state.transfer_state == "transfer_cancelled":
+        return TransitionResult(payment_state, list())
+
+    sub_iteration = subdispatch_to_initiatortransfer(
+        payment_state=payment_state,
+        initiator_state=initiator_state,
+        state_change=state_change,
+        channelidentifiers_to_channels=channelidentifiers_to_channels,
+        pseudo_random_generator=pseudo_random_generator,
+    )
+
+    return TransitionResult(payment_state, sub_iteration.events)
 
 
 def state_transition(
@@ -550,6 +602,15 @@ def state_transition(
         assert isinstance(state_change, ReceiveSecretRequestLight), MYPY_ANNOTATION
         assert payment_state, "ReceiveSecretRequestLight should be accompanied by a valid payment state"
         iteration = handle_secretrequest_light(
+            payment_state=payment_state,
+            state_change=state_change,
+            channelidentifiers_to_channels=channelidentifiers_to_channels,
+            pseudo_random_generator=pseudo_random_generator,
+        )
+    elif type(state_change) == ActionSendSecretRevealLight:
+        assert isinstance(state_change, ActionSendSecretRevealLight), MYPY_ANNOTATION
+        assert payment_state, "ActionSendSecretRevealLight should be accompanied by a valid payment state"
+        iteration = handle_send_secret_reveal_light(
             payment_state=payment_state,
             state_change=state_change,
             channelidentifiers_to_channels=channelidentifiers_to_channels,

@@ -50,7 +50,7 @@ from raiden.lightclient.light_client_utils import LightClientUtils
 from raiden.lightclient.lightclientmessages.hub_message import HubMessage
 from raiden.lightclient.lightclientmessages.light_client_payment import LightClientPayment, LightClientPaymentStatus
 
-from raiden.messages import RequestMonitoring, LockedTransfer
+from raiden.messages import RequestMonitoring, LockedTransfer, RevealSecret
 from raiden.settings import DEFAULT_RETRY_TIMEOUT, DEVELOPMENT_CONTRACT_VERSION
 from raiden.transfer import architecture, views, channel
 from raiden.transfer.events import (
@@ -1124,6 +1124,11 @@ class RaidenAPI:
             signed_locked_transfer=signed_locked_transfer
         )
         return None
+
+    def initiate_send_secret_reveal_light(self, sender_address: typing.Address, receiver_address: typing.Address,
+                                          reveal_secret: RevealSecret):
+        self.raiden.initiate_send_secret_reveal_light(sender_address, receiver_address, reveal_secret)
+
 
     def get_raiden_events_payment_history_with_timestamps_v2(
         self,

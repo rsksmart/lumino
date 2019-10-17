@@ -32,7 +32,7 @@ from raiden.transfer.mediated_transfer.state_change import (
     ReceiveSecretReveal,
     ReceiveTransferRefund,
     ReceiveTransferRefundCancelRoute,
-    ActionInitInitiatorLight, ReceiveSecretRequestLight)
+    ActionInitInitiatorLight, ReceiveSecretRequestLight, ActionSendSecretRevealLight)
 from raiden.transfer.state import (
     ChainState,
     InitiatorTask,
@@ -82,7 +82,7 @@ from raiden.utils.typing import (
     Union,
     Address)
 
-from eth_utils import to_canonical_address
+from eth_utils import to_canonical_address, keccak
 
 # All State changes that are subdispatched as token network actions
 TokenNetworkStateChange = Union[
@@ -294,7 +294,6 @@ def subdispatch_initiatortask(
     token_network_identifier: TokenNetworkID,
     secrethash: SecretHash,
 ) -> TransitionResult[ChainState]:
-
     block_number = chain_state.block_number
     sub_task = chain_state.payment_mapping.secrethashes_to_task.get(secrethash)
 
@@ -340,7 +339,6 @@ def subdispatch_mediatortask(
     token_network_identifier: TokenNetworkID,
     secrethash: SecretHash,
 ) -> TransitionResult[ChainState]:
-
     block_number = chain_state.block_number
     block_hash = chain_state.block_hash
     sub_task = chain_state.payment_mapping.secrethashes_to_task.get(secrethash)
@@ -389,7 +387,6 @@ def subdispatch_targettask(
     secrethash: SecretHash,
     storage
 ) -> TransitionResult[ChainState]:
-
     block_number = chain_state.block_number
     sub_task = chain_state.payment_mapping.secrethashes_to_task.get(secrethash)
 
@@ -702,6 +699,13 @@ def handle_init_initiator_light(
     )
 
 
+def handle_init_reveal_secret_light(
+    chain_state: ChainState, state_change: ActionSendSecretRevealLight
+) -> TransitionResult[ChainState]:
+    secrethash = keccak(state_change.reveal_secret.secret)
+    return subdispatch_to_paymenttask(chain_state, state_change, secrethash)
+
+
 def handle_init_mediator(
     chain_state: ChainState, state_change: ActionInitMediator
 ) -> TransitionResult[ChainState]:
@@ -801,7 +805,7 @@ def handle_update_transport_authdata(
                 .clients_last_transport_authdata.append(light_client_transport_state)
         else:
             for client_last_transport_authdata in \
-                    chain_state.last_node_transport_state_authdata.clients_last_transport_authdata:
+                chain_state.last_node_transport_state_authdata.clients_last_transport_authdata:
                 if to_canonical_address(state_change.address) == client_last_transport_authdata.address:
                     client_last_transport_authdata.auth_data = state_change.auth_data
                 else:
@@ -918,6 +922,8 @@ def handle_state_change(
         iteration = handle_receive_lock_expired(chain_state, state_change)
     elif type(state_change) == ActionInitInitiatorLight:
         iteration = handle_init_initiator_light(chain_state, state_change)
+    elif type(state_change) == ActionSendSecretRevealLight:
+        iteration = handle_init_reveal_secret_light(chain_state, state_change)
 
     assert chain_state is not None, "chain_state must be set"
     return iteration
