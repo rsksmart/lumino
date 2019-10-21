@@ -1040,13 +1040,36 @@ class RaidenService(Runnable):
             current_state=chain_state,
         )
 
-    def _initialize_whitelists(self, chain_state: ChainState):
-        """ Whitelist neighbors and mediated transfer targets on transport """
+    def _get_light_client_transport(self, address):
+        light_client_transport_result = None
+        for light_client_transport in self.transport.light_client_transports:
+            if address == light_client_transport._address:
+                light_client_transport_result = light_client_transport
 
+        return light_client_transport_result
+
+    def _set_hub_transport_whitelist(self, chain_state: ChainState):
         for neighbour in views.all_neighbour_nodes(chain_state):
             if neighbour == ConnectionManager.BOOTSTRAP_ADDR:
                 continue
             self.transport.hub_transport.whitelist(neighbour)
+
+    def _set_light_clients_transports_whitelist(self, chain_state: ChainState):
+        light_clients = self.wal.storage.get_all_light_clients()
+        for light_client in light_clients:
+            for neighbour in views.all_neighbour_nodes(chain_state=chain_state,
+                                                       light_client_address=light_client['address']):
+                if neighbour == ConnectionManager.BOOTSTRAP_ADDR:
+                    continue
+                light_client_transport = self._get_light_client_transport(light_client['address'])
+                if light_client_transport is not None:
+                    light_client_transport.whitelist(neighbour)
+
+    def _initialize_whitelists(self, chain_state: ChainState):
+        """ Whitelist neighbors and mediated transfer targets on transport """
+
+        self._set_hub_transport_whitelist(chain_state)
+        self._set_light_clients_transports_whitelist(chain_state)
 
         events_queues = views.get_all_messagequeues(chain_state)
 
