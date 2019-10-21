@@ -122,24 +122,24 @@ def test_signature_without_secret():
     dict_msg = {
         "type": "LockedTransfer",
         "chain_id": 33,
-        "message_identifier": 15646344508401696016,
-        "payment_identifier": 11565195055784257403,
+        "message_identifier": 14747618820028812404,
+        "payment_identifier": 16050003401382756056,
         "payment_hash_invoice": "0x",
         "nonce": 1,
         "token_network_address": "0x2864a97e7701a08d53f24f9e9fa6727988733f12",
         "token": "0x58cf17e106686e1554177030980829cfd4cb7196",
-        "channel_identifier": 13,
+        "channel_identifier": 22,
         "transferred_amount": 0,
-        "locked_amount": 100000000000000,
-        "recipient": "0x29021129f5d038897f01bd4bc050525ca01a4758",
-        "locksroot": "0x18c3adada74ee7fbb8681ecde56e929f6ba3adb21ba75150cb28095ef1df01e3",
+        "locked_amount": 100000000000000000,
+        "recipient": "0x5a88c15f3ed1bee03c7e85355faed29d202744c6",
+        "locksroot": "0x80c5a4985caf413bb97d97af2e5a4d800f970778b8cf5a5b6b2212e8faa8ff67",
         "lock": {
             "type": "Lock",
-            "amount": 100000000000000,
-            "expiration": 507288,
+            "amount": 100000000000000000,
+            "expiration": 375359,
             "secrethash": "0x3e6d58ba381898cf1a0ff6fbe65a3805419063ea9eb6ff6bc6f0dde45032d0dc"
         },
-        "target": "0x8e1fb8214fcd0989eab681992f06cb09c86f3d69",
+        "target": "0x5a88c15f3ed1bee03c7e85355faed29d202744c6",
         "initiator": "0x6d369723521b4080a19457d5fdd2194d633b0c3a",
         "fee": 0
     }

@@ -13,7 +13,11 @@ def test_signer_sign_seed_retry():
         "0xd5adc7e384a8e080e187a4de4d0a51820a3585f7c44ddf39f32f94ea58a6611b"
     )
 
-    signer: Signer = LocalSigner(privkey)
+    signer = LocalSigner(privkey)
+
+    # signer: Signer = LocalSigner(privkey)
+
+    print(f'SEED SIGNATURE: {encode_hex(signer.sign(message.encode()))}')
 
     result = signer.sign(message.encode())[-32:]
 
@@ -26,7 +30,7 @@ def test_signer_sign_display_user_matrix_client():
 
     rsk_address = "0x6d369723521B4080A19457D5Fdd2194d633B0c3A"
     rsk_address_normalized = to_normalized_address(rsk_address)
-    matrix_server_domain = "transport04.raiden.network"
+    matrix_server_domain = "transport02.raiden.network"
 
     message_to_sign = f'@{rsk_address_normalized}:{matrix_server_domain}'
 
@@ -39,6 +43,8 @@ def test_signer_sign_display_user_matrix_client():
     signer: Signer = LocalSigner(privkey)
 
     result = signer.sign(message_to_sign.encode())
+
+    print(f'DISPLAY_NAME_SIGNATURE: {encode_hex(signer.sign(message_to_sign.encode()))}')
 
     assert result == signature
 
@@ -62,7 +68,7 @@ def test_signer_sign_matrix_server_domain():
     #Rsk Address 0x6d369723521B4080A19457D5Fdd2194d633B0c3A
     privkey = decode_hex('0x51dd3591fb7ce95b0bd77ca14a5236a4989d399c80b8150d3799dd0afcb14282')
 
-    message = 'transport04.raiden.network'
+    message = 'transport02.raiden.network'
 
     # generated with Metamask's web3.personal.sign
     signature = decode_hex(
@@ -73,6 +79,8 @@ def test_signer_sign_matrix_server_domain():
     signer: Signer = LocalSigner(privkey)
 
     result = signer.sign(message.encode())
+
+    print(f'PASSWORD_SIGNATURE: {encode_hex(signer.sign(message.encode()))}')
 
     assert result == signature
 

@@ -243,6 +243,7 @@ class UserAddressManager:
         return user_id
 
     def _fetch_user_presence(self, user_id: str) -> UserPresence:
+        print("_fetch_user_presence" + user_id)
         if user_id not in self._userid_to_presence:
             try:
                 presence = UserPresence(self._client.get_user_presence(user_id))

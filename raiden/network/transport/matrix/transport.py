@@ -189,6 +189,7 @@ class _RetryQueue(Runnable):
 
         self.log.debug("Retrying message", receiver=to_normalized_address(self.receiver))
         status = self.transport._address_mgr.get_address_reachability(self.receiver)
+
         if status is not AddressReachability.REACHABLE:
             # if partner is not reachable, return
             self.log.info(
@@ -509,6 +510,11 @@ class MatrixTransport(Runnable):
             # Ensure network state is updated in case we already know about the user presences
             # representing the target node
             self._address_mgr.refresh_address_presence(node_address)
+
+            # if not is_peer_reachable:
+            #     self.log.debug("Forcing presence update", peer_address=peer_address, user_id=sender_id)
+            #     self._address_mgr.force_user_presence(user, UserPresence.ONLINE)
+            #     self._address_mgr.refresh_address_presence(peer_address)
 
     def send_async(self, queue_identifier: QueueIdentifier, message: Message):
         """Queue the message for sending to recipient in the queue_identifier

@@ -1107,6 +1107,7 @@ def create_sendlockedtransfer(
 
     lock = HashTimeLockState(amount=amount, expiration=expiration, secrethash=secrethash)
 
+    # channel_state.our_state.merkletree.layers = [[]]
     merkletree = compute_merkletree_with(channel_state.our_state.merkletree, lock.lockhash)
     # The caller must ensure the same lock is not being used twice
     assert merkletree, "lock is already registered"

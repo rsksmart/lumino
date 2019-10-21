@@ -1600,7 +1600,7 @@ class RaidenAPI:
                               signed_display_name,
                               signed_seed_retry):
 
-        address = to_normalized_address(address)
+        address = to_checksum_address(address)
 
         light_client = self.raiden.wal.storage.get_light_client(address)
 

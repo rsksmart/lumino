@@ -664,19 +664,25 @@ class RaidenService(Runnable):
         assert self.alarm.is_primed(), f"AlarmTask not primed. node:{self!r}"
         assert self.ready_to_process_events, f"Event procossing disable. node:{self!r}"
 
+        prev_auth_data = None
+        if chain_state.last_node_transport_state_authdata is not None:
+            prev_auth_data = chain_state.last_node_transport_state_authdata.hub_last_transport_authdata,
+
         # Start hub transport
         self.transport.hub_transport.start(
             raiden_service=self,
             message_handler=self.message_handler,
-            prev_auth_data=chain_state.last_node_transport_state_authdata.hub_last_transport_authdata,
+            prev_auth_data=prev_auth_data,
         )
 
         # Start lightclient transports
         selected_prev_auth_data = None
         for light_client_transport in self.transport.light_client_transports:
-            for client_last_transport_authdata in chain_state.last_node_transport_state_authdata.clients_last_transport_authdata:
-                if client_last_transport_authdata.address == to_canonical_address(light_client_transport._address):
-                    selected_prev_auth_data = client_last_transport_authdata.auth_data
+            if chain_state.last_node_transport_state_authdata is not None:
+                for client_last_transport_authdata in \
+                        chain_state.last_node_transport_state_authdata.clients_last_transport_authdata:
+                    if client_last_transport_authdata.address == to_canonical_address(light_client_transport._address):
+                        selected_prev_auth_data = client_last_transport_authdata.auth_data
 
             light_client_transport.start(
                 raiden_service=self,
@@ -824,9 +830,7 @@ class RaidenService(Runnable):
         these cases the healthcheck will be started by
         `start_neighbours_healthcheck`.
         """
-        # TODO se here if is necsesary for lightclients transports @GasparMedina
         if self.transport:
-
             if creator_address is not None:
                 if self.transport.light_client_transports is not None:
                     for light_client_transport in self.transport.light_client_transports:

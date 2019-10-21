@@ -173,13 +173,11 @@ class RaidenEventHandler(EventHandler):
         raiden: "RaidenService", send_locked_transfer_light: SendLockedTransferLight
     ):
         mediated_transfer_message = send_locked_transfer_light.signed_locked_transfer
-        raiden.transport.light_client_transports[0].send_async(
-            send_locked_transfer_light.queue_identifier, mediated_transfer_message
-        )
-
-
-
-
+        light_client_address = to_checksum_address(send_locked_transfer_light.signed_locked_transfer.initiator)
+        for light_client_transport in raiden.transport.light_client_transports:
+            if light_client_address == light_client_transport._address:
+                light_client_transport.send_async(send_locked_transfer_light.queue_identifier,
+                                                  mediated_transfer_message)
 
     @staticmethod
     def handle_send_secretreveal(raiden: "RaidenService", reveal_secret_event: SendSecretReveal):

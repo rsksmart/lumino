@@ -1966,7 +1966,7 @@ class RestAPI:
             )
 
         light_client = self.raiden_api.register_light_client(
-            to_normalized_address(address),
+            address,
             signed_password,
             signed_display_name,
             signed_seed_retry)
