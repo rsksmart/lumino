@@ -2,8 +2,8 @@ from eth_utils import encode_hex, decode_hex
 from raiden.utils.signer import LocalSigner
 
 private_key = decode_hex('0x51dd3591fb7ce95b0bd77ca14a5236a4989d399c80b8150d3799dd0afcb14282')
-display_name_to_sign = "@0x6d369723521b4080a19457d5fdd2194d633b0c3a:transport04.raiden.network"
-password_to_sign = "transport04.raiden.network"
+display_name_to_sign = "@0x6d369723521b4080a19457d5fdd2194d633b0c3a:transport01.raiden.network"
+password_to_sign = "transport01.raiden.network"
 seed_retry = "seed"
 
 signer = LocalSigner(private_key)

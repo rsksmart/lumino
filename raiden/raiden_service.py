@@ -691,9 +691,21 @@ class RaidenService(Runnable):
 
             )
 
+        self._start_health_check_for_hub_nighbours(chain_state)
+        self._start_health_check_for_light_client_neighbour(chain_state)
+
+    def _start_health_check_for_light_client_neighbour(self, chain_state: ChainState):
+        for light_client in self.transport.light_client_transports:
+            for neighbour in views.all_neighbour_nodes(chain_state, light_client['address']):
+                self._start_health_check_for_neighbour(neighbour)
+
+    def _start_health_check_for_hub_nighbours(self, chain_state: ChainState):
         for neighbour in views.all_neighbour_nodes(chain_state):
-            if neighbour != ConnectionManager.BOOTSTRAP_ADDR:
-                self.start_health_check_for(neighbour)
+            self._start_health_check_for_neighbour(neighbour)
+
+    def _start_health_check_for_neighbour(self, neighbour):
+        if neighbour != ConnectionManager.BOOTSTRAP_ADDR:
+            self.start_health_check_for(neighbour)
 
     def _start_alarm_task(self):
         """Start the alarm task.
