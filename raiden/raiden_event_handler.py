@@ -161,12 +161,15 @@ class RaidenEventHandler(EventHandler):
 
     @staticmethod
     def handle_store_message(raiden: "RaidenService", store_message_event: StoreMessageEvent):
-        exists = LightClientMessageHandler.is_light_client_protocol_message_already_stored(TEST_PAYMENT_ID, 4,
+        # FIXME mmartinez7 this should take the right payment id
+        exists = LightClientMessageHandler.is_light_client_protocol_message_already_stored(TEST_PAYMENT_ID,
+                                                                                           store_message_event.message_order,
                                                                                            raiden.wal)
         if not exists:
             # FIXME mmartinez7 payment id does not travel on the protocol messages. Fix TEST_PAYMENT_ID
-            LightClientMessageHandler.store_light_client_protocol_message(store_message_event.message, True,
-                                                                          TEST_PAYMENT_ID, 4,
+            LightClientMessageHandler.store_light_client_protocol_message(store_message_event.message, store_message_event.is_signed,
+                                                                          TEST_PAYMENT_ID,
+                                                                          store_message_event.message_order,
                                                                           raiden.wal)
         else:
             log.info("Message for lc already received, ignoring db storage")

@@ -24,7 +24,7 @@ from raiden.transfer.mediated_transfer.state_change import (
     ReceiveSecretReveal,
     ReceiveTransferRefund,
     ReceiveTransferRefundCancelRoute,
-    ReceiveSecretRequestLight)
+    ReceiveSecretRequestLight, ReceiveSecretRevealLight)
 from raiden.transfer.state import balanceproof_from_envelope
 from raiden.transfer.state_change import ReceiveDelivered, ReceiveProcessed, ReceiveUnlock
 from raiden.utils import pex, random_secret
@@ -44,7 +44,7 @@ class MessageHandler:
 
         elif type(message) == RevealSecret:
             assert isinstance(message, RevealSecret), MYPY_ANNOTATION
-            self.handle_message_revealsecret(raiden, message)
+            self.handle_message_revealsecret(raiden, message, is_light_client)
 
         elif type(message) == Unlock:
             assert isinstance(message, Unlock), MYPY_ANNOTATION
@@ -98,9 +98,19 @@ class MessageHandler:
             raiden.handle_and_track_state_change(secret_request)
 
     @staticmethod
-    def handle_message_revealsecret(raiden: RaidenService, message: RevealSecret) -> None:
-        state_change = ReceiveSecretReveal(message.secret, message.sender)
+    def handle_message_revealsecret_light(raiden: RaidenService, message: RevealSecret) -> None:
+        state_change = ReceiveSecretRevealLight(message.secret, message.sender)
         raiden.handle_and_track_state_change(state_change)
+
+    @staticmethod
+    def handle_message_revealsecret(raiden: RaidenService, message: RevealSecret, is_light_client=False) -> None:
+        if is_light_client:
+            state_change = ReceiveSecretRevealLight(message.secret, message.sender, message)
+            raiden.handle_and_track_state_change(state_change)
+        else:
+            state_change = ReceiveSecretReveal(message.secret, message.sender)
+            raiden.handle_and_track_state_change(state_change)
+
 
     @staticmethod
     def handle_message_unlock(raiden: RaidenService, message: Unlock) -> None:
@@ -196,6 +206,8 @@ class MessageHandler:
         processed = ReceiveProcessed(message.sender, message.message_identifier)
         raiden.handle_and_track_state_change(processed)
         if is_light_client:
+            # FIXME mmartinez7 order isnt 3 always.
+
             # If exists for that payment, the same message by the order, then discard it.
             exists = LightClientMessageHandler.is_light_client_protocol_message_already_stored(TEST_PAYMENT_ID, 3,
                                                                                                raiden.wal)
@@ -211,6 +223,7 @@ class MessageHandler:
         delivered = ReceiveDelivered(message.sender, message.delivered_message_identifier)
         raiden.handle_and_track_state_change(delivered)
         if is_light_client:
+            # FIXME mmartinez7 order isnt 2 always
             exists = LightClientMessageHandler.is_light_client_protocol_message_already_stored(TEST_PAYMENT_ID, 2,
                                                                                                raiden.wal)
             if not exists:
@@ -219,4 +232,3 @@ class MessageHandler:
                                                                               raiden.wal)
             else:
                 log.info("Message for lc already received, ignoring db storage")
-

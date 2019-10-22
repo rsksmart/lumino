@@ -1,3 +1,4 @@
+from raiden.messages import RevealSecret
 from raiden.transfer import channel, token_network, views
 from raiden.transfer.architecture import (
     ContractReceiveStateChange,
@@ -32,7 +33,7 @@ from raiden.transfer.mediated_transfer.state_change import (
     ReceiveSecretReveal,
     ReceiveTransferRefund,
     ReceiveTransferRefundCancelRoute,
-    ActionInitInitiatorLight, ReceiveSecretRequestLight, ActionSendSecretRevealLight)
+    ActionInitInitiatorLight, ReceiveSecretRequestLight, ActionSendSecretRevealLight, ReceiveSecretRevealLight)
 from raiden.transfer.state import (
     ChainState,
     InitiatorTask,
@@ -232,7 +233,6 @@ def subdispatch_to_paymenttask(
                 events = sub_iteration.events
 
                 if sub_iteration.new_state is None:
-                    print("Deleted initiator")
                     del chain_state.payment_mapping.secrethashes_to_task[secrethash]
 
         elif isinstance(sub_task, MediatorTask):
@@ -664,6 +664,10 @@ def handle_tokenadded(
 
     return TransitionResult(chain_state, events)
 
+def handle_secret_reveal_light(
+    chain_state: ChainState, state_change: ReceiveSecretRevealLight
+) -> TransitionResult[ChainState]:
+    return subdispatch_to_paymenttask(chain_state, state_change, state_change.secrethash)
 
 def handle_secret_reveal(
     chain_state: ChainState, state_change: ReceiveSecretReveal
@@ -702,7 +706,8 @@ def handle_init_initiator_light(
 def handle_init_reveal_secret_light(
     chain_state: ChainState, state_change: ActionSendSecretRevealLight
 ) -> TransitionResult[ChainState]:
-    secrethash = keccak(state_change.reveal_secret.secret)
+    revealsecret = RevealSecret.from_dict(state_change.reveal_secret)
+    secrethash = keccak(revealsecret.secrethash)
     return subdispatch_to_paymenttask(chain_state, state_change, secrethash)
 
 
@@ -924,6 +929,9 @@ def handle_state_change(
         iteration = handle_init_initiator_light(chain_state, state_change)
     elif type(state_change) == ActionSendSecretRevealLight:
         iteration = handle_init_reveal_secret_light(chain_state, state_change)
+    elif type(state_change) == ReceiveSecretRevealLight:
+        assert isinstance(state_change, ReceiveSecretRevealLight), MYPY_ANNOTATION
+        iteration = handle_secret_reveal_light(chain_state, state_change)
 
     assert chain_state is not None, "chain_state must be set"
     return iteration

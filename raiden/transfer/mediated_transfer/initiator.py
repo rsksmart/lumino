@@ -3,7 +3,7 @@ import random
 from eth_utils import to_canonical_address
 
 from raiden.constants import EMPTY_SECRET, MAXIMUM_PENDING_TRANSFERS, IS_LIGHT_CLIENT_TEST_PAYMENT, TEST_PAYMENT_ID
-from raiden.messages import LockedTransfer
+from raiden.messages import LockedTransfer, Unlock
 from raiden.settings import DEFAULT_WAIT_BEFORE_LOCK_REMOVAL
 from raiden.transfer import channel
 from raiden.transfer.architecture import Event, TransitionResult
@@ -24,7 +24,7 @@ from raiden.transfer.mediated_transfer.state import (
 from raiden.transfer.mediated_transfer.state_change import (
     ReceiveSecretRequest,
     ReceiveSecretReveal,
-    ReceiveSecretRequestLight, ActionSendSecretRevealLight)
+    ReceiveSecretRequestLight, ActionSendSecretRevealLight, ReceiveSecretRevealLight)
 from raiden.transfer.merkle_tree import merkleroot
 from raiden.transfer.state import (
     CHANNEL_STATE_OPENED,
@@ -49,8 +49,29 @@ from raiden.utils.typing import (
     Secret,
     SecretHash,
     TokenNetworkID,
-    InitiatorAddress, AddressHex)
-from raiden_contracts.utils import get_merkle_root
+    AddressHex)
+
+
+def events_for_unlock_base(
+    initiator_state: InitiatorTransferState,
+    channel_state: NettingChannelState,
+    secret: Secret
+) -> List[Event]:
+    transfer_description = initiator_state.transfer_description
+    payment_sent_success = EventPaymentSentSuccess(
+        payment_network_identifier=channel_state.payment_network_identifier,
+        token_network_identifier=TokenNetworkID(channel_state.token_network_identifier),
+        identifier=transfer_description.payment_identifier,
+        amount=transfer_description.amount,
+        target=transfer_description.target,
+        secret=secret,
+    )
+
+    unlock_success = EventUnlockSuccess(
+        transfer_description.payment_identifier, transfer_description.secrethash
+    )
+
+    return [payment_sent_success, unlock_success]
 
 
 def events_for_unlock_lock(
@@ -74,20 +95,11 @@ def events_for_unlock_lock(
         secrethash=secrethash,
     )
 
-    payment_sent_success = EventPaymentSentSuccess(
-        payment_network_identifier=channel_state.payment_network_identifier,
-        token_network_identifier=TokenNetworkID(channel_state.token_network_identifier),
-        identifier=transfer_description.payment_identifier,
-        amount=transfer_description.amount,
-        target=transfer_description.target,
-        secret=secret,
-    )
-
-    unlock_success = EventUnlockSuccess(
-        transfer_description.payment_identifier, transfer_description.secrethash
-    )
-
-    return [unlock_lock, payment_sent_success, unlock_success]
+    base_events = events_for_unlock_base(initiator_state, channel_state, secret)
+    events = list()
+    events.extend(base_events)
+    events.append(unlock_lock)
+    return events
 
 
 def handle_block(
@@ -498,7 +510,7 @@ def handle_secretrequest_light(
         iteration = TransitionResult(initiator_state, list())
 
     elif is_valid_secretrequest and is_message_from_target:
-        store_event = StoreMessageEvent(TEST_PAYMENT_ID, 4, state_change.secret_request_message)
+        store_event = StoreMessageEvent(TEST_PAYMENT_ID, 4, state_change.secret_request_message, True)
         initiator_state.received_secret_request = True
         iteration = TransitionResult(initiator_state, [store_event])
 
@@ -537,7 +549,65 @@ def handle_send_secret_reveal_light(
 
     initiator_state.revealsecret = revealsecret
     initiator_state.received_secret_request = True
+    # FIXME mmartinez7 should append a StoreMessage event with the payment id extracted from transfer_description
     iteration = TransitionResult(initiator_state, [revealsecret])
+    return iteration
+
+
+def handle_offchain_secretreveal_light(
+    initiator_state: InitiatorTransferState,
+    state_change: ReceiveSecretRevealLight,
+    channel_state: NettingChannelState,
+    pseudo_random_generator: random.Random
+) -> TransitionResult[InitiatorTransferState]:
+    """ Once the next hop proves it knows the secret, the initiator can unlock
+    the mediated transfer.
+
+    This will validate the secret, and if valid a new balance proof is sent to
+    the next hop with the current lock removed from the merkle tree and the
+    transferred amount updated.
+    """
+    iteration: TransitionResult[InitiatorTransferState]
+    valid_reveal = is_valid_secret_reveal(
+        state_change=state_change,
+        transfer_secrethash=initiator_state.transfer_description.secrethash,
+        secret=state_change.secret,
+    )
+    sent_by_partner = state_change.sender == channel_state.partner_state.address
+    is_channel_open = channel.get_status(channel_state) == CHANNEL_STATE_OPENED
+
+    if valid_reveal and is_channel_open and sent_by_partner:
+        unlock_events = events_for_unlock_base(
+            initiator_state=initiator_state,
+            channel_state=channel_state,
+            secret=state_change.secret,
+        )
+
+        transfer_description = initiator_state.transfer_description
+
+        message_identifier = message_identifier_from_prng(pseudo_random_generator)
+        unlock_lock = channel.send_unlock(
+            channel_state=channel_state,
+            message_identifier=message_identifier,
+            payment_identifier=transfer_description.payment_identifier,
+            secret=state_change.secret,
+            secrethash=state_change.secrethash,
+        )
+        unlock_msg = Unlock.from_event(unlock_lock)
+
+        store_received_secret_reveal_event = StoreMessageEvent(TEST_PAYMENT_ID, 9, state_change.secret_reveal_message,
+                                                               True)
+        store_created_unlock_event = StoreMessageEvent(TEST_PAYMENT_ID, 11, unlock_msg, False)
+
+        events = list()
+        events.append(store_received_secret_reveal_event)
+        events.append(store_created_unlock_event)
+        events.extend(unlock_events)
+        iteration = TransitionResult(None, events)
+    else:
+        events = list()
+        iteration = TransitionResult(initiator_state, events)
+
     return iteration
 
 
@@ -653,9 +723,19 @@ def state_transition(
         iteration = handle_offchain_secretreveal(
             initiator_state, state_change, channel_state, pseudo_random_generator
         )
+    elif type(state_change) == ReceiveSecretRevealLight:
+        assert isinstance(state_change, ReceiveSecretRevealLight), MYPY_ANNOTATION
+        iteration = handle_offchain_secretreveal_light(
+            initiator_state, state_change, channel_state, pseudo_random_generator
+        )
     elif type(state_change) == ContractReceiveSecretReveal:
         assert isinstance(state_change, ContractReceiveSecretReveal), MYPY_ANNOTATION
         iteration = handle_onchain_secretreveal(
+            initiator_state, state_change, channel_state, pseudo_random_generator
+        )
+    elif type(state_change) == ActionSendSecretRevealLight:
+        assert isinstance(state_change, ActionSendSecretRevealLight), MYPY_ANNOTATION
+        iteration = handle_send_secret_reveal_light(
             initiator_state, state_change, channel_state, pseudo_random_generator
         )
     elif type(state_change) == ActionSendSecretRevealLight:

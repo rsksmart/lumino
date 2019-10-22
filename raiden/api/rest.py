@@ -21,7 +21,7 @@ from raiden.api.validations.api_error_builder import ApiErrorBuilder
 from raiden.api.validations.api_status_codes import ERROR_STATUS_CODES
 from raiden.api.validations.channel_validator import ChannelValidator
 from raiden.lightclient.light_client_service import LightClientService
-from raiden.messages import LockedTransfer, Delivered, RevealSecret
+from raiden.messages import LockedTransfer, Delivered, RevealSecret, Unlock
 from raiden.rns_constants import RNS_ADDRESS_ZERO
 from raiden.utils.rns import is_rns_address
 from webargs.flaskparser import parser
@@ -2012,7 +2012,7 @@ class RestAPI:
                                               sender: typing.AddressHex,
                                               receiver: typing.AddressHex,
                                               message: Dict):
-        # TODO check if message is coherent
+        # TODO mmartinez7 pending msg validations
         # TODO call from dict will work but we need to validate each parameter in order to know if there are no extra or missing params.
         # TODO we also need to check if message id an order received make sense
 
@@ -2035,7 +2035,8 @@ class RestAPI:
         elif message["type"] == "RevealSecret":
             reveal_secret = RevealSecret.from_dict(message)
             self.initiate_send_secret_reveal_light(sender, receiver, reveal_secret)
-
+        elif message["type"] == "Secret":
+            unlock = Unlock.from_dict(message)
         return api_response("Should respond accordly to the message received")
 
     def create_light_client_payment(
