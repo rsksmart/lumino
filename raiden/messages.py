@@ -174,7 +174,7 @@ def message_from_sendevent(send_event: SendMessageEvent) -> "Message":
         message = LockedTransfer.from_event(send_event)
     elif type(send_event) == SendLockedTransferLight:
         assert isinstance(send_event, SendLockedTransferLight), MYPY_ANNOTATION
-        # TODO mamrtinez this doesnt makes sense for now since we receive the message directly from the LC. Evaluate.
+        message = LockedTransfer.from_event(send_event)
     elif type(send_event) == SendSecretReveal:
         assert isinstance(send_event, SendSecretReveal), MYPY_ANNOTATION
         message = RevealSecret.from_event(send_event)
@@ -1225,34 +1225,38 @@ class LockedTransfer(LockedTransferBase):
         packed.signature = self.signature
 
     @classmethod
-    def from_event(cls, event: SendLockedTransfer) -> "LockedTransfer":
-        transfer = event.transfer
-        balance_proof = transfer.balance_proof
-        lock = Lock(
-            amount=transfer.lock.amount,
-            expiration=transfer.lock.expiration,
-            secrethash=transfer.lock.secrethash,
-        )
-        fee = 0
+    def from_event(cls, event: SendMessageEvent) -> "LockedTransfer":
 
-        locked_transfer = cls(
-            chain_id=balance_proof.chain_id,
-            message_identifier=event.message_identifier,
-            payment_identifier=transfer.payment_identifier,
-            payment_hash_invoice=transfer.payment_hash_invoice,
-            nonce=balance_proof.nonce,
-            token_network_address=TokenNetworkAddress(balance_proof.token_network_identifier),
-            token=transfer.token,
-            channel_identifier=balance_proof.channel_identifier,
-            transferred_amount=balance_proof.transferred_amount,
-            locked_amount=balance_proof.locked_amount,
-            recipient=event.recipient,
-            locksroot=balance_proof.locksroot,
-            lock=lock,
-            target=transfer.target,
-            initiator=transfer.initiator,
-            fee=fee,
-        )
+        if isinstance(event, SendLockedTransfer):
+            transfer = event.transfer
+            balance_proof = transfer.balance_proof
+            lock = Lock(
+                amount=transfer.lock.amount,
+                expiration=transfer.lock.expiration,
+                secrethash=transfer.lock.secrethash,
+            )
+            fee = 0
+
+            locked_transfer = cls(
+                chain_id=balance_proof.chain_id,
+                message_identifier=event.message_identifier,
+                payment_identifier=transfer.payment_identifier,
+                payment_hash_invoice=transfer.payment_hash_invoice,
+                nonce=balance_proof.nonce,
+                token_network_address=TokenNetworkAddress(balance_proof.token_network_identifier),
+                token=transfer.token,
+                channel_identifier=balance_proof.channel_identifier,
+                transferred_amount=balance_proof.transferred_amount,
+                locked_amount=balance_proof.locked_amount,
+                recipient=event.recipient,
+                locksroot=balance_proof.locksroot,
+                lock=lock,
+                target=transfer.target,
+                initiator=transfer.initiator,
+                fee=fee,
+            )
+        else:
+            locked_transfer = event.signed_locked_transfer
 
         return locked_transfer
 

@@ -48,7 +48,7 @@ from raiden.storage import serialize, sqlite, wal
 from raiden.tasks import AlarmTask
 from raiden.transfer import channel, node, views
 from raiden.transfer.architecture import Event as RaidenEvent, StateChange
-from raiden.transfer.mediated_transfer.events import SendLockedTransfer
+from raiden.transfer.mediated_transfer.events import SendLockedTransfer, SendLockedTransferLight
 from raiden.transfer.mediated_transfer.state import (
     TransferDescriptionWithSecretState,
     lockedtransfersigned_from_message,
@@ -94,7 +94,9 @@ from raiden.utils.typing import (
 
 from raiden.utils.upgrades import UpgradeManager
 from raiden_contracts.contract_manager import ContractManager
-from eth_utils import to_canonical_address, to_checksum_address
+from eth_utils import to_canonical_address, to_checksum_address, encode_hex
+from raiden.lightclient.light_client_service import LightClientService
+
 
 log = structlog.get_logger(__name__)  # pylint: disable=invalid-name
 StatusesDict = Dict[TargetAddress, Dict[PaymentID, "PaymentStatus"]]
@@ -545,7 +547,7 @@ class RaidenService(Runnable):
 
         self._initialize_payment_statuses(chain_state)
         self._initialize_transactions_queues(chain_state)
-        self._initialize_messages_queues(chain_state)
+        # self._initialize_messages_queues(chain_state)
         self._initialize_whitelists(chain_state)
         self._initialize_monitoring_services_queue(chain_state)
         self._initialize_ready_to_processed_events()
@@ -567,6 +569,7 @@ class RaidenService(Runnable):
 
         self._start_transport(chain_state)
         self._start_alarm_task()
+        self._initialize_messages_queues(chain_state)
 
         log.debug("Raiden Service started", node=pex(self.address))
         super().start()
@@ -696,7 +699,7 @@ class RaidenService(Runnable):
 
     def _start_health_check_for_light_client_neighbour(self, chain_state: ChainState):
         for light_client in self.transport.light_client_transports:
-            for neighbour in views.all_neighbour_nodes(chain_state, light_client['address']):
+            for neighbour in views.all_neighbour_nodes(chain_state, light_client._address):
                 self._start_health_check_for_neighbour(neighbour)
 
     def _start_health_check_for_hub_nighbours(self, chain_state: ChainState):
@@ -1001,11 +1004,15 @@ class RaidenService(Runnable):
             self.start_health_check_for(queue_identifier.recipient)
 
             for event in event_queue:
-                print("Fixme")
-                #TODO mmartinez FIXME
-               # message = message_from_sendevent(event)
-               # self.sign(message)
-               # self.transport[0].send_async(queue_identifier, message)
+                message = message_from_sendevent(event)
+                if hasattr(message, 'signature'):
+                    light_client_address = to_checksum_address(encode_hex(message.initiator))
+                    if (LightClientService.is_handled_lc(light_client_address, self.wal)):
+                        light_client_transport = self._get_light_client_transport(light_client_address)
+                        light_client_transport.send_async(queue_identifier, message)
+                else:
+                    self.sign(message)
+                    self.transport.hub_transport.send_async(queue_identifier, message)
 
     def _initialize_monitoring_services_queue(self, chain_state: ChainState):
         """Send the monitoring requests for all current balance proofs.
@@ -1085,16 +1092,19 @@ class RaidenService(Runnable):
 
         events_queues = views.get_all_messagequeues(chain_state)
 
+        light_client_transports = self.transport.light_client_transports
+
         for event_queue in events_queues.values():
             for event in event_queue:
                 if isinstance(event, SendLockedTransfer):
                     transfer = event.transfer
                     if transfer.initiator == self.address:
                         self.transport.hub_transport.whitelist(address=transfer.target)
-                        self.transport.light_client_transports[0].whitelist(address=transfer.target)
-                        # TODO
-                        # Verify this for lightclients, now set only hub transport
-                        # self.transport[1].whitelist(address=transfer.target)
+                if isinstance(event, SendLockedTransferLight):
+                    transfer = event.signed_locked_transfer
+                    for light_client_transport in light_client_transports:
+                        if transfer.initiator == to_canonical_address(light_client_transport._address):
+                            light_client_transport.whitelist(address=transfer.target)
 
     def sign(self, message: Message):
         """ Sign message inplace. """
