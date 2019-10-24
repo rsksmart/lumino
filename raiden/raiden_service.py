@@ -38,7 +38,7 @@ from raiden.messages import (
     SignedMessage,
     UpdatePFS,
     message_from_sendevent,
-    RevealSecret)
+    RevealSecret, Unlock)
 from raiden.network.blockchain_service import BlockChainService
 from raiden.network.proxies.secret_registry import SecretRegistry
 from raiden.network.proxies.service_registry import ServiceRegistry
@@ -57,7 +57,7 @@ from raiden.transfer.mediated_transfer.state_change import (
     ActionInitInitiator,
     ActionInitMediator,
     ActionInitTarget,
-    ActionInitInitiatorLight, ActionSendSecretRevealLight)
+    ActionInitInitiatorLight, ActionSendSecretRevealLight, ActionSendUnlockLight)
 from raiden.transfer.state import (
     BalanceProofSignedState,
     BalanceProofUnsignedState,
@@ -1345,8 +1345,17 @@ class RaidenService(Runnable):
         sender: Address,
         receiver: Address,
         reveal_secret: RevealSecret
-    ) :
+    ):
         init_state = ActionSendSecretRevealLight(reveal_secret, sender, receiver)
+        self.handle_and_track_state_change(init_state)
+
+    def initiate_send_balance_proof(
+        self,
+        sender: Address,
+        receiver: Address,
+        reveal_secret: Unlock
+    ):
+        init_state = ActionSendUnlockLight(reveal_secret, sender, receiver)
         self.handle_and_track_state_change(init_state)
 
     def mediate_mediated_transfer(self, transfer: LockedTransfer):

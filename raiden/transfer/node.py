@@ -1,4 +1,4 @@
-from raiden.messages import RevealSecret
+from raiden.messages import RevealSecret, Unlock
 from raiden.transfer import channel, token_network, views
 from raiden.transfer.architecture import (
     ContractReceiveStateChange,
@@ -18,7 +18,7 @@ from raiden.transfer.events import (
 )
 from raiden.transfer.identifiers import CanonicalIdentifier, QueueIdentifier
 from raiden.transfer.mediated_transfer import initiator_manager, mediator, target
-from raiden.transfer.mediated_transfer.events import CHANNEL_IDENTIFIER_GLOBAL_QUEUE
+from raiden.transfer.mediated_transfer.events import CHANNEL_IDENTIFIER_GLOBAL_QUEUE, SendBalanceProof
 from raiden.transfer.mediated_transfer.state import (
     InitiatorPaymentState,
     MediatorTransferState,
@@ -33,7 +33,8 @@ from raiden.transfer.mediated_transfer.state_change import (
     ReceiveSecretReveal,
     ReceiveTransferRefund,
     ReceiveTransferRefundCancelRoute,
-    ActionInitInitiatorLight, ReceiveSecretRequestLight, ActionSendSecretRevealLight, ReceiveSecretRevealLight)
+    ActionInitInitiatorLight, ReceiveSecretRequestLight, ActionSendSecretRevealLight, ReceiveSecretRevealLight,
+    ActionSendUnlockLight)
 from raiden.transfer.state import (
     ChainState,
     InitiatorTask,
@@ -231,7 +232,6 @@ def subdispatch_to_paymenttask(
                     block_number,
                 )
                 events = sub_iteration.events
-
                 if sub_iteration.new_state is None:
                     del chain_state.payment_mapping.secrethashes_to_task[secrethash]
 
@@ -285,6 +285,29 @@ def subdispatch_to_paymenttask(
                 if sub_iteration.new_state is None:
                     del chain_state.payment_mapping.secrethashes_to_task[secrethash]
 
+    return TransitionResult(chain_state, events)
+
+
+def handle_init_unlock_light(
+    chain_state: ChainState, state_change: ActionSendUnlockLight
+) -> TransitionResult[ChainState]:
+    channel_state = views.get_channelstate_by_canonical_identifier_and_address(
+        chain_state=chain_state,
+        canonical_identifier=CanonicalIdentifier(
+            chain_identifier=chain_state.chain_id,
+            token_network_address=state_change.unlock.token_network_address,
+            channel_identifier=state_change.unlock.channel_identifier,
+        ),
+        address=state_change.sender
+    )
+    events = list()
+    if channel_state:
+        balance_proof = channel.create_send_balance_proof_light(channel_state, state_change.unlock.message_identifier,
+                                                state_change.unlock.payment_identifier, state_change.unlock.secret,
+                                                state_change.unlock.nonce, state_change.unlock.transferred_amount,
+                                                state_change.unlock.locked_amount, state_change.unlock.locksroot,
+                                                state_change.receiver, state_change.unlock)
+        events.append(balance_proof)
     return TransitionResult(chain_state, events)
 
 
@@ -664,10 +687,13 @@ def handle_tokenadded(
 
     return TransitionResult(chain_state, events)
 
+
 def handle_secret_reveal_light(
     chain_state: ChainState, state_change: ReceiveSecretRevealLight
 ) -> TransitionResult[ChainState]:
     return subdispatch_to_paymenttask(chain_state, state_change, state_change.secrethash)
+
+
 
 def handle_secret_reveal(
     chain_state: ChainState, state_change: ReceiveSecretReveal
@@ -706,9 +732,11 @@ def handle_init_initiator_light(
 def handle_init_reveal_secret_light(
     chain_state: ChainState, state_change: ActionSendSecretRevealLight
 ) -> TransitionResult[ChainState]:
-    revealsecret = RevealSecret.from_dict(state_change.reveal_secret)
-    secrethash = keccak(revealsecret.secrethash)
+    revealsecret = state_change.reveal_secret
+    secrethash = revealsecret.secrethash
     return subdispatch_to_paymenttask(chain_state, state_change, secrethash)
+
+
 
 
 def handle_init_mediator(
@@ -932,7 +960,9 @@ def handle_state_change(
     elif type(state_change) == ReceiveSecretRevealLight:
         assert isinstance(state_change, ReceiveSecretRevealLight), MYPY_ANNOTATION
         iteration = handle_secret_reveal_light(chain_state, state_change)
-
+    elif type(state_change) == ActionSendUnlockLight:
+        assert isinstance(state_change, ActionSendUnlockLight), MYPY_ANNOTATION
+        iteration = handle_init_unlock_light(chain_state, state_change)
     assert chain_state is not None, "chain_state must be set"
     return iteration
 

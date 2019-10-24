@@ -1460,6 +1460,12 @@ class RestAPI:
                                           reveal_secret: RevealSecret):
         self.raiden_api.initiate_send_secret_reveal_light(sender_address, receiver_address, reveal_secret)
 
+    def initiate_send_balance_proof(self, sender_address: typing.Address, receiver_address: typing.Address,
+                                          unlock: Unlock
+                                    ):
+        self.raiden_api.initiate_send_balance_proof(sender_address, receiver_address, unlock)
+
+
 
 
     def initiate_payment_light(
@@ -2037,6 +2043,7 @@ class RestAPI:
             self.initiate_send_secret_reveal_light(sender, receiver, reveal_secret)
         elif message["type"] == "Secret":
             unlock = Unlock.from_dict(message)
+            self.initiate_send_balance_proof(sender, receiver, unlock)
         return api_response("Should respond accordly to the message received")
 
     def create_light_client_payment(

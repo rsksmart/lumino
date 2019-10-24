@@ -43,7 +43,7 @@ from raiden.transfer.mediated_transfer.events import (
     SendRefundTransfer,
     SendSecretRequest,
     SendSecretReveal,
-    SendLockedTransferLight, StoreMessageEvent, SendSecretRevealLight)
+    SendLockedTransferLight, StoreMessageEvent, SendSecretRevealLight, SendBalanceProofLight)
 from raiden.transfer.state import ChainState, NettingChannelEndState
 from raiden.transfer.utils import (
     get_event_with_balance_proof_by_balance_hash,
@@ -118,6 +118,9 @@ class RaidenEventHandler(EventHandler):
         elif type(event) == SendBalanceProof:
             assert isinstance(event, SendBalanceProof), MYPY_ANNOTATION
             self.handle_send_balanceproof(raiden, event)
+        elif type(event) == SendBalanceProofLight:
+            assert isinstance(event, SendBalanceProofLight), MYPY_ANNOTATION
+            self.handle_send_balanceproof_light(raiden, event)
         elif type(event) == SendSecretRequest:
             assert isinstance(event, SendSecretRequest), MYPY_ANNOTATION
             self.handle_send_secretrequest(raiden, event)
@@ -217,6 +220,11 @@ class RaidenEventHandler(EventHandler):
         unlock_message = message_from_sendevent(balance_proof_event)
         raiden.sign(unlock_message)
         raiden.transport.hub_transport.send_async(balance_proof_event.queue_identifier, unlock_message)
+
+    @staticmethod
+    def handle_send_balanceproof_light(raiden: "RaidenService", balance_proof_event: SendBalanceProofLight):
+        unlock_message = message_from_sendevent(balance_proof_event)
+        raiden.transport.light_client_transports[0].send_async(balance_proof_event.queue_identifier, unlock_message)
 
     @staticmethod
     def handle_send_secretrequest(

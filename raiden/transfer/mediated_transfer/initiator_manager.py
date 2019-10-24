@@ -22,7 +22,8 @@ from raiden.transfer.mediated_transfer.state_change import (
     ReceiveSecretRequest,
     ReceiveSecretReveal,
     ReceiveTransferRefundCancelRoute,
-    ActionInitInitiatorLight, ReceiveSecretRequestLight, ActionSendSecretRevealLight, ReceiveSecretRevealLight)
+    ActionInitInitiatorLight, ReceiveSecretRequestLight, ActionSendSecretRevealLight, ReceiveSecretRevealLight,
+    ActionSendUnlockLight)
 from raiden.transfer.state import RouteState
 from raiden.transfer.state_change import ActionCancelPayment, Block, ContractReceiveSecretReveal
 from raiden.utils.typing import (
@@ -151,6 +152,8 @@ def subdispatch_to_initiatortransfer(
     )
 
     if sub_iteration.new_state is None:
+        print(state_change.__repr__())
+        print("Del 6")
         del payment_state.initiator_transfers[initiator_state.transfer.lock.secrethash]
 
     return sub_iteration
@@ -396,6 +399,7 @@ def handle_lock_expired(
         result.events.append(unlock_failed)
 
     return TransitionResult(payment_state, result.events)
+
 
 
 def handle_offchain_secretreveal_light(

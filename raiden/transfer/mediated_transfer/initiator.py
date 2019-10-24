@@ -3,7 +3,7 @@ import random
 from eth_utils import to_canonical_address
 
 from raiden.constants import EMPTY_SECRET, MAXIMUM_PENDING_TRANSFERS, IS_LIGHT_CLIENT_TEST_PAYMENT, TEST_PAYMENT_ID
-from raiden.messages import LockedTransfer, Unlock
+from raiden.messages import LockedTransfer, Unlock, message_from_sendevent
 from raiden.settings import DEFAULT_WAIT_BEFORE_LOCK_REMOVAL
 from raiden.transfer import channel
 from raiden.transfer.architecture import Event, TransitionResult
@@ -16,7 +16,7 @@ from raiden.transfer.mediated_transfer.events import (
     EventUnlockSuccess,
     SendLockedTransfer,
     SendSecretReveal,
-    SendLockedTransferLight, StoreMessageEvent, SendSecretRevealLight)
+    SendLockedTransferLight, StoreMessageEvent, SendSecretRevealLight, SendBalanceProofLight)
 from raiden.transfer.mediated_transfer.state import (
     InitiatorTransferState,
     TransferDescriptionWithSecretState,
@@ -24,7 +24,7 @@ from raiden.transfer.mediated_transfer.state import (
 from raiden.transfer.mediated_transfer.state_change import (
     ReceiveSecretRequest,
     ReceiveSecretReveal,
-    ReceiveSecretRequestLight, ActionSendSecretRevealLight, ReceiveSecretRevealLight)
+    ReceiveSecretRequestLight, ActionSendSecretRevealLight, ReceiveSecretRevealLight, ActionSendUnlockLight)
 from raiden.transfer.merkle_tree import merkleroot
 from raiden.transfer.state import (
     CHANNEL_STATE_OPENED,
@@ -738,12 +738,9 @@ def state_transition(
         iteration = handle_send_secret_reveal_light(
             initiator_state, state_change, channel_state, pseudo_random_generator
         )
-    elif type(state_change) == ActionSendSecretRevealLight:
-        assert isinstance(state_change, ActionSendSecretRevealLight), MYPY_ANNOTATION
-        iteration = handle_send_secret_reveal_light(
-            initiator_state, state_change, channel_state, pseudo_random_generator
-        )
     else:
         iteration = TransitionResult(initiator_state, list())
 
     return iteration
+
+

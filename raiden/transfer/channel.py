@@ -33,7 +33,7 @@ from raiden.transfer.mediated_transfer.events import (
     SendLockExpired,
     SendRefundTransfer,
     refund_from_sendmediated,
-)
+    SendBalanceProofLight)
 from raiden.transfer.mediated_transfer.state import (
     LockedTransferSignedState,
     LockedTransferUnsignedState,
@@ -115,12 +115,11 @@ from raiden.utils.typing import (
 
 from raiden.billing.invoices.handlers.invoice_handler import handle_received_invoice
 
-
 # This should be changed to `Union[str, MerkleTreeState]`
 MerkletreeOrError = Tuple[bool, Optional[str], Optional[MerkleTreeState]]
 EventsOrError = Tuple[bool, List[Event], Optional[str]]
 BalanceProofData = Tuple[Locksroot, Nonce, TokenAmount, TokenAmount]
-SendUnlockAndMerkleTree = Tuple[SendBalanceProof, MerkleTreeState]
+SendUnlockAndMerkleTree = Tuple[Union[SendBalanceProof, SendBalanceProofLight], MerkleTreeState]
 
 
 class UnlockGain(NamedTuple):
@@ -256,7 +255,7 @@ def is_transaction_confirmed(
     return blockchain_block_number > confirmation_block
 
 
-def is_balance_proof_safe_for_onchain_operations(balance_proof: BalanceProofSignedState,) -> bool:
+def is_balance_proof_safe_for_onchain_operations(balance_proof: BalanceProofSignedState, ) -> bool:
     """ Check if the balance proof would overflow onchain. """
     total_amount = balance_proof.transferred_amount + balance_proof.locked_amount
     return total_amount <= UINT256_MAX
@@ -549,7 +548,6 @@ def valid_lockedtransfer_check(
     payment_hash_invoice,
     storage
 ) -> MerkletreeOrError:
-
     handle_invoice_result = handle_received_invoice(storage, payment_hash_invoice)
 
     current_balance_proof = get_current_balanceproof(sender_state)
@@ -790,7 +788,7 @@ def get_amount_locked(end_state: NettingChannelEndState) -> TokenAmount:
     return TokenAmount(result)
 
 
-def get_batch_unlock_gain(channel_state: NettingChannelState,) -> UnlockGain:
+def get_batch_unlock_gain(channel_state: NettingChannelState, ) -> UnlockGain:
     """Collect amounts for unlocked/unclaimed locks and onchain unlocked locks.
     Note: this function does not check expiry, so the values make only sense during settlement.
 
@@ -883,7 +881,7 @@ def get_distributable(
     return TokenAmount(min(overflow_limit, distributable))
 
 
-def get_batch_unlock(end_state: NettingChannelEndState,) -> Optional[MerkleTreeLeaves]:
+def get_batch_unlock(end_state: NettingChannelEndState, ) -> Optional[MerkleTreeLeaves]:
     """ Unlock proof for an entire merkle tree of pending locks
 
     The unlock proof contains all the merkle tree data, tightly packed, needed by the token
@@ -1093,7 +1091,7 @@ def create_sendlockedtransfer(
     payment_identifier: PaymentID,
     payment_hash_invoice: PaymentHashInvoice,
     expiration: BlockExpiration,
-    secrethash: SecretHash ,
+    secrethash: SecretHash,
 ) -> Tuple[SendLockedTransfer, MerkleTreeState]:
     our_state = channel_state.our_state
     partner_state = channel_state.partner_state
@@ -1155,6 +1153,7 @@ def create_unlock(
     payment_identifier: PaymentID,
     secret: Secret,
     lock: HashTimeLockState,
+    is_light_client: bool = False
 ) -> SendUnlockAndMerkleTree:
     our_state = channel_state.our_state
 
@@ -1189,15 +1188,26 @@ def create_unlock(
         canonical_identifier=channel_state.canonical_identifier,
     )
 
-    unlock_lock = SendBalanceProof(
-        recipient=recipient,
-        channel_identifier=channel_state.identifier,
-        message_identifier=message_identifier,
-        payment_identifier=payment_identifier,
-        token_address=token_address,
-        secret=secret,
-        balance_proof=balance_proof,
-    )
+    if is_light_client:
+        unlock_lock = SendBalanceProofLight(
+            recipient=recipient,
+            channel_identifier=channel_state.identifier,
+            message_identifier=message_identifier,
+            payment_identifier=payment_identifier,
+            token_address=token_address,
+            secret=secret,
+            balance_proof=balance_proof,
+        )
+    else:
+        unlock_lock = SendBalanceProof(
+            recipient=recipient,
+            channel_identifier=channel_state.identifier,
+            message_identifier=message_identifier,
+            payment_identifier=payment_identifier,
+            token_address=token_address,
+            secret=secret,
+            balance_proof=balance_proof,
+        )
 
     return unlock_lock, merkletree
 
@@ -1273,18 +1283,53 @@ def send_refundtransfer(
     return refund_transfer
 
 
+def create_send_balance_proof_light(
+    channel_state: NettingChannelState,
+    message_identifier: MessageID,
+    payment_identifier: PaymentID,
+    secret: Secret,
+    nonce: Nonce,
+    transfered_amount: TokenAmount,
+    locked_amount: TokenAmount,
+    locksroot: Locksroot,
+    recipient: Address,
+    signed_balance_proof
+) -> SendBalanceProofLight:
+    token_address = channel_state.token_address
+
+    balance_proof = BalanceProofUnsignedState(
+        nonce=nonce,
+        transferred_amount=transfered_amount,
+        locked_amount=locked_amount,
+        locksroot=locksroot,
+        canonical_identifier=channel_state.canonical_identifier,
+    )
+    balance_proof = SendBalanceProofLight(
+        recipient=recipient,
+        channel_identifier=channel_state.identifier,
+        message_identifier=message_identifier,
+        payment_identifier=payment_identifier,
+        token_address=token_address,
+        secret=secret,
+        balance_proof=balance_proof,
+        signed_balance_proof=signed_balance_proof
+    )
+    return balance_proof
+
+
 def send_unlock(
     channel_state: NettingChannelState,
     message_identifier: MessageID,
     payment_identifier: PaymentID,
     secret: Secret,
     secrethash: SecretHash,
+    is_light_client: bool = False
 ) -> SendBalanceProof:
     lock = get_lock(channel_state.our_state, secrethash)
     assert lock, "caller must ensure the lock exists"
 
     unlock, merkletree = create_unlock(
-        channel_state, message_identifier, payment_identifier, secret, lock
+        channel_state, message_identifier, payment_identifier, secret, lock, is_light_client
     )
 
     channel_state.our_state.balance_proof = unlock.balance_proof
