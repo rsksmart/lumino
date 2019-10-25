@@ -1285,36 +1285,29 @@ def send_refundtransfer(
 
 def create_send_balance_proof_light(
     channel_state: NettingChannelState,
-    message_identifier: MessageID,
-    payment_identifier: PaymentID,
-    secret: Secret,
-    nonce: Nonce,
-    transfered_amount: TokenAmount,
-    locked_amount: TokenAmount,
-    locksroot: Locksroot,
+    unlock,
     recipient: Address,
-    signed_balance_proof
 ) -> SendBalanceProofLight:
     token_address = channel_state.token_address
 
     balance_proof = BalanceProofUnsignedState(
-        nonce=nonce,
-        transferred_amount=transfered_amount,
-        locked_amount=locked_amount,
-        locksroot=locksroot,
+        nonce=unlock.nonce,
+        transferred_amount=unlock.transferred_amount,
+        locked_amount=unlock.locked_amount,
+        locksroot=unlock.locksroot,
         canonical_identifier=channel_state.canonical_identifier,
     )
-    balance_proof = SendBalanceProofLight(
+    balance_proof_event = SendBalanceProofLight(
         recipient=recipient,
         channel_identifier=channel_state.identifier,
-        message_identifier=message_identifier,
-        payment_identifier=payment_identifier,
+        message_identifier=unlock.message_identifier,
+        payment_identifier=unlock.payment_identifier,
         token_address=token_address,
-        secret=secret,
+        secret=unlock.secret,
         balance_proof=balance_proof,
-        signed_balance_proof=signed_balance_proof
+        signed_balance_proof=unlock
     )
-    return balance_proof
+    return balance_proof_event
 
 
 def send_unlock(

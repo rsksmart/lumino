@@ -19,8 +19,8 @@ def test_balance_proof():
     dict_data = {
         "type": "Secret",
         "chain_id": 33,
-        "message_identifier": 7985989779110421488,
-        "payment_identifier": 2593429822820124583,
+        "message_identifier": 7331028335892713299,
+        "payment_identifier": 3067236291737758355,
         "secret": "0x62580c4d5b4d412c642b64375a735e65432a495548676e67334c4d7a650d6a65",
         "nonce": 2,
         "token_network_address": "0x877ec5961d18d3413fabbd67696b758fe95408d6",
@@ -89,8 +89,8 @@ def test_signature_without_secret():
     dict_msg = {
         "type": "LockedTransfer",
         "chain_id": 33,
-        "message_identifier": 2572260869630630737,
-        "payment_identifier": 17907188989769933860,
+        "message_identifier": 1376110454679662125,
+        "payment_identifier": 3067236291737758355,
         "payment_hash_invoice": "0x",
         "nonce": 1,
         "token_network_address": "0x877ec5961d18d3413fabbd67696b758fe95408d6",

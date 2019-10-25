@@ -302,11 +302,7 @@ def handle_init_unlock_light(
     )
     events = list()
     if channel_state:
-        balance_proof = channel.create_send_balance_proof_light(channel_state, state_change.unlock.message_identifier,
-                                                state_change.unlock.payment_identifier, state_change.unlock.secret,
-                                                state_change.unlock.nonce, state_change.unlock.transferred_amount,
-                                                state_change.unlock.locked_amount, state_change.unlock.locksroot,
-                                                state_change.receiver, state_change.unlock)
+        balance_proof = channel.create_send_balance_proof_light(channel_state, state_change.unlock, state_change.receiver)
         events.append(balance_proof)
     return TransitionResult(chain_state, events)
 
@@ -694,7 +690,6 @@ def handle_secret_reveal_light(
     return subdispatch_to_paymenttask(chain_state, state_change, state_change.secrethash)
 
 
-
 def handle_secret_reveal(
     chain_state: ChainState, state_change: ReceiveSecretReveal
 ) -> TransitionResult[ChainState]:
@@ -735,8 +730,6 @@ def handle_init_reveal_secret_light(
     revealsecret = state_change.reveal_secret
     secrethash = revealsecret.secrethash
     return subdispatch_to_paymenttask(chain_state, state_change, secrethash)
-
-
 
 
 def handle_init_mediator(

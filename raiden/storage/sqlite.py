@@ -14,6 +14,7 @@ from raiden.utils.typing import Any, Dict, Iterator, List, NamedTuple, Optional,
 from dateutil.relativedelta import relativedelta
 from raiden.lightclient.client_model import ClientType
 
+
 class EventRecord(NamedTuple):
     event_identifier: int
     state_change_identifier: int
@@ -425,7 +426,7 @@ class SQLiteStorage:
                 "INSERT INTO client("
                 "address, "
                 "password, "
-                "api_key, "                               
+                "api_key, "
                 "type, "
                 "display_name, "
                 "seed_retry)"
@@ -438,7 +439,6 @@ class SQLiteStorage:
                  kwargs['encrypt_signed_seed_retry'],),
             )
             last_id = cursor.lastrowid
-
 
         return last_id
 
@@ -1282,16 +1282,15 @@ class SQLiteStorage:
         )
         return cursor.fetchone()
 
-    def get_light_client_messages(self, offset):
+    def get_light_client_messages(self, payments_ids):
         cursor = self.conn.cursor()
+        id_list = ','.join(map(str, payments_ids))
+        in_clause = "(" + id_list + ")"
         cursor.execute(
-            """
-            SELECT identifier, message_order, unsigned_message, signed_message, state_change_id, light_client_payment_id
-            FROM light_client_protocol_message
-            WHERE identifier  >= ?
-            ORDER BY identifier ASC
-            """,
-            (offset,),
+            "SELECT identifier, message_order, unsigned_message, signed_message, state_change_id, light_client_payment_id" +
+            " FROM light_client_protocol_message" +
+            " WHERE light_client_payment_id  in " + in_clause +
+            "ORDER BY identifier ASC"
         )
         return cursor.fetchall()
 
@@ -1305,8 +1304,8 @@ class SerializedSQLiteStorage(SQLiteStorage):
 
         self.serializer = serializer
 
-    def get_light_client_messages(self, offset):
-        messages = super().get_light_client_messages(offset)
+    def get_light_client_messages(self, payments_ids):
+        messages = super().get_light_client_messages(payments_ids)
         result = []
         if messages:
             for message in messages:
