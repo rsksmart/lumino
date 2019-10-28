@@ -511,11 +511,6 @@ class MatrixTransport(Runnable):
             # representing the target node
             self._address_mgr.refresh_address_presence(node_address)
 
-            # if not is_peer_reachable:
-            #     self.log.debug("Forcing presence update", peer_address=peer_address, user_id=sender_id)
-            #     self._address_mgr.force_user_presence(user, UserPresence.ONLINE)
-            #     self._address_mgr.refresh_address_presence(peer_address)
-
     def send_async(self, queue_identifier: QueueIdentifier, message: Message):
         """Queue the message for sending to recipient in the queue_identifier
 
@@ -1484,7 +1479,7 @@ class MatrixLightClientTransport(MatrixTransport):
             return None
         address_hex = to_normalized_address(address)
         msg = f"address not health checked: me: {self._user_id}, peer: {address_hex}"
-        #  assert address and self._address_mgr.is_address_known(address), msg
+        assert address and self._address_mgr.is_address_known(address), msg
 
         # filter_private is done in _get_room_ids_for_address
         room_ids = self._get_room_ids_for_address(address)

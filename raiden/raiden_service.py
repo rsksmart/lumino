@@ -547,7 +547,6 @@ class RaidenService(Runnable):
 
         self._initialize_payment_statuses(chain_state)
         self._initialize_transactions_queues(chain_state)
-        # self._initialize_messages_queues(chain_state)
         self._initialize_whitelists(chain_state)
         self._initialize_monitoring_services_queue(chain_state)
         self._initialize_ready_to_processed_events()
