@@ -38,7 +38,7 @@ from raiden.messages import (
     SignedMessage,
     UpdatePFS,
     message_from_sendevent,
-)
+    RevealSecret, Unlock)
 from raiden.network.blockchain_service import BlockChainService
 from raiden.network.proxies.secret_registry import SecretRegistry
 from raiden.network.proxies.service_registry import ServiceRegistry
@@ -48,7 +48,8 @@ from raiden.storage import serialize, sqlite, wal
 from raiden.tasks import AlarmTask
 from raiden.transfer import channel, node, views
 from raiden.transfer.architecture import Event as RaidenEvent, StateChange
-from raiden.transfer.mediated_transfer.events import SendLockedTransfer, SendLockedTransferLight
+from raiden.transfer.mediated_transfer.events import SendLockedTransfer, SendLockedTransferLight, CHANNEL_IDENTIFIER_GLOBAL_QUEUE
+
 from raiden.transfer.mediated_transfer.state import (
     TransferDescriptionWithSecretState,
     lockedtransfersigned_from_message,
@@ -57,7 +58,7 @@ from raiden.transfer.mediated_transfer.state_change import (
     ActionInitInitiator,
     ActionInitMediator,
     ActionInitTarget,
-    ActionInitInitiatorLight)
+    ActionInitInitiatorLight, ActionSendSecretRevealLight, ActionSendUnlockLight)
 from raiden.transfer.state import (
     BalanceProofSignedState,
     BalanceProofUnsignedState,
@@ -121,6 +122,7 @@ def _redact_secret(data: Union[Dict, List]) -> Union[Dict, List]:
 
     return data
 
+
 # TODO this method should receive a signed locked transfer type, not a LockedTransfer
 def initiator_init_light(
     raiden: "RaidenService",
@@ -134,7 +136,6 @@ def initiator_init_light(
     creator_address: InitiatorAddress,
     signed_locked_transfer: LockedTransfer
 ) -> ActionInitInitiatorLight:
-
     transfer_state = TransferDescriptionWithoutSecretState(
         payment_network_identifier=raiden.default_registry.address,
         payment_identifier=transfer_identifier,
@@ -760,8 +761,6 @@ class RaidenService(Runnable):
         old_state = views.state_from_raiden(self)
         new_state, raiden_event_list = self.wal.log_and_dispatch(state_change)
 
-
-
         # TODO marcosmartinez7 FIXME cannot work after the lc refactor
         # for changed_balance_proof in views.detect_balance_proof_change(old_state, new_state):
         # update_services_from_balance_proof(self, new_state, changed_balance_proof)
@@ -784,7 +783,7 @@ class RaidenService(Runnable):
 
             state_changes_count = self.wal.storage.count_state_changes()
             new_snapshot_group = state_changes_count // SNAPSHOT_STATE_CHANGES_COUNT
-            #FIXME mmartinez
+            # FIXME mmartinez
             # if new_snapshot_group > self.snapshot_group:
             #     log.debug("Storing snapshot", snapshot_id=new_snapshot_group)
             #     self.wal.snapshot()
@@ -1106,6 +1105,7 @@ class RaidenService(Runnable):
                         if transfer.initiator == to_canonical_address(light_client_transport._address):
                             light_client_transport.whitelist(address=transfer.target)
 
+
     def sign(self, message: Message):
         """ Sign message inplace. """
         if not isinstance(message, SignedMessage):
@@ -1199,7 +1199,7 @@ class RaidenService(Runnable):
             payment_hash_invoice=payment_hash_invoice,
             signed_locked_transfer=signed_locked_transfer
         )
-
+        # FIXME mmartinez7 return accordlty
         return None
 
     def mediated_transfer_async(
@@ -1250,7 +1250,7 @@ class RaidenService(Runnable):
         creator: InitiatorAddress,
         target: TargetAddress,
         identifier: PaymentID,
-        secrethash: SecretHash ,
+        secrethash: SecretHash,
         signed_locked_transfer: LockedTransfer,
         payment_hash_invoice: PaymentHashInvoice = None
 
@@ -1397,6 +1397,24 @@ class RaidenService(Runnable):
         self.handle_and_track_state_change(init_initiator_statechange)
 
         return payment_status
+
+    def initiate_send_secret_reveal_light(
+        self,
+        sender: Address,
+        receiver: Address,
+        reveal_secret: RevealSecret
+    ):
+        init_state = ActionSendSecretRevealLight(reveal_secret, sender, receiver)
+        self.handle_and_track_state_change(init_state)
+
+    def initiate_send_balance_proof(
+        self,
+        sender: Address,
+        receiver: Address,
+        reveal_secret: Unlock
+    ):
+        init_state = ActionSendUnlockLight(reveal_secret, sender, receiver)
+        self.handle_and_track_state_change(init_state)
 
     def mediate_mediated_transfer(self, transfer: LockedTransfer):
         init_mediator_statechange = mediator_init(self, transfer)

@@ -29,7 +29,7 @@ from raiden.transfer.mediated_transfer.events import (
     SendRefundTransfer,
     SendSecretRequest,
     SendSecretReveal,
-    SendLockedTransferLight)
+    SendLockedTransferLight, SendBalanceProofLight)
 from raiden.transfer.state import BalanceProofSignedState, NettingChannelState
 from raiden.transfer.utils import hash_balance_data
 from raiden.utils import ishash, pex, sha3
@@ -181,6 +181,9 @@ def message_from_sendevent(send_event: SendMessageEvent) -> "Message":
     elif type(send_event) == SendBalanceProof:
         assert isinstance(send_event, SendBalanceProof), MYPY_ANNOTATION
         message = Unlock.from_event(send_event)
+    elif type(send_event) == SendBalanceProofLight:
+        assert isinstance(send_event, SendBalanceProofLight), MYPY_ANNOTATION
+        message = send_event.signed_balance_proof
     elif type(send_event) == SendSecretRequest:
         assert isinstance(send_event, SendSecretRequest), MYPY_ANNOTATION
         message = SecretRequest.from_event(send_event)

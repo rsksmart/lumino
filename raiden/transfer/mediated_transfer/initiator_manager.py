@@ -1,5 +1,7 @@
 import random
 
+from eth_utils import keccak
+
 from raiden.transfer import channel
 from raiden.transfer.architecture import Event, StateChange, TransitionResult
 from raiden.transfer.events import EventPaymentSentFailed
@@ -20,7 +22,8 @@ from raiden.transfer.mediated_transfer.state_change import (
     ReceiveSecretRequest,
     ReceiveSecretReveal,
     ReceiveTransferRefundCancelRoute,
-    ActionInitInitiatorLight, ReceiveSecretRequestLight)
+    ActionInitInitiatorLight, ReceiveSecretRequestLight, ActionSendSecretRevealLight, ReceiveSecretRevealLight,
+    ActionSendUnlockLight)
 from raiden.transfer.state import RouteState
 from raiden.transfer.state_change import ActionCancelPayment, Block, ContractReceiveSecretReveal
 from raiden.utils.typing import (
@@ -149,6 +152,8 @@ def subdispatch_to_initiatortransfer(
     )
 
     if sub_iteration.new_state is None:
+        print(state_change.__repr__())
+        print("Del 6")
         del payment_state.initiator_transfers[initiator_state.transfer.lock.secrethash]
 
     return sub_iteration
@@ -396,6 +401,35 @@ def handle_lock_expired(
     return TransitionResult(payment_state, result.events)
 
 
+
+def handle_offchain_secretreveal_light(
+    payment_state: InitiatorPaymentState,
+    state_change: ReceiveSecretRevealLight,
+    channelidentifiers_to_channels: ChannelMap,
+    pseudo_random_generator: random.Random,
+) -> TransitionResult:
+    initiator_state = payment_state.initiator_transfers.get(state_change.secrethash)
+
+    if not initiator_state:
+        return TransitionResult(payment_state, list())
+
+    assert initiator_state.transfer_state != "transfer_cancelled"
+
+    sub_iteration = subdispatch_to_initiatortransfer(
+        payment_state=payment_state,
+        initiator_state=initiator_state,
+        state_change=state_change,
+        channelidentifiers_to_channels=channelidentifiers_to_channels,
+        pseudo_random_generator=pseudo_random_generator,
+    )
+
+    # The current secretreveal unlocked the transfer
+    if not transfer_exists(payment_state, state_change.secrethash):
+        cancel_other_transfers(payment_state)
+
+    return TransitionResult(payment_state, sub_iteration.events)
+
+
 def handle_offchain_secretreveal(
     payment_state: InitiatorPaymentState,
     state_change: ReceiveSecretReveal,
@@ -477,6 +511,33 @@ def handle_secretrequest(
     return TransitionResult(payment_state, sub_iteration.events)
 
 
+def handle_send_secret_reveal_light(
+    payment_state: InitiatorPaymentState,
+    state_change: ActionSendSecretRevealLight,
+    channelidentifiers_to_channels: ChannelMap,
+    pseudo_random_generator: random.Random,
+) -> TransitionResult[InitiatorPaymentState]:
+    secrethash = keccak(state_change.reveal_secret.secret)
+
+    initiator_state = payment_state.initiator_transfers.get(secrethash)
+
+    if not initiator_state:
+        return TransitionResult(payment_state, list())
+
+    if initiator_state.transfer_state == "transfer_cancelled":
+        return TransitionResult(payment_state, list())
+
+    sub_iteration = subdispatch_to_initiatortransfer(
+        payment_state=payment_state,
+        initiator_state=initiator_state,
+        state_change=state_change,
+        channelidentifiers_to_channels=channelidentifiers_to_channels,
+        pseudo_random_generator=pseudo_random_generator,
+    )
+
+    return TransitionResult(payment_state, sub_iteration.events)
+
+
 def handle_secretrequest_light(
     payment_state: InitiatorPaymentState,
     state_change: ReceiveSecretRequestLight,
@@ -502,6 +563,29 @@ def handle_secretrequest_light(
     return TransitionResult(payment_state, sub_iteration.events)
 
 
+def handle_secretreveal_light(
+    payment_state: InitiatorPaymentState,
+    state_change: ReceiveSecretRequestLight,
+    channelidentifiers_to_channels: ChannelMap,
+    pseudo_random_generator: random.Random,
+) -> TransitionResult[InitiatorPaymentState]:
+    initiator_state = payment_state.initiator_transfers.get(state_change.secrethash)
+
+    if not initiator_state:
+        return TransitionResult(payment_state, list())
+
+    if initiator_state.transfer_state == "transfer_cancelled":
+        return TransitionResult(payment_state, list())
+
+    sub_iteration = subdispatch_to_initiatortransfer(
+        payment_state=payment_state,
+        initiator_state=initiator_state,
+        state_change=state_change,
+        channelidentifiers_to_channels=channelidentifiers_to_channels,
+        pseudo_random_generator=pseudo_random_generator,
+    )
+
+    return TransitionResult(payment_state, sub_iteration.events)
 
 
 def state_transition(
@@ -555,6 +639,15 @@ def state_transition(
             channelidentifiers_to_channels=channelidentifiers_to_channels,
             pseudo_random_generator=pseudo_random_generator,
         )
+    elif type(state_change) == ActionSendSecretRevealLight:
+        assert isinstance(state_change, ActionSendSecretRevealLight), MYPY_ANNOTATION
+        assert payment_state, "ActionSendSecretRevealLight should be accompanied by a valid payment state"
+        iteration = handle_send_secret_reveal_light(
+            payment_state=payment_state,
+            state_change=state_change,
+            channelidentifiers_to_channels=channelidentifiers_to_channels,
+            pseudo_random_generator=pseudo_random_generator,
+        )
     elif type(state_change) == ReceiveTransferRefundCancelRoute:
         assert isinstance(state_change, ReceiveTransferRefundCancelRoute), MYPY_ANNOTATION
         msg = "ReceiveTransferRefundCancelRoute should be accompanied by a valid payment state"
@@ -577,6 +670,15 @@ def state_transition(
         assert isinstance(state_change, ReceiveSecretReveal), MYPY_ANNOTATION
         assert payment_state, "ReceiveSecretReveal should be accompanied by a valid payment state"
         iteration = handle_offchain_secretreveal(
+            payment_state=payment_state,
+            state_change=state_change,
+            channelidentifiers_to_channels=channelidentifiers_to_channels,
+            pseudo_random_generator=pseudo_random_generator,
+        )
+    elif type(state_change) == ReceiveSecretRevealLight:
+        assert isinstance(state_change, ReceiveSecretRevealLight), MYPY_ANNOTATION
+        assert payment_state, "ReceiveSecretRevealLight should be accompanied by a valid payment state"
+        iteration = handle_offchain_secretreveal_light(
             payment_state=payment_state,
             state_change=state_change,
             channelidentifiers_to_channels=channelidentifiers_to_channels,

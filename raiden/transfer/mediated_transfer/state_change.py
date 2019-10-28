@@ -4,6 +4,8 @@ from eth_utils import to_canonical_address, to_checksum_address
 
 from raiden.encoding.messages import LockedTransfer
 from raiden.encoding.messages import RevealSecret
+from raiden.encoding.messages import Unlock
+
 from raiden.transfer.architecture import (
     AuthenticatedSenderStateChange,
     BalanceProofStateChange,
@@ -332,12 +334,14 @@ class ReceiveSecretRequestLight(AuthenticatedSenderStateChange):
         expiration: BlockExpiration,
         secrethash: SecretHash,
         sender: Address,
+        secret_request_message
     ) -> None:
         super().__init__(sender)
         self.payment_identifier = payment_identifier
         self.amount = amount
         self.expiration = expiration
         self.secrethash = secrethash
+        self.secret_request_message = secret_request_message
         self.revealsecret = None
 
     def __repr__(self) -> str:
@@ -369,6 +373,7 @@ class ReceiveSecretRequestLight(AuthenticatedSenderStateChange):
             "revealsecret": self.revealsecret,
         }
 
+    #FIXME mmartinez why secret_request_message isnt stored?
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "ReceiveSecretRequestLight":
         instance = cls(
@@ -377,9 +382,11 @@ class ReceiveSecretRequestLight(AuthenticatedSenderStateChange):
             expiration=BlockExpiration(int(data["expiration"])),
             secrethash=SecretHash(deserialize_bytes(data["secrethash"])),
             sender=to_canonical_address(data["sender"]),
+            secret_request_message=""
         )
         instance.revealsecret = data["revealsecret"]
         return instance
+
 
 
 class ReceiveSecretReveal(AuthenticatedSenderStateChange):
@@ -424,6 +431,51 @@ class ReceiveSecretReveal(AuthenticatedSenderStateChange):
         instance.secrethash = deserialize_bytes(data["secrethash"])
         return instance
 
+
+class ReceiveSecretRevealLight(AuthenticatedSenderStateChange):
+    """ A SecretReveal light client message received. """
+
+    def __init__(self, secret: Secret, sender: Address, secret_reveal_message) -> None:
+        super().__init__(sender)
+        secrethash = sha3(secret)
+
+        self.secret = secret
+        self.secrethash = secrethash
+        self.secret_reveal_message = secret_reveal_message
+
+    def __repr__(self) -> str:
+        return "<ReceiveSecretRevealLight secrethash:{} sender:{}>".format(
+            pex(self.secrethash), pex(self.sender)
+        )
+
+    def __eq__(self, other: Any) -> bool:
+        return (
+            isinstance(other, ReceiveSecretRevealLight)
+            and self.secret == other.secret
+            and self.secrethash == other.secrethash
+            and super().__eq__(other)
+        )
+
+    def __ne__(self, other: Any) -> bool:
+        return not self.__eq__(other)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "secret": serialize_bytes(self.secret),
+            "secrethash": serialize_bytes(self.secrethash),
+            "sender": to_checksum_address(self.sender),
+        }
+
+    #FIXME mmartinez why secret_reveal_msg isnt stored
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "ReceiveSecretRevealLight":
+        instance = cls(
+            secret=Secret(deserialize_bytes(data["secret"])),
+            sender=to_canonical_address(data["sender"]),
+            secret_reveal_message=""
+        )
+        instance.secrethash = deserialize_bytes(data["secrethash"])
+        return instance
 
 class ReceiveTransferRefundCancelRoute(BalanceProofStateChange):
     """ A RefundTransfer message received by the initiator will cancel the current
@@ -521,21 +573,22 @@ class ReceiveTransferRefund(BalanceProofStateChange):
         return instance
 
 
-class SendSecretRevealLight(AuthenticatedSenderStateChange):
+class ActionSendSecretRevealLight(AuthenticatedSenderStateChange):
     """ A SecretReveal message must be sent to a light client. """
 
-    def __init__(self, reveal_secret: RevealSecret, sender: Address) -> None:
+    def __init__(self, reveal_secret: RevealSecret, sender: Address, receiver: Address) -> None:
         super().__init__(sender)
+        self.receiver = receiver
         self.reveal_secret = reveal_secret
 
     def __repr__(self) -> str:
-        return "<SendSecretRevealLight reveal_secret:{} sender:{}>".format(
+        return "<ActionSendSecretRevealLight reveal_secret:{} sender:{}>".format(
             pex(self.reveal_secret.__repr__()), pex(self.sender)
         )
 
     def __eq__(self, other: Any) -> bool:
         return (
-            isinstance(other, SendSecretRevealLight)
+            isinstance(other, ActionSendSecretRevealLight)
             and self.reveal_secret.__eq__(other.reveal_secret)
             and super().__eq__(other)
         )
@@ -547,12 +600,54 @@ class SendSecretRevealLight(AuthenticatedSenderStateChange):
         return {
             "reveal_secret": self.reveal_secret.to_dict(),
             "sender": to_checksum_address(self.sender),
+            "receiver": to_checksum_address(self.receiver)
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "SendSecretRevealLight":
+    def from_dict(cls, data: Dict[str, Any]) -> "ActionSendSecretRevealLight":
         instance = cls(
-            reveal_secret= RevealSecret.from_dict(data["reveal_secret"]),
+            reveal_secret=(data["reveal_secret"]),
             sender=to_canonical_address(data["sender"]),
+            receiver=to_canonical_address(data["receiver"])
+        )
+        return instance
+
+
+class ActionSendUnlockLight(AuthenticatedSenderStateChange):
+    """ An Unlock message must be sent to a light client. """
+
+    def __init__(self, unlock: Unlock, sender: Address, receiver: Address) -> None:
+        super().__init__(sender)
+        self.receiver = receiver
+        self.unlock = unlock
+
+    def __repr__(self) -> str:
+        return "<ActionSendUnlockLight unlock:{} sender:{}>".format(
+            pex(self.unlock.__repr__()), pex(self.sender)
+        )
+
+    def __eq__(self, other: Any) -> bool:
+        return (
+            isinstance(other, ActionSendUnlockLight)
+            and self.unlock.__eq__(other.unlock)
+            and super().__eq__(other)
+        )
+
+    def __ne__(self, other: Any) -> bool:
+        return not self.__eq__(other)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "unlock": self.unlock.to_dict(),
+            "sender": to_checksum_address(self.sender),
+            "receiver": to_checksum_address(self.receiver)
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "ActionSendUnlockLight":
+        instance = cls(
+            unlock= Unlock.from_dict(data["unlock"]),
+            sender=to_canonical_address(data["sender"]),
+            receiver=to_canonical_address(data["receiver"])
         )
         return instance

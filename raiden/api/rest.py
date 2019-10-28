@@ -21,7 +21,7 @@ from raiden.api.validations.api_error_builder import ApiErrorBuilder
 from raiden.api.validations.api_status_codes import ERROR_STATUS_CODES
 from raiden.api.validations.channel_validator import ChannelValidator
 from raiden.lightclient.light_client_service import LightClientService
-from raiden.messages import LockedTransfer, Delivered, RevealSecret
+from raiden.messages import LockedTransfer, Delivered, RevealSecret, Unlock
 from raiden.rns_constants import RNS_ADDRESS_ZERO
 from raiden.utils.rns import is_rns_address
 from webargs.flaskparser import parser
@@ -79,8 +79,8 @@ from raiden.api.v1.resources import (
     LightChannelsResourceByTokenAndPartnerAddress,
     LightClientMatrixCredentialsBuildResource,
     LightClientResource,
-    PaymentLightResource
-)
+    PaymentLightResource,
+    CreatePaymentLightResource)
 
 from raiden.constants import GENESIS_BLOCK_NUMBER, UINT256_MAX, Environment, EMPTY_PAYMENT_HASH_INVOICE
 
@@ -167,7 +167,7 @@ URLS_V1 = [
         "token_target_paymentresource",
     ),
     ("/payments_light", PaymentLightResource),
-    ("/payments_light/<int:offset>", PaymentLightResource, "get_paymentmessageresource"),
+    ("/payments_light/create", CreatePaymentLightResource, "create_payment"),
 
     ("/tokens", TokensResource),
     ("/tokens/<hexaddress:token_address>/partners", PartnersResourceByTokenAddress),
@@ -1456,8 +1456,16 @@ class RestAPI:
         result = self.payment_schema.dump(payment)
         return api_response(result=result.data)
 
-    def initiate_send_secret_reveal_light(self, reveal_secret: RevealSecret):
-        print("Unimplemented")
+    def initiate_send_secret_reveal_light(self, sender_address: typing.Address, receiver_address: typing.Address,
+                                          reveal_secret: RevealSecret):
+        self.raiden_api.initiate_send_secret_reveal_light(sender_address, receiver_address, reveal_secret)
+
+    def initiate_send_balance_proof(self, sender_address: typing.Address, receiver_address: typing.Address,
+                                          unlock: Unlock
+                                    ):
+        self.raiden_api.initiate_send_balance_proof(sender_address, receiver_address, unlock)
+
+
 
 
     def initiate_payment_light(
@@ -1987,7 +1995,7 @@ class RestAPI:
 
         return api_response(light_client)
 
-    def get_light_client_protocol_message(self, offset):
+    def get_light_client_protocol_message(self, messages_requests):
         headers = request.headers
         api_key = headers.get("x-api-key")
         if not api_key:
@@ -2000,7 +2008,7 @@ class RestAPI:
                 errors="There is no light client associated with the api key provided",
                 status_code=HTTPStatus.FORBIDDEN, log=log)
 
-        messages = LightClientService.get_light_client_messages(offset, self.raiden_api.raiden.wal)
+        messages = LightClientService.get_light_client_messages(messages_requests, self.raiden_api.raiden.wal)
         response = [message.to_dict() for message in messages]
         return api_response(response)
 
@@ -2010,9 +2018,15 @@ class RestAPI:
                                               sender: typing.AddressHex,
                                               receiver: typing.AddressHex,
                                               message: Dict):
-        # TODO check if message is coherent
+        # TODO mmartinez7 pending msg validations
         # TODO call from dict will work but we need to validate each parameter in order to know if there are no extra or missing params.
         # TODO we also need to check if message id an order received make sense
+
+        headers = request.headers
+        api_key = headers.get("x-api-key")
+        if not api_key:
+            return ApiErrorBuilder.build_and_log_error(errors="Missing api_key auth header",
+                                                       status_code=HTTPStatus.BAD_REQUEST, log=log)
 
         payment_request = LightClientService.get_light_client_payment(message_id, self.raiden_api.raiden.wal)
         if not payment_request:
@@ -2032,9 +2046,10 @@ class RestAPI:
             lc_transport.send_for_light_client_with_retry(receiver, delivered)
         elif message["type"] == "RevealSecret":
             reveal_secret = RevealSecret.from_dict(message)
-            self.initiate_send_secret_reveal_light(reveal_secret)
-
-
+            self.initiate_send_secret_reveal_light(sender, receiver, reveal_secret)
+        elif message["type"] == "Secret":
+            unlock = Unlock.from_dict(message)
+            self.initiate_send_balance_proof(sender, receiver, unlock)
         return api_response("Should respond accordly to the message received")
 
     def create_light_client_payment(
