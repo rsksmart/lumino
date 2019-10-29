@@ -228,6 +228,9 @@ def run_app(
     (listen_host, listen_port) = split_endpoint(listen_address)
     (api_host, api_port) = split_endpoint(api_address)
 
+    print("Private key: " + encode_hex(privatekey_bin))
+    print("Public key: " + encode_hex(pubkey_bin))
+
     config["pubkey"] = pubkey_bin
     config["privatekey"] = privatekey_bin
     config["transport"]["udp"]["host"] = listen_host

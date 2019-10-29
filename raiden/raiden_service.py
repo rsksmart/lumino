@@ -48,7 +48,8 @@ from raiden.storage import serialize, sqlite, wal
 from raiden.tasks import AlarmTask
 from raiden.transfer import channel, node, views
 from raiden.transfer.architecture import Event as RaidenEvent, StateChange
-from raiden.transfer.mediated_transfer.events import SendLockedTransfer, CHANNEL_IDENTIFIER_GLOBAL_QUEUE
+from raiden.transfer.mediated_transfer.events import SendLockedTransfer, SendLockedTransferLight, CHANNEL_IDENTIFIER_GLOBAL_QUEUE
+
 from raiden.transfer.mediated_transfer.state import (
     TransferDescriptionWithSecretState,
     lockedtransfersigned_from_message,
@@ -94,7 +95,9 @@ from raiden.utils.typing import (
 
 from raiden.utils.upgrades import UpgradeManager
 from raiden_contracts.contract_manager import ContractManager
-from eth_utils import to_canonical_address
+from eth_utils import to_canonical_address, to_checksum_address, encode_hex
+from raiden.lightclient.light_client_service import LightClientService
+
 
 log = structlog.get_logger(__name__)  # pylint: disable=invalid-name
 StatusesDict = Dict[TargetAddress, Dict[PaymentID, "PaymentStatus"]]
@@ -545,7 +548,6 @@ class RaidenService(Runnable):
 
         self._initialize_payment_statuses(chain_state)
         self._initialize_transactions_queues(chain_state)
-        self._initialize_messages_queues(chain_state)
         self._initialize_whitelists(chain_state)
         self._initialize_monitoring_services_queue(chain_state)
         self._initialize_ready_to_processed_events()
@@ -567,6 +569,7 @@ class RaidenService(Runnable):
 
         self._start_transport(chain_state)
         self._start_alarm_task()
+        self._initialize_messages_queues(chain_state)
 
         log.debug("Raiden Service started", node=pex(self.address))
         super().start()
@@ -664,19 +667,25 @@ class RaidenService(Runnable):
         assert self.alarm.is_primed(), f"AlarmTask not primed. node:{self!r}"
         assert self.ready_to_process_events, f"Event procossing disable. node:{self!r}"
 
+        prev_auth_data = None
+        if chain_state.last_node_transport_state_authdata is not None:
+            prev_auth_data = chain_state.last_node_transport_state_authdata.hub_last_transport_authdata,
+
         # Start hub transport
         self.transport.hub_transport.start(
             raiden_service=self,
             message_handler=self.message_handler,
-            prev_auth_data=chain_state.last_node_transport_state_authdata.hub_last_transport_authdata,
+            prev_auth_data=prev_auth_data,
         )
 
         # Start lightclient transports
         selected_prev_auth_data = None
         for light_client_transport in self.transport.light_client_transports:
-            for client_last_transport_authdata in chain_state.last_node_transport_state_authdata.clients_last_transport_authdata:
-                if client_last_transport_authdata.address == to_canonical_address(light_client_transport._address):
-                    selected_prev_auth_data = client_last_transport_authdata.auth_data
+            if chain_state.last_node_transport_state_authdata is not None:
+                for client_last_transport_authdata in \
+                        chain_state.last_node_transport_state_authdata.clients_last_transport_authdata:
+                    if client_last_transport_authdata.address == to_canonical_address(light_client_transport._address):
+                        selected_prev_auth_data = client_last_transport_authdata.auth_data
 
             light_client_transport.start(
                 raiden_service=self,
@@ -685,9 +694,21 @@ class RaidenService(Runnable):
 
             )
 
+        self._start_health_check_for_hub_nighbours(chain_state)
+        self._start_health_check_for_light_client_neighbour(chain_state)
+
+    def _start_health_check_for_light_client_neighbour(self, chain_state: ChainState):
+        for light_client in self.transport.light_client_transports:
+            for neighbour in views.all_neighbour_nodes(chain_state, light_client._address):
+                self._start_health_check_for_neighbour(neighbour)
+
+    def _start_health_check_for_hub_nighbours(self, chain_state: ChainState):
         for neighbour in views.all_neighbour_nodes(chain_state):
-            if neighbour != ConnectionManager.BOOTSTRAP_ADDR:
-                self.start_health_check_for(neighbour)
+            self._start_health_check_for_neighbour(neighbour)
+
+    def _start_health_check_for_neighbour(self, neighbour):
+        if neighbour != ConnectionManager.BOOTSTRAP_ADDR:
+            self.start_health_check_for(neighbour)
 
     def _start_alarm_task(self):
         """Start the alarm task.
@@ -814,7 +835,7 @@ class RaidenService(Runnable):
         state_change = ActionChangeNodeNetworkState(node_address, network_state)
         self.handle_and_track_state_change(state_change)
 
-    def start_health_check_for(self, node_address: Address):
+    def start_health_check_for(self, node_address: Address = None, creator_address: Address = None):
         """Start health checking `node_address`.
 
         This function is a noop during initialization, because health checking
@@ -822,9 +843,14 @@ class RaidenService(Runnable):
         these cases the healthcheck will be started by
         `start_neighbours_healthcheck`.
         """
-        # TODO se here if is necsesary for lightclients transports @GasparMedina
         if self.transport:
-            self.transport.hub_transport.start_health_check(node_address)
+            if creator_address is not None:
+                if self.transport.light_client_transports is not None:
+                    for light_client_transport in self.transport.light_client_transports:
+                        if to_checksum_address(creator_address) == light_client_transport.get_address():
+                            light_client_transport.start_health_check(node_address)
+            else:
+                self.transport.hub_transport.start_health_check(node_address)
 
     def _callback_new_block(self, latest_block: Dict):
         """Called once a new block is detected by the alarm task.
@@ -976,11 +1002,15 @@ class RaidenService(Runnable):
             self.start_health_check_for(queue_identifier.recipient)
 
             for event in event_queue:
-                print("Fixme")
-                # TODO mmartinez FIXME
-            # message = message_from_sendevent(event)
-            # self.sign(message)
-            # self.transport[0].send_async(queue_identifier, message)
+                message = message_from_sendevent(event)
+                if hasattr(message, 'signature'):
+                    light_client_address = to_checksum_address(encode_hex(message.initiator))
+                    if (LightClientService.is_handled_lc(light_client_address, self.wal)):
+                        light_client_transport = self._get_light_client_transport(light_client_address)
+                        light_client_transport.send_async(queue_identifier, message)
+                else:
+                    self.sign(message)
+                    self.transport.hub_transport.send_async(queue_identifier, message)
 
     def _initialize_monitoring_services_queue(self, chain_state: ChainState):
         """Send the monitoring requests for all current balance proofs.
@@ -1027,15 +1057,40 @@ class RaidenService(Runnable):
             current_state=chain_state,
         )
 
-    def _initialize_whitelists(self, chain_state: ChainState):
-        """ Whitelist neighbors and mediated transfer targets on transport """
+    def _get_light_client_transport(self, address):
+        light_client_transport_result = None
+        for light_client_transport in self.transport.light_client_transports:
+            if address == light_client_transport._address:
+                light_client_transport_result = light_client_transport
 
+        return light_client_transport_result
+
+    def _set_hub_transport_whitelist(self, chain_state: ChainState):
         for neighbour in views.all_neighbour_nodes(chain_state):
             if neighbour == ConnectionManager.BOOTSTRAP_ADDR:
                 continue
             self.transport.hub_transport.whitelist(neighbour)
 
+    def _set_light_clients_transports_whitelist(self, chain_state: ChainState):
+        light_clients = self.wal.storage.get_all_light_clients()
+        for light_client in light_clients:
+            for neighbour in views.all_neighbour_nodes(chain_state=chain_state,
+                                                       light_client_address=light_client['address']):
+                if neighbour == ConnectionManager.BOOTSTRAP_ADDR:
+                    continue
+                light_client_transport = self._get_light_client_transport(light_client['address'])
+                if light_client_transport is not None:
+                    light_client_transport.whitelist(neighbour)
+
+    def _initialize_whitelists(self, chain_state: ChainState):
+        """ Whitelist neighbors and mediated transfer targets on transport """
+
+        self._set_hub_transport_whitelist(chain_state)
+        self._set_light_clients_transports_whitelist(chain_state)
+
         events_queues = views.get_all_messagequeues(chain_state)
+
+        light_client_transports = self.transport.light_client_transports
 
         for event_queue in events_queues.values():
             for event in event_queue:
@@ -1043,10 +1098,12 @@ class RaidenService(Runnable):
                     transfer = event.transfer
                     if transfer.initiator == self.address:
                         self.transport.hub_transport.whitelist(address=transfer.target)
-                        # self.transport.light_client_transports[0].whitelist(address=transfer.target)
-                        # TODO
-                        # Verify this for lightclients, now set only hub transport
-                        # self.transport[1].whitelist(address=transfer.target)
+                if isinstance(event, SendLockedTransferLight):
+                    transfer = event.signed_locked_transfer
+                    for light_client_transport in light_client_transports:
+                        if transfer.initiator == to_canonical_address(light_client_transport._address):
+                            light_client_transport.whitelist(address=transfer.target)
+
 
     def sign(self, message: Message):
         """ Sign message inplace. """
@@ -1219,7 +1276,7 @@ class RaidenService(Runnable):
                 f" That secret is already registered onchain."
             )
 
-        self.start_health_check_for(Address(target))
+        self.start_health_check_for(Address(target), Address(creator))
 
         if identifier is None:
             raise InvalidPaymentIdentifier("Payment identifier wasnt provided")

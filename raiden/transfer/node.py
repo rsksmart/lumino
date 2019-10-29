@@ -43,7 +43,8 @@ from raiden.transfer.state import (
     TargetTask,
     TokenNetworkState,
     NettingChannelState,
-    LightClientTransportState)
+    LightClientTransportState,
+    NodeTransportState)
 from raiden.transfer.state_change import (
     ActionChangeNodeNetworkState,
     ActionChannelClose,
@@ -822,6 +823,8 @@ def handle_update_transport_authdata(
     assert chain_state is not None, "chain_state must be set"
 
     if state_change.address == b'00000000000000000000' or state_change.address == chain_state.our_address:
+        if chain_state.last_node_transport_state_authdata is None:
+            chain_state.last_node_transport_state_authdata = NodeTransportState('', [])
         chain_state.last_node_transport_state_authdata.hub_last_transport_authdata = state_change.auth_data
     else:
         if len(chain_state.last_node_transport_state_authdata.clients_last_transport_authdata) == 0:

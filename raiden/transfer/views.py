@@ -46,16 +46,22 @@ from raiden.utils.typing import (
 #     the view functions
 
 
-def all_neighbour_nodes(chain_state: ChainState) -> Set[Address]:
+def all_neighbour_nodes(chain_state: ChainState, light_client_address: Address = None) -> Set[Address]:
     """ Return the identifiers for all nodes accross all payment networks which
     have a channel open with this one.
     """
     addresses = set()
 
+    address_to_search_neighbour = None
+    if light_client_address is not None:
+        address_to_search_neighbour = to_canonical_address(light_client_address)
+    else:
+        address_to_search_neighbour = chain_state.our_address
+
     for payment_network in chain_state.identifiers_to_paymentnetworks.values():
         for token_network in payment_network.tokenidentifiers_to_tokennetworks.values():
-            if chain_state.our_address in token_network.channelidentifiers_to_channels:
-                channel_states = token_network.channelidentifiers_to_channels[chain_state.our_address].values()
+            if address_to_search_neighbour in token_network.channelidentifiers_to_channels:
+                channel_states = token_network.channelidentifiers_to_channels[address_to_search_neighbour].values()
                 for channel_state in channel_states:
                     addresses.add(channel_state.partner_state.address)
 

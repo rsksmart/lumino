@@ -554,7 +554,7 @@ class RaidenAPI:
                 f"token network limit of {per_token_network_deposit_limit}"
             )
 
-        balance = token.balance_of(self.raiden.address)
+        balance = token.balance_of(creator_address)
 
         functions = token_network_proxy.proxy.contract.functions
         deposit_limit = functions.channel_participant_deposit_limit().call()
@@ -1597,7 +1597,7 @@ class RaidenAPI:
         server_url = client.api.base_url
         server_name = urlparse(server_url).netloc
         data_to_sign = {
-            "display_name_to_sign": "@" + encode_hex(address) + ":" + server_name,
+            "display_name_to_sign": "@" + to_normalized_address(address) + ":" + server_name,
             "password_to_sign": server_name,
             "seed_retry": "seed"}
         return data_to_sign
@@ -1607,6 +1607,8 @@ class RaidenAPI:
                               signed_password,
                               signed_display_name,
                               signed_seed_retry):
+
+        address = to_checksum_address(address)
 
         light_client = self.raiden.wal.storage.get_light_client(address)
 
