@@ -1461,12 +1461,9 @@ class RestAPI:
         self.raiden_api.initiate_send_secret_reveal_light(sender_address, receiver_address, reveal_secret)
 
     def initiate_send_balance_proof(self, sender_address: typing.Address, receiver_address: typing.Address,
-                                          unlock: Unlock
+                                    unlock: Unlock
                                     ):
         self.raiden_api.initiate_send_balance_proof(sender_address, receiver_address, unlock)
-
-
-
 
     def initiate_payment_light(
         self,
@@ -2008,8 +2005,21 @@ class RestAPI:
                 errors="There is no light client associated with the api key provided",
                 status_code=HTTPStatus.FORBIDDEN, log=log)
 
+        is_request_valid = LightClientService.is_get_messages_request_valid(messages_requests)
+        if not is_request_valid:
+            return ApiErrorBuilder.build_and_log_error(
+                errors="Invalid request format. Keys must be payment identifiers and values integers representing msg_order",
+                status_code=HTTPStatus.BAD_REQUEST, log=log)
+
         messages = LightClientService.get_light_client_messages(messages_requests, self.raiden_api.raiden.wal)
-        response = [message.to_dict() for message in messages]
+        # Filter msg by order
+        # TODO this can be moved to sql logic
+        filtered_messages = list()
+        for message in messages:
+            filter_order = messages_requests.get(str(message.light_client_payment_id))
+            if LightClientService.apply_message_order_filter(message, filter_order):
+                filtered_messages.append(message)
+        response = [message.to_dict() for message in filtered_messages]
         return api_response(response)
 
     def receive_light_client_protocol_message(self,

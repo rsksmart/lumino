@@ -646,7 +646,7 @@ class ActionSendUnlockLight(AuthenticatedSenderStateChange):
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "ActionSendUnlockLight":
         instance = cls(
-            unlock= Unlock.from_dict(data["unlock"]),
+            unlock=(data["unlock"]),
             sender=to_canonical_address(data["sender"]),
             receiver=to_canonical_address(data["receiver"])
         )
