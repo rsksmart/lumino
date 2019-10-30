@@ -1677,19 +1677,21 @@ class RaidenAPI:
                                          is_lc_initiator, channel_state.token_network_identifier,
                                          amount,
                                          str(date.today()),
-                                         LightClientPaymentStatus.Pending)
+                                         LightClientPaymentStatus.Pending,
+                                         locked_transfer.payment_identifier)
             # Persist the light_client_protocol_message associated
             order = 0
-            payment_id = LightClientMessageHandler.store_light_client_payment(payment, self.raiden.wal)
+            payment_row_id = LightClientMessageHandler.store_light_client_payment(payment, self.raiden.wal)
             light_client_message_id = LightClientMessageHandler.store_light_client_protocol_message(
+                locked_transfer.message_identifier,
                 locked_transfer,
                 False,
-                payment_id,
+                payment.payment_id,
                 order,
                 self.raiden.wal
             )
 
-            return HubMessage(payment_id, order, locked_transfer)
+            return HubMessage(payment.payment_id, order, locked_transfer)
         else:
             raise ChannelNotFound("Channel with given partner address doesnt exists")
 

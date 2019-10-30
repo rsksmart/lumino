@@ -26,10 +26,10 @@ class LightClientPayment:
         amount: int,
         created_on: string,
         payment_status: LightClientPaymentStatus,
-        identifier: int = None
+        identifier: string
 
     ):
-        self.payment_id = identifier
+        self.payment_id = int(identifier)
         self.light_client_address = to_checksum_address(light_client_address)
         self.partner_address = to_checksum_address(partner_address)
         self.is_lc_initiator = is_lc_initiator
