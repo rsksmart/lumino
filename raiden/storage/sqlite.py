@@ -168,10 +168,10 @@ class SQLiteStorage:
                 "payment_status "
                 ") VALUES(?, ?, ?, ?, ?,  ?, ?, ?)",
                 (light_client_payment.payment_id,
-                 to_checksum_address(light_client_payment.light_client_address),
+                 light_client_payment.light_client_address,
                  light_client_payment.partner_address,
                  light_client_payment.is_lc_initiator,
-                 to_checksum_address(light_client_payment.token_network_id),
+                 light_client_payment.token_network_id,
                  light_client_payment.amount,
                  light_client_payment.created_on,
                  str(light_client_payment.payment_status.value))

@@ -1,5 +1,6 @@
 import string
 from enum import Enum
+from eth_utils import to_checksum_address
 
 from raiden.utils.typing import AddressHex, TokenNetworkID, Secret
 
@@ -29,10 +30,10 @@ class LightClientPayment:
 
     ):
         self.payment_id = identifier
-        self.light_client_address = light_client_address
-        self.partner_address = partner_address
+        self.light_client_address = to_checksum_address(light_client_address)
+        self.partner_address = to_checksum_address(partner_address)
         self.is_lc_initiator = is_lc_initiator
-        self.token_network_id = token_network_id
+        self.token_network_id = to_checksum_address(token_network_id)
         self.amount = amount
         self.created_on = created_on
         self.payment_status = payment_status
