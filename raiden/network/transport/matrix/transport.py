@@ -189,12 +189,13 @@ class _RetryQueue(Runnable):
 
         self.log.debug("Retrying message", receiver=to_normalized_address(self.receiver))
         status = self.transport._address_mgr.get_address_reachability(self.receiver)
-        # if status is not AddressReachability.REACHABLE:
-        #     # if partner is not reachable, return
-        #     self.log.debug(
-        #         "Partner not reachable. Skipping.", partner=pex(self.receiver), status=status
-        #     )
-        #     return
+
+        if status is not AddressReachability.REACHABLE:
+            # if partner is not reachable, return
+            self.log.info(
+                "Partner not reachable. Skipping.", partner=pex(self.receiver), status=status
+            )
+            return
         # sort output by channel_identifier (so global/unordered queue goes first)
         # inside queue, preserve order in which messages were enqueued
         ordered_queue = sorted(
@@ -738,11 +739,6 @@ class MatrixTransport(Runnable):
             # Ignore non-messages and non-text messages
             return False
 
-        #FIXME mmartinez7 this return false cause there is a bug : the hub is present at the matrix room
-        if IS_LIGHT_CLIENT_TEST_PAYMENT:
-            return False
-
-
         sender_id = event["sender"]
 
         if sender_id == self._user_id:
@@ -840,7 +836,7 @@ class MatrixTransport(Runnable):
         return True
 
     def _receive_delivered(self, delivered: Delivered):
-        self.log.debug(
+        self.log.info(
             "Delivered message received", sender=pex(delivered.sender), message=delivered
         )
 
@@ -850,7 +846,7 @@ class MatrixTransport(Runnable):
     def _receive_message(self, message: Union[SignedRetrieableMessage, Processed]):
         print("---- Matrix Received Message HUB Transport" + str(message))
         assert self._raiden_service is not None
-        self.log.debug(
+        self.log.info(
             "Message received",
             node=pex(self._raiden_service.address),
             message=message,
@@ -1461,6 +1457,170 @@ class MatrixLightClientTransport(MatrixTransport):
         except Exception:
             self.stop()  # ensure cleanup and wait on subtasks
             raise
+
+
+    def _send_raw(self, receiver_address: Address, data: str):
+        with self._getroom_lock:
+            room = self._get_room_for_address(receiver_address)
+        if not room:
+            self.log.error(
+                "No room for receiver", receiver=to_normalized_address(receiver_address)
+            )
+            return
+        self.log.debug(
+            "Send raw", receiver=pex(receiver_address), room=room, data=data.replace("\n", "\\n")
+        )
+        print("---- Matrix Send Message " + data)
+
+        room.send_text(data)
+
+    def _get_room_for_address(self, address: Address, allow_missing_peers=False) -> Optional[Room]:
+        if self._stop_event.ready():
+            return None
+        address_hex = to_normalized_address(address)
+        msg = f"address not health checked: me: {self._user_id}, peer: {address_hex}"
+        assert address and self._address_mgr.is_address_known(address), msg
+
+        # filter_private is done in _get_room_ids_for_address
+        room_ids = self._get_room_ids_for_address(address)
+        if room_ids:  # if we know any room for this user, use the first one
+            # This loop is used to ignore any global rooms that may have 'polluted' the
+            # user's room cache due to bug #3765
+            # Can be removed after the next upgrade that switches to a new TokenNetworkRegistry
+            while room_ids:
+                room_id = room_ids.pop(0)
+                room = self._client.rooms[room_id]
+                if not self._is_room_global(room):
+                    self.log.warning("Existing room", room=room, members=room.get_joined_members())
+                    return room
+                self.log.warning("Ignoring global room for peer", room=room, peer=address_hex)
+
+        assert self._raiden_service is not None
+        address_pair = sorted(
+            [to_normalized_address(address) for address in [address, to_canonical_address(self._address)]]
+        )
+
+        room_name = make_room_alias(self.network_id, *address_pair)
+
+        # no room with expected name => create one and invite peer
+        peer_candidates = [
+            self._get_user(user) for user in self._client.search_user_directory(address_hex)
+        ]
+
+        # filter peer_candidates
+        peers = [user for user in peer_candidates if validate_userid_signature(user) == address]
+        if not peers and not allow_missing_peers:
+            self.log.error("No valid peer found", peer_address=address_hex)
+            return None
+
+        if self._private_rooms:
+            room = self._get_private_room(invitees=peers)
+        else:
+            room = self._get_public_room(room_name, invitees=peers)
+
+        peer_ids = self._address_mgr.get_userids_for_address(address)
+        member_ids = {member.user_id for member in room.get_joined_members(force_resync=True)}
+        room_is_empty = not bool(peer_ids & member_ids)
+        if room_is_empty:
+            last_ex: Optional[Exception] = None
+            retry_interval = 0.1
+            self.log.debug("Waiting for peer to join from invite", peer_address=address_hex)
+            for _ in range(JOIN_RETRIES):
+                try:
+                    member_ids = {member.user_id for member in room.get_joined_members()}
+                except MatrixRequestError as e:
+                    last_ex = e
+                room_is_empty = not bool(peer_ids & member_ids)
+                if room_is_empty or last_ex:
+                    if self._stop_event.wait(retry_interval):
+                        break
+                    retry_interval = retry_interval * 2
+                else:
+                    break
+
+            if room_is_empty or last_ex:
+                if last_ex:
+                    raise last_ex  # re-raise if couldn't succeed in retries
+                else:
+                    # Inform the client, that currently no one listens:
+                    self.log.error(
+                        "Peer has not joined from invite yet, should join eventually",
+                        peer_address=address_hex,
+                    )
+
+        self._address_mgr.add_userids_for_address(address, {user.user_id for user in peers})
+        self._set_room_id_for_address(address, room.room_id)
+
+        if not room.listeners:
+            room.add_listener(self._handle_message, "m.room.message")
+
+        self.log.debug("Channel room", peer_address=to_normalized_address(address), room=room)
+        return room
+
+    def _get_public_room(self, room_name, invitees: List[User]):
+        """ Obtain a public, canonically named (if possible) room and invite peers """
+        room_name_full = f"#{room_name}:{self._server_name}"
+        invitees_uids = [user.user_id for user in invitees]
+
+        for _ in range(JOIN_RETRIES):
+            # try joining room
+            try:
+                room = self._client.join_room(room_name_full)
+            except MatrixRequestError as error:
+                if error.code == 404:
+                    self.log.debug(
+                        f"No room for peer, trying to create",
+                        room_name=room_name_full,
+                        error=error,
+                    )
+                else:
+                    self.log.debug(
+                        f"Error joining room",
+                        room_name=room_name,
+                        error=error.content,
+                        error_code=error.code,
+                    )
+            else:
+                # Invite users to existing room
+                member_ids = {user.user_id for user in room.get_joined_members(force_resync=True)}
+                users_to_invite = set(invitees_uids) - member_ids
+                self.log.debug("Inviting users", room=room, invitee_ids=users_to_invite)
+                for invitee_id in users_to_invite:
+                    room.invite_user(invitee_id)
+                self.log.debug("Room joined successfully", room=room)
+                break
+
+            # if can't, try creating it
+            try:
+                room = self._client.create_room(room_name, invitees=invitees_uids, is_public=True)
+            except MatrixRequestError as error:
+                if error.code == 409:
+                    msg = (
+                        "Error creating room, "
+                        "seems to have been created by peer meanwhile, retrying."
+                    )
+                else:
+                    msg = "Error creating room, retrying."
+
+                self.log.debug(
+                    msg, room_name=room_name, error=error.content, error_code=error.code
+                )
+            else:
+                self.log.debug("Room created successfully", room=room, invitees=invitees)
+                break
+        else:
+            # if can't join nor create, create an unnamed one
+            room = self._client.create_room(None, invitees=invitees_uids, is_public=True)
+            self.log.warning(
+                "Could not create nor join a named room. Successfuly created an unnamed one",
+                room=room,
+                invitees=invitees,
+            )
+
+        return room
+
+    def get_address(self):
+        return self._address
 
     def _handle_message(self, room, event) -> bool:
         """ Handle text messages sent to listening rooms """

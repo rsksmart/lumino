@@ -122,8 +122,14 @@ def handle_channel_new(raiden: "RaidenService", event: Event):
 
         partner_address = channel_state.partner_state.address
 
+        light_client_address = None
+        if is_participant1_handled_lc:
+            light_client_address = participant1
+        elif is_participant2_handled_lc:
+            light_client_address = participant2
+
         if ConnectionManager.BOOTSTRAP_ADDR != partner_address:
-            raiden.start_health_check_for(partner_address)
+            raiden.start_health_check_for(partner_address, light_client_address)
 
     # Raiden node is not participant of channel. Lc are not participants
     else:
