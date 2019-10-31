@@ -383,7 +383,8 @@ def get_lc_address_by_channel_id_and_partner(token_network_state: TokenNetworkSt
         channel_ids: List[ChannelID] = token_network_state.partneraddresses_to_channelidentifiers[node_address]
         for channel_id in channel_ids:
             if channel_id == canonical_identifier.channel_identifier:
-                if len(token_network_state.network_graph.channel_identifier_to_participants) > 0:
+                if len(token_network_state.network_graph.channel_identifier_to_participants) > 0 \
+                        and channel_id in token_network_state.network_graph.channel_identifier_to_participants:
                     participants: Tuple[Address, Address] = \
                         token_network_state.network_graph.channel_identifier_to_participants[channel_id]
                 if participants is not None:
@@ -604,8 +605,10 @@ def filter_channels_by_partneraddress(
             channels = token_network.channelidentifiers_to_channels[node_address]
             if channels is not None:
                 for channelId, channel in channels.items():
-                    if channel.close_transaction is None or channel.close_transaction.result != 'success':
-                        channelsResult.append(channel)
+                    for partner_address in partner_addresses:
+                        if channel.partner_state.address == partner_address:
+                            if channel.close_transaction is None or channel.close_transaction.result != 'success':
+                                channelsResult.append(channel)
 
     states = filter_channels_by_status(channelsResult, [CHANNEL_STATE_UNUSABLE])
     # If multiple channel states are found, return the last one.
