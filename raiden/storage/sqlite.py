@@ -167,8 +167,8 @@ class SQLiteStorage:
                 "created_on, "
                 "payment_status "
                 ") VALUES(?, ?, ?, ?, ?,  ?, ?, ?)",
-                (light_client_payment.payment_id,
-                 light_client_payment.light_client_address,
+                (str(light_client_payment.payment_id),
+                 to_checksum_address(light_client_payment.light_client_address),
                  light_client_payment.partner_address,
                  light_client_payment.is_lc_initiator,
                  light_client_payment.token_network_id,
@@ -191,12 +191,12 @@ class SQLiteStorage:
                 "light_client_payment_id "
                 ")"
                 "VALUES(?, ?, ?, ?, ?, ?)",
-                (msg_dto.identifier,
+                (str(msg_dto.identifier),
                  msg_dto.message_order,
                  msg_dto.unsigned_message,
                  msg_dto.signed_message,
                  msg_dto.state_change_id,
-                 msg_dto.light_client_payment_id,
+                 str(msg_dto.light_client_payment_id),
                  ),
             )
             last_id = cursor.lastrowid
@@ -226,7 +226,19 @@ class SQLiteStorage:
             SELECT *
                 FROM light_client_protocol_message WHERE light_client_payment_id = ? and message_order = ?;
             """,
-            (payment_id, order)
+            (str(payment_id), order)
+        )
+
+        return cursor.fetchone()
+
+    def is_light_client_protocol_message_already_stored_with_message_id(self, message_id: int, payment_id: int, order: int):
+        cursor = self.conn.cursor()
+        cursor.execute(
+            """
+            SELECT *
+                FROM light_client_protocol_message WHERE identifier = ? and light_client_payment_id = ? and message_order = ?;
+            """,
+            (str(message_id), str(payment_id), order)
         )
 
         return cursor.fetchone()
@@ -1278,7 +1290,7 @@ class SQLiteStorage:
             FROM light_client_payment
             WHERE payment_id = ?
             """,
-            (payment_id,),
+            (str(payment_id),),
         )
         return cursor.fetchone()
 
@@ -1293,6 +1305,19 @@ class SQLiteStorage:
             "ORDER BY identifier ASC"
         )
         return cursor.fetchall()
+
+    def get_light_client_protocol_message_by_identifier(self, identifier):
+        cursor = self.conn.cursor()
+        cursor.execute(
+            """
+            SELECT identifier, message_order, unsigned_message, signed_message, state_change_id, light_client_payment_id
+            FROM light_client_protocol_message
+            WHERE identifier  >= ?
+            LIMIT 1
+            """,
+            (str(identifier),),
+        )
+        return cursor.fetchone()
 
     def __del__(self):
         self.conn.close()

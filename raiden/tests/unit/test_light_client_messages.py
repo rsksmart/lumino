@@ -4,7 +4,7 @@ from raiden.utils import Secret
 from raiden.utils.signer import LocalSigner, recover
 from raiden.utils.typing import MessageID, ChainID, Locksroot
 
-PRIVKEY = decode_hex("0xb8948740e32ba130afec6817c12fcaa716d5a8831554e974f1e40e3e95fe87c2")
+PRIVKEY = decode_hex("0x1bc5766d3f31e2e76dfd4d76684d8dde5671135bd30511aae20f424655d0e33b")
 signer = LocalSigner(PRIVKEY)
 
 secret = Secret(b'bX\x0cM[MA,d+d7Zs^eC*IUHgng3LMze\rje')
@@ -106,8 +106,8 @@ def test_signature_without_secret():
             "expiration": 1624776,
             "secrethash": "0x2947ad48b464ceb482736ef615cd8115deae0e117c4f42ac5085d3c52d16544b"
         },
-        "target": "0x29021129f5d038897f01bd4bc050525ca01a4758",
-        "initiator": "0x09fcbe7ceb49c944703b4820e29b0541edfe7e82",
+        "target": "0xaa5d80331b546bc74407009b176b675e90f65bbb",
+        "initiator": "0x54df5016e08e81ce7cec2d5e0ce4c30fd55b98de",
         "fee": 0
     }
 
