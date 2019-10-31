@@ -39,6 +39,47 @@ def refund_from_sendmediated(
     )
 
 
+class StoreMessageEvent(Event):
+    """ Marker used for events which represent database persistance of light client messages
+
+    """
+
+    def __init__(
+        self, payment_id: int, message_order: int, message: Any, is_signed: bool
+    ) -> None:
+        self.payment_id = payment_id
+        self.message_order = message_order
+        self.message = message
+        self.is_signed = is_signed
+
+    def __eq__(self, other: Any) -> bool:
+        return (
+            isinstance(other, StoreMessageEvent)
+            and self.payment_id == other.payment_id
+            and self.message_order == other.message_order
+            and self.message == other.message
+            and self.is_signed == other.is_signed
+        )
+
+    def __ne__(self, other: Any) -> bool:
+        return not self.__eq__(other)
+
+    def to_dict(self) -> Dict[str, Any]:
+        result = {
+            "payment_id": str(self.payment_id),
+            "message_order": str(self.message_order)
+        }
+        return result
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "StoreMessageEvent":
+        restored = cls(
+            payment_id=int(data["payment_id"]),
+            message_order=int(data["message_order"])
+        )
+        return restored
+
+
 class SendLockExpired(SendMessageEvent):
     def __init__(
         self,
@@ -101,7 +142,6 @@ class SendLockedTransferLight(SendMessageEvent):
         message_identifier: MessageID,
         signed_locked_transfer: LockedTransferUnsignedState
     ) -> None:
-
         super().__init__(recipient, channel_identifier, message_identifier)
 
         self.signed_locked_transfer = signed_locked_transfer
@@ -282,6 +322,64 @@ class SendSecretReveal(SendMessageEvent):
         return restored
 
 
+class SendSecretRevealLight(SendMessageEvent):
+    """ Sends a signed SecretReveal to another node.
+    """
+
+    def __init__(
+        self,
+        recipient: Address,
+        channel_identifier: ChannelID,
+        message_identifier: MessageID,
+        secret: Secret,
+        signed_secret_reveal: Any
+    ) -> None:
+        secrethash = sha3(secret)
+
+        super().__init__(recipient, channel_identifier, message_identifier)
+
+        self.secret = secret
+        self.secrethash = secrethash
+        self.signed_secret_reveal = signed_secret_reveal
+
+    def __repr__(self) -> str:
+        return "<SendSecretRevealLight msgid:{} secrethash:{} recipient:{}>".format(
+            self.message_identifier, pex(self.secrethash), pex(self.recipient)
+        )
+
+    def __eq__(self, other: Any) -> bool:
+        return (
+            isinstance(other, SendSecretRevealLight)
+            and self.secret == other.secret
+            and self.secrethash == other.secrethash
+            and super().__eq__(other)
+        )
+
+    def __ne__(self, other: Any) -> bool:
+        return not self.__eq__(other)
+
+    def to_dict(self) -> Dict[str, Any]:
+        result = {
+            "recipient": to_checksum_address(self.recipient),
+            "channel_identifier": str(self.queue_identifier.channel_identifier),
+            "message_identifier": str(self.message_identifier),
+            "secret": serialize_bytes(self.secret),
+        }
+
+        return result
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "SendSecretRevealLight":
+        restored = cls(
+            recipient=to_canonical_address(data["recipient"]),
+            channel_identifier=ChannelID(int(data["channel_identifier"])),
+            message_identifier=MessageID(int(data["message_identifier"])),
+            secret=deserialize_secret(data["secret"]),
+        )
+
+        return restored
+
+
 class SendBalanceProof(SendMessageEvent):
     """ Event to send a balance-proof to the counter-party, used after a lock
     is unlocked locally allowing the counter-party to claim it.
@@ -362,6 +460,101 @@ class SendBalanceProof(SendMessageEvent):
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "SendBalanceProof":
+        restored = cls(
+            recipient=to_canonical_address(data["recipient"]),
+            channel_identifier=ChannelID(int(data["channel_identifier"])),
+            message_identifier=MessageID(int(data["message_identifier"])),
+            payment_identifier=PaymentID(int(data["payment_identifier"])),
+            token_address=to_canonical_address(data["token_address"]),
+            secret=deserialize_secret(data["secret"]),
+            balance_proof=data["balance_proof"],
+        )
+
+        return restored
+
+
+class SendBalanceProofLight(SendMessageEvent):
+    """ Event to send a balance-proof to the counter-party, used after a lock
+    is unlocked locally allowing the counter-party to claim it.
+
+    Used by payers: The initiator and mediator nodes.
+
+    Note:
+        This event has a dual role, it serves as a synchronization and as
+        balance-proof for the netting channel smart contract.
+
+        Nodes need to keep the last known merkle root synchronized. This is
+        required by the receiving end of a transfer in order to properly
+        validate. The rule is "only the party that owns the current payment
+        channel may change it" (remember that a netting channel is composed of
+        two uni-directional channels), as a consequence the merkle root is only
+        updated by the recipient once a balance proof message is received.
+    """
+
+    def __init__(
+        self,
+        recipient: Address,
+        channel_identifier: ChannelID,
+        message_identifier: MessageID,
+        payment_identifier: PaymentID,
+        token_address: TokenAddress,
+        secret: Secret,
+        balance_proof: BalanceProofUnsignedState,
+        signed_balance_proof
+    ) -> None:
+        super().__init__(recipient, channel_identifier, message_identifier)
+
+        self.payment_identifier = payment_identifier
+        self.token = token_address
+        self.secret = secret
+        self.secrethash = sha3(secret)
+        self.balance_proof = balance_proof
+        self.signed_balance_proof = signed_balance_proof
+
+    def __repr__(self) -> str:
+        return (
+            "<"
+            "SendBalanceProofLight msgid:{} paymentid:{} token:{} secrethash:{} recipient:{} "
+            "balance_proof:{}"
+            ">"
+        ).format(
+            self.message_identifier,
+            self.payment_identifier,
+            pex(self.token),
+            pex(self.secrethash),
+            pex(self.recipient),
+            self.balance_proof,
+        )
+
+    def __eq__(self, other: Any) -> bool:
+        return (
+            isinstance(other, SendBalanceProofLight)
+            and self.payment_identifier == other.payment_identifier
+            and self.token == other.token
+            and self.recipient == other.recipient
+            and self.secret == other.secret
+            and self.balance_proof == other.balance_proof
+            and super().__eq__(other)
+        )
+
+    def __ne__(self, other: Any) -> bool:
+        return not self.__eq__(other)
+
+    def to_dict(self) -> Dict[str, Any]:
+        result = {
+            "recipient": to_checksum_address(self.recipient),
+            "channel_identifier": str(self.queue_identifier.channel_identifier),
+            "message_identifier": str(self.message_identifier),
+            "payment_identifier": str(self.payment_identifier),
+            "token_address": to_checksum_address(self.token),
+            "secret": serialize_bytes(self.secret),
+            "balance_proof": self.balance_proof,
+        }
+
+        return result
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "SendBalanceProofLight":
         restored = cls(
             recipient=to_canonical_address(data["recipient"]),
             channel_identifier=ChannelID(int(data["channel_identifier"])),

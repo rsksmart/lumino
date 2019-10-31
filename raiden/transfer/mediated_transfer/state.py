@@ -136,7 +136,8 @@ class InitiatorTransferState(State):
         revealsecret: Optional["SendSecretReveal"],
         received_secret_request: bool = False,
     ) -> None:
-        if not isinstance(transfer_description, TransferDescriptionWithSecretState) and not isinstance(transfer_description, TransferDescriptionWithoutSecretState):
+        if not isinstance(transfer_description, TransferDescriptionWithSecretState) and not isinstance(
+            transfer_description, TransferDescriptionWithoutSecretState):
             raise ValueError(
                 "transfer_description must be an instance of TransferDescriptionWithSecretState or TransferDescriptionWithoutSecretState"
             )
@@ -644,6 +645,7 @@ class TransferDescriptionWithoutSecretState(State):
             "token_network_identifier": to_checksum_address(self.token_network_identifier),
             "initiator": to_checksum_address(self.initiator),
             "target": to_checksum_address(self.target),
+            "secrethash": serialize_bytes(self.secrethash)
         }
 
     @classmethod
@@ -659,7 +661,8 @@ class TransferDescriptionWithoutSecretState(State):
             allocated_fee=FeeAmount(int(data["allocated_fee"])),
             token_network_identifier=to_canonical_address(data["token_network_identifier"]),
             initiator=to_canonical_address(data["initiator"]),
-            target=to_canonical_address(data["target"])
+            target=to_canonical_address(data["target"]),
+            secrethash=deserialize_secret_hash(data["secrethash"])
         )
 
         return restored

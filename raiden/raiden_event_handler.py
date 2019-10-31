@@ -5,8 +5,9 @@ import structlog
 from eth_utils import to_checksum_address, to_hex
 from eth_utils import encode_hex
 
-from raiden.constants import EMPTY_BALANCE_HASH, EMPTY_HASH, EMPTY_MESSAGE_HASH, EMPTY_SIGNATURE
+from raiden.constants import EMPTY_BALANCE_HASH, EMPTY_HASH, EMPTY_MESSAGE_HASH, EMPTY_SIGNATURE, TEST_PAYMENT_ID
 from raiden.exceptions import ChannelOutdatedError, RaidenUnrecoverableError
+from raiden.lightclient.light_client_message_handler import LightClientMessageHandler
 from raiden.messages import message_from_sendevent
 from raiden.network.proxies.payment_channel import PaymentChannel
 from raiden.network.proxies.token_network import TokenNetwork
@@ -42,7 +43,7 @@ from raiden.transfer.mediated_transfer.events import (
     SendRefundTransfer,
     SendSecretRequest,
     SendSecretReveal,
-    SendLockedTransferLight)
+    SendLockedTransferLight, StoreMessageEvent, SendSecretRevealLight, SendBalanceProofLight)
 from raiden.transfer.state import ChainState, NettingChannelEndState
 from raiden.transfer.utils import (
     get_event_with_balance_proof_by_balance_hash,
@@ -97,7 +98,7 @@ class EventHandler(ABC):
 
 class RaidenEventHandler(EventHandler):
     def on_raiden_event(self, raiden: "RaidenService", chain_state: ChainState, event: Event):
-        print("On raiden event "+str(type(event)))
+        print("On raiden event " + str(type(event)))
         # pylint: disable=too-many-branches
         if type(event) == SendLockExpired:
             assert isinstance(event, SendLockExpired), MYPY_ANNOTATION
@@ -111,9 +112,15 @@ class RaidenEventHandler(EventHandler):
         elif type(event) == SendSecretReveal:
             assert isinstance(event, SendSecretReveal), MYPY_ANNOTATION
             self.handle_send_secretreveal(raiden, event)
+        elif type(event) == SendSecretRevealLight:
+            assert isinstance(event, SendSecretRevealLight), MYPY_ANNOTATION
+            self.handle_send_secretreveal_light(raiden, event)
         elif type(event) == SendBalanceProof:
             assert isinstance(event, SendBalanceProof), MYPY_ANNOTATION
             self.handle_send_balanceproof(raiden, event)
+        elif type(event) == SendBalanceProofLight:
+            assert isinstance(event, SendBalanceProofLight), MYPY_ANNOTATION
+            self.handle_send_balanceproof_light(raiden, event)
         elif type(event) == SendSecretRequest:
             assert isinstance(event, SendSecretRequest), MYPY_ANNOTATION
             self.handle_send_secretrequest(raiden, event)
@@ -147,10 +154,28 @@ class RaidenEventHandler(EventHandler):
         elif type(event) == ContractSendChannelSettle:
             assert isinstance(event, ContractSendChannelSettle), MYPY_ANNOTATION
             self.handle_contract_send_channelsettle(raiden, event)
+        elif type(event) == StoreMessageEvent:
+            assert isinstance(event, StoreMessageEvent), MYPY_ANNOTATION
+            self.handle_store_message(raiden, event)
         elif type(event) in UNEVENTFUL_EVENTS:
             pass
         else:
             log.error("Unknown event", event_type=str(type(event)), node=pex(raiden.address))
+
+    @staticmethod
+    def handle_store_message(raiden: "RaidenService", store_message_event: StoreMessageEvent):
+        # FIXME mmartinez7 this should take the right payment id
+        exists = LightClientMessageHandler.is_light_client_protocol_message_already_stored(TEST_PAYMENT_ID,
+                                                                                           store_message_event.message_order,
+                                                                                           raiden.wal)
+        if not exists:
+            # FIXME mmartinez7 payment id does not travel on the protocol messages. Fix TEST_PAYMENT_ID
+            LightClientMessageHandler.store_light_client_protocol_message(store_message_event.message, store_message_event.is_signed,
+                                                                          TEST_PAYMENT_ID,
+                                                                          store_message_event.message_order,
+                                                                          raiden.wal)
+        else:
+            log.info("Message for lc already received, ignoring db storage")
 
     @staticmethod
     def handle_send_lockexpired(raiden: "RaidenService", send_lock_expired: SendLockExpired):
@@ -173,13 +198,11 @@ class RaidenEventHandler(EventHandler):
         raiden: "RaidenService", send_locked_transfer_light: SendLockedTransferLight
     ):
         mediated_transfer_message = send_locked_transfer_light.signed_locked_transfer
-        raiden.transport.light_client_transports[0].send_async(
-            send_locked_transfer_light.queue_identifier, mediated_transfer_message
-        )
-
-
-
-
+        light_client_address = to_checksum_address(send_locked_transfer_light.signed_locked_transfer.initiator)
+        for light_client_transport in raiden.transport.light_client_transports:
+            if light_client_address == light_client_transport._address:
+                light_client_transport.send_async(send_locked_transfer_light.queue_identifier,
+                                                  mediated_transfer_message)
 
     @staticmethod
     def handle_send_secretreveal(raiden: "RaidenService", reveal_secret_event: SendSecretReveal):
@@ -188,10 +211,22 @@ class RaidenEventHandler(EventHandler):
         raiden.transport.hub_transport.send_async(reveal_secret_event.queue_identifier, reveal_secret_message)
 
     @staticmethod
+    def handle_send_secretreveal_light(raiden: "RaidenService", reveal_secret_event: SendSecretRevealLight):
+        signed_secret_reveal = reveal_secret_event.signed_secret_reveal
+        raiden.transport.light_client_transports[0].send_async(
+            reveal_secret_event.queue_identifier, signed_secret_reveal
+        )
+
+    @staticmethod
     def handle_send_balanceproof(raiden: "RaidenService", balance_proof_event: SendBalanceProof):
         unlock_message = message_from_sendevent(balance_proof_event)
         raiden.sign(unlock_message)
         raiden.transport.hub_transport.send_async(balance_proof_event.queue_identifier, unlock_message)
+
+    @staticmethod
+    def handle_send_balanceproof_light(raiden: "RaidenService", balance_proof_event: SendBalanceProofLight):
+        unlock_message = message_from_sendevent(balance_proof_event)
+        raiden.transport.light_client_transports[0].send_async(balance_proof_event.queue_identifier, unlock_message)
 
     @staticmethod
     def handle_send_secretrequest(
@@ -318,8 +353,6 @@ class RaidenEventHandler(EventHandler):
                                       signature=signature,
                                       block_identifier=channel_close_event.triggered_by_block_hash,
                                       signed_close_tx=channel_close_event.signed_close_tx)
-
-
 
     @staticmethod
     def handle_contract_send_channelupdate(

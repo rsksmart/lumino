@@ -656,7 +656,7 @@ class TokenNetwork:
         # channel_operations_lock is not sufficient, as it allows two
         # concurrent deposits for different channels.
         #
-        current_balance = token.balance_of(self.node_address)
+        current_balance = token.balance_of(creator)
         if current_balance < amount_to_deposit:
             msg = (
                 f"new_total_deposit - previous_total_deposit =  {amount_to_deposit} can not "
@@ -1818,7 +1818,7 @@ class TokenNetwork:
         if not self.client.can_query_state_for_block(block_identifier):
             raise NoStateForBlockIdentifier()
 
-        # First investigate why closed channels are not removed from the new channel data structure and then uncomment this @GASPAR MEDINA
+        # First investigate why closed channels are not removed from the new channel data structure and then uncomment this #FIXME
         # self._check_for_outdated_channel(
         #     participant1=self.node_address,
         #     participant2=partner,

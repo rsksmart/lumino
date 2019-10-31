@@ -26,10 +26,9 @@ from raiden.api.v1.encoding import (
     ChannelLightPatchSchema,
     LightClientSchema,
     LightClientMatrixCredentialsBuildSchema,
-    PaymentLightGetSchema,
     PaymentLightPutSchema,
-    PaymentLightPostSchema
-)
+    PaymentLightPostSchema,
+    CreatePaymentLightPostSchema)
 
 from raiden.utils import typing
 
@@ -275,28 +274,9 @@ class PaymentInvoiceResource(BaseResource):
             coded_invoice=coded_invoice
         )
 
-class PaymentLightResource(BaseResource):
-    put_schema = PaymentLightPutSchema
-    post_schema = PaymentLightPostSchema
-    get_schema = PaymentLightGetSchema
 
-    def get(self, **kwargs):
-        """
-        this translates to 'get all the messages by payment id'
-        """
-        return self.rest_api.get_light_client_protocol_message(**kwargs)
-
-    @use_kwargs(put_schema, locations=("json",))
-    def put(self,
-            message_id: int,
-            message_order: int,
-            sender: typing.AddressHex,
-            receiver: typing.AddressHex,
-            message: Dict):
-        """
-        put a signed message associated with a payment of a light client
-        """
-        return self.rest_api.receive_light_client_protocol_message(message_id, message_order, sender, receiver, message)
+class CreatePaymentLightResource(BaseResource):
+    post_schema = CreatePaymentLightPostSchema
 
     @use_kwargs(post_schema, locations=("json",))
     def post(
@@ -315,6 +295,30 @@ class PaymentLightResource(BaseResource):
             amount=amount,
             secrethash=secrethash
         )
+
+
+class PaymentLightResource(BaseResource):
+    put_schema = PaymentLightPutSchema
+    post_schema = PaymentLightPostSchema
+
+    @use_kwargs(put_schema, locations=("json",))
+    def put(self,
+            message_id: int,
+            message_order: int,
+            sender: typing.AddressHex,
+            receiver: typing.AddressHex,
+            message: Dict):
+        """
+        put a signed message associated with a payment of a light client
+        """
+        return self.rest_api.receive_light_client_protocol_message(message_id, message_order, sender, receiver, message)
+
+    @use_kwargs(post_schema, locations=("json",))
+    def post(
+        self,
+        ** kwargs
+    ):
+        return self.rest_api.get_light_client_protocol_message(**kwargs)
 
 
 class PaymentResource(BaseResource):

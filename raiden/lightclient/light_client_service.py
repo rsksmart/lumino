@@ -35,8 +35,9 @@ class LightClientService:
         return result
 
     @classmethod
-    def get_light_client_messages(cls, offset, wal: WriteAheadLog):
-        messages = wal.storage.get_light_client_messages(offset)
+    def get_light_client_messages(cls, messages_requests: dict, wal: WriteAheadLog):
+        payments_ids = list(messages_requests.keys())
+        messages = wal.storage.get_light_client_messages(payments_ids)
         result: List[LightClientProtocolMessage] = []
         for message in messages:
             result.append(
@@ -45,9 +46,31 @@ class LightClientService:
         return result
 
     @classmethod
+    def apply_message_order_filter(cls, message: LightClientProtocolMessage, msg_order: int) -> bool:
+        return message.message_order >= msg_order
+
+    @classmethod
     def get_light_client_payment(cls, payment_id, wal: WriteAheadLog):
         payment = wal.storage.get_light_client_payment(payment_id)
         if payment:
             payment = LightClientPayment(payment[1], payment[2], payment[3], payment[4], payment[5],
                                       payment[6], payment[7], payment[0])
         return payment
+
+    @classmethod
+    def is_get_messages_request_valid(cls, message_request: dict):
+        payment_ids = list(message_request.keys())
+        msg_orders = list(message_request.values())
+        valid_payment_ids = len(payment_ids) > 0
+        valid_msg_orders = len(msg_orders) > 0
+        if not valid_msg_orders or not valid_payment_ids:
+            return False
+        else:
+            for payment_id in payment_ids:
+                if type(payment_id) is not str:
+                    return False
+            for message_order in msg_orders:
+                if type(message_order) is not int:
+                    return False
+        return True
+

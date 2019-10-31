@@ -296,8 +296,6 @@ class ChainState(State):
         self.pending_transactions: List[ContractSendEvent] = list()
         self.pseudo_random_generator = pseudo_random_generator
         self.queueids_to_queues: QueueIdsToQueues = dict()
-        # self.last_transport_authdata: Optional[str] = None
-
         self.last_node_transport_state_authdata: NodeTransportState = NodeTransportState('', [])
 
         self.tokennetworkaddresses_to_paymentnetworkaddresses: Dict[
