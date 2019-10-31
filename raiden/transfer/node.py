@@ -69,6 +69,7 @@ from raiden.transfer.state_change import (
     ReceiveProcessed,
     ReceiveUnlock,
 )
+from raiden.utils import sha3
 from raiden.utils.typing import (
     MYPY_ANNOTATION,
     BlockHash,
@@ -85,7 +86,7 @@ from raiden.utils.typing import (
     Union,
     Address)
 
-from eth_utils import to_canonical_address, keccak
+from eth_utils import to_canonical_address, keccak, decode_hex
 
 # All State changes that are subdispatched as token network actions
 TokenNetworkStateChange = Union[
@@ -729,7 +730,11 @@ def handle_init_reveal_secret_light(
     chain_state: ChainState, state_change: ActionSendSecretRevealLight
 ) -> TransitionResult[ChainState]:
     revealsecret = state_change.reveal_secret
-    secrethash = revealsecret.secrethash
+    if type(revealsecret) == dict:
+        #extracted from persisted state change
+        secrethash = sha3(decode_hex(revealsecret['secret']))
+    else:
+        secrethash = revealsecret.secrethash
     return subdispatch_to_paymenttask(chain_state, state_change, secrethash)
 
 

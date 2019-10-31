@@ -19,8 +19,8 @@ def test_balance_proof():
     dict_data = {
         "type": "Secret",
         "chain_id": 33,
-        "message_identifier": 7331028335892713299,
-        "payment_identifier": 3067236291737758355,
+        "message_identifier": 5296181112217886153,
+        "payment_identifier": 658552690069865136,
         "secret": "0x62580c4d5b4d412c642b64375a735e65432a495548676e67334c4d7a650d6a65",
         "nonce": 2,
         "token_network_address": "0x877ec5961d18d3413fabbd67696b758fe95408d6",
@@ -62,7 +62,7 @@ def test_reveal_secret_7():
 def test_delivered_6():
     dict_msg = {
         "type": "Delivered",
-        "delivered_message_identifier": 599569265152083442
+        "delivered_message_identifier": 12792016288654049179
     }
     message = Delivered.from_dict_unsigned(dict_msg)
     message.sign(signer)
@@ -75,7 +75,7 @@ def test_delivered_6():
 def test_delivered_4():
     dict_msg = {
         "type": "Delivered",
-        "delivered_message_identifier": 3113270929352335381
+        "delivered_message_identifier": 12103104860561726973
     }
     message = Delivered.from_dict_unsigned(dict_msg)
     message.sign(signer)
@@ -87,15 +87,15 @@ def test_delivered_4():
 
 def test_signature_without_secret():
     dict_msg = {
-        "type": "LockedTransfer",
+         "type": "LockedTransfer",
         "chain_id": 33,
-        "message_identifier": 1376110454679662125,
-        "payment_identifier": 3067236291737758355,
+        "message_identifier": 13755141366067700437,
+        "payment_identifier": 6179798876113273543,
         "payment_hash_invoice": "0x",
         "nonce": 1,
-        "token_network_address": "0x877ec5961d18d3413fabbd67696b758fe95408d6",
-        "token": "0xff10e500973a0b0071e2263421e4af60425834a6",
-        "channel_identifier": 1,
+        "token_network_address": "0xb3df4fbd04d29a04d9d0666c009713076e364109",
+        "token": "0x95aa68e40b4409f8584b6e60796f29c342e7180a",
+        "channel_identifier": 2,
         "transferred_amount": 0,
         "locked_amount": 1000000000000000,
         "recipient": "0x29021129f5d038897f01bd4bc050525ca01a4758",
