@@ -31,13 +31,12 @@ from raiden.exceptions import (
     RaidenRecoverableError,
     RaidenUnrecoverableError,
     InvalidPaymentIdentifier)
+from raiden.message_event_convertor import message_from_sendevent
 from raiden.messages import (
     LockedTransfer,
     Message,
     RequestMonitoring,
     SignedMessage,
-    UpdatePFS,
-    message_from_sendevent,
     RevealSecret, Unlock)
 from raiden.network.blockchain_service import BlockChainService
 from raiden.network.proxies.secret_registry import SecretRegistry
@@ -248,39 +247,39 @@ def update_services_from_balance_proof(
     chain_state: "ChainState",
     balance_proof: Union[BalanceProofSignedState, BalanceProofUnsignedState],
 ) -> None:
-    update_path_finding_service_from_balance_proof(
-        raiden=raiden, chain_state=chain_state, new_balance_proof=balance_proof
-    )
+    # update_path_finding_service_from_balance_proof(
+    #     raiden=raiden, chain_state=chain_state, new_balance_proof=balance_proof
+    # )
     if isinstance(balance_proof, BalanceProofSignedState):
         update_monitoring_service_from_balance_proof(
             raiden=raiden, chain_state=chain_state, new_balance_proof=balance_proof
         )
 
 
-def update_path_finding_service_from_balance_proof(
-    raiden: "RaidenService",
-    chain_state: "ChainState",
-    new_balance_proof: Union[BalanceProofSignedState, BalanceProofUnsignedState],
-) -> None:
-    channel_state = views.get_channelstate_by_canonical_identifier_and_address(
-        chain_state=chain_state, canonical_identifier=new_balance_proof.canonical_identifier,
-        address=chain_state.our_address
-    )
-    network_address = new_balance_proof.canonical_identifier.token_network_address
-    error_msg = (
-        f"tried to send a balance proof in non-existant channel "
-        f"token_network_address: {pex(network_address)} "
-    )
-    assert channel_state is not None, error_msg
-    if isinstance(new_balance_proof, BalanceProofSignedState):
-        assert channel_state.partner_state.balance_proof == new_balance_proof
-    else:  # BalanceProofUnsignedState
-        assert channel_state.our_state.balance_proof == new_balance_proof
-
-    msg = UpdatePFS.from_channel_state(channel_state)
-    msg.sign(raiden.signer)
-    raiden.transport[0].send_global(constants.PATH_FINDING_BROADCASTING_ROOM, msg)
-    log.debug("Sent a PFS Update", message=msg, balance_proof=new_balance_proof)
+# def update_path_finding_service_from_balance_proof(
+#     raiden: "RaidenService",
+#     chain_state: "ChainState",
+#     new_balance_proof: Union[BalanceProofSignedState, BalanceProofUnsignedState],
+# ) -> None:
+#     channel_state = views.get_channelstate_by_canonical_identifier_and_address(
+#         chain_state=chain_state, canonical_identifier=new_balance_proof.canonical_identifier,
+#         address=chain_state.our_address
+#     )
+#     network_address = new_balance_proof.canonical_identifier.token_network_address
+#     error_msg = (
+#         f"tried to send a balance proof in non-existant channel "
+#         f"token_network_address: {pex(network_address)} "
+#     )
+#     assert channel_state is not None, error_msg
+#     if isinstance(new_balance_proof, BalanceProofSignedState):
+#         assert channel_state.partner_state.balance_proof == new_balance_proof
+#     else:  # BalanceProofUnsignedState
+#         assert channel_state.our_state.balance_proof == new_balance_proof
+#
+#     msg = UpdatePFS.from_channel_state(channel_state)
+#     msg.sign(raiden.signer)
+#     raiden.transport[0].send_global(constants.PATH_FINDING_BROADCASTING_ROOM, msg)
+#     log.debug("Sent a PFS Update", message=msg, balance_proof=new_balance_proof)
 
 
 def update_monitoring_service_from_balance_proof(
@@ -784,7 +783,7 @@ class RaidenService(Runnable):
             new_snapshot_group = state_changes_count // SNAPSHOT_STATE_CHANGES_COUNT
             # FIXME mmartinez
             if new_snapshot_group > self.snapshot_group:
-                log.debug("Storing snapshot", snapshot_id=new_snapshot_group)
+                log.info("Storing snapshot", snapshot_id=new_snapshot_group)
                 self.wal.snapshot()
                 self.snapshot_group = new_snapshot_group
 

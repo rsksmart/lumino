@@ -18,7 +18,8 @@ from raiden.transfer.events import (
 )
 from raiden.transfer.identifiers import CanonicalIdentifier, QueueIdentifier
 from raiden.transfer.mediated_transfer import initiator_manager, mediator, target
-from raiden.transfer.mediated_transfer.events import CHANNEL_IDENTIFIER_GLOBAL_QUEUE, SendBalanceProof
+from raiden.transfer.mediated_transfer.events import CHANNEL_IDENTIFIER_GLOBAL_QUEUE, SendBalanceProof, \
+    StoreMessageEvent
 from raiden.transfer.mediated_transfer.state import (
     InitiatorPaymentState,
     MediatorTransferState,
@@ -304,8 +305,12 @@ def handle_init_unlock_light(
     )
     events = list()
     if channel_state:
-        balance_proof = channel.create_send_balance_proof_light(channel_state, state_change.unlock, state_change.receiver)
+        balance_proof = channel.create_send_balance_proof_light(channel_state, state_change.unlock,
+                                                                state_change.receiver)
+        store_signed_bp = StoreMessageEvent(balance_proof.message_identifier, balance_proof.payment_identifier, 12,
+                                            state_change.unlock, True)
         events.append(balance_proof)
+        events.append(store_signed_bp)
     return TransitionResult(chain_state, events)
 
 
@@ -730,11 +735,7 @@ def handle_init_reveal_secret_light(
     chain_state: ChainState, state_change: ActionSendSecretRevealLight
 ) -> TransitionResult[ChainState]:
     revealsecret = state_change.reveal_secret
-    if type(revealsecret) == dict:
-        #extracted from persisted state change
-        secrethash = sha3(decode_hex(revealsecret['secret']))
-    else:
-        secrethash = revealsecret.secrethash
+    secrethash = revealsecret.secrethash
     return subdispatch_to_paymenttask(chain_state, state_change, secrethash)
 
 

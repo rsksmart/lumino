@@ -243,6 +243,17 @@ class SQLiteStorage:
 
         return cursor.fetchone()
 
+    def exists_payment(self, payment_id: int):
+        cursor = self.conn.cursor()
+        cursor.execute(
+            """
+            SELECT *
+                FROM light_client_payment WHERE payment_id = ?;
+            """,
+            (str(payment_id), )
+        )
+        return cursor.fetchone()
+
     def write_state_snapshot(self, statechange_id, snapshot):
         with self.write_lock, self.conn:
             cursor = self.conn.execute(
@@ -1312,8 +1323,8 @@ class SQLiteStorage:
             """
             SELECT identifier, message_order, unsigned_message, signed_message, state_change_id, light_client_payment_id
             FROM light_client_protocol_message
-            WHERE identifier  >= ?
-            LIMIT 1
+            WHERE identifier  = ?
+            ORDER BY message_order ASC
             """,
             (str(identifier),),
         )

@@ -2,8 +2,8 @@ import random
 
 from eth_utils import to_canonical_address
 
-from raiden.constants import EMPTY_SECRET, MAXIMUM_PENDING_TRANSFERS, IS_LIGHT_CLIENT_TEST_PAYMENT, TEST_PAYMENT_ID
-from raiden.messages import LockedTransfer, Unlock, message_from_sendevent
+from raiden.constants import MAXIMUM_PENDING_TRANSFERS
+from raiden.messages import LockedTransfer, Unlock
 from raiden.settings import DEFAULT_WAIT_BEFORE_LOCK_REMOVAL
 from raiden.transfer import channel
 from raiden.transfer.architecture import Event, TransitionResult
@@ -252,7 +252,7 @@ def try_new_route_light(
             reason = "there is no route available"
         else:
             reason = "none of the available routes could be used"
-
+        # TODO mmartinez handle persistance with status failure?
         transfer_failed = EventPaymentSentFailed(
             payment_network_identifier=transfer_description.payment_network_identifier,
             token_network_identifier=transfer_description.token_network_identifier,
@@ -289,7 +289,6 @@ def try_new_route_light(
                                                        signed_locked_transfer.channel_identifier,
                                                        signed_locked_transfer.message_identifier,
                                                        signed_locked_transfer)
-        assert lockedtransfer_event
 
         # Check that the constructed merkletree is equals to the sent by the light client.
         calculated_locksroot = merkleroot(merkletree)
@@ -300,7 +299,13 @@ def try_new_route_light(
                 transfer=calculated_transfer,
                 revealsecret=None,
             )
+            store_signed_lt = StoreMessageEvent(signed_locked_transfer.message_identifier,
+                                                signed_locked_transfer.payment_identifier, 1, signed_locked_transfer,
+                                                True)
+
             events.append(lockedtransfer_event)
+            events.append(store_signed_lt)
+
         else:
             transfer_failed = EventPaymentSentFailed(
                 payment_network_identifier=transfer_description.payment_network_identifier,
@@ -310,6 +315,7 @@ def try_new_route_light(
                 reason="Received locksroot {} doesnt match with expected one {}".format(
                     signed_locked_transfer.locksroot.hex(), calculated_locksroot.hex()),
             )
+            # FIXME mmartinez same
             events.append(transfer_failed)
 
             initiator_state = None
@@ -510,7 +516,8 @@ def handle_secretrequest_light(
         iteration = TransitionResult(initiator_state, list())
 
     elif is_valid_secretrequest and is_message_from_target:
-        store_event = StoreMessageEvent(TEST_PAYMENT_ID, 4, state_change.secret_request_message, True)
+        store_event = StoreMessageEvent(state_change.secret_request_message.message_identifier,
+                                        state_change.payment_identifier, 5, state_change.secret_request_message, True)
         initiator_state.received_secret_request = True
         iteration = TransitionResult(initiator_state, [store_event])
 
@@ -526,9 +533,7 @@ def handle_secretrequest_light(
 
 def handle_send_secret_reveal_light(
     initiator_state: InitiatorTransferState,
-    state_change: ActionSendSecretRevealLight,
-    channel_state: NettingChannelState,
-    pseudo_random_generator: random.Random,
+    state_change: ActionSendSecretRevealLight
 ) -> TransitionResult[InitiatorTransferState]:
     # Reveal the secret to the target node and wait for its confirmation.
     # At this point the transfer is not cancellable anymore as either the lock
@@ -536,7 +541,7 @@ def handle_send_secret_reveal_light(
     #
     # Note: The target might be the first hop
     #
-    message_identifier = message_identifier_from_prng(pseudo_random_generator)
+    message_identifier = state_change.reveal_secret.message_identifier
     transfer_description = initiator_state.transfer_description
     recipient = transfer_description.target
     revealsecret = SendSecretRevealLight(
@@ -549,8 +554,9 @@ def handle_send_secret_reveal_light(
 
     initiator_state.revealsecret = revealsecret
     initiator_state.received_secret_request = True
-    # FIXME mmartinez7 should append a StoreMessage event with the payment id extracted from transfer_description
-    iteration = TransitionResult(initiator_state, [revealsecret])
+    store_message_event = StoreMessageEvent(message_identifier, transfer_description.payment_identifier, 7,
+                                            state_change.reveal_secret, True)
+    iteration = TransitionResult(initiator_state, [revealsecret, store_message_event])
     return iteration
 
 
@@ -595,9 +601,12 @@ def handle_offchain_secretreveal_light(
         )
         unlock_msg = Unlock.from_event(unlock_lock)
 
-        store_received_secret_reveal_event = StoreMessageEvent(TEST_PAYMENT_ID, 9, state_change.secret_reveal_message,
+        store_received_secret_reveal_event = StoreMessageEvent(state_change.secret_reveal_message.message_identifier,
+                                                               transfer_description.payment_identifier, 9,
+                                                               state_change.secret_reveal_message,
                                                                True)
-        store_created_unlock_event = StoreMessageEvent(TEST_PAYMENT_ID, 11, unlock_msg, False)
+        store_created_unlock_event = StoreMessageEvent(message_identifier, transfer_description.payment_identifier, 11,
+                                                       unlock_msg, False)
 
         events = list()
         events.append(store_received_secret_reveal_event)
@@ -736,11 +745,9 @@ def state_transition(
     elif type(state_change) == ActionSendSecretRevealLight:
         assert isinstance(state_change, ActionSendSecretRevealLight), MYPY_ANNOTATION
         iteration = handle_send_secret_reveal_light(
-            initiator_state, state_change, channel_state, pseudo_random_generator
+            initiator_state, state_change
         )
     else:
         iteration = TransitionResult(initiator_state, list())
 
     return iteration
-
-

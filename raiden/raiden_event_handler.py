@@ -3,12 +3,12 @@ from typing import TYPE_CHECKING
 
 import structlog
 from eth_utils import to_checksum_address, to_hex
-from eth_utils import encode_hex
 
-from raiden.constants import EMPTY_BALANCE_HASH, EMPTY_HASH, EMPTY_MESSAGE_HASH, EMPTY_SIGNATURE, TEST_PAYMENT_ID
+from raiden.constants import EMPTY_BALANCE_HASH, EMPTY_HASH, EMPTY_MESSAGE_HASH, EMPTY_SIGNATURE
 from raiden.exceptions import ChannelOutdatedError, RaidenUnrecoverableError
 from raiden.lightclient.light_client_message_handler import LightClientMessageHandler
-from raiden.messages import message_from_sendevent
+from raiden.message_event_convertor import message_from_sendevent
+from raiden.messages import LockedTransfer
 from raiden.network.proxies.payment_channel import PaymentChannel
 from raiden.network.proxies.token_network import TokenNetwork
 from raiden.network.resolver.client import reveal_secret_with_resolver
@@ -53,7 +53,7 @@ from raiden.transfer.utils import (
 )
 from raiden.transfer.views import get_channelstate_by_token_network_and_partner
 from raiden.utils import pex
-from raiden.utils.typing import MYPY_ANNOTATION, Address, Nonce, TokenNetworkID
+from raiden.utils.typing import MYPY_ANNOTATION, Address, Nonce, TokenNetworkID, Secret
 
 from raiden.billing.invoices.handlers.invoice_handler import handle_receive_events_with_payments
 
@@ -164,14 +164,14 @@ class RaidenEventHandler(EventHandler):
 
     @staticmethod
     def handle_store_message(raiden: "RaidenService", store_message_event: StoreMessageEvent):
-        # FIXME mmartinez7 this should take the right payment id
-        exists = LightClientMessageHandler.is_light_client_protocol_message_already_stored(TEST_PAYMENT_ID,
+        existing_message = LightClientMessageHandler.is_light_client_protocol_message_already_stored(store_message_event.payment_id,
                                                                                            store_message_event.message_order,
                                                                                            raiden.wal)
-        if not exists:
-            # FIXME mmartinez7 payment id does not travel on the protocol messages. Fix TEST_PAYMENT_ID
-            LightClientMessageHandler.store_light_client_protocol_message(store_message_event.message, store_message_event.is_signed,
-                                                                          TEST_PAYMENT_ID,
+        if not existing_message:
+            LightClientMessageHandler.store_light_client_protocol_message(store_message_event.message_id,
+                                                                          store_message_event.message,
+                                                                          store_message_event.is_signed,
+                                                                          store_message_event.payment_id,
                                                                           store_message_event.message_order,
                                                                           raiden.wal)
         else:

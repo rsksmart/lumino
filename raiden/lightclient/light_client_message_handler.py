@@ -8,6 +8,7 @@ from raiden.storage.wal import WriteAheadLog
 from typing import List
 
 
+
 def build_light_client_protocol_message(identifier: int, message: Message, signed: bool, payment_id: int,
                                         order: int) -> LightClientProtocolMessage:
     if signed:
@@ -65,9 +66,7 @@ class LightClientMessageHandler:
     def get_light_client_protocol_message_by_identifier(cls, message_identifier: int, wal: WriteAheadLog):
         message = wal.storage.get_light_client_protocol_message_by_identifier(message_identifier)
 
-        return LightClientProtocolMessage(message[3] != None, message[1], message[5], message[0], message[4], message[2], message[3])
-        # return build_light_client_protocol_message(message_protocol[0][0], message, signed, payment_id, order)
-        # return message_protocol
+        return LightClientProtocolMessage(message[3] is not None, message[1], message[5], message[0], message[4], message[2], message[3])
 
     @staticmethod
     def get_order_principal(messagetype: string):
@@ -76,7 +75,7 @@ class LightClientMessageHandler:
             SecretRequest.__name__: 5,
             RevealSecret.__name__: 9,
         }
-        return switcher.get(messagetype, "Invalid Type")
+        return switcher.get(messagetype, -1)
 
     @staticmethod
     def get_order_for_ack(ack_parent_type: string, ack_type: string):
@@ -92,6 +91,11 @@ class LightClientMessageHandler:
             Secret.__name__: 12,
         }
         if ack_type.lower() == "processed":
-            return switcher_processed.get(ack_parent_type, "Invalid Type")
+            return switcher_processed.get(ack_parent_type, -1)
         else:
-            return switcher_delivered.get(ack_parent_type, "Invalid Type")
+            return switcher_delivered.get(ack_parent_type, -1)
+
+    @classmethod
+    def exists_payment(cls, payment_id: int, wal: WriteAheadLog):
+        return wal.storage.exists_payment(payment_id)
+

@@ -1,10 +1,7 @@
 # pylint: disable=too-few-public-methods,too-many-arguments,too-many-instance-attributes
 
 from eth_utils import to_canonical_address, to_checksum_address
-
-from raiden.encoding.messages import LockedTransfer
-from raiden.encoding.messages import RevealSecret
-from raiden.encoding.messages import Unlock
+from raiden.messages import RevealSecret, Unlock, LockedTransfer, SecretRequest
 
 from raiden.transfer.architecture import (
     AuthenticatedSenderStateChange,
@@ -334,7 +331,7 @@ class ReceiveSecretRequestLight(AuthenticatedSenderStateChange):
         expiration: BlockExpiration,
         secrethash: SecretHash,
         sender: Address,
-        secret_request_message
+        secret_request_message: SecretRequest
     ) -> None:
         super().__init__(sender)
         self.payment_identifier = payment_identifier
@@ -371,9 +368,9 @@ class ReceiveSecretRequestLight(AuthenticatedSenderStateChange):
             "secrethash": serialize_bytes(self.secrethash),
             "sender": to_checksum_address(self.sender),
             "revealsecret": self.revealsecret,
+            "secret_request_message": self.secret_request_message
         }
 
-    #FIXME mmartinez why secret_request_message isnt stored?
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "ReceiveSecretRequestLight":
         instance = cls(
@@ -382,7 +379,7 @@ class ReceiveSecretRequestLight(AuthenticatedSenderStateChange):
             expiration=BlockExpiration(int(data["expiration"])),
             secrethash=SecretHash(deserialize_bytes(data["secrethash"])),
             sender=to_canonical_address(data["sender"]),
-            secret_request_message=""
+            secret_request_message=data["secret_request_message"]
         )
         instance.revealsecret = data["revealsecret"]
         return instance
@@ -435,7 +432,7 @@ class ReceiveSecretReveal(AuthenticatedSenderStateChange):
 class ReceiveSecretRevealLight(AuthenticatedSenderStateChange):
     """ A SecretReveal light client message received. """
 
-    def __init__(self, secret: Secret, sender: Address, secret_reveal_message) -> None:
+    def __init__(self, secret: Secret, sender: Address, secret_reveal_message: RevealSecret) -> None:
         super().__init__(sender)
         secrethash = sha3(secret)
 
@@ -464,15 +461,15 @@ class ReceiveSecretRevealLight(AuthenticatedSenderStateChange):
             "secret": serialize_bytes(self.secret),
             "secrethash": serialize_bytes(self.secrethash),
             "sender": to_checksum_address(self.sender),
+            "secret_reveal_message": self.secret_reveal_message
         }
 
-    #FIXME mmartinez why secret_reveal_msg isnt stored
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "ReceiveSecretRevealLight":
         instance = cls(
             secret=Secret(deserialize_bytes(data["secret"])),
             sender=to_canonical_address(data["sender"]),
-            secret_reveal_message=""
+            secret_reveal_message=data["secret_reveal_message"]
         )
         instance.secrethash = deserialize_bytes(data["secrethash"])
         return instance
@@ -606,7 +603,7 @@ class ActionSendSecretRevealLight(AuthenticatedSenderStateChange):
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "ActionSendSecretRevealLight":
         instance = cls(
-            reveal_secret=(data["reveal_secret"]),
+            reveal_secret=RevealSecret(data["reveal_secret"]),
             sender=to_canonical_address(data["sender"]),
             receiver=to_canonical_address(data["receiver"])
         )
@@ -646,7 +643,7 @@ class ActionSendUnlockLight(AuthenticatedSenderStateChange):
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "ActionSendUnlockLight":
         instance = cls(
-            unlock=(data["unlock"]),
+            unlock=data["unlock"],
             sender=to_canonical_address(data["sender"]),
             receiver=to_canonical_address(data["receiver"])
         )
