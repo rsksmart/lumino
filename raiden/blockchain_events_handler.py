@@ -355,7 +355,8 @@ def handle_channel_settled(raiden: "RaidenService", event: Event):
         our_onchain_locksroot=our_locksroot,
         partner_onchain_locksroot=partner_locksroot,
         block_number=block_number,
-        block_hash=block_hash
+        block_hash=block_hash,
+        participant1=channel_state.our_state.address
     )
     raiden.handle_and_track_state_change(channel_settled)
 
@@ -487,13 +488,11 @@ def on_blockchain_event(raiden: "RaidenService", event: Event):
         handle_channel_update_transfer(raiden, event)
 
     elif event_name == ChannelEvent.CLOSED:
-        # TODO FIXME MARCOS UNINMPLEMENTED  handle_channel_closed(raiden, event)
-        # print("Implement me!")
         handle_channel_closed(raiden, event)
+
     elif event_name == ChannelEvent.SETTLED:
-        # TODO FIXME MARCOS UNINMPLEMENTED handle_channel_settled(raiden, event)
-        print("Implement me!")
-        handle_channel_settled(raiden,event)
+        handle_channel_settled(raiden, event)
+
     elif event_name == EVENT_SECRET_REVEALED:
         handle_secret_revealed(raiden, event)
 

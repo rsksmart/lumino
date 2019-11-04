@@ -622,13 +622,15 @@ class ContractReceiveChannelSettled(ContractReceiveStateChange):
         our_onchain_locksroot: Locksroot,
         partner_onchain_locksroot: Locksroot,
         block_number: BlockNumber,
-        block_hash: BlockHash
+        block_hash: BlockHash,
+        participant1: Address
     ) -> None:
         super().__init__(transaction_hash, block_number, block_hash)
 
         self.our_onchain_locksroot = our_onchain_locksroot
         self.partner_onchain_locksroot = partner_onchain_locksroot
         self.canonical_identifier = canonical_identifier
+        self.participant1 = participant1
 
     @property
     def channel_identifier(self) -> ChannelID:
@@ -649,6 +651,7 @@ class ContractReceiveChannelSettled(ContractReceiveStateChange):
             and self.canonical_identifier == other.canonical_identifier
             and self.our_onchain_locksroot == other.our_onchain_locksroot
             and self.partner_onchain_locksroot == other.partner_onchain_locksroot
+            and self.participant1 == other.participant1
             and super().__eq__(other)
         )
 
@@ -664,6 +667,7 @@ class ContractReceiveChannelSettled(ContractReceiveStateChange):
             "canonical_identifier": self.canonical_identifier.to_dict(),
             "block_number": str(self.block_number),
             "block_hash": serialize_bytes(self.block_hash),
+            "participant1" : to_checksum_address(self.participant1)
         }
 
     @classmethod
@@ -676,6 +680,7 @@ class ContractReceiveChannelSettled(ContractReceiveStateChange):
             partner_onchain_locksroot=deserialize_locksroot(data["partner_onchain_locksroot"]),
             block_number=BlockNumber(int(data["block_number"])),
             block_hash=BlockHash(deserialize_bytes(data["block_hash"])),
+            participant1=to_canonical_address(data["participant1"])
         )
 
 
