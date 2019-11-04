@@ -247,39 +247,14 @@ def update_services_from_balance_proof(
     chain_state: "ChainState",
     balance_proof: Union[BalanceProofSignedState, BalanceProofUnsignedState],
 ) -> None:
-    # update_path_finding_service_from_balance_proof(
-    #     raiden=raiden, chain_state=chain_state, new_balance_proof=balance_proof
-    # )
+    update_path_finding_service_from_balance_proof(
+        raiden=raiden, chain_state=chain_state, new_balance_proof=balance_proof
+    )
     if isinstance(balance_proof, BalanceProofSignedState):
         update_monitoring_service_from_balance_proof(
             raiden=raiden, chain_state=chain_state, new_balance_proof=balance_proof
         )
 
-
-# def update_path_finding_service_from_balance_proof(
-#     raiden: "RaidenService",
-#     chain_state: "ChainState",
-#     new_balance_proof: Union[BalanceProofSignedState, BalanceProofUnsignedState],
-# ) -> None:
-#     channel_state = views.get_channelstate_by_canonical_identifier_and_address(
-#         chain_state=chain_state, canonical_identifier=new_balance_proof.canonical_identifier,
-#         address=chain_state.our_address
-#     )
-#     network_address = new_balance_proof.canonical_identifier.token_network_address
-#     error_msg = (
-#         f"tried to send a balance proof in non-existant channel "
-#         f"token_network_address: {pex(network_address)} "
-#     )
-#     assert channel_state is not None, error_msg
-#     if isinstance(new_balance_proof, BalanceProofSignedState):
-#         assert channel_state.partner_state.balance_proof == new_balance_proof
-#     else:  # BalanceProofUnsignedState
-#         assert channel_state.our_state.balance_proof == new_balance_proof
-#
-#     msg = UpdatePFS.from_channel_state(channel_state)
-#     msg.sign(raiden.signer)
-#     raiden.transport[0].send_global(constants.PATH_FINDING_BROADCASTING_ROOM, msg)
-#     log.debug("Sent a PFS Update", message=msg, balance_proof=new_balance_proof)
 
 
 def update_monitoring_service_from_balance_proof(
@@ -756,12 +731,8 @@ class RaidenService(Runnable):
             state_change=_redact_secret(serialize.JSONSerializer.serialize(state_change)),
         )
 
-        old_state = views.state_from_raiden(self)
         new_state, raiden_event_list = self.wal.log_and_dispatch(state_change)
 
-        # TODO marcosmartinez7 FIXME cannot work after the lc refactor
-        # for changed_balance_proof in views.detect_balance_proof_change(old_state, new_state):
-        # update_services_from_balance_proof(self, new_state, changed_balance_proof)
 
         log.debug(
             "Raiden events",
