@@ -11,9 +11,8 @@ from gevent.lock import Semaphore
 from gevent.queue import JoinableQueue
 from matrix_client.errors import MatrixRequestError
 
-from raiden.constants import DISCOVERY_DEFAULT_ROOM, IS_LIGHT_CLIENT_TEST_PAYMENT
+from raiden.constants import DISCOVERY_DEFAULT_ROOM
 from raiden.exceptions import InvalidAddress, TransportError, UnknownAddress, UnknownTokenAddress
-from raiden.lightclient.light_client_message_handler import LightClientMessageHandler
 from raiden.message_handler import MessageHandler
 from raiden.messages import (
     Delivered,

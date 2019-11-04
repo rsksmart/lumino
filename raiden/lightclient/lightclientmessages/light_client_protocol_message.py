@@ -1,3 +1,5 @@
+import string
+
 from raiden.messages import Message
 
 
@@ -9,12 +11,12 @@ class LightClientProtocolMessage:
         is_signed: bool,
         message_order: int,
         light_client_payment_id: int,
+        identifier: string,
         state_change_id: int = None,
         unsigned_message: Message = None,
-        signed_message: Message = None,
-        identifier: int = None
+        signed_message: Message = None
     ):
-        self.identifier = identifier
+        self.identifier = int(identifier)
         self.is_signed = is_signed
         self.message_order = message_order
         self.unsigned_message = unsigned_message

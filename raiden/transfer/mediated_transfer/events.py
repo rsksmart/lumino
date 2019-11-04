@@ -1,5 +1,6 @@
 # pylint: disable=too-many-arguments,too-few-public-methods
 from eth_utils import to_canonical_address, to_checksum_address
+from raiden.messages import RevealSecret
 
 from raiden.transfer.architecture import Event, SendMessageEvent
 from raiden.transfer.mediated_transfer.state import LockedTransferUnsignedState
@@ -45,8 +46,9 @@ class StoreMessageEvent(Event):
     """
 
     def __init__(
-        self, payment_id: int, message_order: int, message: Any, is_signed: bool
+        self, message_id: int, payment_id: int, message_order: int, message: Any, is_signed: bool
     ) -> None:
+        self.message_id = message_id
         self.payment_id = payment_id
         self.message_order = message_order
         self.message = message
@@ -67,6 +69,7 @@ class StoreMessageEvent(Event):
     def to_dict(self) -> Dict[str, Any]:
         result = {
             "payment_id": str(self.payment_id),
+            "message_id": str(self.message_id),
             "message_order": str(self.message_order)
         }
         return result
@@ -75,6 +78,7 @@ class StoreMessageEvent(Event):
     def from_dict(cls, data: Dict[str, Any]) -> "StoreMessageEvent":
         restored = cls(
             payment_id=int(data["payment_id"]),
+            message_id=int(data["message_id"]),
             message_order=int(data["message_order"])
         )
         return restored
@@ -332,7 +336,7 @@ class SendSecretRevealLight(SendMessageEvent):
         channel_identifier: ChannelID,
         message_identifier: MessageID,
         secret: Secret,
-        signed_secret_reveal: Any
+        signed_secret_reveal: RevealSecret
     ) -> None:
         secrethash = sha3(secret)
 
@@ -364,6 +368,7 @@ class SendSecretRevealLight(SendMessageEvent):
             "channel_identifier": str(self.queue_identifier.channel_identifier),
             "message_identifier": str(self.message_identifier),
             "secret": serialize_bytes(self.secret),
+            "signed_secret_reveal": self.signed_secret_reveal.to_dict()
         }
 
         return result
@@ -375,6 +380,7 @@ class SendSecretRevealLight(SendMessageEvent):
             channel_identifier=ChannelID(int(data["channel_identifier"])),
             message_identifier=MessageID(int(data["message_identifier"])),
             secret=deserialize_secret(data["secret"]),
+            signed_secret_reveal=RevealSecret.from_dict(data["signed_secret_reveal"])
         )
 
         return restored

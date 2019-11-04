@@ -182,6 +182,7 @@ def handle_settled(
         state_change=state_change,
         block_number=block_number,
         block_hash=block_hash,
+        node_address=state_change.participant1
     )
 
 

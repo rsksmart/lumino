@@ -1,4 +1,5 @@
 import structlog
+import json
 
 from raiden.constants import EMPTY_SECRET, TEST_PAYMENT_ID
 from raiden.lightclient.light_client_message_handler import LightClientMessageHandler
@@ -15,6 +16,7 @@ from raiden.messages import (
 )
 from raiden.raiden_service import RaidenService
 from raiden.routing import get_best_routes
+from raiden.storage.wal import WriteAheadLog
 from raiden.transfer import views
 from raiden.transfer.architecture import StateChange
 from raiden.transfer.mediated_transfer.state import lockedtransfersigned_from_message
@@ -28,7 +30,7 @@ from raiden.transfer.mediated_transfer.state_change import (
 from raiden.transfer.state import balanceproof_from_envelope
 from raiden.transfer.state_change import ReceiveDelivered, ReceiveProcessed, ReceiveUnlock
 from raiden.utils import pex, random_secret
-from raiden.utils.typing import MYPY_ANNOTATION, InitiatorAddress, PaymentAmount, TokenNetworkID
+from raiden.utils.typing import MYPY_ANNOTATION, InitiatorAddress, PaymentAmount, TokenNetworkID, Union
 
 log = structlog.get_logger(__name__)  # pylint: disable=invalid-name
 
@@ -86,7 +88,6 @@ class MessageHandler:
                 message
             )
             raiden.handle_and_track_state_change(secret_request_light)
-
         else:
             secret_request = ReceiveSecretRequest(
                 message.payment_identifier,
@@ -98,11 +99,6 @@ class MessageHandler:
             raiden.handle_and_track_state_change(secret_request)
 
     @staticmethod
-    def handle_message_revealsecret_light(raiden: RaidenService, message: RevealSecret) -> None:
-        state_change = ReceiveSecretRevealLight(message.secret, message.sender)
-        raiden.handle_and_track_state_change(state_change)
-
-    @staticmethod
     def handle_message_revealsecret(raiden: RaidenService, message: RevealSecret, is_light_client=False) -> None:
         if is_light_client:
             state_change = ReceiveSecretRevealLight(message.secret, message.sender, message)
@@ -110,7 +106,6 @@ class MessageHandler:
         else:
             state_change = ReceiveSecretReveal(message.secret, message.sender)
             raiden.handle_and_track_state_change(state_change)
-
 
     @staticmethod
     def handle_message_unlock(raiden: RaidenService, message: Unlock) -> None:
@@ -201,34 +196,49 @@ class MessageHandler:
         else:
             raiden.mediate_mediated_transfer(message)
 
-    @staticmethod
-    def handle_message_processed(raiden: RaidenService, message: Processed, is_light_client: bool = False) -> None:
+    @classmethod
+    def handle_message_processed(cls, raiden: RaidenService, message: Processed, is_light_client: bool = False) -> None:
         processed = ReceiveProcessed(message.sender, message.message_identifier)
         raiden.handle_and_track_state_change(processed)
         if is_light_client:
-            # FIXME mmartinez7 order isnt 3 always.
+            cls.store_ack_message(message, raiden.wal)
 
-            # If exists for that payment, the same message by the order, then discard it.
-            exists = LightClientMessageHandler.is_light_client_protocol_message_already_stored(TEST_PAYMENT_ID, 3,
-                                                                                               raiden.wal)
-            if not exists:
-                # FIXME mmartinez7 payment id does not travel on the protocol messages. Fix TEST_PAYMENT_ID
-                LightClientMessageHandler.store_light_client_protocol_message(message, True, TEST_PAYMENT_ID, 3,
-                                                                              raiden.wal)
-            else:
-                log.info("Message for lc already received, ignoring db storage")
-
-    @staticmethod
-    def handle_message_delivered(raiden: RaidenService, message: Delivered, is_light_client: bool = False) -> None:
+    @classmethod
+    def handle_message_delivered(cls, raiden: RaidenService, message: Delivered, is_light_client: bool = False) -> None:
         delivered = ReceiveDelivered(message.sender, message.delivered_message_identifier)
         raiden.handle_and_track_state_change(delivered)
         if is_light_client:
-            # FIXME mmartinez7 order isnt 2 always
-            exists = LightClientMessageHandler.is_light_client_protocol_message_already_stored(TEST_PAYMENT_ID, 2,
-                                                                                               raiden.wal)
+            cls.store_ack_message(message, raiden.wal)
+
+    @staticmethod
+    def store_ack_message(message: Union[Processed, Delivered], wal: WriteAheadLog):
+        # If exists for that payment, the same message by the order, then discard it.
+        is_delivered = type(message) == Delivered
+        message_identifier = None
+        if is_delivered:
+            message_identifier = message.delivered_message_identifier
+        else:
+            message_identifier = message.message_identifier
+
+        protocol_message = LightClientMessageHandler.get_light_client_protocol_message_by_identifier(
+            message_identifier, wal)
+        json_message = None
+        if protocol_message.signed_message is None:
+            json_message = protocol_message.unsigned_message
+        else:
+            json_message = protocol_message.signed_message
+
+        json_message = json.loads(json_message)
+        order = LightClientMessageHandler.get_order_for_ack(json_message["type"], message.__class__.__name__.lower())
+        if order == -1:
+            log.error("Unable to find principal message for {} {}: ".format(message.__class__.__name__,
+                                                                            message_identifier))
+        else:
+            exists = LightClientMessageHandler.is_light_client_protocol_message_already_stored_message_id(
+                message_identifier, protocol_message.light_client_payment_id, order, wal)
             if not exists:
-                # FIXME mmartinez7 payment id does not travel on the protocol messages. Fix TEST_PAYMENT_ID
-                LightClientMessageHandler.store_light_client_protocol_message(message, True, TEST_PAYMENT_ID, 2,
-                                                                              raiden.wal)
+                LightClientMessageHandler.store_light_client_protocol_message(
+                    message_identifier, message, True, protocol_message.light_client_payment_id, order,
+                    wal)
             else:
                 log.info("Message for lc already received, ignoring db storage")

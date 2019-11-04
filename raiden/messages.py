@@ -13,29 +13,19 @@ from raiden.constants import UINT64_MAX, UINT256_MAX, EMPTY_PAYMENT_HASH_INVOICE
 from raiden.encoding import messages
 from raiden.encoding.format import buffer_for
 from raiden.exceptions import InvalidProtocolMessage, InvalidSignature
-from raiden.transfer import channel
 from raiden.transfer.architecture import SendMessageEvent
 from raiden.transfer.balance_proof import (
     pack_balance_proof,
     pack_balance_proof_update,
     pack_reward_proof,
 )
-from raiden.transfer.events import SendProcessed
 from raiden.transfer.identifiers import CanonicalIdentifier
-from raiden.transfer.mediated_transfer.events import (
-    SendBalanceProof,
-    SendLockedTransfer,
-    SendLockExpired,
-    SendRefundTransfer,
-    SendSecretRequest,
-    SendSecretReveal,
-    SendLockedTransferLight, SendBalanceProofLight)
+
 from raiden.transfer.state import BalanceProofSignedState, NettingChannelState
 from raiden.transfer.utils import hash_balance_data
 from raiden.utils import ishash, pex, sha3
 from raiden.utils.signer import Signer, recover
 from raiden.utils.typing import (
-    MYPY_ANNOTATION,
     AdditionalHash,
     Address,
     Any,
@@ -167,39 +157,6 @@ def from_dict(data: dict) -> "Message":
             ) from None
     return klass.from_dict(data)
 
-
-def message_from_sendevent(send_event: SendMessageEvent) -> "Message":
-    if type(send_event) == SendLockedTransfer:
-        assert isinstance(send_event, SendLockedTransfer), MYPY_ANNOTATION
-        message = LockedTransfer.from_event(send_event)
-    elif type(send_event) == SendLockedTransferLight:
-        assert isinstance(send_event, SendLockedTransferLight), MYPY_ANNOTATION
-        message = LockedTransfer.from_event(send_event)
-    elif type(send_event) == SendSecretReveal:
-        assert isinstance(send_event, SendSecretReveal), MYPY_ANNOTATION
-        message = RevealSecret.from_event(send_event)
-    elif type(send_event) == SendBalanceProof:
-        assert isinstance(send_event, SendBalanceProof), MYPY_ANNOTATION
-        message = Unlock.from_event(send_event)
-    elif type(send_event) == SendBalanceProofLight:
-        assert isinstance(send_event, SendBalanceProofLight), MYPY_ANNOTATION
-        message = send_event.signed_balance_proof
-    elif type(send_event) == SendSecretRequest:
-        assert isinstance(send_event, SendSecretRequest), MYPY_ANNOTATION
-        message = SecretRequest.from_event(send_event)
-    elif type(send_event) == SendRefundTransfer:
-        assert isinstance(send_event, SendRefundTransfer), MYPY_ANNOTATION
-        message = RefundTransfer.from_event(send_event)
-    elif type(send_event) == SendLockExpired:
-        assert isinstance(send_event, SendLockExpired), MYPY_ANNOTATION
-        message = LockExpired.from_event(send_event)
-    elif type(send_event) == SendProcessed:
-        assert isinstance(send_event, SendProcessed), MYPY_ANNOTATION
-        message = Processed.from_event(send_event)
-    else:
-        raise ValueError(f"Unknown event type {send_event}")
-
-    return message
 
 
 class Message:
@@ -1229,38 +1186,33 @@ class LockedTransfer(LockedTransferBase):
 
     @classmethod
     def from_event(cls, event: SendMessageEvent) -> "LockedTransfer":
+        transfer = event.transfer
+        balance_proof = transfer.balance_proof
+        lock = Lock(
+            amount=transfer.lock.amount,
+            expiration=transfer.lock.expiration,
+            secrethash=transfer.lock.secrethash,
+        )
+        fee = 0
 
-        if isinstance(event, SendLockedTransfer):
-            transfer = event.transfer
-            balance_proof = transfer.balance_proof
-            lock = Lock(
-                amount=transfer.lock.amount,
-                expiration=transfer.lock.expiration,
-                secrethash=transfer.lock.secrethash,
-            )
-            fee = 0
-
-            locked_transfer = cls(
-                chain_id=balance_proof.chain_id,
-                message_identifier=event.message_identifier,
-                payment_identifier=transfer.payment_identifier,
-                payment_hash_invoice=transfer.payment_hash_invoice,
-                nonce=balance_proof.nonce,
-                token_network_address=TokenNetworkAddress(balance_proof.token_network_identifier),
-                token=transfer.token,
-                channel_identifier=balance_proof.channel_identifier,
-                transferred_amount=balance_proof.transferred_amount,
-                locked_amount=balance_proof.locked_amount,
-                recipient=event.recipient,
-                locksroot=balance_proof.locksroot,
-                lock=lock,
-                target=transfer.target,
-                initiator=transfer.initiator,
-                fee=fee,
-            )
-        else:
-            locked_transfer = event.signed_locked_transfer
-
+        locked_transfer = cls(
+            chain_id=balance_proof.chain_id,
+            message_identifier=event.message_identifier,
+            payment_identifier=transfer.payment_identifier,
+            payment_hash_invoice=transfer.payment_hash_invoice,
+            nonce=balance_proof.nonce,
+            token_network_address=TokenNetworkAddress(balance_proof.token_network_identifier),
+            token=transfer.token,
+            channel_identifier=balance_proof.channel_identifier,
+            transferred_amount=balance_proof.transferred_amount,
+            locked_amount=balance_proof.locked_amount,
+            recipient=event.recipient,
+            locksroot=balance_proof.locksroot,
+            lock=lock,
+            target=transfer.target,
+            initiator=transfer.initiator,
+            fee=fee,
+        )
         return locked_transfer
 
     def to_dict(self):
@@ -1880,128 +1832,6 @@ class RequestMonitoring(SignedMessage):
             recover(balance_proof_data, self.balance_proof.signature) == partner_address
             and recover(blinded_data, self.non_closing_signature) == requesting_address
             and recover(reward_proof_data, self.reward_proof_signature) == requesting_address
-        )
-
-
-class UpdatePFS(SignedMessage):
-    """ Message to inform a pathfinding service about a capacity change. """
-
-    def __init__(
-        self,
-        *,
-        canonical_identifier: CanonicalIdentifier,
-        updating_participant: Address,
-        other_participant: Address,
-        updating_nonce: Nonce,
-        other_nonce: Nonce,
-        updating_capacity: TokenAmount,
-        other_capacity: TokenAmount,
-        reveal_timeout: int,
-        mediation_fee: FeeAmount,
-        signature: Optional[Signature] = None,
-        **kwargs,
-    ):
-        super().__init__(**kwargs)
-        self.canonical_identifier = canonical_identifier
-        self.updating_participant = updating_participant
-        self.other_participant = other_participant
-        self.updating_nonce = updating_nonce
-        self.other_nonce = other_nonce
-        self.updating_capacity = updating_capacity
-        self.other_capacity = other_capacity
-        self.reveal_timeout = reveal_timeout
-        self.mediation_fee = mediation_fee
-        if signature is None:
-            self.signature = Signature(b"")
-        else:
-            self.signature = signature
-
-    @classmethod
-    def from_channel_state(cls, channel_state: NettingChannelState) -> "UpdatePFS":
-        return cls(
-            canonical_identifier=channel_state.canonical_identifier,
-            updating_participant=channel_state.our_state.address,
-            other_participant=channel_state.partner_state.address,
-            updating_nonce=channel.get_current_nonce(channel_state.our_state),
-            other_nonce=channel.get_current_nonce(channel_state.partner_state),
-            updating_capacity=channel.get_distributable(
-                sender=channel_state.our_state, receiver=channel_state.partner_state
-            ),
-            other_capacity=channel.get_distributable(
-                sender=channel_state.partner_state, receiver=channel_state.our_state
-            ),
-            reveal_timeout=channel_state.reveal_timeout,
-            mediation_fee=channel_state.mediation_fee,
-        )
-
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            "type": self.__class__.__name__,
-            "canonical_identifier": self.canonical_identifier.to_dict(),
-            "updating_participant": to_normalized_address(self.updating_participant),
-            "other_participant": to_normalized_address(self.other_participant),
-            "updating_nonce": self.updating_nonce,
-            "other_nonce": self.other_nonce,
-            "updating_capacity": str(self.updating_capacity),
-            "other_capacity": str(self.other_capacity),
-            "reveal_timeout": self.reveal_timeout,
-            "mediation_fee": str(self.mediation_fee),
-            "signature": encode_hex(self.signature),
-        }
-
-    @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "UpdatePFS":
-        return cls(
-            canonical_identifier=CanonicalIdentifier.from_dict(data["canonical_identifier"]),
-            updating_participant=to_canonical_address(data["updating_participant"]),
-            other_participant=to_canonical_address(data["other_participant"]),
-            updating_nonce=data["updating_nonce"],
-            other_nonce=data["other_nonce"],
-            updating_capacity=TokenAmount(int(data["updating_capacity"])),
-            other_capacity=TokenAmount(int(data["other_capacity"])),
-            reveal_timeout=data["reveal_timeout"],
-            mediation_fee=FeeAmount(int(data["mediation_fee"])),
-            signature=decode_hex(data["signature"]),
-        )
-
-    def packed(self) -> bytes:
-        klass = messages.UpdatePFS
-        data = buffer_for(klass)
-        packed = klass(data)
-        self.pack(packed)
-        return packed
-
-    def pack(self, packed) -> None:
-        packed.chain_id = self.canonical_identifier.chain_identifier
-        packed.token_network_address = self.canonical_identifier.token_network_address
-        packed.channel_identifier = self.canonical_identifier.channel_identifier
-        packed.updating_participant = self.updating_participant
-        packed.other_participant = self.other_participant
-        packed.updating_nonce = self.updating_nonce
-        packed.other_nonce = self.other_nonce
-        packed.updating_capacity = self.updating_capacity
-        packed.other_capacity = self.other_capacity
-        packed.reveal_timeout = self.reveal_timeout
-        packed.fee = self.mediation_fee
-        packed.signature = self.signature
-
-    @classmethod
-    def unpack(cls, packed) -> "UpdatePFS":
-        return cls(
-            canonical_identifier=CanonicalIdentifier(
-                chain_identifier=packed.chain_id,
-                token_network_address=packed.token_network_address,
-                channel_identifier=packed.channel_identifier,
-            ),
-            updating_participant=packed.updating_participant,
-            other_participant=packed.other_participant,
-            updating_nonce=packed.updating_nonce,
-            other_nonce=packed.other_nonce,
-            updating_capacity=packed.other_capacity,
-            other_capacity=packed.other_capacity,
-            reveal_timeout=packed.reveal_timeout,
-            mediation_fee=packed.fee,
-            signature=packed.signature,
         )
 
 
