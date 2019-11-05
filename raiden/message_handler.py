@@ -201,44 +201,11 @@ class MessageHandler:
         processed = ReceiveProcessed(message.sender, message.message_identifier)
         raiden.handle_and_track_state_change(processed)
         if is_light_client:
-            cls.store_ack_message(message, raiden.wal)
+            LightClientMessageHandler.store_ack_message(message, raiden.wal)
 
     @classmethod
     def handle_message_delivered(cls, raiden: RaidenService, message: Delivered, is_light_client: bool = False) -> None:
         delivered = ReceiveDelivered(message.sender, message.delivered_message_identifier)
         raiden.handle_and_track_state_change(delivered)
         if is_light_client:
-            cls.store_ack_message(message, raiden.wal)
-
-    @staticmethod
-    def store_ack_message(message: Union[Processed, Delivered], wal: WriteAheadLog):
-        # If exists for that payment, the same message by the order, then discard it.
-        is_delivered = type(message) == Delivered
-        message_identifier = None
-        if is_delivered:
-            message_identifier = message.delivered_message_identifier
-        else:
-            message_identifier = message.message_identifier
-
-        protocol_message = LightClientMessageHandler.get_light_client_protocol_message_by_identifier(
-            message_identifier, wal)
-        json_message = None
-        if protocol_message.signed_message is None:
-            json_message = protocol_message.unsigned_message
-        else:
-            json_message = protocol_message.signed_message
-
-        json_message = json.loads(json_message)
-        order = LightClientMessageHandler.get_order_for_ack(json_message["type"], message.__class__.__name__.lower())
-        if order == -1:
-            log.error("Unable to find principal message for {} {}: ".format(message.__class__.__name__,
-                                                                            message_identifier))
-        else:
-            exists = LightClientMessageHandler.is_light_client_protocol_message_already_stored_message_id(
-                message_identifier, protocol_message.light_client_payment_id, order, wal)
-            if not exists:
-                LightClientMessageHandler.store_light_client_protocol_message(
-                    message_identifier, message, True, protocol_message.light_client_payment_id, order,
-                    wal)
-            else:
-                log.info("Message for lc already received, ignoring db storage")
+            LightClientMessageHandler.store_ack_message(message, raiden.wal)

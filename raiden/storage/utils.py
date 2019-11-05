@@ -117,8 +117,6 @@ CREATE TABLE IF NOT EXISTS light_client_protocol_message (
     message_order INTEGER, 
     unsigned_message JSON,
     signed_message JSON,
-    state_change_id INTEGER ,
-    FOREIGN KEY(state_change_id) REFERENCES state_changes(identifier),
     FOREIGN KEY(light_client_payment_id) REFERENCES light_client_payment(payment_id),
     PRIMARY KEY (identifier, light_client_payment_id, message_order)
 );

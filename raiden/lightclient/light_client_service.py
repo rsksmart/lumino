@@ -40,9 +40,14 @@ class LightClientService:
         messages = wal.storage.get_light_client_messages(payments_ids)
         result: List[LightClientProtocolMessage] = []
         for message in messages:
+            signed = message[0]
+            order = message[1]
+            payment_id = message[2]
+            unsigned_msg = message[3]
+            signed_msg = message[4]
+            identifier = message[5]
             result.append(
-                LightClientProtocolMessage(message[0], message[1], message[2], message[3], message[4], message[5],
-                                           message[6]))
+                LightClientProtocolMessage(signed, order, payment_id, identifier, unsigned_msg, signed_msg))
         return result
 
     @classmethod
@@ -54,7 +59,7 @@ class LightClientService:
         payment = wal.storage.get_light_client_payment(payment_id)
         if payment:
             payment = LightClientPayment(payment[1], payment[2], payment[3], payment[4], payment[5],
-                                      payment[6], payment[7], payment[0])
+                                         payment[6], payment[7], payment[0])
         return payment
 
     @classmethod
@@ -73,4 +78,3 @@ class LightClientService:
                 if type(message_order) is not int:
                     return False
         return True
-

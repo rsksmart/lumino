@@ -187,15 +187,13 @@ class SQLiteStorage:
                 "message_order, "
                 "unsigned_message, "
                 "signed_message, "
-                "state_change_id, "
                 "light_client_payment_id "
                 ")"
-                "VALUES(?, ?, ?, ?, ?, ?)",
+                "VALUES(?, ?, ?, ?, ?)",
                 (str(msg_dto.identifier),
                  msg_dto.message_order,
                  msg_dto.unsigned_message,
                  msg_dto.signed_message,
-                 msg_dto.state_change_id,
                  str(msg_dto.light_client_payment_id),
                  ),
             )
@@ -210,10 +208,9 @@ class SQLiteStorage:
                 "message_order, "
                 "unsigned_message, "
                 "signed_message, "
-                "state_change_id, "
                 "light_client_payment_id "
                 ")"
-                "VALUES(?, ?, ?, ?, ?, ?)",
+                "VALUES(?, ?, ?, ?, ?)",
                 msg_dtos,
             )
             last_id = cursor.lastrowid
@@ -231,7 +228,8 @@ class SQLiteStorage:
 
         return cursor.fetchone()
 
-    def is_light_client_protocol_message_already_stored_with_message_id(self, message_id: int, payment_id: int, order: int):
+    def is_light_client_protocol_message_already_stored_with_message_id(self, message_id: int, payment_id: int,
+                                                                        order: int):
         cursor = self.conn.cursor()
         cursor.execute(
             """
@@ -250,7 +248,7 @@ class SQLiteStorage:
             SELECT *
                 FROM light_client_payment WHERE payment_id = ?;
             """,
-            (str(payment_id), )
+            (str(payment_id),)
         )
         return cursor.fetchone()
 
@@ -1307,13 +1305,17 @@ class SQLiteStorage:
 
     def get_light_client_messages(self, payments_ids):
         cursor = self.conn.cursor()
-        id_list = ','.join(map(str, payments_ids))
+
+        def add_quotes(payment_id: str) -> str:
+            return '"' + payment_id + '"'
+
+        id_list = ','.join(map(add_quotes, payments_ids))
         in_clause = "(" + id_list + ")"
         cursor.execute(
-            "SELECT identifier, message_order, unsigned_message, signed_message, state_change_id, light_client_payment_id" +
+            "SELECT identifier, message_order, unsigned_message, signed_message, light_client_payment_id" +
             " FROM light_client_protocol_message" +
             " WHERE light_client_payment_id  in " + in_clause +
-            "ORDER BY identifier ASC"
+            "ORDER BY light_client_payment_id, message_order ASC"
         )
         return cursor.fetchall()
 
@@ -1321,7 +1323,7 @@ class SQLiteStorage:
         cursor = self.conn.cursor()
         cursor.execute(
             """
-            SELECT identifier, message_order, unsigned_message, signed_message, state_change_id, light_client_payment_id
+            SELECT identifier, message_order, unsigned_message, signed_message, light_client_payment_id
             FROM light_client_protocol_message
             WHERE identifier  = ?
             ORDER BY message_order ASC
@@ -1357,7 +1359,7 @@ class SerializedSQLiteStorage(SQLiteStorage):
                 else:
                     serialized_unsigned_msg = None
                 result.append(
-                    (signed, message[1], message[5], message[4], serialized_unsigned_msg,
+                    (signed, message[1], message[4], serialized_unsigned_msg,
                      serialized_signed_msg, message[0]))
         return result
 

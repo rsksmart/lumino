@@ -31,13 +31,14 @@ from raiden.exceptions import (
     RaidenRecoverableError,
     RaidenUnrecoverableError,
     InvalidPaymentIdentifier)
+from raiden.lightclient.light_client_message_handler import LightClientMessageHandler
 from raiden.message_event_convertor import message_from_sendevent
 from raiden.messages import (
     LockedTransfer,
     Message,
     RequestMonitoring,
     SignedMessage,
-    RevealSecret, Unlock)
+    RevealSecret, Unlock, Delivered)
 from raiden.network.blockchain_service import BlockChainService
 from raiden.network.proxies.secret_registry import SecretRegistry
 from raiden.network.proxies.service_registry import ServiceRegistry
@@ -47,7 +48,8 @@ from raiden.storage import serialize, sqlite, wal
 from raiden.tasks import AlarmTask
 from raiden.transfer import channel, node, views
 from raiden.transfer.architecture import Event as RaidenEvent, StateChange
-from raiden.transfer.mediated_transfer.events import SendLockedTransfer, SendLockedTransferLight, CHANNEL_IDENTIFIER_GLOBAL_QUEUE
+from raiden.transfer.mediated_transfer.events import SendLockedTransfer, SendLockedTransferLight, \
+    CHANNEL_IDENTIFIER_GLOBAL_QUEUE
 
 from raiden.transfer.mediated_transfer.state import (
     TransferDescriptionWithSecretState,
@@ -96,7 +98,6 @@ from raiden.utils.upgrades import UpgradeManager
 from raiden_contracts.contract_manager import ContractManager
 from eth_utils import to_canonical_address, to_checksum_address, encode_hex
 from raiden.lightclient.light_client_service import LightClientService
-
 
 log = structlog.get_logger(__name__)  # pylint: disable=invalid-name
 StatusesDict = Dict[TargetAddress, Dict[PaymentID, "PaymentStatus"]]
@@ -254,7 +255,6 @@ def update_services_from_balance_proof(
         update_monitoring_service_from_balance_proof(
             raiden=raiden, chain_state=chain_state, new_balance_proof=balance_proof
         )
-
 
 
 def update_monitoring_service_from_balance_proof(
@@ -657,7 +657,7 @@ class RaidenService(Runnable):
         for light_client_transport in self.transport.light_client_transports:
             if chain_state.last_node_transport_state_authdata is not None:
                 for client_last_transport_authdata in \
-                        chain_state.last_node_transport_state_authdata.clients_last_transport_authdata:
+                    chain_state.last_node_transport_state_authdata.clients_last_transport_authdata:
                     if client_last_transport_authdata.address == to_canonical_address(light_client_transport._address):
                         selected_prev_auth_data = client_last_transport_authdata.auth_data
 
@@ -732,7 +732,6 @@ class RaidenService(Runnable):
         )
 
         new_state, raiden_event_list = self.wal.log_and_dispatch(state_change)
-
 
         log.debug(
             "Raiden events",
@@ -1074,7 +1073,6 @@ class RaidenService(Runnable):
                         if transfer.initiator == to_canonical_address(light_client_transport._address):
                             light_client_transport.whitelist(address=transfer.target)
 
-
     def sign(self, message: Message):
         """ Sign message inplace. """
         if not isinstance(message, SignedMessage):
@@ -1366,6 +1364,19 @@ class RaidenService(Runnable):
         self.handle_and_track_state_change(init_initiator_statechange)
 
         return payment_status
+
+    def initiate_send_delivered_light(self, sender_address: Address, receiver_address: Address,
+                                      delivered: Delivered, msg_order: int, payment_id: int):
+        lc_transport = self.transport.light_client_transports[0]
+        LightClientMessageHandler.store_light_client_protocol_message(
+            delivered.delivered_message_identifier,
+            delivered,
+            True,
+            payment_id,
+            msg_order,
+            self.wal
+        )
+        lc_transport.send_for_light_client_with_retry(receiver_address, delivered)
 
     def initiate_send_secret_reveal_light(
         self,

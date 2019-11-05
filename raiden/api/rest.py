@@ -15,6 +15,7 @@ from flask import Flask, make_response, send_from_directory, url_for, request
 from flask_restful import Api, abort
 from gevent.pywsgi import WSGIServer
 from hexbytes import HexBytes
+from raiden.lightclient.light_client_message_handler import LightClientMessageHandler
 from raiden_webui import RAIDEN_WEBUI_PATH
 
 from raiden.api.validations.api_error_builder import ApiErrorBuilder
@@ -1456,6 +1457,11 @@ class RestAPI:
         result = self.payment_schema.dump(payment)
         return api_response(result=result.data)
 
+    def initiate_send_delivered_light(self, sender_address: typing.Address, receiver_address: typing.Address,
+                                      delivered: Delivered, msg_order: int, payment_id: int):
+        self.raiden_api.initiate_send_delivered_light(sender_address, receiver_address, delivered, msg_order,
+                                                      payment_id)
+
     def initiate_send_secret_reveal_light(self, sender_address: typing.Address, receiver_address: typing.Address,
                                           reveal_secret: RevealSecret):
         self.raiden_api.initiate_send_secret_reveal_light(sender_address, receiver_address, reveal_secret)
@@ -2040,7 +2046,8 @@ class RestAPI:
 
         payment_request = LightClientService.get_light_client_payment(message_id, self.raiden_api.raiden.wal)
         if not payment_request:
-            return api_response("No payment associated")
+            return ApiErrorBuilder.build_and_log_error(errors="No payment associated",
+                                                       status_code=HTTPStatus.BAD_REQUEST, log=log)
 
         if message["type"] == "LockedTransfer":
             lt = LockedTransfer.from_dict(message)
@@ -2049,18 +2056,16 @@ class RestAPI:
                                         lt.lock.secrethash,
                                         EMPTY_PAYMENT_HASH_INVOICE, lt)
         elif message["type"] == "Delivered":
-            # TODO mamrtinez make this a function, encapsulate.
             delivered = Delivered.from_dict(message)
-            lc_transport = self.raiden_api.raiden.transport.light_client_transports[0]
-            # TODO mmartinez store the message on the hub.
-            lc_transport.send_for_light_client_with_retry(receiver, delivered)
+            self.initiate_send_delivered_light(sender, receiver, delivered, message_order, payment_request.payment_id)
         elif message["type"] == "RevealSecret":
             reveal_secret = RevealSecret.from_dict(message)
             self.initiate_send_secret_reveal_light(sender, receiver, reveal_secret)
         elif message["type"] == "Secret":
             unlock = Unlock.from_dict(message)
             self.initiate_send_balance_proof(sender, receiver, unlock)
-        return api_response("Should respond accordly to the message received")
+
+        return api_response("Received, message should be sent to partner")
 
     def create_light_client_payment(
         self,
