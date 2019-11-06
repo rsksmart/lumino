@@ -35,9 +35,8 @@ class LightClientService:
         return result
 
     @classmethod
-    def get_light_client_messages(cls, messages_requests: dict, wal: WriteAheadLog):
-        payments_ids = list(messages_requests.keys())
-        messages = wal.storage.get_light_client_messages(payments_ids)
+    def get_light_client_messages(cls, from_message: int, wal: WriteAheadLog):
+        messages = wal.storage.get_light_client_messages(from_message)
         result: List[LightClientProtocolMessage] = []
         for message in messages:
             signed = message[0]
@@ -78,3 +77,4 @@ class LightClientService:
                 if type(message_order) is not int:
                     return False
         return True
+

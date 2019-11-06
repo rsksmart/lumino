@@ -27,8 +27,7 @@ from raiden.api.v1.encoding import (
     LightClientSchema,
     LightClientMatrixCredentialsBuildSchema,
     PaymentLightPutSchema,
-    PaymentLightPostSchema,
-    CreatePaymentLightPostSchema)
+    CreatePaymentLightPostSchema, PaymentLightGetSchema)
 
 from raiden.utils import typing
 
@@ -299,7 +298,7 @@ class CreatePaymentLightResource(BaseResource):
 
 class PaymentLightResource(BaseResource):
     put_schema = PaymentLightPutSchema
-    post_schema = PaymentLightPostSchema
+    get_schema = PaymentLightGetSchema
 
     @use_kwargs(put_schema, locations=("json",))
     def put(self,
@@ -313,12 +312,9 @@ class PaymentLightResource(BaseResource):
         """
         return self.rest_api.receive_light_client_protocol_message(message_id, message_order, sender, receiver, message)
 
-    @use_kwargs(post_schema, locations=("json",))
-    def post(
-        self,
-        ** kwargs
-    ):
-        return self.rest_api.get_light_client_protocol_message(**kwargs)
+    @use_kwargs(get_schema, locations=("query",))
+    def get(self, from_message):
+        return self.rest_api.get_light_client_protocol_message(from_message)
 
 
 class PaymentResource(BaseResource):

@@ -213,9 +213,11 @@ class RaidenEventHandler(EventHandler):
     @staticmethod
     def handle_send_secretreveal_light(raiden: "RaidenService", reveal_secret_event: SendSecretRevealLight):
         signed_secret_reveal = reveal_secret_event.signed_secret_reveal
-        raiden.transport.light_client_transports[0].send_async(
-            reveal_secret_event.queue_identifier, signed_secret_reveal
-        )
+        lc_transport = raiden.get_light_client_transport(to_checksum_address(reveal_secret_event.sender))
+        if lc_transport:
+            lc_transport.send_async(
+                reveal_secret_event.queue_identifier, signed_secret_reveal
+            )
 
     @staticmethod
     def handle_send_balanceproof(raiden: "RaidenService", balance_proof_event: SendBalanceProof):
@@ -226,7 +228,9 @@ class RaidenEventHandler(EventHandler):
     @staticmethod
     def handle_send_balanceproof_light(raiden: "RaidenService", balance_proof_event: SendBalanceProofLight):
         unlock_message = message_from_sendevent(balance_proof_event)
-        raiden.transport.light_client_transports[0].send_async(balance_proof_event.queue_identifier, unlock_message)
+        lc_transport = raiden.get_light_client_transport(to_checksum_address(balance_proof_event.sender))
+        if lc_transport:
+            lc_transport.send_async(balance_proof_event.queue_identifier, unlock_message)
 
     @staticmethod
     def handle_send_secretrequest(

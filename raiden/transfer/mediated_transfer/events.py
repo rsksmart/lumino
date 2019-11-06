@@ -332,6 +332,7 @@ class SendSecretRevealLight(SendMessageEvent):
 
     def __init__(
         self,
+        sender: Address,
         recipient: Address,
         channel_identifier: ChannelID,
         message_identifier: MessageID,
@@ -341,14 +342,14 @@ class SendSecretRevealLight(SendMessageEvent):
         secrethash = sha3(secret)
 
         super().__init__(recipient, channel_identifier, message_identifier)
-
+        self.sender = sender
         self.secret = secret
         self.secrethash = secrethash
         self.signed_secret_reveal = signed_secret_reveal
 
     def __repr__(self) -> str:
-        return "<SendSecretRevealLight msgid:{} secrethash:{} recipient:{}>".format(
-            self.message_identifier, pex(self.secrethash), pex(self.recipient)
+        return "<SendSecretRevealLight msgid:{} secrethash:{} sender:{} recipient:{}>".format(
+            self.message_identifier, pex(self.secrethash), pex(self.sender), pex(self.recipient)
         )
 
     def __eq__(self, other: Any) -> bool:
@@ -356,6 +357,7 @@ class SendSecretRevealLight(SendMessageEvent):
             isinstance(other, SendSecretRevealLight)
             and self.secret == other.secret
             and self.secrethash == other.secrethash
+            and self.sender == other.sender
             and super().__eq__(other)
         )
 
@@ -364,6 +366,7 @@ class SendSecretRevealLight(SendMessageEvent):
 
     def to_dict(self) -> Dict[str, Any]:
         result = {
+            "sender": to_checksum_address(self.sender),
             "recipient": to_checksum_address(self.recipient),
             "channel_identifier": str(self.queue_identifier.channel_identifier),
             "message_identifier": str(self.message_identifier),
@@ -376,6 +379,7 @@ class SendSecretRevealLight(SendMessageEvent):
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "SendSecretRevealLight":
         restored = cls(
+            sender=to_canonical_address(data["sender"]),
             recipient=to_canonical_address(data["recipient"]),
             channel_identifier=ChannelID(int(data["channel_identifier"])),
             message_identifier=MessageID(int(data["message_identifier"])),
@@ -499,6 +503,7 @@ class SendBalanceProofLight(SendMessageEvent):
 
     def __init__(
         self,
+        sender: Address,
         recipient: Address,
         channel_identifier: ChannelID,
         message_identifier: MessageID,
@@ -509,7 +514,7 @@ class SendBalanceProofLight(SendMessageEvent):
         signed_balance_proof
     ) -> None:
         super().__init__(recipient, channel_identifier, message_identifier)
-
+        self.sender = sender
         self.payment_identifier = payment_identifier
         self.token = token_address
         self.secret = secret
@@ -520,7 +525,7 @@ class SendBalanceProofLight(SendMessageEvent):
     def __repr__(self) -> str:
         return (
             "<"
-            "SendBalanceProofLight msgid:{} paymentid:{} token:{} secrethash:{} recipient:{} "
+            "SendBalanceProofLight msgid:{} paymentid:{} token:{} secrethash:{} sender: {} recipient:{} "
             "balance_proof:{}"
             ">"
         ).format(
@@ -528,6 +533,7 @@ class SendBalanceProofLight(SendMessageEvent):
             self.payment_identifier,
             pex(self.token),
             pex(self.secrethash),
+            pex(self.sender),
             pex(self.recipient),
             self.balance_proof,
         )
@@ -537,6 +543,7 @@ class SendBalanceProofLight(SendMessageEvent):
             isinstance(other, SendBalanceProofLight)
             and self.payment_identifier == other.payment_identifier
             and self.token == other.token
+            and self.sender == other.sender
             and self.recipient == other.recipient
             and self.secret == other.secret
             and self.balance_proof == other.balance_proof
@@ -548,6 +555,7 @@ class SendBalanceProofLight(SendMessageEvent):
 
     def to_dict(self) -> Dict[str, Any]:
         result = {
+            "sender": to_checksum_address(self.sender),
             "recipient": to_checksum_address(self.recipient),
             "channel_identifier": str(self.queue_identifier.channel_identifier),
             "message_identifier": str(self.message_identifier),
@@ -562,6 +570,7 @@ class SendBalanceProofLight(SendMessageEvent):
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "SendBalanceProofLight":
         restored = cls(
+            sender=to_canonical_address(data["sender"]),
             recipient=to_canonical_address(data["recipient"]),
             channel_identifier=ChannelID(int(data["channel_identifier"])),
             message_identifier=MessageID(int(data["message_identifier"])),

@@ -545,6 +545,7 @@ def handle_send_secret_reveal_light(
     transfer_description = initiator_state.transfer_description
     recipient = transfer_description.target
     revealsecret = SendSecretRevealLight(
+        sender= Address(state_change.sender),
         recipient=Address(recipient),
         channel_identifier=CHANNEL_IDENTIFIER_GLOBAL_QUEUE,
         message_identifier=message_identifier,

@@ -168,6 +168,8 @@ URLS_V1 = [
         "token_target_paymentresource",
     ),
     ("/payments_light", PaymentLightResource),
+    ("/payments_light/get_messages", PaymentLightResource, "Message poling"),
+
     ("/payments_light/create", CreatePaymentLightResource, "create_payment"),
 
     ("/tokens", TokensResource),
@@ -1998,7 +2000,7 @@ class RestAPI:
 
         return api_response(light_client)
 
-    def get_light_client_protocol_message(self, messages_requests):
+    def get_light_client_protocol_message(self, from_message: int):
         headers = request.headers
         api_key = headers.get("x-api-key")
         if not api_key:
@@ -2011,21 +2013,9 @@ class RestAPI:
                 errors="There is no light client associated with the api key provided",
                 status_code=HTTPStatus.FORBIDDEN, log=log)
 
-        is_request_valid = LightClientService.is_get_messages_request_valid(messages_requests)
-        if not is_request_valid:
-            return ApiErrorBuilder.build_and_log_error(
-                errors="Invalid request format. Keys must be payment identifiers and values integers representing msg_order",
-                status_code=HTTPStatus.BAD_REQUEST, log=log)
 
-        messages = LightClientService.get_light_client_messages(messages_requests, self.raiden_api.raiden.wal)
-        # Filter msg by order
-        # TODO this can be moved to sql logic
-        filtered_messages = list()
-        for message in messages:
-            filter_order = messages_requests.get(str(message.light_client_payment_id))
-            if LightClientService.apply_message_order_filter(message, filter_order):
-                filtered_messages.append(message)
-        response = [message.to_dict() for message in filtered_messages]
+        messages = LightClientService.get_light_client_messages(from_message, self.raiden_api.raiden.wal)
+        response = [message.to_dict() for message in messages]
         return api_response(response)
 
     def receive_light_client_protocol_message(self,

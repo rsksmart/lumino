@@ -91,7 +91,6 @@ class SQLiteStorage:
 
         with conn:
             conn.executescript(DB_SCRIPT_CREATE_TABLES)
-            # FIXME mmartinez conn.executescript(DB_UPDATE_TABLES)
 
         # When writting to a table where the primary key is the identifier and we want
         # to return said identifier we use cursor.lastrowid, which uses sqlite's last_insert_rowid
@@ -1303,19 +1302,15 @@ class SQLiteStorage:
         )
         return cursor.fetchone()
 
-    def get_light_client_messages(self, payments_ids):
+    def get_light_client_messages(self, from_message):
         cursor = self.conn.cursor()
-
-        def add_quotes(payment_id: str) -> str:
-            return '"' + payment_id + '"'
-
-        id_list = ','.join(map(add_quotes, payments_ids))
-        in_clause = "(" + id_list + ")"
         cursor.execute(
             "SELECT identifier, message_order, unsigned_message, signed_message, light_client_payment_id" +
             " FROM light_client_protocol_message" +
-            " WHERE light_client_payment_id  in " + in_clause +
-            "ORDER BY light_client_payment_id, message_order ASC"
+            " WHERE internal_msg_identifier >= ?" 
+            "ORDER BY light_client_payment_id, message_order ASC",
+            (from_message,),
+
         )
         return cursor.fetchall()
 
@@ -1342,8 +1337,8 @@ class SerializedSQLiteStorage(SQLiteStorage):
 
         self.serializer = serializer
 
-    def get_light_client_messages(self, payments_ids):
-        messages = super().get_light_client_messages(payments_ids)
+    def get_light_client_messages(self, from_message):
+        messages = super().get_light_client_messages(from_message)
         result = []
         if messages:
             for message in messages:

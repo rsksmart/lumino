@@ -257,59 +257,6 @@ def update_services_from_balance_proof(
         )
 
 
-def update_monitoring_service_from_balance_proof(
-    raiden: "RaidenService", chain_state: "ChainState", new_balance_proof: BalanceProofSignedState
-) -> None:
-    if raiden.config["services"]["monitoring_enabled"] is False:
-        return
-
-    channel_state = views.get_channelstate_by_canonical_identifier_and_address(
-        chain_state=chain_state, canonical_identifier=new_balance_proof.canonical_identifier,
-        address=chain_state.our_address
-    )
-
-    msg = (
-        f"Failed to update monitoring service due to inability to find "
-        f"channel: {new_balance_proof.channel_identifier} "
-        f"token_network_address: {pex(new_balance_proof.token_network_identifier)}."
-    )
-    assert channel_state, msg
-
-    balance = channel.get_balance(
-        sender=channel_state.our_state, receiver=channel_state.partner_state
-    )
-
-    if balance < MONITORING_MIN_CAPACITY:
-        log.warn(
-            f"Skipping update to Monitoring service. "
-            f"Available balance of {balance} is less than configured "
-            f"minimum capacity of {MONITORING_MIN_CAPACITY}"
-        )
-        return
-
-    rei_balance = raiden.user_deposit.effective_balance(raiden.address, "latest")
-    if rei_balance < MONITORING_REWARD:
-        rdn_balance = to_rdn(rei_balance)
-        rdn_reward = to_rdn(MONITORING_REWARD)
-        log.warn(
-            f"Skipping update to Monitoring service. "
-            f"Your deposit balance {rdn_balance} is less than "
-            f"the required monitoring service reward of {rdn_reward}"
-        )
-        return
-
-    log.info(
-        "Received new balance proof, creating message for Monitoring Service.",
-        balance_proof=new_balance_proof,
-    )
-
-    monitoring_message = RequestMonitoring.from_balance_proof_signed_state(
-        new_balance_proof, MONITORING_REWARD
-    )
-    monitoring_message.sign(raiden.signer)
-    raiden.transport[0].send_global(constants.MONITORING_BROADCASTING_ROOM, monitoring_message)
-
-
 class RaidenService(Runnable):
     """ A Raiden node. """
 
@@ -974,8 +921,8 @@ class RaidenService(Runnable):
                 message = message_from_sendevent(event)
                 if hasattr(message, 'signature'):
                     light_client_address = to_checksum_address(encode_hex(message.initiator))
-                    if (LightClientService.is_handled_lc(light_client_address, self.wal)):
-                        light_client_transport = self._get_light_client_transport(light_client_address)
+                    if LightClientService.is_handled_lc(light_client_address, self.wal):
+                        light_client_transport = self.get_light_client_transport(light_client_address)
                         light_client_transport.send_async(queue_identifier, message)
                 else:
                     self.sign(message)
@@ -1026,7 +973,7 @@ class RaidenService(Runnable):
             current_state=chain_state,
         )
 
-    def _get_light_client_transport(self, address):
+    def get_light_client_transport(self, address):
         light_client_transport_result = None
         for light_client_transport in self.transport.light_client_transports:
             if address == light_client_transport._address:
@@ -1047,7 +994,7 @@ class RaidenService(Runnable):
                                                        light_client_address=light_client['address']):
                 if neighbour == ConnectionManager.BOOTSTRAP_ADDR:
                     continue
-                light_client_transport = self._get_light_client_transport(light_client['address'])
+                light_client_transport = self.get_light_client_transport(light_client['address'])
                 if light_client_transport is not None:
                     light_client_transport.whitelist(neighbour)
 
@@ -1367,16 +1314,17 @@ class RaidenService(Runnable):
 
     def initiate_send_delivered_light(self, sender_address: Address, receiver_address: Address,
                                       delivered: Delivered, msg_order: int, payment_id: int):
-        lc_transport = self.transport.light_client_transports[0]
-        LightClientMessageHandler.store_light_client_protocol_message(
-            delivered.delivered_message_identifier,
-            delivered,
-            True,
-            payment_id,
-            msg_order,
-            self.wal
-        )
-        lc_transport.send_for_light_client_with_retry(receiver_address, delivered)
+        lc_transport = self.get_light_client_transport(to_checksum_address(sender_address))
+        if lc_transport:
+            LightClientMessageHandler.store_light_client_protocol_message(
+                delivered.delivered_message_identifier,
+                delivered,
+                True,
+                payment_id,
+                msg_order,
+                self.wal
+            )
+            lc_transport.send_for_light_client_with_retry(receiver_address, delivered)
 
     def initiate_send_secret_reveal_light(
         self,

@@ -383,13 +383,13 @@ class CreatePaymentLightPostSchema(BaseSchema):
         decoding_class = dict
 
 
-class PaymentLightPostSchema(BaseSchema):
-    messages_requests = fields.Dict(required=True)
+
+class PaymentLightGetSchema(BaseSchema):
+    from_message = fields.Int(required=True)
 
     class Meta:
         strict = True
         decoding_class = dict
-
 
 
 class PaymentLightPutSchema(BaseSchema):

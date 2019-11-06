@@ -112,14 +112,14 @@ CREATE TABLE IF NOT EXISTS light_client_payment(
 
 DB_CREATE_LIGHT_CLIENT_PROTOCOL_MESSAGE = """
 CREATE TABLE IF NOT EXISTS light_client_protocol_message (
+    internal_msg_identifier INTEGER PRIMARY KEY AUTOINCREMENT,
     identifier TEXT,
     light_client_payment_id TEXT,
     message_order INTEGER, 
     unsigned_message JSON,
     signed_message JSON,
-    FOREIGN KEY(light_client_payment_id) REFERENCES light_client_payment(payment_id),
-    PRIMARY KEY (identifier, light_client_payment_id, message_order)
-);
+    FOREIGN KEY(light_client_payment_id) REFERENCES light_client_payment(payment_id)
+    );
 """
 
 DB_SCRIPT_CREATE_TABLES = """
