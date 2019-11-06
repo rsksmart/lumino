@@ -171,7 +171,7 @@ class NodeRunner:
             )
 
             try:
-                api_server.start()
+                 api_server.start()
             except APIServerPortInUseError:
                 click.secho(
                     f"ERROR: API Address {api_host}:{api_port} is in use. "

@@ -626,12 +626,13 @@ class TokenNetwork:
         if not self.client.can_query_state_for_block(block_identifier):
             raise NoStateForBlockIdentifier()
 
-        self._check_for_outdated_channel(
-            participant1=creator,
-            participant2=partner,
-            block_identifier=block_identifier,
-            channel_identifier=channel_identifier,
-        )
+        # First investigate why closed channels are not removed from the new channel data structure and then uncomment this @GASPAR MEDINA
+        # self._check_for_outdated_channel(
+        #     participant1=creator,
+        #     participant2=partner,
+        #     block_identifier=block_identifier,
+        #     channel_identifier=channel_identifier,
+        # )
 
         amount_to_deposit = total_deposit - previous_total_deposit
 
@@ -655,7 +656,7 @@ class TokenNetwork:
         # channel_operations_lock is not sufficient, as it allows two
         # concurrent deposits for different channels.
         #
-        current_balance = token.balance_of(self.node_address)
+        current_balance = token.balance_of(creator)
         if current_balance < amount_to_deposit:
             msg = (
                 f"new_total_deposit - previous_total_deposit =  {amount_to_deposit} can not "
@@ -1013,7 +1014,7 @@ class TokenNetwork:
 
         return error_type, msg
 
-    def close(
+    def close_light(
         self,
         channel_identifier: ChannelID,
         partner: Address,
@@ -1022,6 +1023,214 @@ class TokenNetwork:
         additional_hash: AdditionalHash,
         signature: Signature,
         given_block_identifier: BlockSpecification,
+        signed_close_tx: str
+    ):
+        """ Close the channel using the provided balance proof.
+
+        Note:
+            This method must *not* be called without updating the application
+            state, otherwise the node may accept new transfers which cannot be
+            used, because the closer is not allowed to update the balance proof
+            submitted on chain after closing
+
+        Raises:
+            RaidenRecoverableError: If the close call failed but it is not
+                critical.
+            RaidenUnrecoverableError: If the operation was ilegal at the
+                `given_block_identifier` or if the channel changes in a way that
+                cannot be recovered.
+        """
+
+        log_details = {
+            "token_network": pex(self.address),
+            "node": pex(self.node_address),
+            "partner": pex(partner),
+            "nonce": nonce,
+            "balance_hash": encode_hex(balance_hash),
+            "additional_hash": encode_hex(additional_hash),
+            "signature": encode_hex(signature),
+        }
+        log.debug("closeChannel called", **log_details)
+
+        if signature != EMPTY_SIGNATURE:
+            canonical_identifier = CanonicalIdentifier(
+                chain_identifier=self.proxy.contract.functions.chain_id().call(),
+                token_network_address=self.address,
+                channel_identifier=channel_identifier,
+            )
+            partner_signed_data = pack_balance_proof(
+                nonce=nonce,
+                balance_hash=balance_hash,
+                additional_hash=additional_hash,
+                canonical_identifier=canonical_identifier,
+            )
+            try:
+                partner_recovered_address = recover(data=partner_signed_data, signature=signature)
+
+                # InvalidSignature is raised by raiden.utils.signer.recover if signature
+                # is not bytes or has the incorrect length
+                #
+                # ValueError is raised if the PublicKey instantiation failed, let it
+                # propagate because it's a memory pressure problem.
+                #
+                # Exception is raised if the public key recovery failed.
+            except Exception:  # pylint: disable=broad-except
+                raise RaidenUnrecoverableError("Couldn't verify the close signature")
+            else:
+                if partner_recovered_address != partner:
+                    raise RaidenUnrecoverableError("Invalid close proof signature")
+
+        try:
+            channel_onchain_detail = self._detail_channel(
+                participant1=self.node_address,
+                participant2=partner,
+                block_identifier=given_block_identifier,
+                channel_identifier=channel_identifier,
+            )
+        except ValueError:
+            # If `given_block_identifier` has been pruned the checks cannot be
+            # performed.
+            pass
+        else:
+            onchain_channel_identifier = channel_onchain_detail.channel_identifier
+            if onchain_channel_identifier != channel_identifier:
+                msg = (
+                    f"The provided channel identifier does not match the value "
+                    f"on-chain at the provided block ({given_block_identifier}). "
+                    f"This call should never have been attempted. "
+                    f"provided_channel_identifier={channel_identifier}, "
+                    f"onchain_channel_identifier={channel_onchain_detail.channel_identifier}"
+                )
+                raise RaidenUnrecoverableError(msg)
+
+            if channel_onchain_detail.state != ChannelState.OPENED:
+                msg = (
+                    f"The channel was not open at the provided block "
+                    f"({given_block_identifier}). This call should never have "
+                    f"been attempted."
+                )
+                raise RaidenUnrecoverableError(msg)
+
+        with self.channel_operations_lock[partner]:
+            checking_block = self.client.get_checking_block()
+            gas_limit = self.proxy.estimate_gas(
+                checking_block,
+                "closeChannel",
+                channel_identifier=channel_identifier,
+                partner=partner,
+                balance_hash=balance_hash,
+                nonce=nonce,
+                additional_hash=additional_hash,
+                signature=signature,
+            )
+
+            if gas_limit:
+                # transaction_hash = self.proxy.transact(
+                #     "closeChannel",
+                #     safe_gas_limit(gas_limit, GAS_REQUIRED_FOR_CLOSE_CHANNEL),
+                #     channel_identifier=channel_identifier,
+                #     partner=partner,
+                #     balance_hash=balance_hash,
+                #     nonce=nonce,
+                #     additional_hash=additional_hash,
+                #     signature=signature,
+                # )
+
+                print("Sending signed_close_tx")
+                transaction_hash = self.proxy.broadcast_signed_transaction(signed_close_tx)
+
+                self.client.poll(transaction_hash)
+                receipt_or_none = check_transaction_threw(self.client, transaction_hash)
+
+                if receipt_or_none:
+                    # Because the gas estimation succeeded it is known that:
+                    # - The channel existed.
+                    # - The channel was at the state open.
+                    # - The account had enough balance to pay for the gas
+                    #   (however there is a race condition for multiple
+                    #   transactions #3890)
+                    #
+                    # So the only reason for the transaction to fail is if our
+                    # partner closed it before (assuming exclusive usage of the
+                    # account and no compiler bugs)
+
+                    # These checks do not have problems with race conditions because
+                    # `poll`ing waits for the transaction to be confirmed.
+                    mining_block = int(receipt_or_none["blockNumber"])
+
+                    if receipt_or_none["cumulativeGasUsed"] == gas_limit:
+                        msg = (
+                            "update transfer failed and all gas was used. Estimate gas "
+                            "may have underestimated update transfer, or succeeded even "
+                            "though an assert is triggered, or the smart contract code "
+                            "has an conditional assert."
+                        )
+                        raise RaidenUnrecoverableError(msg)
+
+                    partner_details = self._detail_participant(
+                        channel_identifier=channel_identifier,
+                        participant=partner,
+                        partner=self.node_address,
+                        block_identifier=mining_block,
+                    )
+
+                    if partner_details.is_closer:
+                        msg = "Channel was already closed by channel partner first."
+                        raise RaidenRecoverableError(msg)
+
+                    raise RaidenUnrecoverableError("closeChannel call failed")
+
+            else:
+                # The transaction would have failed if sent, figure out why.
+
+                # The latest block can not be used reliably because of reorgs,
+                # therefore every call using this block has to handle pruned data.
+                failed_at = self.proxy.jsonrpc_client.get_block("latest")
+                failed_at_blockhash = encode_hex(failed_at["hash"])
+                failed_at_blocknumber = failed_at["number"]
+
+                self.proxy.jsonrpc_client.check_for_insufficient_eth(
+                    transaction_name="closeChannel",
+                    address=self.node_address,
+                    transaction_executed=True,
+                    required_gas=GAS_REQUIRED_FOR_CLOSE_CHANNEL,
+                    block_identifier=failed_at_blocknumber,
+                )
+
+                detail = self._detail_channel(
+                    participant1=self.node_address,
+                    participant2=partner,
+                    block_identifier=failed_at_blockhash,
+                    channel_identifier=channel_identifier,
+                )
+
+                if detail.state < ChannelState.OPENED:
+                    msg = (
+                        f"cannot call close channel has not been opened yet. "
+                        f"current_state={detail.state}"
+                    )
+                    raise RaidenUnrecoverableError(msg)
+
+                if detail.state >= ChannelState.CLOSED:
+                    msg = (
+                        f"cannot call close on a channel that has been closed already. "
+                        f"current_state={detail.state}"
+                    )
+                    raise RaidenRecoverableError(msg)
+
+                raise RaidenUnrecoverableError("close channel failed for an unknown reason")
+
+        log.info("closeChannel successful", **log_details)
+
+    def close(
+        self,
+        channel_identifier: ChannelID,
+        partner: Address,
+        balance_hash: BalanceHash,
+        nonce: Nonce,
+        additional_hash: AdditionalHash,
+        signature: Signature,
+        given_block_identifier: BlockSpecification
     ):
         """ Close the channel using the provided balance proof.
 
@@ -1133,6 +1342,7 @@ class TokenNetwork:
                     additional_hash=additional_hash,
                     signature=signature,
                 )
+
                 self.client.poll(transaction_hash)
                 receipt_or_none = check_transaction_threw(self.client, transaction_hash)
 
@@ -1608,12 +1818,13 @@ class TokenNetwork:
         if not self.client.can_query_state_for_block(block_identifier):
             raise NoStateForBlockIdentifier()
 
-        self._check_for_outdated_channel(
-            participant1=self.node_address,
-            participant2=partner,
-            block_identifier=block_identifier,
-            channel_identifier=channel_identifier,
-        )
+        # First investigate why closed channels are not removed from the new channel data structure and then uncomment this #FIXME
+        # self._check_for_outdated_channel(
+        #     participant1=self.node_address,
+        #     participant2=partner,
+        #     block_identifier=block_identifier,
+        #     channel_identifier=channel_identifier,
+        # )
 
     def settle(
         self,

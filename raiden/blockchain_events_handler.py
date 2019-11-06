@@ -2,7 +2,7 @@ from typing import TYPE_CHECKING, List
 
 import gevent
 import structlog
-from eth_utils import to_canonical_address, to_checksum_address, encode_hex
+from eth_utils import to_canonical_address, to_checksum_address, encode_hex, decode_hex
 
 from raiden.blockchain.events import Event
 from raiden.blockchain.state import get_channel_state
@@ -122,8 +122,14 @@ def handle_channel_new(raiden: "RaidenService", event: Event):
 
         partner_address = channel_state.partner_state.address
 
+        light_client_address = None
+        if is_participant1_handled_lc:
+            light_client_address = participant1
+        elif is_participant2_handled_lc:
+            light_client_address = participant2
+
         if ConnectionManager.BOOTSTRAP_ADDR != partner_address:
-            raiden.start_health_check_for(partner_address)
+            raiden.start_health_check_for(partner_address, light_client_address)
 
     # Raiden node is not participant of channel. Lc are not participants
     else:
@@ -212,13 +218,14 @@ def handle_channel_closed(raiden: "RaidenService", event: Event):
     block_hash = data["block_hash"]
 
     chain_state = views.state_from_raiden(raiden)
-    channel_state = views.get_channelstate_by_canonical_identifier(
+    channel_state = views.get_channelstate_by_canonical_identifier_and_address(
         chain_state=chain_state,
         canonical_identifier=CanonicalIdentifier(
             chain_identifier=chain_state.chain_id,
             token_network_address=token_network_identifier,
             channel_identifier=channel_identifier,
         ),
+        address=args['closing_participant'],
     )
 
     channel_closed: StateChange
@@ -258,13 +265,14 @@ def handle_channel_update_transfer(raiden: "RaidenService", event: Event):
     block_hash = data["block_hash"]
 
     chain_state = views.state_from_raiden(raiden)
-    channel_state = views.get_channelstate_by_canonical_identifier(
+    channel_state = views.get_channelstate_by_canonical_identifier_and_address(
         chain_state=chain_state,
         canonical_identifier=CanonicalIdentifier(
             chain_identifier=chain_state.chain_id,
             token_network_address=token_network_identifier,
             channel_identifier=channel_identifier,
         ),
+        address=args['closing_participant'],
     )
 
     if channel_state:
@@ -287,13 +295,14 @@ def handle_channel_settled(raiden: "RaidenService", event: Event):
     transaction_hash = data["transaction_hash"]
 
     chain_state = views.state_from_raiden(raiden)
-    channel_state = views.get_channelstate_by_canonical_identifier(
+    channel_state = views.get_channelstate_by_canonical_identifier_and_address(
         chain_state=chain_state,
         canonical_identifier=CanonicalIdentifier(
             chain_identifier=chain_state.chain_id,
             token_network_address=token_network_identifier,
             channel_identifier=channel_identifier,
         ),
+        address=raiden.address,
     )
 
     # This may happen for two reasons:
@@ -347,6 +356,7 @@ def handle_channel_settled(raiden: "RaidenService", event: Event):
         partner_onchain_locksroot=partner_locksroot,
         block_number=block_number,
         block_hash=block_hash,
+        participant1=channel_state.our_state.address
     )
     raiden.handle_and_track_state_change(channel_settled)
 
@@ -478,13 +488,10 @@ def on_blockchain_event(raiden: "RaidenService", event: Event):
         handle_channel_update_transfer(raiden, event)
 
     elif event_name == ChannelEvent.CLOSED:
-        # TODO FIXME MARCOS UNINMPLEMENTED  handle_channel_closed(raiden, event)
-        print("Implement me!")
+        handle_channel_closed(raiden, event)
 
     elif event_name == ChannelEvent.SETTLED:
-        # TODO FIXME MARCOS UNINMPLEMENTED handle_channel_settled(raiden, event)
-        print("Implement me!")
-
+        handle_channel_settled(raiden, event)
 
     elif event_name == EVENT_SECRET_REVEALED:
         handle_secret_revealed(raiden, event)

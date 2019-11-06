@@ -5,7 +5,7 @@ import pytest
 
 from raiden import waiting
 from raiden.api.python import RaidenAPI
-from raiden.constants import UINT64_MAX
+from raiden.constants import UINT64_MAX, EMPTY_PAYMENT_HASH_INVOICE
 from raiden.exceptions import RaidenUnrecoverableError
 from raiden.messages import LockedTransfer, LockExpired, RevealSecret
 from raiden.storage.restore import channel_state_until_state_change
@@ -193,6 +193,7 @@ def run_test_lock_expiry(raiden_network, token_addresses, deposit):
         fee=0,
         target=target,
         identifier=identifier,
+        payment_hash_invoice=EMPTY_PAYMENT_HASH_INVOICE,
         secret=transfer_1_secret,
     )
     transfer1_received.wait()
@@ -243,6 +244,7 @@ def run_test_lock_expiry(raiden_network, token_addresses, deposit):
         fee=0,
         target=target,
         identifier=identifier,
+        payment_hash_invoice=EMPTY_PAYMENT_HASH_INVOICE,
         secret=transfer_2_secret,
     )
     transfer2_received.wait()
@@ -318,6 +320,7 @@ def run_test_batch_unlock(
         fee=0,
         target=target,
         identifier=identifier,
+        payment_hash_invoice=EMPTY_PAYMENT_HASH_INVOICE,
         secret=secret,
     )
 
@@ -454,6 +457,7 @@ def run_test_settled_lock(token_addresses, raiden_network, deposit):
         fee=0,
         target=target,
         identifier=identifier,
+        payment_hash_invoice=EMPTY_PAYMENT_HASH_INVOICE,
         secret=secret,
     )
 
@@ -543,6 +547,7 @@ def run_test_automatic_secret_registration(raiden_chain, token_addresses):
         fee=0,
         target=target,
         identifier=identifier,
+        payment_hash_invoice=EMPTY_PAYMENT_HASH_INVOICE,
         secret=secret,
     )
 
@@ -616,6 +621,7 @@ def run_test_start_end_attack(token_addresses, raiden_chain, deposit):
         fee=0,
         target=target,
         identifier=identifier,
+        payment_hash_invoice=EMPTY_PAYMENT_HASH_INVOICE,
         secret=secret,
     )
 
@@ -833,6 +839,7 @@ def run_test_batch_unlock_after_restart(raiden_network, token_addresses, deposit
         fee=0,
         target=bob_app.raiden.address,
         identifier=identifier,
+        payment_hash_invoice=EMPTY_PAYMENT_HASH_INVOICE,
         secret=alice_transfer_secret,
     )
 
@@ -842,6 +849,7 @@ def run_test_batch_unlock_after_restart(raiden_network, token_addresses, deposit
         fee=0,
         target=alice_app.raiden.address,
         identifier=identifier + 1,
+        payment_hash_invoice=EMPTY_PAYMENT_HASH_INVOICE,
         secret=bob_transfer_secret,
     )
 

@@ -9,6 +9,7 @@ from raiden.constants import (
     EMPTY_MERKLE_ROOT,
     MAXIMUM_PENDING_TRANSFERS,
     UINT256_MAX,
+    EMPTY_PAYMENT_HASH_INVOICE
 )
 from raiden.settings import DEFAULT_NUMBER_OF_BLOCK_CONFIRMATIONS
 from raiden.transfer.architecture import Event, StateChange, TransitionResult
@@ -32,7 +33,7 @@ from raiden.transfer.mediated_transfer.events import (
     SendLockExpired,
     SendRefundTransfer,
     refund_from_sendmediated,
-)
+    SendBalanceProofLight)
 from raiden.transfer.mediated_transfer.state import (
     LockedTransferSignedState,
     LockedTransferUnsignedState,
@@ -114,12 +115,11 @@ from raiden.utils.typing import (
 
 from raiden.billing.invoices.handlers.invoice_handler import handle_received_invoice
 
-
 # This should be changed to `Union[str, MerkleTreeState]`
 MerkletreeOrError = Tuple[bool, Optional[str], Optional[MerkleTreeState]]
 EventsOrError = Tuple[bool, List[Event], Optional[str]]
 BalanceProofData = Tuple[Locksroot, Nonce, TokenAmount, TokenAmount]
-SendUnlockAndMerkleTree = Tuple[SendBalanceProof, MerkleTreeState]
+SendUnlockAndMerkleTree = Tuple[Union[SendBalanceProof, SendBalanceProofLight], MerkleTreeState]
 
 
 class UnlockGain(NamedTuple):
@@ -255,7 +255,7 @@ def is_transaction_confirmed(
     return blockchain_block_number > confirmation_block
 
 
-def is_balance_proof_safe_for_onchain_operations(balance_proof: BalanceProofSignedState,) -> bool:
+def is_balance_proof_safe_for_onchain_operations(balance_proof: BalanceProofSignedState, ) -> bool:
     """ Check if the balance proof would overflow onchain. """
     total_amount = balance_proof.transferred_amount + balance_proof.locked_amount
     return total_amount <= UINT256_MAX
@@ -548,7 +548,6 @@ def valid_lockedtransfer_check(
     payment_hash_invoice,
     storage
 ) -> MerkletreeOrError:
-
     handle_invoice_result = handle_received_invoice(storage, payment_hash_invoice)
 
     current_balance_proof = get_current_balanceproof(sender_state)
@@ -564,22 +563,22 @@ def valid_lockedtransfer_check(
         sender_state=sender_state,
     )
 
-    result: MerkletreeOrError = (False, None, None)
+    result: MerkletreeOrError = (False, None, None, None)
 
     if not is_balance_proof_usable:
         msg = f"Invalid {message_name} message. {invalid_balance_proof_msg}"
-        result = (False, msg, None)
+        result = (False, msg, None, None)
 
     elif merkletree is None:
         msg = "Invalid {} message. Same lockhash handled twice.".format(message_name)
-        result = (False, msg, None)
+        result = (False, msg, None, None)
 
     elif _merkletree_width(merkletree) > MAXIMUM_PENDING_TRANSFERS:
         msg = (
             f"Invalid {message_name} message. Adding the transfer would exceed the allowed "
             f"limit of {MAXIMUM_PENDING_TRANSFERS} pending transfers per channel."
         )
-        result = (False, msg, None)
+        result = (False, msg, None, None)
 
     else:
         locksroot_with_lock = merkleroot(merkletree)
@@ -595,7 +594,7 @@ def valid_lockedtransfer_check(
                 encode_hex(received_balance_proof.locksroot),
             )
 
-            result = (False, msg, None)
+            result = (False, msg, None, None)
 
         elif received_balance_proof.transferred_amount != current_transferred_amount:
             # Mediated transfers must not change transferred_amount
@@ -606,7 +605,7 @@ def valid_lockedtransfer_check(
                 message_name, current_transferred_amount, received_balance_proof.transferred_amount
             )
 
-            result = (False, msg, None)
+            result = (False, msg, None, None)
 
         elif received_balance_proof.locked_amount != expected_locked_amount:
             # Mediated transfers must increase the locked_amount by lock.amount
@@ -615,7 +614,7 @@ def valid_lockedtransfer_check(
                 "Balance proof's locked_amount is invalid, expected: {} got: {}."
             ).format(message_name, expected_locked_amount, received_balance_proof.locked_amount)
 
-            result = (False, msg, None)
+            result = (False, msg, None, None)
 
         # the locked amount is limited to the current available balance, otherwise
         # the sender is attempting to game the protocol and do a double spend
@@ -626,7 +625,7 @@ def valid_lockedtransfer_check(
                 "lock amount: {} maximum distributable: {}"
             ).format(message_name, lock.amount, distributable)
 
-            result = (False, msg, None)
+            result = (False, msg, None, None)
 
         # if the message contains the keccak of the empty hash it will never be
         # usable onchain https://github.com/raiden-network/raiden/issues/3091
@@ -635,7 +634,7 @@ def valid_lockedtransfer_check(
                 f"Invalid {message_name} message. "
                 "The secrethash is the keccak of 0x0 and will not be usable onchain"
             )
-            result = (False, msg, None)
+            result = (False, msg, None, None)
         else:
             result = (True, None, merkletree, handle_invoice_result)
 
@@ -672,13 +671,15 @@ def is_valid_refund(
     receiver_state: NettingChannelEndState,
     received_transfer: LockedTransferUnsignedState,
 ) -> MerkletreeOrError:
-    is_valid_locked_transfer, msg, merkletree = valid_lockedtransfer_check(
+    is_valid_locked_transfer, msg, merkletree, _ = valid_lockedtransfer_check(
         channel_state,
         sender_state,
         receiver_state,
         "RefundTransfer",
         refund.transfer.balance_proof,
         refund.transfer.lock,
+        EMPTY_PAYMENT_HASH_INVOICE,
+        None
     )
 
     if not is_valid_locked_transfer:
@@ -787,7 +788,7 @@ def get_amount_locked(end_state: NettingChannelEndState) -> TokenAmount:
     return TokenAmount(result)
 
 
-def get_batch_unlock_gain(channel_state: NettingChannelState,) -> UnlockGain:
+def get_batch_unlock_gain(channel_state: NettingChannelState, ) -> UnlockGain:
     """Collect amounts for unlocked/unclaimed locks and onchain unlocked locks.
     Note: this function does not check expiry, so the values make only sense during settlement.
 
@@ -880,7 +881,7 @@ def get_distributable(
     return TokenAmount(min(overflow_limit, distributable))
 
 
-def get_batch_unlock(end_state: NettingChannelEndState,) -> Optional[MerkleTreeLeaves]:
+def get_batch_unlock(end_state: NettingChannelEndState, ) -> Optional[MerkleTreeLeaves]:
     """ Unlock proof for an entire merkle tree of pending locks
 
     The unlock proof contains all the merkle tree data, tightly packed, needed by the token
@@ -1104,6 +1105,7 @@ def create_sendlockedtransfer(
 
     lock = HashTimeLockState(amount=amount, expiration=expiration, secrethash=secrethash)
 
+    # channel_state.our_state.merkletree.layers = [[]]
     merkletree = compute_merkletree_with(channel_state.our_state.merkletree, lock.lockhash)
     # The caller must ensure the same lock is not being used twice
     assert merkletree, "lock is already registered"
@@ -1152,6 +1154,7 @@ def create_unlock(
     payment_identifier: PaymentID,
     secret: Secret,
     lock: HashTimeLockState,
+    is_light_client: bool = False
 ) -> SendUnlockAndMerkleTree:
     our_state = channel_state.our_state
 
@@ -1186,15 +1189,26 @@ def create_unlock(
         canonical_identifier=channel_state.canonical_identifier,
     )
 
-    unlock_lock = SendBalanceProof(
-        recipient=recipient,
-        channel_identifier=channel_state.identifier,
-        message_identifier=message_identifier,
-        payment_identifier=payment_identifier,
-        token_address=token_address,
-        secret=secret,
-        balance_proof=balance_proof,
-    )
+    if is_light_client:
+        unlock_lock = SendBalanceProofLight(
+            recipient=recipient,
+            channel_identifier=channel_state.identifier,
+            message_identifier=message_identifier,
+            payment_identifier=payment_identifier,
+            token_address=token_address,
+            secret=secret,
+            balance_proof=balance_proof,
+        )
+    else:
+        unlock_lock = SendBalanceProof(
+            recipient=recipient,
+            channel_identifier=channel_state.identifier,
+            message_identifier=message_identifier,
+            payment_identifier=payment_identifier,
+            token_address=token_address,
+            secret=secret,
+            balance_proof=balance_proof,
+        )
 
     return unlock_lock, merkletree
 
@@ -1254,6 +1268,7 @@ def send_refundtransfer(
         amount,
         message_identifier,
         payment_identifier,
+        EMPTY_PAYMENT_HASH_INVOICE,
         expiration,
         secrethash,
     )
@@ -1269,18 +1284,46 @@ def send_refundtransfer(
     return refund_transfer
 
 
+def create_send_balance_proof_light(
+    channel_state: NettingChannelState,
+    unlock,
+    recipient: Address,
+) -> SendBalanceProofLight:
+    token_address = channel_state.token_address
+
+    balance_proof = BalanceProofUnsignedState(
+        nonce=unlock.nonce,
+        transferred_amount=unlock.transferred_amount,
+        locked_amount=unlock.locked_amount,
+        locksroot=unlock.locksroot,
+        canonical_identifier=channel_state.canonical_identifier,
+    )
+    balance_proof_event = SendBalanceProofLight(
+        recipient=recipient,
+        channel_identifier=channel_state.identifier,
+        message_identifier=unlock.message_identifier,
+        payment_identifier=unlock.payment_identifier,
+        token_address=token_address,
+        secret=unlock.secret,
+        balance_proof=balance_proof,
+        signed_balance_proof=unlock
+    )
+    return balance_proof_event
+
+
 def send_unlock(
     channel_state: NettingChannelState,
     message_identifier: MessageID,
     payment_identifier: PaymentID,
     secret: Secret,
     secrethash: SecretHash,
+    is_light_client: bool = False
 ) -> SendBalanceProof:
     lock = get_lock(channel_state.our_state, secrethash)
     assert lock, "caller must ensure the lock exists"
 
     unlock, merkletree = create_unlock(
-        channel_state, message_identifier, payment_identifier, secret, lock
+        channel_state, message_identifier, payment_identifier, secret, lock, is_light_client
     )
 
     channel_state.our_state.balance_proof = unlock.balance_proof
@@ -1292,7 +1335,8 @@ def send_unlock(
 
 
 def events_for_close(
-    channel_state: NettingChannelState, block_number: BlockNumber, block_hash: BlockHash
+    channel_state: NettingChannelState, block_number: BlockNumber, block_hash: BlockHash,
+    signed_close_tx: str
 ) -> List[Event]:
     events: List[Event] = list()
 
@@ -1307,6 +1351,7 @@ def events_for_close(
             canonical_identifier=channel_state.canonical_identifier,
             balance_proof=balance_proof,
             triggered_by_block_hash=block_hash,
+            signed_close_tx=signed_close_tx
         )
 
         events.append(close_event)
@@ -1483,7 +1528,8 @@ def handle_action_close(
     assert channel_state.identifier == close.channel_identifier, msg
 
     events = events_for_close(
-        channel_state=channel_state, block_number=block_number, block_hash=block_hash
+        channel_state=channel_state, block_number=block_number, block_hash=block_hash,
+        signed_close_tx=close.signed_close_tx
     )
     return TransitionResult(channel_state, events)
 
@@ -1612,7 +1658,7 @@ def handle_receive_lockedtransfer(
 def handle_receive_refundtransfercancelroute(
     channel_state: NettingChannelState, refund_transfer: LockedTransferSignedState
 ) -> EventsOrError:
-    return handle_receive_lockedtransfer(channel_state, refund_transfer)
+    return handle_receive_lockedtransfer(channel_state, refund_transfer, None)
 
 
 def handle_unlock(channel_state: NettingChannelState, unlock: ReceiveUnlock) -> EventsOrError:

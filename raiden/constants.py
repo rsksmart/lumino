@@ -16,6 +16,9 @@ from raiden.utils.typing import (
     PaymentHashInvoice,
 )
 
+TEST_PAYMENT_ID = 1
+IS_LIGHT_CLIENT_TEST_PAYMENT = True
+
 LATEST = "https://api.github.com/repos/rsksmart/lumino/releases/latest"
 RELEASE_PAGE = "https://github.com/rsksmart/lumino/releases"
 SECURITY_EXPRESSION = r"\[CRITICAL UPDATE.*?\]"
@@ -71,7 +74,7 @@ HTTP_PORT = 80
 HTTPS_PORT = 443
 
 START_QUERY_BLOCK_KEY = "DefaultStartBlock"
-SNAPSHOT_STATE_CHANGES_COUNT = 500
+SNAPSHOT_STATE_CHANGES_COUNT = 10
 
 # An arbitrary limit for transaction size in Raiden, added in PR #1990
 TRANSACTION_GAS_LIMIT_UPPER_BOUND = int(0.4 * 3_141_592)

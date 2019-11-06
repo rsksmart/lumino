@@ -41,7 +41,7 @@ from raiden.utils.typing import (
     TargetAddress,
     TokenAddress,
     TokenNetworkID,
-)
+    Union)
 
 if TYPE_CHECKING:
     # pylint: disable=unused-import
@@ -130,16 +130,16 @@ class InitiatorTransferState(State):
 
     def __init__(
         self,
-        transfer_description: "TransferDescriptionWithSecretState",
+        transfer_description: Union["TransferDescriptionWithSecretState", "TransferDescriptionWithoutSecretState"],
         channel_identifier: ChannelID,
         transfer: "LockedTransferUnsignedState",
         revealsecret: Optional["SendSecretReveal"],
         received_secret_request: bool = False,
     ) -> None:
-
-        if not isinstance(transfer_description, TransferDescriptionWithSecretState):
+        if not isinstance(transfer_description, TransferDescriptionWithSecretState) and not isinstance(
+            transfer_description, TransferDescriptionWithoutSecretState):
             raise ValueError(
-                "transfer_description must be an instance of TransferDescriptionWithSecretState"
+                "transfer_description must be an instance of TransferDescriptionWithSecretState or TransferDescriptionWithoutSecretState"
             )
 
         # This is the users description of the transfer. It does not contain a
@@ -427,7 +427,7 @@ class LockedTransferUnsignedState(LockedTransferState):
 
         result_dict = {
             "payment_identifier": str(self.payment_identifier),
-            "payment_hash_invoice" : encode_hex(self.payment_hash_invoice),
+            "payment_hash_invoice": encode_hex(self.payment_hash_invoice),
             "token": to_checksum_address(self.token),
             "balance_proof": self.balance_proof,
             "lock": self.lock,
@@ -567,6 +567,107 @@ class LockedTransferSignedState(LockedTransferState):
         return restored
 
 
+class TransferDescriptionWithoutSecretState(State):
+    """ Describes a transfer (target, amount, and token) that is part of a light client payment
+    """
+
+    __slots__ = (
+        "payment_network_identifier",
+        "payment_identifier",
+        "payment_hash_invoice",
+        "amount",
+        "allocated_fee",
+        "token_network_identifier",
+        "initiator",
+        "target",
+        "secrethash",
+    )
+
+    def __init__(
+        self,
+        payment_network_identifier: PaymentNetworkID,
+        payment_identifier: PaymentID,
+        payment_hash_invoice: PaymentHashInvoice,
+        amount: PaymentAmount,
+        allocated_fee: FeeAmount,
+        token_network_identifier: TokenNetworkID,
+        initiator: InitiatorAddress,
+        target: TargetAddress,
+        secrethash: SecretHash = None,
+    ) -> None:
+        self.payment_network_identifier = payment_network_identifier
+        self.payment_identifier = payment_identifier
+        self.payment_hash_invoice = payment_hash_invoice
+        self.amount = amount
+        self.allocated_fee = allocated_fee
+        self.token_network_identifier = token_network_identifier
+        self.initiator = initiator
+        self.target = target
+        self.secrethash = secrethash
+
+    def __repr__(self) -> str:
+        return (
+            f"<"
+            f"TransferDescriptionWithSecretState "
+            f"token_network:{pex(self.token_network_identifier)} "
+            f"payment_hash_invoice:{pex(self.payment_hash_invoice)} "
+            f"amount:{self.amount} "
+            f"allocated_fee:{self.allocated_fee} "
+            f"target:{pex(self.target)} "
+            f"secrethash:{pex(self.secrethash)}"
+            f">"
+        )
+
+    def __eq__(self, other: Any) -> bool:
+        return (
+            isinstance(other, TransferDescriptionWithoutSecretState)
+            and self.payment_network_identifier == other.payment_network_identifier
+            and self.payment_identifier == other.payment_identifier
+            and self.payment_hash_invoice == other.payment_hash_invoice
+            and self.amount == other.amount
+            and self.allocated_fee == other.allocated_fee
+            and self.token_network_identifier == other.token_network_identifier
+            and self.initiator == other.initiator
+            and self.target == other.target
+            and self.secrethash == other.secrethash
+        )
+
+    def __ne__(self, other: Any) -> bool:
+        return not self.__eq__(other)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "payment_network_identifier": to_checksum_address(self.payment_network_identifier),
+            "payment_identifier": str(self.payment_identifier),
+            "payment_hash_invoice": serialize_bytes(self.payment_hash_invoice),
+            "amount": str(self.amount),
+            "allocated_fee": str(self.allocated_fee),
+            "token_network_identifier": to_checksum_address(self.token_network_identifier),
+            "initiator": to_checksum_address(self.initiator),
+            "target": to_checksum_address(self.target),
+            "secrethash": serialize_bytes(self.secrethash)
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "TransferDescriptionWithoutSecretState":
+        if "payment_hash_invoice" not in data:
+            data["payment_hash_invoice"] = EMPTY_PAYMENT_HASH_INVOICE
+
+        restored = cls(
+            payment_network_identifier=to_canonical_address(data["payment_network_identifier"]),
+            payment_identifier=PaymentID(int(data["payment_identifier"])),
+            payment_hash_invoice=deserialize_payment_hash_invoice(data["payment_hash_invoice"]),
+            amount=PaymentAmount(int(data["amount"])),
+            allocated_fee=FeeAmount(int(data["allocated_fee"])),
+            token_network_identifier=to_canonical_address(data["token_network_identifier"]),
+            initiator=to_canonical_address(data["initiator"]),
+            target=to_canonical_address(data["target"]),
+            secrethash=deserialize_secret_hash(data["secrethash"])
+        )
+
+        return restored
+
+
 class TransferDescriptionWithSecretState(State):
     """ Describes a transfer (target, amount, and token) and contains an
     additional secret that can be used with a hash-time-lock.
@@ -595,7 +696,7 @@ class TransferDescriptionWithSecretState(State):
         token_network_identifier: TokenNetworkID,
         initiator: InitiatorAddress,
         target: TargetAddress,
-        secret: Secret,
+        secret: Secret = None,
         secrethash: SecretHash = None,
     ) -> None:
 
@@ -618,7 +719,7 @@ class TransferDescriptionWithSecretState(State):
             f"<"
             f"TransferDescriptionWithSecretState "
             f"token_network:{pex(self.token_network_identifier)} "
-            f"payment_hash_invoice:{pex(self.payment_hash_invoice)} "            
+            f"payment_hash_invoice:{pex(self.payment_hash_invoice)} "
             f"amount:{self.amount} "
             f"allocated_fee:{self.allocated_fee} "
             f"target:{pex(self.target)} "
@@ -648,7 +749,7 @@ class TransferDescriptionWithSecretState(State):
         return {
             "payment_network_identifier": to_checksum_address(self.payment_network_identifier),
             "payment_identifier": str(self.payment_identifier),
-            "payment_hash_invoice" : serialize_bytes(self.payment_hash_invoice),
+            "payment_hash_invoice": serialize_bytes(self.payment_hash_invoice),
             "amount": str(self.amount),
             "allocated_fee": str(self.allocated_fee),
             "token_network_identifier": to_checksum_address(self.token_network_identifier),

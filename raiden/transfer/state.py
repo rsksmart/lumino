@@ -296,7 +296,8 @@ class ChainState(State):
         self.pending_transactions: List[ContractSendEvent] = list()
         self.pseudo_random_generator = pseudo_random_generator
         self.queueids_to_queues: QueueIdsToQueues = dict()
-        self.last_transport_authdata: Optional[str] = None
+        self.last_node_transport_state_authdata: NodeTransportState = NodeTransportState('', [])
+
         self.tokennetworkaddresses_to_paymentnetworkaddresses: Dict[
             TokenNetworkAddress, PaymentNetworkID
         ] = {}
@@ -330,7 +331,7 @@ class ChainState(State):
             and self.nodeaddresses_to_networkstates == other.nodeaddresses_to_networkstates
             and self.payment_mapping == other.payment_mapping
             and self.chain_id == other.chain_id
-            and self.last_transport_authdata == other.last_transport_authdata
+            and self.last_node_transport_state_authdata == other.last_node_transport_state_authdata
             and our_tnpn == other_tnpn
         )
 
@@ -355,7 +356,7 @@ class ChainState(State):
             "queueids_to_queues": serialization.serialize_queueid_to_queue(
                 self.queueids_to_queues
             ),
-            "last_transport_authdata": self.last_transport_authdata,
+            "last_node_transport_state_authdata": self.last_node_transport_state_authdata,
             "tokennetworkaddresses_to_paymentnetworkaddresses": map_dict(
                 to_checksum_address,
                 to_checksum_address,
@@ -386,11 +387,108 @@ class ChainState(State):
         restored.queueids_to_queues = serialization.deserialize_queueid_to_queue(
             data["queueids_to_queues"]
         )
-        restored.last_transport_authdata = data.get("last_transport_authdata")
+        restored.last_node_transport_state_authdata = data.get("last_node_transport_state_authdata")
         restored.tokennetworkaddresses_to_paymentnetworkaddresses = map_dict(
             to_canonical_address,
             to_canonical_address,
             data["tokennetworkaddresses_to_paymentnetworkaddresses"],
+        )
+
+        return restored
+
+
+class LightClientTransportState(State):
+
+    __slots__ = (
+        "address",
+        "auth_data",
+    )
+
+    def __init__(
+        self, address: Address, auth_data: Optional[str]
+    ) -> None:
+        if not isinstance(address, T_Address):
+            raise ValueError("address must be an address instance")
+
+        self.address = address
+        self.auth_data = auth_data
+
+    def __repr__(self) -> str:
+        return "<LightClientTransportState address:{} auth_data:{}>".format(pex(self.address), self.auth_data)
+
+    def __eq__(self, other: Any) -> bool:
+        return (
+            isinstance(other, LightClientTransportState)
+            and self.address == other.address
+            and self.auth_data == other.auth_data
+        )
+
+    def __ne__(self, other: Any) -> bool:
+        return not self.__eq__(other)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "address": to_checksum_address(self.address),
+            "auth_data": self.auth_data,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "LightClientTransportState":
+        restored = cls(
+            address=to_canonical_address(data["address"]),
+            auth_data=data["auth_data"],
+        )
+
+        return restored
+
+
+class NodeTransportState(State):
+    """ Corresponds to a Node transport state. """
+
+    __slots__ = (
+        "hub_last_transport_authdata",
+        "clients_last_transport_authdata",
+    )
+
+    def __init__(
+        self,
+        hub_last_transport_authdata: Optional[str],
+        clients_last_transport_authdata: List["LightClientTransportState"]
+    ) -> None:
+        self.hub_last_transport_authdata = hub_last_transport_authdata
+        self.clients_last_transport_authdata = clients_last_transport_authdata
+
+    def __repr__(self) -> str:
+        return "<NodeTransportState hub_last_transport_authdata:{} " \
+               "clients_last_transport_authdata:{}>"\
+            .format(self.hub_last_transport_authdata, self.clients_last_transport_authdata)
+
+    def __eq__(self, other: Any) -> bool:
+        return (
+            isinstance(other, NodeTransportState)
+            and self.hub_last_transport_authdata == other.hub_last_transport_authdata
+            and self.clients_last_transport_authdata == other.clients_last_transport_authdata
+        )
+
+    def __ne__(self, other: Any) -> bool:
+        return not self.__eq__(other)
+
+    def to_dict(self) -> Dict[str, Any]:
+        if self.clients_last_transport_authdata is None:
+            light_client_transport_state = LightClientTransportState(b'00000000000000000000', "")
+            self.clients_last_transport_authdata.append(light_client_transport_state)
+        return {
+            "hub_last_transport_authdata": self.hub_last_transport_authdata,
+            "clients_last_transport_authdata": [
+                client_last_transport_authdata for client_last_transport_authdata in self.clients_last_transport_authdata
+            ],
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "NodeTransportState":
+        restored = cls(
+            hub_last_transport_authdata=data["hub_last_transport_authdata"],
+            clients_last_transport_authdata=[client_last_transport_authdata for client_last_transport_authdata in data["clients_last_transport_authdata"]],
         )
 
         return restored

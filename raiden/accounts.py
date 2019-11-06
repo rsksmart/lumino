@@ -134,6 +134,29 @@ class AccountManager:
 
         return address.lower() in self.accounts
 
+    def get_privkey_and_pubkey(self, address: AddressHex, password: str) :
+        """Find the keystore file for an account, unlock it and get the private key
+
+        Args:
+            address: The Ethereum address for which to find the keyfile in the system
+            password: Mostly for testing purposes. A password can be provided
+                           as the function argument here. If it's not then the
+                           user is interactively queried for one.
+        Returns
+            The private key associated with the address
+        """
+        address = add_0x_prefix(address).lower()
+
+        if not self.address_in_keystore(address):
+            raise ValueError("Keystore file not found for %s" % address)
+
+        with open(self.accounts[address]) as data_file:
+            data = json.load(data_file)
+
+        acc = Account(data, password, self.accounts[address])
+        assert acc.privkey is not None
+        return acc.privkey, acc.pubkey
+
     def get_privkey(self, address: AddressHex, password: str) -> PrivateKey:
         """Find the keystore file for an account, unlock it and get the private key
 

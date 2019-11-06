@@ -22,8 +22,7 @@ DEFAULT_MATRIX_KNOWN_SERVERS = {
         "/master/known_servers.main.yaml"
     ),
     Environment.DEVELOPMENT: (
-        "https://raw.githubusercontent.com/raiden-network/raiden-transport"
-        "/master/known_servers.test.yaml"
+        "https://raw.githubusercontent.com/raiden-network/raiden-transport/master/known_servers.test.yaml"
     ),
 }
 

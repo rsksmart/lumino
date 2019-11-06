@@ -41,6 +41,8 @@ from raiden.utils import pex
 from raiden.utils.signer import Signer, recover
 from raiden.utils.typing import Address, ChainID
 from raiden_contracts.constants import ID_TO_NETWORKNAME
+from ecies import decrypt
+
 
 log = structlog.get_logger(__name__)
 
@@ -241,6 +243,7 @@ class UserAddressManager:
         return user_id
 
     def _fetch_user_presence(self, user_id: str) -> UserPresence:
+        print("_fetch_user_presence" + user_id)
         if user_id not in self._userid_to_presence:
             try:
                 presence = UserPresence(self._client.get_user_presence(user_id))
@@ -318,39 +321,62 @@ def join_global_room(client: GMatrixClient, name: str, servers: Sequence[str] = 
     return global_room
 
 
-def login_or_register(
-    client: GMatrixClient, signer: Signer, lc: bool, prev_user_id: str = None, prev_access_token: str = None,
-) -> User:
+def login_or_register_light_client(client: GMatrixClient, **kwargs):
 
-    print("----- calling TRANSPORT MATRIX UTILS LOGIN OR REGISTER. LC? "+str(lc))
-    """Login to a Raiden matrix server with password and displayname proof-of-keys
+    if kwargs['encrypted_light_client_password_signature'] is not None:
+        descrypt_light_client_password_signature = \
+            decrypt(kwargs['private_key_hub'],
+                    bytes.fromhex(kwargs['encrypted_light_client_password_signature']))
 
-    - Username is in the format: 0x<eth_address>(.<suffix>)?, where the suffix is not required,
-    but a deterministic (per-account) random 8-hex string to prevent DoS by other users registering
-    our address
-    - Password is the signature of the server hostname, verified by the server to prevent account
-    creation spam
-    - Displayname currently is the signature of the whole user_id (including homeserver), to be
-    verified by other peers. May include in the future other metadata such as protocol version
+    if kwargs['encrypted_light_client_display_name_signature'] is not None:
+        descrypt_light_client_display_name_signature = \
+            decrypt(kwargs['private_key_hub'],
+                    bytes.fromhex(kwargs['encrypted_light_client_display_name_signature']))
 
-    Params:
-        client: GMatrixClient instance configured with desired homeserver
-        signer: raiden.utils.signer.Signer instance for signing password and displayname
-        prev_user_id: (optional) previously persisted client.user_id. Must match signer's account
-        prev_access_token: (optional) previously persisted client.access_token for prev_user_id
-    Returns:
-        Own matrix_client.User
-    """
+    if kwargs['encrypted_light_client_seed_for_retry_signature'] is not None:
+        desctypt_seed_retry_signature = \
+            decrypt(kwargs['private_key_hub'],
+                    bytes.fromhex(kwargs['encrypted_light_client_seed_for_retry_signature']))
+
     server_url = client.api.base_url
     server_name = urlparse(server_url).netloc
 
-    base_username = to_normalized_address(signer.address)
-    if lc:
-        base_username = "0x09fcbe7ceb49c944703b4820e29b0541edfe7e82"
-    _match_user = False
+    base_username = to_normalized_address(kwargs['light_client_address'])
+
+    user = _check_previous_login(client, kwargs['prev_user_id'], kwargs['prev_access_token'],
+                                 base_username, server_name)
+
+    if user is None:
+        # password is signed server address
+        password = descrypt_light_client_password_signature.decode("utf-8")
+        seed = decode_hex(desctypt_seed_retry_signature.decode("utf-8"))[-32:]
+
+        _try_login_or_register(client, base_username, password, server_name, server_url, seed)
+
+        name = descrypt_light_client_display_name_signature.decode("utf-8")
+        user = client.get_user(client.user_id)
+        user.set_display_name(name)
+
+    log.info("Login or register for LightCLient with address " + base_username + " is successfully run")
+
+    return user
+
+
+def _check_previous_login(client: GMatrixClient,
+                          prev_user_id: str = None,
+                          prev_access_token: str = None,
+                          base_username: str = None,
+                          server_name: str = None):
+
+    # log.info("User: " + prev_user_id)
+    # log.info("Access Token: " + prev_access_token)
+
+    _match_user = re.match(
+        f"^@{re.escape(base_username)}.*:{re.escape(server_name)}$", prev_user_id or ""
+    )
     if _match_user:  # same user as before
         assert prev_user_id is not None
-        log.debug("Trying previous user login", user_id=prev_user_id)
+        log.info("Trying previous user login", user_id=prev_user_id)
         client.set_access_token(user_id=prev_user_id, token=prev_access_token)
 
         try:
@@ -365,7 +391,7 @@ def login_or_register(
             prev_sync_limit = client.set_sync_limit(0)
             client._sync()  # initial_sync
             client.set_sync_limit(prev_sync_limit)
-            log.debug("Success. Valid previous credentials", user_id=prev_user_id)
+            log.info("Success. Valid previous credentials", user_id=prev_user_id)
             return client.get_user(client.user_id)
     elif prev_user_id:
         log.debug(
@@ -375,10 +401,14 @@ def login_or_register(
             current_server=server_name,
         )
 
-    # password is signed server address
-    password = encode_hex(signer.sign(server_name.encode()))
-    if lc:
-        password = '0x51ed5c180b2854f1efe019051203317c74c47ca6618e8dc0b3f3d5f9520acd5b3385291b6ef05eb5bf24838e606cca06b9ccf90dd50baebc1878b1dec55dddce1c'
+
+def _try_login_or_register(client: GMatrixClient,
+                           base_username: str,
+                           password: str,
+                           server_name: str,
+                           server_url,
+                           seed):
+
     rand = None
     # try login and register on first 5 possible accounts
     for i in range(JOIN_RETRIES):
@@ -387,7 +417,7 @@ def login_or_register(
             if not rand:
                 rand = Random()  # deterministic, random secret for username suffixes
                 # initialize rand for seed (which requires a signature) only if/when needed
-                rand.seed(int.from_bytes(signer.sign(b"seed")[-32:], "big"))
+                rand.seed(int.from_bytes(seed, "big"))
             username = f"{username}.{rand.randint(0, 0xffffffff):08x}"
 
         try:
@@ -395,12 +425,12 @@ def login_or_register(
             prev_sync_limit = client.set_sync_limit(0)
             client._sync()  # when logging, do initial_sync with limit=0
             client.set_sync_limit(prev_sync_limit)
-            log.debug("Login", homeserver=server_name, server_url=server_url, username=username)
+            log.info("Login", homeserver=server_name, server_url=server_url, username=username)
             break
         except MatrixRequestError as ex:
             if ex.code != 403:
                 raise
-            log.debug(
+            log.info(
                 "Could not login. Trying register",
                 homeserver=server_name,
                 server_url=server_url,
@@ -420,9 +450,52 @@ def login_or_register(
     else:
         raise ValueError("Could not register or login!")
 
-    name = encode_hex(signer.sign(client.user_id.encode()))
-    user = client.get_user(client.user_id)
-    user.set_display_name(name)
+
+def login_or_register(
+    client: GMatrixClient,
+    signer: Signer,
+    prev_user_id: str = None,
+    prev_access_token: str = None
+) -> User:
+
+    """Login to a Raiden matrix server with password and displayname proof-of-keys
+
+    - Username is in the format: 0x<eth_address>(.<suffix>)?, where the suffix is not required,
+    but a deterministic (per-account) random 8-hex string to prevent DoS by other users registering
+    our address
+    - Password is the signature of the server hostname, verified by the server to prevent account
+    creation spam
+    - Displayname currently is the signature of the whole user_id (including homeserver), to be
+    verified by other peers. May include in the future other metadata such as protocol version
+
+    Params:
+        client: GMatrixClient instance configured with desired homeserver
+        signer: raiden.utils.signer.Signer instance for signing password and displayname
+        prev_user_id: (optional) previously persisted client.user_id. Must match signer's account
+        prev_access_token: (optional) previously persisted client.access_token for prev_user_id
+    Returns:
+        Own matrix_client.User
+    """
+
+    server_url = client.api.base_url
+    server_name = urlparse(server_url).netloc
+
+    base_username = to_normalized_address(signer.address)
+
+    user = _check_previous_login(client, prev_user_id, prev_access_token, base_username, server_name)
+
+    if user is None:
+        # password is signed server address
+        password = encode_hex(signer.sign(server_name.encode()))
+        seed = signer.sign(b"seed")[-32:]
+
+        _try_login_or_register(client, base_username, password, server_name, server_url, seed)
+
+        name = encode_hex(signer.sign(client.user_id.encode()))
+        user = client.get_user(client.user_id)
+        user.set_display_name(name)
+
+    log.info("Login or register for Hub Node is successfully run")
     return user
 
 

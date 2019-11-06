@@ -4,11 +4,16 @@ from gevent import Greenlet
 import random
 import string
 import hashlib
+from binascii import hexlify
+import os
 import dateutil.parser
-from datetime import datetime
+from datetime import datetime, date
 from dateutil.relativedelta import relativedelta
 from eth_utils import is_binary_address, to_checksum_address, to_canonical_address, to_normalized_address, decode_hex, \
     encode_hex
+
+from ecies import encrypt, decrypt
+from ecies.utils import generate_eth_key, generate_key
 
 import raiden.blockchain.events as blockchain_events
 from raiden import waiting
@@ -18,7 +23,7 @@ from raiden.constants import (
     RED_EYES_PER_TOKEN_NETWORK_LIMIT,
     UINT256_MAX,
     Environment,
-)
+    EMPTY_PAYMENT_HASH_INVOICE)
 from raiden.exceptions import (
     AlreadyRegisteredTokenAddress,
     ChannelNotFound,
@@ -39,11 +44,15 @@ from raiden.exceptions import (
     UnknownTokenAddress,
     InvoiceCoding,
     UnhandledLightClient)
+from raiden.lightclient.light_client_message_handler import LightClientMessageHandler
 from raiden.lightclient.light_client_service import LightClientService
+from raiden.lightclient.light_client_utils import LightClientUtils
+from raiden.lightclient.lightclientmessages.hub_message import HubMessage
+from raiden.lightclient.lightclientmessages.light_client_payment import LightClientPayment, LightClientPaymentStatus
 
-from raiden.messages import RequestMonitoring
+from raiden.messages import RequestMonitoring, LockedTransfer, RevealSecret, Unlock, Delivered
 from raiden.settings import DEFAULT_RETRY_TIMEOUT, DEVELOPMENT_CONTRACT_VERSION
-from raiden.transfer import architecture, views
+from raiden.transfer import architecture, views, channel
 from raiden.transfer.events import (
     EventPaymentReceivedSuccess,
     EventPaymentSentFailed,
@@ -64,6 +73,7 @@ from raiden.utils import pex, typing
 from raiden.utils.gas_reserve import has_enough_gas_reserve
 from raiden.utils.typing import (
     Address,
+    AddressHex,
     Any,
     BlockSpecification,
     BlockTimeout,
@@ -84,7 +94,7 @@ from raiden.utils.typing import (
     TokenNetworkAddress,
     TokenNetworkID,
     Tuple,
-    SignedTransaction)
+    SignedTransaction, InitiatorAddress, TargetAddress, PaymentWithFeeAmount, BlockExpiration)
 
 from raiden.rns_constants import RNS_ADDRESS_ZERO
 from raiden.utils.rns import is_rns_address
@@ -102,6 +112,18 @@ EVENTS_PAYMENT_HISTORY_RELATED = (
     EventPaymentSentFailed,
     EventPaymentReceivedSuccess,
 )
+
+from raiden.settings import (
+    DEFAULT_MATRIX_KNOWN_SERVERS
+)
+
+from raiden.utils.cli import get_matrix_servers
+
+from raiden.network.transport.matrix.utils import (
+    make_client
+)
+
+from urllib.parse import urlparse
 
 
 def event_filter_for_payments(
@@ -209,6 +231,7 @@ class RaidenAPI:
         token_address: TokenAddress,
         creator_address: Address,
         partner_address: Address,
+        channel_id_to_check: ChannelID= None
     ) -> NettingChannelState:
         if not is_binary_address(token_address):
             raise InvalidAddress("Expected binary address format for token in get_channel")
@@ -219,7 +242,7 @@ class RaidenAPI:
         if not is_binary_address(partner_address):
             raise InvalidAddress("Expected binary address format for partner in get_channel")
 
-        channel_list = self.get_channel_list(registry_address, token_address, creator_address, partner_address)
+        channel_list = self.get_channel_list(registry_address, token_address, creator_address, partner_address, channel_id_to_check)
         assert len(channel_list) <= 1
 
         if not channel_list:
@@ -531,7 +554,7 @@ class RaidenAPI:
                 f"token network limit of {per_token_network_deposit_limit}"
             )
 
-        balance = token.balance_of(self.raiden.address)
+        balance = token.balance_of(creator_address)
 
         functions = token_network_proxy.proxy.contract.functions
         deposit_limit = functions.channel_participant_deposit_limit().call()
@@ -702,6 +725,72 @@ class RaidenAPI:
             retry_timeout=retry_timeout,
         )
 
+    def channel_close_light(
+        self,
+        registry_address: PaymentNetworkID,
+        token_address: TokenAddress,
+        partner_address: Address,
+        retry_timeout: NetworkTimeout = DEFAULT_RETRY_TIMEOUT,
+        signed_close_tx: typing.SignedTransaction = None,
+    ):
+        """Close a channel opened with `partner_address` for the given
+        `token_address`.
+        Race condition, this can fail if channel was closed externally.
+        """
+        self.channel_batch_close_light(
+            registry_address=registry_address,
+            token_address=token_address,
+            partner_addresses=[partner_address],
+            retry_timeout=retry_timeout,
+            signed_close_tx=signed_close_tx
+        )
+
+    def channel_batch_close_light(
+        self,
+        registry_address: PaymentNetworkID,
+        token_address: TokenAddress,
+        partner_addresses: List[Address],
+        retry_timeout: NetworkTimeout = DEFAULT_RETRY_TIMEOUT,
+        signed_close_tx: typing.SignedTransaction = None,
+    ):
+        """Close a channel opened with `partner_address` for the given
+        `token_address`.
+        Race condition, this can fail if channel was closed externally.
+        """
+
+        channels_to_close = ChannelValidator.can_close_channel(
+            token_address,
+            partner_addresses,
+            registry_address,
+            self.raiden)
+
+        self.delegate_channel_close_task(channels_to_close, signed_close_tx)
+
+        channel_ids = [channel_state.identifier for channel_state in channels_to_close]
+
+        waiting.wait_for_close(
+            raiden=self.raiden,
+            payment_network_id=registry_address,
+            token_address=token_address,
+            channel_ids=channel_ids,
+            retry_timeout=retry_timeout,
+            partner_addresses=partner_addresses
+        )
+
+    def delegate_channel_close_task(self, channels_to_close, signed_close_tx=None):
+        greenlets: Set[Greenlet] = set()
+        for channel_state in channels_to_close:
+            channel_close = ActionChannelClose(
+                canonical_identifier=channel_state.canonical_identifier,
+                signed_close_tx=signed_close_tx,
+                participant1=channel_state.our_state.address,
+                participant2=channel_state.partner_state.address
+            )
+
+            greenlets.update(self.raiden.handle_state_change(channel_close))
+
+        gevent.joinall(greenlets, raise_error=True)
+
     def channel_batch_close(
         self,
         registry_address: PaymentNetworkID,
@@ -714,35 +803,13 @@ class RaidenAPI:
         Race condition, this can fail if channel was closed externally.
         """
 
-        if not is_binary_address(token_address):
-            raise InvalidAddress("Expected binary address format for token in channel close")
+        channels_to_close = ChannelValidator.can_close_channel(
+            token_address,
+            partner_addresses,
+            registry_address,
+            self.raiden)
 
-        if not all(map(is_binary_address, partner_addresses)):
-            raise InvalidAddress("Expected binary address format for partner in channel close")
-
-        valid_tokens = views.get_token_identifiers(
-            chain_state=views.state_from_raiden(self.raiden), payment_network_id=registry_address
-        )
-        if token_address not in valid_tokens:
-            raise UnknownTokenAddress("Token address is not known.")
-
-        chain_state = views.state_from_raiden(self.raiden)
-        channels_to_close = views.filter_channels_by_partneraddress(
-            chain_state=chain_state,
-            payment_network_id=registry_address,
-            token_address=token_address,
-            partner_addresses=partner_addresses,
-        )
-
-        greenlets: Set[Greenlet] = set()
-        for channel_state in channels_to_close:
-            channel_close = ActionChannelClose(
-                canonical_identifier=channel_state.canonical_identifier
-            )
-
-            greenlets.update(self.raiden.handle_state_change(channel_close))
-
-        gevent.joinall(greenlets, raise_error=True)
+        self.delegate_channel_close_task(channels_to_close)
 
         channel_ids = [channel_state.identifier for channel_state in channels_to_close]
 
@@ -752,6 +819,7 @@ class RaidenAPI:
             token_address=token_address,
             channel_ids=channel_ids,
             retry_timeout=retry_timeout,
+            partner_addresses=partner_addresses,
         )
 
     def get_channel_list(
@@ -760,6 +828,7 @@ class RaidenAPI:
         token_address: TokenAddress = None,
         creator_address: Address = None,
         partner_address: Address = None,
+        channel_id_to_check: ChannelID = None
     ) -> List[NettingChannelState]:
         """Returns a list of channels associated with the optionally given
            `token_address` and/or `partner_address`.
@@ -792,13 +861,24 @@ class RaidenAPI:
                 raise UnknownTokenAddress("Provided a partner address but no token address")
 
         if token_address and partner_address and creator_address:
-            channel_state = views.get_channelstate_for(
-                chain_state=views.state_from_raiden(self.raiden),
-                payment_network_id=registry_address,
-                token_address=token_address,
-                creator_address=creator_address,
-                partner_address=partner_address,
-            )
+
+            if channel_id_to_check is not None:
+                channel_state = views.get_channelstate_for_close_channel(
+                    chain_state=views.state_from_raiden(self.raiden),
+                    payment_network_id=registry_address,
+                    token_address=token_address,
+                    creator_address=creator_address,
+                    partner_address=partner_address,
+                    channel_id_to_check=channel_id_to_check
+                )
+            else:
+                channel_state = views.get_channelstate_for(
+                    chain_state=views.state_from_raiden(self.raiden),
+                    payment_network_id=registry_address,
+                    token_address=token_address,
+                    creator_address=creator_address,
+                    partner_address=partner_address
+                )
 
             if channel_state:
                 result = [channel_state]
@@ -975,6 +1055,88 @@ class RaidenAPI:
             payment_hash_invoice=payment_hash_invoice
         )
         return payment_status
+
+    def transfer_async_light(
+        self,
+        registry_address: PaymentNetworkID,
+        token_address: TokenAddress,
+        amount: TokenAmount,
+        creator: Address,
+        target: Address,
+        identifier: PaymentID,
+        secrethash: SecretHash,
+        signed_locked_transfer: LockedTransfer,
+        payment_hash_invoice: PaymentHashInvoice = None
+    ):
+        current_state = views.state_from_raiden(self.raiden)
+        payment_network_identifier = self.raiden.default_registry.address
+
+        if not isinstance(amount, int):
+            raise InvalidAmount("Amount not a number")
+
+        if amount <= 0:
+            raise InvalidAmount("Amount negative")
+
+        if amount > UINT256_MAX:
+            raise InvalidAmount("Amount too large")
+
+        if not is_binary_address(token_address):
+            raise InvalidAddress("token address is not valid.")
+
+        if token_address not in views.get_token_identifiers(current_state, registry_address):
+            raise UnknownTokenAddress("Token address is not known.")
+
+        if not is_binary_address(target):
+            raise InvalidAddress("target address is not valid.")
+
+        valid_tokens = views.get_token_identifiers(
+            views.state_from_raiden(self.raiden), registry_address
+        )
+        if token_address not in valid_tokens:
+            raise UnknownTokenAddress("Token address is not known.")
+
+        if secrethash is not None and not isinstance(secrethash, typing.T_SecretHash):
+            raise InvalidSecretHash("secrethash is not valid.")
+
+        log.debug(
+            "Initiating transfer light",
+            initiator=pex(creator),
+            target=pex(target),
+            token=pex(token_address),
+            amount=amount,
+            identifier=identifier,
+            payment_hash_invoice=payment_hash_invoice
+        )
+
+        token_network_identifier = views.get_token_network_identifier_by_token_address(
+            chain_state=current_state,
+            payment_network_id=payment_network_identifier,
+            token_address=token_address,
+        )
+        payment_status = self.raiden.mediated_transfer_async_light(
+            token_network_identifier=token_network_identifier,
+            amount=amount,
+            creator=creator,
+            target=target,
+            identifier=identifier,
+            secrethash=secrethash,
+            payment_hash_invoice=payment_hash_invoice,
+            signed_locked_transfer=signed_locked_transfer
+        )
+        return None
+
+    def initiate_send_secret_reveal_light(self, sender_address: typing.Address, receiver_address: typing.Address,
+                                          reveal_secret: RevealSecret):
+        self.raiden.initiate_send_secret_reveal_light(sender_address, receiver_address, reveal_secret)
+
+    def initiate_send_balance_proof(self, sender_address: typing.Address, receiver_address: typing.Address,
+                                          unlock: Unlock):
+        self.raiden.initiate_send_balance_proof(sender_address, receiver_address, unlock)
+
+    def initiate_send_delivered_light(self, sender_address: typing.Address, receiver_address: typing.Address,
+                                      delivered: Delivered, msg_order: int, payment_id: int):
+        self.raiden.initiate_send_delivered_light(sender_address, receiver_address, delivered, msg_order, payment_id)
+
 
     def get_raiden_events_payment_history_with_timestamps_v2(
         self,
@@ -1202,6 +1364,7 @@ class RaidenAPI:
                     token_address=token_address,
                     creator_address=self.address,
                     partner_address=partner_address,
+                    channel_id_to_check=None
                 )
                 channel_id = partner_channel.identifier
 
@@ -1426,3 +1589,124 @@ class RaidenAPI:
                 node_addresses.append(to_checksum_address("0x" + address.hex()))
 
         return node_addresses
+
+    def get_all_light_clients(self):
+        light_clients = self.raiden.wal.storage.get_all_light_clients()
+        return light_clients
+
+    def get_data_for_registration_request(self, address):
+        # fetch list of known servers from raiden-network/raiden-tranport repo
+        available_servers_url = DEFAULT_MATRIX_KNOWN_SERVERS[self.raiden.config["environment_type"]]
+        available_servers = get_matrix_servers(available_servers_url)
+        client = make_client(available_servers)
+        server_url = client.api.base_url
+        server_name = urlparse(server_url).netloc
+        data_to_sign = {
+            "display_name_to_sign": "@" + to_normalized_address(address) + ":" + server_name,
+            "password_to_sign": server_name,
+            "seed_retry": "seed"}
+        return data_to_sign
+
+    def register_light_client(self,
+                              address,
+                              signed_password,
+                              signed_display_name,
+                              signed_seed_retry):
+
+        address = to_checksum_address(address)
+
+        light_client = self.raiden.wal.storage.get_light_client(address)
+
+        if light_client is None:
+
+            api_key = hexlify(os.urandom(20))
+            api_key = api_key.decode("utf-8")
+
+            pubhex = self.raiden.config["pubkey"].hex()
+            encrypt_signed_password = encrypt(pubhex, signed_password.encode())
+            encrypt_signed_display_name = encrypt(pubhex, signed_display_name.encode())
+            encrypt_signed_seed_retry = encrypt(pubhex, signed_seed_retry.encode())
+
+            result = self.raiden.wal.storage.save_light_client(
+                api_key=api_key,
+                address=address,
+                encrypt_signed_password=encrypt_signed_password.hex(),
+                encrypt_signed_display_name=encrypt_signed_display_name.hex(),
+                encrypt_signed_seed_retry=encrypt_signed_seed_retry.hex())
+
+            if result > 0:
+                result = {"address": address,
+                          "encrypt_signed_password": encrypt_signed_password.hex(),
+                          "encrypt_signed_display_name": encrypt_signed_display_name.hex(),
+                          "api_key": api_key,
+                          "encrypt_signed_seed_retry": encrypt_signed_seed_retry.hex(),
+                          "message": "successfully registered",
+                          "result_code": 0}
+            else:
+                result = {"message": "An unexpected error has occurred.",
+                          "result_code": 1}
+        else:
+            result = {"message": "The client you are trying to register has already registered.",
+                      "result_code": 2}
+
+        return result
+
+    def create_light_client_payment(
+        self,
+        registry_address: typing.PaymentNetworkID,
+        creator_address: typing.AddressHex,
+        partner_address: typing.AddressHex,
+        token_address: typing.TokenAddress,
+        amount: typing.TokenAmount,
+        secrethash: typing.SecretHash
+    ) -> HubMessage:
+        channel_state = views.get_channelstate_for(
+            views.state_from_raiden(self.raiden),
+            registry_address,
+            token_address,
+            creator_address,
+            partner_address,
+        )
+        if channel_state:
+            chain_state = views.state_from_raiden(self.raiden)
+            # Build autogenerated values
+            lt_autogenerated_values = LightClientUtils.build_lt_autogen_values(chain_state, channel_state)
+            # Create locked transfer event
+            locked_transfer, merkle_tree_state = channel.create_sendlockedtransfer(
+                channel_state,
+                InitiatorAddress(creator_address),
+                TargetAddress(partner_address),
+                PaymentWithFeeAmount(amount),
+                lt_autogenerated_values.message_identifier,
+                lt_autogenerated_values.payment_identifier,
+                EMPTY_PAYMENT_HASH_INVOICE,
+                BlockExpiration(1624776),
+                secrethash)
+
+
+            # Get the LockedTransfer message
+            locked_transfer = LockedTransfer.from_event(locked_transfer)
+            # Create the light_client_payment
+            is_lc_initiator = 1
+            payment = LightClientPayment(creator_address, partner_address,
+                                         is_lc_initiator, channel_state.token_network_identifier,
+                                         amount,
+                                         str(date.today()),
+                                         LightClientPaymentStatus.Pending,
+                                         locked_transfer.payment_identifier)
+            # Persist the light_client_protocol_message associated
+            order = 0
+            payment_row_id = LightClientMessageHandler.store_light_client_payment(payment, self.raiden.wal)
+            light_client_message_id = LightClientMessageHandler.store_light_client_protocol_message(
+                locked_transfer.message_identifier,
+                locked_transfer,
+                False,
+                payment.payment_id,
+                order,
+                self.raiden.wal
+            )
+
+            return HubMessage(payment.payment_id, order, locked_transfer)
+        else:
+            raise ChannelNotFound("Channel with given partner address doesnt exists")
+

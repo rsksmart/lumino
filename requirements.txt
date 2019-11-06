@@ -34,8 +34,6 @@ apscheduler==3.6.0
 base58==0.2.5
 secp256k1==0.13.2
 bitstring==3.1.5
-
-
+eciespy==0.3.0
 #Web3 RSK compatible
-
 git+git://github.com/infuy/web3.py@rsk-4.8.2#egg=web3

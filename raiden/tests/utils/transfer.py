@@ -6,10 +6,10 @@ import gevent
 from gevent.timeout import Timeout
 
 from raiden.app import App
-from raiden.constants import UINT64_MAX
+from raiden.constants import UINT64_MAX, EMPTY_PAYMENT_HASH_INVOICE
 from raiden.message_handler import MessageHandler
 from raiden.messages import LockedTransfer, LockExpired, Message, Unlock
-from raiden.tests.utils.factories import make_address, make_secret
+from raiden.tests.utils.factories import make_address, make_secret, make_payment_hash_invoice
 from raiden.tests.utils.protocol import WaitForMessage
 from raiden.transfer import channel, views
 from raiden.transfer.architecture import TransitionResult
@@ -150,6 +150,7 @@ def _transfer_unlocked(
         amount=amount,
         target=target_app.raiden.address,
         identifier=identifier,
+        payment_hash_invoice=EMPTY_PAYMENT_HASH_INVOICE,
         fee=fee,
     )
 
@@ -202,6 +203,7 @@ def _transfer_expired(
         fee=fee,
         target=target_app.raiden.address,
         identifier=identifier,
+        payment_hash_invoice=EMPTY_PAYMENT_HASH_INVOICE,
         secret=secret,
         secrethash=secrethash,
     )
@@ -246,6 +248,7 @@ def _transfer_secret_not_requested(
         fee=fee,
         target=target_app.raiden.address,
         identifier=identifier,
+        payment_hash_invoice=EMPTY_PAYMENT_HASH_INVOICE,
         secret=secret,
         secrethash=secrethash,
     )
@@ -348,6 +351,7 @@ def transfer_and_assert_path(
         fee=fee,
         target=last_app.raiden.address,
         identifier=identifier,
+        payment_hash_invoice=EMPTY_PAYMENT_HASH_INVOICE,
         secret=secret,
     )
 
@@ -535,6 +539,7 @@ def make_receive_transfer_mediated(
     locksroot = layers[MERKLEROOT][0]
 
     payment_identifier = nonce
+    payment_hash_invoice = make_payment_hash_invoice()
     transfer_target = make_address()
     transfer_initiator = make_address()
     chain_id = chain_id or channel_state.chain_id
@@ -542,6 +547,7 @@ def make_receive_transfer_mediated(
         chain_id=chain_id,
         message_identifier=random.randint(0, UINT64_MAX),
         payment_identifier=payment_identifier,
+        payment_hash_invoice=payment_hash_invoice,
         nonce=nonce,
         token_network_address=channel_state.token_network_identifier,
         token=channel_state.token_address,
@@ -561,6 +567,7 @@ def make_receive_transfer_mediated(
     receive_lockedtransfer = LockedTransferSignedState(
         random.randint(0, UINT64_MAX),
         payment_identifier,
+        payment_hash_invoice,
         channel_state.token_address,
         balance_proof,
         lock,

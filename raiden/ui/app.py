@@ -11,6 +11,7 @@ from web3 import HTTPProvider, Web3
 from definitions import ROOT_DIR
 import json
 from eth_utils import encode_hex
+from raiden.storage import serialize, sqlite
 
 from raiden.accounts import AccountManager
 from raiden.constants import (
@@ -25,6 +26,7 @@ from raiden.message_handler import MessageHandler
 from raiden.network.blockchain_service import BlockChainService
 from raiden.network.rpc.client import JSONRPCClient
 from raiden.network.transport import MatrixTransport
+from raiden.network.transport.matrix import MatrixLightClientTransport, NodeTransport
 from raiden.raiden_event_handler import RaidenEventHandler
 from raiden.settings import (
     DEFAULT_MATRIX_KNOWN_SERVERS,
@@ -78,14 +80,41 @@ def _setup_matrix(config):
 
     try:
 
-        transport = MatrixTransport(config["transport"]["matrix"], False)
-        transport2 = MatrixTransport(config["transport"]["matrix"], True)
+        database_path = config["database_path"]
+
+        database_dir = os.path.dirname(config["database_path"])
+        os.makedirs(database_dir, exist_ok=True)
+
+        storage = sqlite.SerializedSQLiteStorage(
+            database_path=database_path, serializer=serialize.JSONSerializer()
+        )
+
+        light_clients = storage.get_all_light_clients()
+
+        light_client_transports = []
+        for light_client in light_clients:
+            light_client_transport = get_matrix_light_client_instance(config["transport"]["matrix"],
+                                             light_client['password'],
+                                             light_client['display_name'],
+                                             light_client['seed_retry'],
+                                             light_client['address'])
+
+            light_client_transports.append(light_client_transport)
+
+        hub_transport = MatrixTransport(config["transport"]["matrix"])
+
+        node_transport = NodeTransport(hub_transport, light_client_transports)
 
     except RaidenError as ex:
         click.secho(f"FATAL: {ex}", fg="red")
         sys.exit(1)
 
-    return [transport, transport2]
+    return node_transport
+
+
+def get_matrix_light_client_instance(config, password, display_name, seed_retry, address):
+    light_client_transport = MatrixLightClientTransport(config, password, display_name, seed_retry, address)
+    return light_client_transport
 
 
 def _setup_web3(eth_rpc_endpoint):
@@ -124,11 +153,11 @@ def get_account_and_private_key(
             account_manager=account_manager, address_hex=address_hex, password_file=password_file
         )
     else:
-        privatekey_bin = unlock_account_with_passwordprompt(
+        privatekey_bin, pubkey_bin = unlock_account_with_passwordprompt(
             account_manager=account_manager, address_hex=address_hex
         )
 
-    return to_canonical_address(address_hex), privatekey_bin
+    return to_canonical_address(address_hex), privatekey_bin, pubkey_bin
 
 
 def rpc_normalized_endpoint(eth_rpc_endpoint: str) -> str:
@@ -192,13 +221,18 @@ def run_app(
     check_ethereum_client_is_supported(web3)
     check_ethereum_network_id(network_id, web3)
 
-    (address, privatekey_bin) = get_account_and_private_key(
+    (address, privatekey_bin, pubkey_bin) = get_account_and_private_key(
         account_manager, address, password_file
     )
 
     (listen_host, listen_port) = split_endpoint(listen_address)
     (api_host, api_port) = split_endpoint(api_address)
 
+    print("Private key: " + encode_hex(privatekey_bin))
+    print("Public key: " + encode_hex(pubkey_bin))
+
+    config["pubkey"] = pubkey_bin
+    config["privatekey"] = privatekey_bin
     config["transport"]["udp"]["host"] = listen_host
     config["transport"]["udp"]["port"] = listen_port
     config["console"] = console

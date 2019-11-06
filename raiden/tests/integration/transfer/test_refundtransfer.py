@@ -30,6 +30,7 @@ from raiden.transfer.mediated_transfer.state_change import ReceiveLockExpired
 from raiden.transfer.state_change import ContractReceiveChannelBatchUnlock, ReceiveProcessed
 from raiden.transfer.views import state_from_raiden
 from raiden.waiting import wait_for_block, wait_for_settle
+from raiden.constants import EMPTY_PAYMENT_HASH_INVOICE
 
 
 @pytest.mark.parametrize("channels_per_node", [CHAIN])
@@ -70,7 +71,8 @@ def run_test_refund_messages(raiden_chain, token_addresses, deposit, network_wai
     refund_amount = deposit // 2
     identifier = 1
     payment_status = app0.raiden.mediated_transfer_async(
-        token_network_identifier, refund_amount, app2.raiden.address, identifier
+        token_network_identifier, refund_amount, app2.raiden.address, identifier,
+        payment_hash_invoice=EMPTY_PAYMENT_HASH_INVOICE
     )
     msg = "Must fail, there are no routes available"
     assert payment_status.payment_done.wait() is False, msg
@@ -213,7 +215,8 @@ def run_test_refund_transfer(
     identifier_refund = 3
     amount_refund = 50
     payment_status = app0.raiden.mediated_transfer_async(
-        token_network_identifier, amount_refund, app2.raiden.address, identifier_refund
+        token_network_identifier, amount_refund, app2.raiden.address, identifier_refund,
+        payment_hash_invoice=EMPTY_PAYMENT_HASH_INVOICE
     )
     msg = "there is no path with capacity, the transfer must fail"
     assert payment_status.payment_done.wait() is False, msg
@@ -428,7 +431,8 @@ def run_test_different_view_of_last_bp_during_unlock(
     identifier_refund = 3
     amount_refund = 50
     payment_status = app0.raiden.mediated_transfer_async(
-        token_network_identifier, amount_refund, app2.raiden.address, identifier_refund
+        token_network_identifier, amount_refund, app2.raiden.address, identifier_refund,
+        payment_hash_invoice=EMPTY_PAYMENT_HASH_INVOICE
     )
     msg = "there is no path with capacity, the transfer must fail"
     assert payment_status.payment_done.wait() is False, msg
@@ -652,7 +656,8 @@ def run_test_refund_transfer_after_2nd_hop(
     identifier_refund = 3
     amount_refund = 50
     payment_status = app0.raiden.mediated_transfer_async(
-        token_network_identifier, amount_refund, app3.raiden.address, identifier_refund
+        token_network_identifier, amount_refund, app3.raiden.address, identifier_refund,
+        payment_hash_invoice=EMPTY_PAYMENT_HASH_INVOICE
     )
     msg = "there is no path with capacity, the transfer must fail"
     assert payment_status.payment_done.wait() is False, msg

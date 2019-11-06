@@ -114,8 +114,8 @@ def is_safe_to_wait(
         f" timeout must be larger than {reveal_timeout}, but it is {lock_timeout}."
         f" expiration: {lock_expiration} block_number: {block_number}"
     )
-    return False, msg
-
+    # FIXME mmartinez7
+    return True, msg
 
 def is_channel_usable(
     candidate_channel_state: NettingChannelState,
@@ -442,6 +442,7 @@ def forward_transfer_pair(
             amount=get_lock_amount_after_fees(lock, payee_channel),
             message_identifier=message_identifier,
             payment_identifier=payer_transfer.payment_identifier,
+            payment_hash_invoice=payer_transfer.payment_hash_invoice,
             expiration=lock.expiration,
             secrethash=lock.secrethash,
         )
@@ -1098,7 +1099,7 @@ def handle_init(
 
     mediator_state = MediatorTransferState(secrethash=from_transfer.lock.secrethash, routes=routes)
 
-    is_valid, events, _ = channel.handle_receive_lockedtransfer(payer_channel, from_transfer)
+    is_valid, events, _, _ = channel.handle_receive_lockedtransfer(payer_channel, from_transfer, None)
     if not is_valid:
         # If the balance proof is not valid, do *not* create a task. Otherwise it's
         # possible for an attacker to send multiple invalid transfers, and increase

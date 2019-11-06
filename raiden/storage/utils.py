@@ -88,16 +88,44 @@ CREATE TABLE IF NOT EXISTS invoices_payments (
 DB_CREATE_CLIENT = """
 CREATE TABLE IF NOT EXISTS client (
     address TEXT PRIMARY KEY,
-    password TEXT NOT NULL, 
+    password TEXT NOT NULL,
+    display_name TEXT NOT NULL,
+    seed_retry TEXT NOT NULL, 
     api_key TEXT NOT NULL,
     type TEXT CHECK ( type IN ('HUB','FULL','LIGHT') ) NOT NULL DEFAULT 'FULL'
 );
 """
 
+DB_CREATE_LIGHT_CLIENT_PAYMENT = """
+CREATE TABLE IF NOT EXISTS light_client_payment(
+    payment_id TEXT PRIMARY KEY,
+    light_client_address TEXT NOT NULL,
+    partner_address TEXT NOT NULL, 
+    is_lc_initiator INTEGER DEFAULT 1,
+    token_network_id TEXT NOT NULL,
+    amount INTEGER NOT NULL,
+    created_on TEXT NOT NULL, 
+    payment_status  TEXT CHECK  (payment_status in ('InProgress', 'Expired', 'Failed', 'Done', 'Pending', 'Deleted' ) ) NOT NULL DEFAULT 'Pending',
+    FOREIGN KEY(light_client_address) REFERENCES client(address)
+);
+"""
+
+DB_CREATE_LIGHT_CLIENT_PROTOCOL_MESSAGE = """
+CREATE TABLE IF NOT EXISTS light_client_protocol_message (
+    internal_msg_identifier INTEGER PRIMARY KEY AUTOINCREMENT,
+    identifier TEXT,
+    light_client_payment_id TEXT,
+    message_order INTEGER, 
+    unsigned_message JSON,
+    signed_message JSON,
+    FOREIGN KEY(light_client_payment_id) REFERENCES light_client_payment(payment_id)
+    );
+"""
+
 DB_SCRIPT_CREATE_TABLES = """
 PRAGMA foreign_keys=off;
 BEGIN TRANSACTION;
-{}{}{}{}{}{}{}{}{}
+{}{}{}{}{}{}{}{}{}{}{}
 COMMIT;
 PRAGMA foreign_keys=on;
 """.format(
@@ -109,7 +137,9 @@ PRAGMA foreign_keys=on;
     DB_CREATE_TOKEN_ACTION,
     DB_CREATE_INVOICES,
     DB_CREATE_INVOICES_PAYMENTS,
-    DB_CREATE_CLIENT
+    DB_CREATE_CLIENT,
+    DB_CREATE_LIGHT_CLIENT_PAYMENT,
+    DB_CREATE_LIGHT_CLIENT_PROTOCOL_MESSAGE
 )
 
 DB_STATE_EVENT_ADD_CLIENT_FK = """

@@ -113,6 +113,14 @@ class InvalidAmount(RaidenError):
     pass
 
 
+class InvalidPaymentIdentifier(RaidenError):
+    """ Raised when a payment light doesnt present the message identifier or payment identifier.
+    """
+
+    pass
+
+
+
 class InvalidSettleTimeout(RaidenError):
     """ Raised when the user provided timeout value is less than the minimum
     settle timeout"""

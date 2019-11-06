@@ -36,42 +36,43 @@ def subdispatch_to_channel_by_id_and_address(
     state_change: StateChangeWithChannelID,
     block_number: BlockNumber,
     block_hash: BlockHash,
-    node_address: AddressHex
+    node_address: AddressHex = None
 ) -> TransitionResult:
     events = list()
 
     ids_to_channels = token_network_state.channelidentifiers_to_channels
 
     channel_state = None
-    if node_address in ids_to_channels:
-        channel_state = ids_to_channels[node_address].get(state_change.channel_identifier)
-    else:
-        lc_address = views.get_lc_address_by_channel_id_and_partner(token_network_state, node_address,
-                                                                    state_change.canonical_identifier)
-        node_address = lc_address
-        if lc_address in token_network_state.channelidentifiers_to_channels:
-            channel_state = token_network_state.channelidentifiers_to_channels[lc_address].get(
-                state_change.canonical_identifier.channel_identifier)
-    if channel_state:
-        result = channel.state_transition(
-            channel_state=channel_state,
-            state_change=state_change,
-            block_number=block_number,
-            block_hash=block_hash,
-        )
-
-        partner_to_channelids = token_network_state.partneraddresses_to_channelidentifiers[
-            channel_state.partner_state.address
-        ]
-
-        channel_identifier = state_change.channel_identifier
-        if result.new_state is None:
-            del ids_to_channels[node_address][channel_identifier]
-            partner_to_channelids.remove(channel_identifier)
+    if node_address is not None:
+        if node_address in ids_to_channels:
+            channel_state = ids_to_channels[node_address].get(state_change.channel_identifier)
         else:
-            ids_to_channels[node_address][channel_identifier] = result.new_state
+            lc_address = views.get_lc_address_by_channel_id_and_partner(token_network_state, node_address,
+                                                                    state_change.canonical_identifier)
+            node_address = lc_address
+            if lc_address in token_network_state.channelidentifiers_to_channels:
+                channel_state = token_network_state.channelidentifiers_to_channels[lc_address].get(
+                    state_change.canonical_identifier.channel_identifier)
+        if channel_state:
+            result = channel.state_transition(
+                channel_state=channel_state,
+                state_change=state_change,
+                block_number=block_number,
+                block_hash=block_hash,
+            )
 
-        events.extend(result.events)
+            partner_to_channelids = token_network_state.partneraddresses_to_channelidentifiers[
+                channel_state.partner_state.address
+            ]
+
+            channel_identifier = state_change.channel_identifier
+            if result.new_state is None:
+                del ids_to_channels[node_address][channel_identifier]
+                partner_to_channelids.remove(channel_identifier)
+            else:
+                ids_to_channels[node_address][channel_identifier] = result.new_state
+
+            events.extend(result.events)
 
     return TransitionResult(token_network_state, events)
 
@@ -82,11 +83,12 @@ def handle_channel_close(
     block_number: BlockNumber,
     block_hash: BlockHash,
 ) -> TransitionResult:
-    return subdispatch_to_channel_by_id(
+    return subdispatch_to_channel_by_id_and_address(
         token_network_state=token_network_state,
         state_change=state_change,
         block_number=block_number,
         block_hash=block_hash,
+        node_address=state_change.participant1
     )
 
 
@@ -145,23 +147,27 @@ def handle_closed(
     block_hash: BlockHash,
 ) -> TransitionResult:
     network_graph_state = token_network_state.network_graph
-
+    node_address = None
     # it might happen that both partners close at the same time, so the channel might
     # already be deleted
     if state_change.channel_identifier in network_graph_state.channel_identifier_to_participants:
         participant1, participant2 = network_graph_state.channel_identifier_to_participants[
             state_change.channel_identifier
         ]
-        token_network_state.network_graph.network.remove_edge(participant1, participant2)
-        del token_network_state.network_graph.channel_identifier_to_participants[
-            state_change.channel_identifier
-        ]
 
-    return subdispatch_to_channel_by_id(
+        if participant1 is not None and participant2 is not None:
+            token_network_state.network_graph.network.remove_edge(participant1, participant2)
+            del token_network_state.network_graph.channel_identifier_to_participants[
+                state_change.channel_identifier
+            ]
+            node_address = participant1
+
+    return subdispatch_to_channel_by_id_and_address(
         token_network_state=token_network_state,
         state_change=state_change,
         block_number=block_number,
         block_hash=block_hash,
+        node_address=node_address
     )
 
 
@@ -171,11 +177,12 @@ def handle_settled(
     block_number: BlockNumber,
     block_hash: BlockHash,
 ) -> TransitionResult:
-    return subdispatch_to_channel_by_id(
+    return subdispatch_to_channel_by_id_and_address(
         token_network_state=token_network_state,
         state_change=state_change,
         block_number=block_number,
         block_hash=block_hash,
+        node_address=state_change.participant1
     )
 
 
@@ -185,7 +192,7 @@ def handle_updated_transfer(
     block_number: BlockNumber,
     block_hash: BlockHash,
 ) -> TransitionResult:
-    return subdispatch_to_channel_by_id(
+    return subdispatch_to_channel_by_id_and_address(
         token_network_state=token_network_state,
         state_change=state_change,
         block_number=block_number,

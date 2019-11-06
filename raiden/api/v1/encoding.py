@@ -9,6 +9,8 @@ from eth_utils import (
     to_hex,
 )
 from marshmallow import Schema, SchemaOpts, fields, post_dump, post_load, pre_load
+
+from raiden.lightclient.lightclientmessages.hub_message import HubMessage
 from raiden.utils.rns import is_rns_address
 from webargs import validate
 from werkzeug.exceptions import NotFound
@@ -93,6 +95,16 @@ def deserialize_address_helper(self, value, attr, data):  # pylint: disable=unus
     if len(value) != 20:
         self.fail("invalid_size")
     return value
+
+
+class HubMessageField(fields.Field):
+    @staticmethod
+    def _serialize(value, attr, obj):  # pylint: disable=unused-argument
+        return data_encoder(value)
+
+    @staticmethod
+    def _deserialize(value, attr, data):  # pylint: disable=unused-argument
+        return data_decoder(value)
 
 
 class AddressField(fields.Field):
@@ -358,6 +370,43 @@ class ChannelLightPutSchema(BaseSchema):
         decoding_class = dict
 
 
+class CreatePaymentLightPostSchema(BaseSchema):
+    creator_address = AddressField(required=True)
+    partner_address = AddressField(required=True)
+    token_address = AddressField(required=True)
+    amount = fields.Integer(required=True)
+    secrethash = SecretHashField(required=True)
+
+    class Meta:
+        strict = True
+        # decoding to a dict is required by the @use_kwargs decorator from webargs:
+        decoding_class = dict
+
+
+
+class PaymentLightGetSchema(BaseSchema):
+    from_message = fields.Int(required=True)
+
+    class Meta:
+        strict = True
+        decoding_class = dict
+
+
+class PaymentLightPutSchema(BaseSchema):
+    message_id = fields.Integer(required=True)
+    message_order = fields.Integer(required=True)
+    message = fields.Dict(required=True)
+    sender = AddressField(required=True)
+    receiver = AddressField(required=True)
+
+
+    class Meta:
+        strict = True
+        # decoding to a dict is required by the @use_kwargs decorator from webargs:
+        decoding_class = dict
+
+
+
 class ChannelPutLuminoSchema(BaseSchema):
     token_address = AddressField(required=True)
     partner_address = AddressRnsField(required=True)
@@ -372,6 +421,15 @@ class ChannelPutLuminoSchema(BaseSchema):
 
 class ChannelLuminoGetSchema(BaseSchema):
     token_addresses = fields.String(required=True)
+
+    class Meta:
+        strict = True
+        # decoding to a dict is required by the @use_kwargs decorator from webargs:
+        decoding_class = dict
+
+
+class RequestRegisterLightGetSchema(BaseSchema):
+    address = AddressField(required=True)
 
     class Meta:
         strict = True
@@ -406,6 +464,7 @@ class ChannelLightPatchSchema(BaseSchema):
     )
     signed_approval_tx = fields.String(required=True)
     signed_deposit_tx = fields.String(required=True)
+    signed_close_tx = fields.String(required=True)
 
     class Meta:
         strict = True
@@ -458,8 +517,32 @@ class InvoiceCreateSchema(BaseSchema):
         decoding_class = dict
 
 
+class LightClientSchema(BaseSchema):
+    address = AddressField(required=True)
+    signed_password = fields.String(required=True)
+    signed_display_name = fields.String(required=True)
+    signed_seed_retry = fields.String(required=True)
+    password = fields.String(required=True)
+    display_name = fields.String(required=True)
+    seed_retry = fields.String(required=True)
+
+    class Meta:
+        strict = True
+        # decoding to a dict is required by the @use_kwargs decorator from webargs
+        decoding_class = dict
+
+
 class TokenActionRequestSchema(BaseSchema):
     token = fields.String(missing=None)
+
+    class Meta:
+        strict = True
+        # decoding to a dict is required by the @use_kwargs decorator from webargs
+        decoding_class = dict
+
+
+class LightClientMatrixCredentialsBuildSchema(BaseSchema):
+    address = AddressField()
 
     class Meta:
         strict = True

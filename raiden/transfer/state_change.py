@@ -18,7 +18,7 @@ from raiden.transfer.state import (
     TransactionChannelNewBalance,
 )
 from raiden.transfer.utils import pseudo_random_generator_from_json
-from raiden.utils import pex, sha3
+from raiden.utils import pex, sha3, decode_hex
 from raiden.utils.serialization import (
     deserialize_blockhash,
     deserialize_bytes,
@@ -57,7 +57,8 @@ from raiden.utils.typing import (
     TokenNetworkID,
     TransactionHash,
     TransferID,
-    AddressHex)
+    AddressHex,
+    SignedTransaction)
 
 
 class Block(StateChange):
@@ -118,26 +119,38 @@ class ActionUpdateTransportAuthData(StateChange):
     Can be used later to filter the messages which have not been processed.
     """
 
-    def __init__(self, auth_data: str):
+    def __init__(self, auth_data: str, address: Address):
         self.auth_data = auth_data
+        self.address = address
 
     def __repr__(self) -> str:
-        return "<ActionUpdateTransportAuthData value:{}>".format(self.auth_data)
+        return "<ActionUpdateTransportAuthData value:{} address:{}>".format(self.auth_data, self.address)
 
     def __eq__(self, other: Any) -> bool:
         return (
-            isinstance(other, ActionUpdateTransportAuthData) and self.auth_data == other.auth_data
+            isinstance(other, ActionUpdateTransportAuthData)
+            and self.auth_data == other.auth_data
+            and self.address == other.address
         )
 
     def __ne__(self, other: Any) -> bool:
         return not self.__eq__(other)
 
     def to_dict(self) -> Dict[str, Any]:
-        return {"auth_data": str(self.auth_data)}
+        return {
+            "auth_data": str(self.auth_data),
+            "address": to_checksum_address(self.address),
+        }
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "ActionUpdateTransportAuthData":
-        return cls(auth_data=data["auth_data"])
+        if "address" not in data:
+            data["address"] = b'00000000000000000000'
+
+        return cls(
+            auth_data=data["auth_data"],
+            address=to_canonical_address(data["address"])
+        )
 
 
 class ActionCancelPayment(StateChange):
@@ -172,8 +185,14 @@ class ActionCancelPayment(StateChange):
 class ActionChannelClose(StateChange):
     """ User is closing an existing channel. """
 
-    def __init__(self, canonical_identifier: CanonicalIdentifier) -> None:
+    def __init__(self, canonical_identifier: CanonicalIdentifier,
+                 signed_close_tx: str,
+                 participant1: AddressHex,
+                 participant2: AddressHex) -> None:
         self.canonical_identifier = canonical_identifier
+        self.signed_close_tx = signed_close_tx
+        self.participant1 = participant1
+        self.participant2 = participant2
 
     @property
     def chain_identifier(self) -> ChainID:
@@ -188,24 +207,43 @@ class ActionChannelClose(StateChange):
         return self.canonical_identifier.channel_identifier
 
     def __repr__(self) -> str:
-        return "<ActionChannelClose channel_identifier:{}>".format(self.channel_identifier)
+        return "<ActionChannelClose channel_identifier:{} signed_close_tx:{} participant1:{} participant2:{}>".format(
+            self.channel_identifier,
+            self.signed_close_tx,
+            self.participant1,
+            self.participant2)
 
     def __eq__(self, other: Any) -> bool:
         return (
             isinstance(other, ActionChannelClose)
             and self.canonical_identifier == other.canonical_identifier
+            and self.signed_close_tx == other.signed_close_tx
+            and self.participant1 == other.participant1
+            and self.participant2 == other.participant2
         )
 
     def __ne__(self, other: Any) -> bool:
         return not self.__eq__(other)
 
     def to_dict(self) -> Dict[str, Any]:
-        return {"canonical_identifier": self.canonical_identifier.to_dict()}
+        return {"canonical_identifier": self.canonical_identifier.to_dict(),
+                "signed_close_tx": self.signed_close_tx,
+                "participant1": to_checksum_address(self.participant1),
+                "participant2": to_checksum_address(self.participant2)}
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "ActionChannelClose":
+
+        if not "participant1" in data:
+            data["participant1"] = ""
+        if not "participant2" in data:
+            data["participant2"] = ""
+
         return cls(
-            canonical_identifier=CanonicalIdentifier.from_dict(data["canonical_identifier"])
+            canonical_identifier=CanonicalIdentifier.from_dict(data["canonical_identifier"]),
+            signed_close_tx=data["signed_close_tx"],
+            participant1=AddressHex(data["participant1"]),
+            participant2=AddressHex(data["participant2"])
         )
 
 
@@ -585,12 +623,14 @@ class ContractReceiveChannelSettled(ContractReceiveStateChange):
         partner_onchain_locksroot: Locksroot,
         block_number: BlockNumber,
         block_hash: BlockHash,
+        participant1: Address
     ) -> None:
         super().__init__(transaction_hash, block_number, block_hash)
 
         self.our_onchain_locksroot = our_onchain_locksroot
         self.partner_onchain_locksroot = partner_onchain_locksroot
         self.canonical_identifier = canonical_identifier
+        self.participant1 = participant1
 
     @property
     def channel_identifier(self) -> ChannelID:
@@ -611,6 +651,7 @@ class ContractReceiveChannelSettled(ContractReceiveStateChange):
             and self.canonical_identifier == other.canonical_identifier
             and self.our_onchain_locksroot == other.our_onchain_locksroot
             and self.partner_onchain_locksroot == other.partner_onchain_locksroot
+            and self.participant1 == other.participant1
             and super().__eq__(other)
         )
 
@@ -618,6 +659,7 @@ class ContractReceiveChannelSettled(ContractReceiveStateChange):
         return not self.__eq__(other)
 
     def to_dict(self) -> Dict[str, Any]:
+
         return {
             "transaction_hash": serialize_bytes(self.transaction_hash),
             "our_onchain_locksroot": serialize_bytes(self.our_onchain_locksroot),
@@ -625,10 +667,12 @@ class ContractReceiveChannelSettled(ContractReceiveStateChange):
             "canonical_identifier": self.canonical_identifier.to_dict(),
             "block_number": str(self.block_number),
             "block_hash": serialize_bytes(self.block_hash),
+            "participant1" : to_checksum_address(self.participant1)
         }
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "ContractReceiveChannelSettled":
+
         return cls(
             transaction_hash=deserialize_transactionhash(data["transaction_hash"]),
             canonical_identifier=CanonicalIdentifier.from_dict(data["canonical_identifier"]),
@@ -636,6 +680,7 @@ class ContractReceiveChannelSettled(ContractReceiveStateChange):
             partner_onchain_locksroot=deserialize_locksroot(data["partner_onchain_locksroot"]),
             block_number=BlockNumber(int(data["block_number"])),
             block_hash=BlockHash(deserialize_bytes(data["block_hash"])),
+            participant1=to_canonical_address(data["participant1"])
         )
 
 

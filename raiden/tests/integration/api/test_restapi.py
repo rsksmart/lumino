@@ -19,6 +19,7 @@ from raiden.constants import (
     RED_EYES_PER_CHANNEL_PARTICIPANT_LIMIT,
     SECRET_LENGTH,
     Environment,
+    EMPTY_PAYMENT_HASH_INVOICE,
 )
 from raiden.messages import LockedTransfer, Unlock
 from raiden.tests.integration.api.utils import create_api_server
@@ -1822,6 +1823,7 @@ def test_pending_transfers_endpoint(raiden_network, token_addresses):
         target=target.raiden.address,
         identifier=identifier,
         secret=secret,
+        payment_hash_invoice=EMPTY_PAYMENT_HASH_INVOICE
     )
 
     transfer_arrived = target_wait.wait_for_message(LockedTransfer, {"payment_identifier": 42})

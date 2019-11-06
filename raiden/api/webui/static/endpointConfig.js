@@ -1,7 +1,7 @@
-const backendUrl='http://127.0.0.1:5001'; 
-const nodeAddress = '0x09fcbe7cEb49c944703b4820e29b0541eDfE7E82'; 
+const backendUrl='http://localhost:5000'; 
+const nodeAddress = '0x01c16BF77c7d3651A5840A044A9D751655089Ac6'; 
 const rnsDomain = null 
-const chainEndpoint = 'http://localhost:4444'; 
+const chainEndpoint = 'http://127.0.0.1:4444'; 
 
 window.luminoUrl = backendUrl;
 window.nodeAddress= nodeAddress;

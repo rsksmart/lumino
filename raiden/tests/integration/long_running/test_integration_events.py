@@ -14,7 +14,7 @@ from raiden.blockchain.events import (
     get_token_network_events,
     get_token_network_registry_events,
 )
-from raiden.constants import GENESIS_BLOCK_NUMBER
+from raiden.constants import GENESIS_BLOCK_NUMBER, EMPTY_PAYMENT_HASH_INVOICE
 from raiden.network.blockchain_service import BlockChainService
 from raiden.settings import DEFAULT_NUMBER_OF_BLOCK_CONFIRMATIONS
 from raiden.tests.utils.detect_failure import raise_on_failure
@@ -483,6 +483,7 @@ def run_test_secret_revealed_on_chain(
         fee=0,
         target=target,
         identifier=identifier,
+        payment_hash_invoice=EMPTY_PAYMENT_HASH_INVOICE,
         secret=secret,
     )
 
@@ -576,6 +577,7 @@ def run_test_clear_closed_queue(raiden_network, token_addresses, network_wait):
         fee=0,
         target=target,
         identifier=payment_identifier,
+        payment_hash_invoice=EMPTY_PAYMENT_HASH_INVOICE,
         secret=secret,
     )
 
