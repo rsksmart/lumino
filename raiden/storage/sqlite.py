@@ -1302,14 +1302,16 @@ class SQLiteStorage:
         )
         return cursor.fetchone()
 
-    def get_light_client_messages(self, from_message):
+    def get_light_client_messages(self, from_message, light_client):
         cursor = self.conn.cursor()
         cursor.execute(
             "SELECT identifier, message_order, unsigned_message, signed_message, light_client_payment_id" +
-            " FROM light_client_protocol_message" +
-            " WHERE internal_msg_identifier >= ?" 
+            " FROM light_client_protocol_message A INNER JOIN light_client_payment B" +
+            " ON A.light_client_payment_id = B.payment_id" +
+            " WHERE A.internal_msg_identifier >= ?" +
+            " AND B.light_client_address = ?" +
             "ORDER BY light_client_payment_id, message_order ASC",
-            (from_message,),
+            (from_message, light_client),
 
         )
         return cursor.fetchall()
@@ -1337,8 +1339,8 @@ class SerializedSQLiteStorage(SQLiteStorage):
 
         self.serializer = serializer
 
-    def get_light_client_messages(self, from_message):
-        messages = super().get_light_client_messages(from_message)
+    def get_light_client_messages(self, from_message, light_client):
+        messages = super().get_light_client_messages(from_message, light_client)
         result = []
         if messages:
             for message in messages:
