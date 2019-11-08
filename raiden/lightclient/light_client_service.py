@@ -35,8 +35,8 @@ class LightClientService:
         return result
 
     @classmethod
-    def get_light_client_messages(cls, from_message: int, wal: WriteAheadLog):
-        messages = wal.storage.get_light_client_messages(from_message)
+    def get_light_client_messages(cls, from_message: int, light_client: ChecksumAddress, wal: WriteAheadLog):
+        messages = wal.storage.get_light_client_messages(from_message, light_client)
         result: List[LightClientProtocolMessage] = []
         for message in messages:
             signed = message[0]

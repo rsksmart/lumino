@@ -2013,8 +2013,8 @@ class RestAPI:
                 errors="There is no light client associated with the api key provided",
                 status_code=HTTPStatus.FORBIDDEN, log=log)
 
-
-        messages = LightClientService.get_light_client_messages(from_message, self.raiden_api.raiden.wal)
+        messages = LightClientService.get_light_client_messages(from_message, light_client.address,
+                                                                self.raiden_api.raiden.wal)
         response = [message.to_dict() for message in messages]
         return api_response(response)
 
