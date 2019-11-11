@@ -917,16 +917,16 @@ class RaidenService(Runnable):
         for queue_identifier, event_queue in events_queues.items():
             self.start_health_check_for(queue_identifier.recipient)
 
-            for event in event_queue:
-                message = message_from_sendevent(event)
-                if hasattr(message, 'signature'):
-                    light_client_address = to_checksum_address(encode_hex(message.initiator))
-                    if LightClientService.is_handled_lc(light_client_address, self.wal):
-                        light_client_transport = self.get_light_client_transport(light_client_address)
-                        light_client_transport.send_async(queue_identifier, message)
-                else:
-                    self.sign(message)
-                    self.transport.hub_transport.send_async(queue_identifier, message)
+            # for event in event_queue:
+            #     message = message_from_sendevent(event)
+            #     if hasattr(message, 'signature'):
+            #         light_client_address = to_checksum_address(encode_hex(message.initiator))
+            #         if LightClientService.is_handled_lc(light_client_address, self.wal):
+            #             light_client_transport = self.get_light_client_transport(light_client_address)
+            #             light_client_transport.send_async(queue_identifier, message)
+            #     else:h
+            #         self.sign(message)
+            #         self.transport.hub_transport.send_async(queue_identifier, message)
 
     def _initialize_monitoring_services_queue(self, chain_state: ChainState):
         """Send the monitoring requests for all current balance proofs.

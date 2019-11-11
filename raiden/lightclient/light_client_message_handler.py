@@ -52,26 +52,46 @@ class LightClientMessageHandler:
         )
 
     @classmethod
+    def update_stored_msg_set_signed_data(
+        cls, message: Message,
+        payment_id: int,
+        order: int,
+        wal: WriteAheadLog
+    ):
+        return wal.storage.update_light_client_protocol_message_set_signed_data(payment_id, order, message)
+
+    @classmethod
     def store_light_client_payment(cls, payment: LightClientPayment, wal: WriteAheadLog):
         return wal.storage.write_light_client_payment(payment)
 
     @classmethod
     def is_light_client_protocol_message_already_stored(cls, payment_id: int, order: int, wal: WriteAheadLog):
-        return wal.storage.is_light_client_protocol_message_already_stored(payment_id, order)
+        existing_message = wal.storage.is_light_client_protocol_message_already_stored(payment_id, order)
+        if existing_message:
+            return LightClientProtocolMessage(existing_message[4] is not None,
+                                              existing_message[3],
+                                              existing_message[2],
+                                              existing_message[1],
+                                              existing_message[4],
+                                              existing_message[5])
+        return existing_message
 
     @classmethod
-    def is_light_client_protocol_message_already_stored_message_id(cls, message_id: int, payment_id: int, order: int, wal: WriteAheadLog):
-        return wal.storage.is_light_client_protocol_message_already_stored_with_message_id(message_id, payment_id, order)
+    def is_light_client_protocol_message_already_stored_message_id(cls, message_id: int, payment_id: int, order: int,
+                                                                   wal: WriteAheadLog):
+        return wal.storage.is_light_client_protocol_message_already_stored_with_message_id(message_id, payment_id,
+                                                                                           order)
 
     @classmethod
     def get_light_client_protocol_message_by_identifier(cls, message_identifier: int, wal: WriteAheadLog):
         message = wal.storage.get_light_client_protocol_message_by_identifier(message_identifier)
-        return LightClientProtocolMessage(message[3] is not None, message[1], message[4], message[0], message[2], message[3])
+        return LightClientProtocolMessage(message[3] is not None, message[1], message[4], message[0], message[2],
+                                          message[3])
 
     @staticmethod
     def get_order_principal(messagetype: string):
         switcher = {
-            LockedTransfer.__name__: 0,
+            LockedTransfer.__name__: 1,
             SecretRequest.__name__: 5,
             RevealSecret.__name__: 9,
         }
@@ -81,14 +101,13 @@ class LightClientMessageHandler:
     def get_order_for_ack(ack_parent_type: string, ack_type: string):
         switcher_processed = {
             LockedTransfer.__name__: 3,
-            SecretRequest.__name__: 6,
             RevealSecret.__name__: 10,
-            Secret.__name__: 14,
+            Secret.__name__: 13,
         }
         switcher_delivered = {
             LockedTransfer.__name__: 2,
             RevealSecret.__name__: 8,
-            Secret.__name__: 13,
+            Secret.__name__: 12,
         }
         if ack_type.lower() == "processed":
             return switcher_processed.get(ack_parent_type, -1)
@@ -121,7 +140,7 @@ class LightClientMessageHandler:
         order = LightClientMessageHandler.get_order_for_ack(json_message["type"], message.__class__.__name__.lower())
         if order == -1:
             cls.log.error("Unable to find principal message for {} {}: ".format(message.__class__.__name__,
-                                                                            message_identifier))
+                                                                                message_identifier))
         else:
             exists = LightClientMessageHandler.is_light_client_protocol_message_already_stored_message_id(
                 message_identifier, protocol_message.light_client_payment_id, order, wal)
@@ -131,4 +150,3 @@ class LightClientMessageHandler:
                     wal)
             else:
                 cls.log.info("Message for lc already received, ignoring db storage")
-

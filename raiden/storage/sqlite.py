@@ -1360,6 +1360,19 @@ class SerializedSQLiteStorage(SQLiteStorage):
                      serialized_signed_msg, message[0]))
         return result
 
+    def update_light_client_protocol_message_set_signed_data(self, payment_id, msg_order, signed_message):
+        with self.write_lock, self.conn:
+            cursor = self.conn.cursor()
+            cursor.execute(
+                """
+                UPDATE  light_client_protocol_message set signed_message = ? WHERE light_client_payment_id = ? and message_order = ?;
+                """,
+                (self.serializer.serialize(signed_message), str(payment_id), msg_order)
+            )
+
+            last_id = cursor.lastrowid
+        return last_id
+
     def query_invoice(self, payment_hash_invoice):
         return super().query_invoice(payment_hash_invoice)
 

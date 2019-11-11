@@ -306,8 +306,8 @@ def handle_init_unlock_light(
     events = list()
     if channel_state:
         balance_proof = channel.create_send_balance_proof_light(channel_state, state_change.unlock,
-                                                                state_change.receiver)
-        store_signed_bp = StoreMessageEvent(balance_proof.message_identifier, balance_proof.payment_identifier, 12,
+                                                                state_change.sender, state_change.receiver)
+        store_signed_bp = StoreMessageEvent(balance_proof.message_identifier, balance_proof.payment_identifier, 11,
                                             state_change.unlock, True)
         events.append(balance_proof)
         events.append(store_signed_bp)

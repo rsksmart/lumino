@@ -1,6 +1,6 @@
 # pylint: disable=too-many-arguments,too-few-public-methods
 from eth_utils import to_canonical_address, to_checksum_address
-from raiden.messages import RevealSecret
+from raiden.messages import RevealSecret, Unlock, Message
 
 from raiden.transfer.architecture import Event, SendMessageEvent
 from raiden.transfer.mediated_transfer.state import LockedTransferUnsignedState
@@ -46,7 +46,7 @@ class StoreMessageEvent(Event):
     """
 
     def __init__(
-        self, message_id: int, payment_id: int, message_order: int, message: Any, is_signed: bool
+        self, message_id: int, payment_id: int, message_order: int, message: Message, is_signed: bool
     ) -> None:
         self.message_id = message_id
         self.payment_id = payment_id
@@ -511,7 +511,7 @@ class SendBalanceProofLight(SendMessageEvent):
         token_address: TokenAddress,
         secret: Secret,
         balance_proof: BalanceProofUnsignedState,
-        signed_balance_proof
+        signed_balance_proof: Unlock
     ) -> None:
         super().__init__(recipient, channel_identifier, message_identifier)
         self.sender = sender
@@ -563,6 +563,7 @@ class SendBalanceProofLight(SendMessageEvent):
             "token_address": to_checksum_address(self.token),
             "secret": serialize_bytes(self.secret),
             "balance_proof": self.balance_proof,
+            "signed_balance_proof": self.signed_balance_proof
         }
 
         return result
@@ -578,6 +579,7 @@ class SendBalanceProofLight(SendMessageEvent):
             token_address=to_canonical_address(data["token_address"]),
             secret=deserialize_secret(data["secret"]),
             balance_proof=data["balance_proof"],
+            signed_balance_proof=data["signed_balance_proof"]
         )
 
         return restored

@@ -11,6 +11,7 @@ from raiden.constants import (
     UINT256_MAX,
     EMPTY_PAYMENT_HASH_INVOICE
 )
+from raiden.messages import Unlock
 from raiden.settings import DEFAULT_NUMBER_OF_BLOCK_CONFIRMATIONS
 from raiden.transfer.architecture import Event, StateChange, TransitionResult
 from raiden.transfer.balance_proof import pack_balance_proof
@@ -1286,7 +1287,8 @@ def send_refundtransfer(
 
 def create_send_balance_proof_light(
     channel_state: NettingChannelState,
-    unlock,
+    unlock: Unlock,
+    sender: Address,
     recipient: Address,
 ) -> SendBalanceProofLight:
     token_address = channel_state.token_address
@@ -1306,7 +1308,8 @@ def create_send_balance_proof_light(
         token_address=token_address,
         secret=unlock.secret,
         balance_proof=balance_proof,
-        signed_balance_proof=unlock
+        signed_balance_proof=unlock,
+        sender=sender
     )
     return balance_proof_event
 
