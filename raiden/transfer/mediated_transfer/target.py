@@ -1,5 +1,11 @@
 import random
 
+from datetime import date
+
+from raiden.lightclient.light_client_message_handler import LightClientMessageHandler
+from raiden.lightclient.light_client_service import LightClientService
+from raiden.lightclient.lightclientmessages.light_client_payment import LightClientPayment, LightClientPaymentStatus
+from raiden.messages import SecretRequest, LockedTransfer
 from raiden.transfer import channel, secret_registry
 from raiden.transfer.architecture import Event, StateChange, TransitionResult
 from raiden.transfer.events import EventPaymentReceivedSuccess, SendProcessed
@@ -9,14 +15,14 @@ from raiden.transfer.mediated_transfer.events import (
     EventUnlockClaimSuccess,
     SendSecretRequest,
     SendSecretReveal,
-)
+    StoreMessageEvent)
 from raiden.transfer.mediated_transfer.mediator import is_safe_to_wait
 from raiden.transfer.mediated_transfer.state import TargetTransferState
 from raiden.transfer.mediated_transfer.state_change import (
     ActionInitTarget,
     ReceiveLockExpired,
     ReceiveSecretReveal,
-)
+    ActionInitTargetLight)
 from raiden.transfer.state import NettingChannelState, message_identifier_from_prng
 from raiden.transfer.state_change import Block, ContractReceiveSecretReveal, ReceiveUnlock
 from raiden.transfer.utils import is_valid_secret_reveal
@@ -139,6 +145,98 @@ def handle_inittarget(
             )
 
             channel_events.append(secret_request)
+
+        iteration = TransitionResult(target_state, channel_events)
+    else:
+        # If the balance proof is not valid, do *not* create a task. Otherwise it's
+        # possible for an attacker to send multiple invalid transfers, and increase
+        # the memory usage of this Node.
+        assert errormsg, "handle_receive_lockedtransfer should return error msg if not valid"
+        unlock_failed = EventUnlockClaimFailed(
+            identifier=transfer.payment_identifier,
+            secrethash=transfer.lock.secrethash,
+            reason=errormsg,
+        )
+        channel_events.append(unlock_failed)
+        iteration = TransitionResult(None, channel_events)
+
+    return iteration
+
+
+def handle_inittarget_light(
+    state_change: ActionInitTargetLight,
+    channel_state: NettingChannelState,
+    pseudo_random_generator: random.Random,
+    block_number: BlockNumber,
+    storage
+) -> TransitionResult[TargetTransferState]:
+    """ Handles an ActionInitTarget state change. """
+    transfer = state_change.transfer
+    route = state_change.route
+
+    assert channel_state.identifier == transfer.balance_proof.channel_identifier
+    is_valid, channel_events, errormsg, handle_invoice_result = channel.handle_receive_lockedtransfer_light(
+        channel_state, transfer, storage
+    )
+
+    if is_valid:
+        # A valid balance proof does not mean the payment itself is still valid.
+        # e.g. the lock may be near expiration or have expired. This is fine. The
+        # message with an unusable lock must be handled to properly synchronize the
+        # local view of the partner's channel state, allowing the next balance
+        # proofs to be handled. This however, must only be done once, which is
+        # enforced by the nonce increasing sequentially, which is verified by
+        # the handler handle_receive_lockedtransfer.
+        target_state = TargetTransferState(route, transfer)
+
+        safe_to_wait, _ = is_safe_to_wait(
+            transfer.lock.expiration, channel_state.reveal_timeout, block_number
+        )
+
+        # If there is not enough time to safely unlock the lock on-chain
+        # silently let the transfer expire. The target task must be created to
+        # handle the ReceiveLockExpired state change, which will clear the
+        # expired lock.
+        #
+        # We add a new validation.
+        # It is verified that if there was an invoice it was paid successfully,
+        # if it was not, the payment is interrupted
+        # by not generating an event send secret request
+        if safe_to_wait and handle_invoice_result['is_valid']:
+            payment = LightClientPayment(
+                state_change.transfer.target, state_change.transfer.initiator,
+                False,
+                channel_state.token_network_identifier,
+                transfer.lock.amount,
+                str(date.today()),
+                LightClientPaymentStatus.Pending,
+                transfer.payment_identifier
+            )
+
+            payment_exists = LightClientService.get_light_client_payment(payment.payment_id, storage)
+            if not payment_exists:
+                LightClientMessageHandler.store_light_client_payment(payment, storage)
+
+            message_identifier = message_identifier_from_prng(pseudo_random_generator)
+            recipient = transfer.initiator
+            secret_request = SendSecretRequest(
+                recipient=Address(recipient),
+                channel_identifier=CHANNEL_IDENTIFIER_GLOBAL_QUEUE,
+                message_identifier=message_identifier,
+                payment_identifier=transfer.payment_identifier,
+                amount=transfer.lock.amount,
+                expiration=transfer.lock.expiration,
+                secrethash=transfer.lock.secrethash,
+            )
+
+            store_locked_transfer_event = StoreMessageEvent(transfer.message_identifier, transfer.payment_identifier, 1,
+                                                            state_change.signed_lockedtransfer, True)
+
+            secret_request_message = SecretRequest.from_event(secret_request)
+            store_secret_request_event = StoreMessageEvent(message_identifier, transfer.payment_identifier, 5,
+                                                           secret_request_message, False)
+            channel_events.append(store_secret_request_event)
+            channel_events.append(store_locked_transfer_event)
 
         iteration = TransitionResult(target_state, channel_events)
     else:
@@ -347,6 +445,12 @@ def state_transition(
         assert isinstance(state_change, ActionInitTarget), MYPY_ANNOTATION
         if target_state is None:
             iteration = handle_inittarget(
+                state_change, channel_state, pseudo_random_generator, block_number, storage
+            )
+    elif type(state_change) == ActionInitTargetLight:
+        assert isinstance(state_change, ActionInitTargetLight), MYPY_ANNOTATION
+        if target_state is None:
+            iteration = handle_inittarget_light(
                 state_change, channel_state, pseudo_random_generator, block_number, storage
             )
     elif type(state_change) == Block:

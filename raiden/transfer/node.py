@@ -35,7 +35,7 @@ from raiden.transfer.mediated_transfer.state_change import (
     ReceiveTransferRefund,
     ReceiveTransferRefundCancelRoute,
     ActionInitInitiatorLight, ReceiveSecretRequestLight, ActionSendSecretRevealLight, ReceiveSecretRevealLight,
-    ActionSendUnlockLight)
+    ActionSendUnlockLight, ActionInitTargetLight)
 from raiden.transfer.state import (
     ChainState,
     InitiatorTask,
@@ -85,7 +85,7 @@ from raiden.utils.typing import (
     TokenNetworkID,
     Tuple,
     Union,
-    Address)
+    Address, AddressHex)
 
 from eth_utils import to_canonical_address, keccak, decode_hex
 
@@ -411,6 +411,7 @@ def subdispatch_targettask(
     token_network_identifier: TokenNetworkID,
     channel_identifier: ChannelID,
     secrethash: SecretHash,
+    initiator: AddressHex,
     storage
 ) -> TransitionResult[ChainState]:
     block_number = chain_state.block_number
@@ -436,7 +437,7 @@ def subdispatch_targettask(
                 token_network_address=token_network_identifier,
                 channel_identifier=channel_identifier,
             ),
-            address=chain_state.our_address
+            address=initiator
         )
 
     if channel_state:
@@ -752,7 +753,7 @@ def handle_init_mediator(
 
 
 def handle_init_target(
-    chain_state: ChainState, state_change: ActionInitTarget, storage
+    chain_state: ChainState, state_change: ActionInitTarget, storage, initiator: Address
 ) -> TransitionResult[ChainState]:
     transfer = state_change.transfer
     secrethash = transfer.lock.secrethash
@@ -765,6 +766,7 @@ def handle_init_target(
         TokenNetworkID(token_network_identifier),
         channel_identifier,
         secrethash,
+        initiator,
         storage
     )
 
@@ -891,7 +893,10 @@ def handle_state_change(
         iteration = handle_init_mediator(chain_state, state_change)
     elif type(state_change) == ActionInitTarget:
         assert isinstance(state_change, ActionInitTarget), MYPY_ANNOTATION
-        iteration = handle_init_target(chain_state, state_change, storage)
+        iteration = handle_init_target(chain_state, state_change, storage, chain_state.our_address)
+    elif type(state_change) == ActionInitTargetLight:
+        assert isinstance(state_change, ActionInitTargetLight), MYPY_ANNOTATION
+        iteration = handle_init_target(chain_state, state_change, storage, state_change.transfer.initiator)
     elif type(state_change) == ActionUpdateTransportAuthData:
         assert isinstance(state_change, ActionUpdateTransportAuthData), MYPY_ANNOTATION
         iteration = handle_update_transport_authdata(chain_state, state_change)

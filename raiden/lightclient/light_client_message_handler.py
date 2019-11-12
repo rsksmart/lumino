@@ -6,6 +6,7 @@ from raiden.lightclient.lightclientmessages.light_client_payment import LightCli
 from raiden.lightclient.lightclientmessages.light_client_protocol_message import LightClientProtocolMessage, \
     DbLightClientProtocolMessage
 from raiden.messages import Message, LockedTransfer, SecretRequest, RevealSecret, Secret, Processed, Delivered
+from raiden.storage.sqlite import SerializedSQLiteStorage
 from raiden.storage.wal import WriteAheadLog
 from typing import List, Union
 
@@ -52,6 +53,16 @@ class LightClientMessageHandler:
         )
 
     @classmethod
+    def store_received_locked_transfer(cls, identifier: int, message: Message, signed: bool, payment_id: int,
+                                            order: int,
+                                            storage: SerializedSQLiteStorage):
+        return storage.write_light_client_protocol_message(
+            message,
+            build_light_client_protocol_message(identifier, message, signed,
+                                                payment_id, order)
+        )
+
+    @classmethod
     def update_stored_msg_set_signed_data(
         cls, message: Message,
         payment_id: int,
@@ -61,8 +72,8 @@ class LightClientMessageHandler:
         return wal.storage.update_light_client_protocol_message_set_signed_data(payment_id, order, message)
 
     @classmethod
-    def store_light_client_payment(cls, payment: LightClientPayment, wal: WriteAheadLog):
-        return wal.storage.write_light_client_payment(payment)
+    def store_light_client_payment(cls, payment: LightClientPayment, storage: SerializedSQLiteStorage):
+        return storage.write_light_client_payment(payment)
 
     @classmethod
     def is_light_client_protocol_message_already_stored(cls, payment_id: int, order: int, wal: WriteAheadLog):

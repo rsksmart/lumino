@@ -109,7 +109,8 @@ class ActionInitInitiatorLight(StateChange):
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "ActionInitInitiatorLight":
-        return cls(transfer_description=data["transfer"], routes=data["routes"], signed_locked_transfer=data["signed_locked_transfer"])
+        return cls(transfer_description=data["transfer"], routes=data["routes"],
+                   signed_locked_transfer=data["signed_locked_transfer"])
 
 
 class ActionInitMediator(BalanceProofStateChange):
@@ -214,6 +215,55 @@ class ActionInitTarget(BalanceProofStateChange):
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "ActionInitTarget":
         return cls(route=data["route"], transfer=data["transfer"])
+
+
+class ActionInitTargetLight(BalanceProofStateChange):
+    """ Initial state for a new target that is a handled light client.
+
+    Args:
+        route: The payee route.
+        transfer: The payee transfer.
+    """
+
+    def __init__(self, route: RouteState, transfer: LockedTransferSignedState,
+                 signed_lockedtransfer: LockedTransfer) -> None:
+        if not isinstance(route, RouteState):
+            raise ValueError("route must be a RouteState instance")
+
+        if not isinstance(transfer, LockedTransferSignedState):
+            raise ValueError("transfer must be a LockedTransferSignedState instance")
+
+        super().__init__(transfer.balance_proof)
+        self.route = route
+        self.transfer = transfer
+        self.signed_lockedtransfer = signed_lockedtransfer
+
+    def __repr__(self) -> str:
+        return "<ActionInitTargetLight route:{} transfer:{} signed_lockedtransfer:{}>".format(self.route, self.transfer,
+                                                                                              self.signed_lockedtransfer)
+
+    def __eq__(self, other: Any) -> bool:
+        return (
+            isinstance(other, ActionInitTargetLight)
+            and self.route == other.route
+            and self.transfer == other.transfer
+            and self.signed_lockedtransfer == other.signed_lockedtransfer
+        )
+
+    def __ne__(self, other: Any) -> bool:
+        return not self.__eq__(other)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "route": self.route,
+            "transfer": self.transfer,
+            "balance_proof": self.balance_proof,
+            "signed_lockedtransfer": self.signed_lockedtransfer
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "ActionInitTargetLight":
+        return cls(route=data["route"], transfer=data["transfer"], signed_lockedtransfer=data["signed_lockedtransfer"])
 
 
 class ReceiveLockExpired(BalanceProofStateChange):
@@ -385,7 +435,6 @@ class ReceiveSecretRequestLight(AuthenticatedSenderStateChange):
         return instance
 
 
-
 class ReceiveSecretReveal(AuthenticatedSenderStateChange):
     """ A SecretReveal message received. """
 
@@ -473,6 +522,7 @@ class ReceiveSecretRevealLight(AuthenticatedSenderStateChange):
         )
         instance.secrethash = deserialize_bytes(data["secrethash"])
         return instance
+
 
 class ReceiveTransferRefundCancelRoute(BalanceProofStateChange):
     """ A RefundTransfer message received by the initiator will cancel the current

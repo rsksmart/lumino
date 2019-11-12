@@ -1,8 +1,11 @@
 import structlog
 import json
 
+from eth_utils import to_checksum_address, encode_hex
+
 from raiden.constants import EMPTY_SECRET, TEST_PAYMENT_ID
 from raiden.lightclient.light_client_message_handler import LightClientMessageHandler
+from raiden.lightclient.light_client_service import LightClientService
 from raiden.messages import (
     Delivered,
     LockedTransfer,
@@ -178,7 +181,7 @@ class MessageHandler:
         # the node must not use it to start a payment.
         #
         # For this particular case, it's preferable to use `latest` instead of
-        # having a specific block_hash, because it's preferable to know if the secret
+        # having a specific block_hash, because it's preferable to know if the secret`
         # was ever known, rather than having a consistent view of the blockchain.
         registered = raiden.default_secret_registry.is_secret_registered(
             secrethash=secrethash, block_identifier="latest"
@@ -190,9 +193,14 @@ class MessageHandler:
             )
             return
 
-        # TODO marcosmartinez7: what about lc reception here?
+        # TODO marcosmartinez7: unimplemented mediated transfer for light clients
+        is_handled_light_client = LightClientService.is_handled_lc(to_checksum_address(message.recipient),
+                                                                   raiden.wal)
+
         if message.target == raiden.address:
             raiden.target_mediated_transfer(message)
+        elif is_handled_light_client:
+            raiden.target_mediated_transfer_light(message)
         else:
             raiden.mediate_mediated_transfer(message)
 

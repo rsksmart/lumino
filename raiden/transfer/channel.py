@@ -11,7 +11,7 @@ from raiden.constants import (
     UINT256_MAX,
     EMPTY_PAYMENT_HASH_INVOICE
 )
-from raiden.messages import Unlock
+from raiden.messages import Unlock, Processed
 from raiden.settings import DEFAULT_NUMBER_OF_BLOCK_CONFIRMATIONS
 from raiden.transfer.architecture import Event, StateChange, TransitionResult
 from raiden.transfer.balance_proof import pack_balance_proof
@@ -34,7 +34,7 @@ from raiden.transfer.mediated_transfer.events import (
     SendLockExpired,
     SendRefundTransfer,
     refund_from_sendmediated,
-    SendBalanceProofLight)
+    SendBalanceProofLight, StoreMessageEvent)
 from raiden.transfer.mediated_transfer.state import (
     LockedTransferSignedState,
     LockedTransferUnsignedState,
@@ -1648,6 +1648,51 @@ def handle_receive_lockedtransfer(
             message_identifier=mediated_transfer.message_identifier,
         )
         events = [send_processed]
+    else:
+        assert msg, "is_valid_lock_expired should return error msg if not valid"
+        invalid_locked = EventInvalidReceivedLockedTransfer(
+            payment_identifier=mediated_transfer.payment_identifier, reason=msg
+        )
+        events = [invalid_locked]
+
+    return is_valid, events, msg, handle_invoice_result
+
+
+def handle_receive_lockedtransfer_light(
+    channel_state: NettingChannelState, mediated_transfer: LockedTransferSignedState, storage
+) -> EventsOrError:
+    """Register the latest known transfer.
+
+    The receiver needs to use this method to update the container with a
+    _valid_ transfer, otherwise the locksroot will not contain the pending
+    transfer. The receiver needs to ensure that the merkle root has the
+    secrethash included, otherwise it won't be able to claim it.
+    """
+    events: List[Event]
+    is_valid, msg, merkletree, handle_invoice_result = is_valid_lockedtransfer(
+        mediated_transfer, channel_state, channel_state.partner_state, channel_state.our_state, storage
+    )
+
+    if is_valid:
+        assert merkletree, "is_valid_lock_expired should return merkletree if valid"
+        channel_state.partner_state.balance_proof = mediated_transfer.balance_proof
+        channel_state.partner_state.merkletree = merkletree
+
+        lock = mediated_transfer.lock
+        channel_state.partner_state.secrethashes_to_lockedlocks[lock.secrethash] = lock
+
+        send_processed = SendProcessed(
+            recipient=mediated_transfer.balance_proof.sender,
+            channel_identifier=CHANNEL_IDENTIFIER_GLOBAL_QUEUE,
+            message_identifier=mediated_transfer.message_identifier,
+        )
+        processed_store_event = StoreMessageEvent(mediated_transfer.message_identifier,
+                                                  mediated_transfer.payment_identifier,
+                                                  3,
+                                                  Processed.from_event(send_processed),
+                                                  False)
+        events = [processed_store_event]
+
     else:
         assert msg, "is_valid_lock_expired should return error msg if not valid"
         invalid_locked = EventInvalidReceivedLockedTransfer(

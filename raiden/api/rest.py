@@ -2034,7 +2034,7 @@ class RestAPI:
             return ApiErrorBuilder.build_and_log_error(errors="Missing api_key auth header",
                                                        status_code=HTTPStatus.BAD_REQUEST, log=log)
 
-        payment_request = LightClientService.get_light_client_payment(message_id, self.raiden_api.raiden.wal)
+        payment_request = LightClientService.get_light_client_payment(message_id, self.raiden_api.raiden.wal.storage)
         if not payment_request:
             return ApiErrorBuilder.build_and_log_error(errors="No payment associated",
                                                        status_code=HTTPStatus.BAD_REQUEST, log=log)

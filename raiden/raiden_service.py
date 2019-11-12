@@ -59,6 +59,7 @@ from raiden.transfer.mediated_transfer.state_change import (
     ActionInitInitiator,
     ActionInitMediator,
     ActionInitTarget,
+    ActionInitTargetLight,
     ActionInitInitiatorLight, ActionSendSecretRevealLight, ActionSendUnlockLight)
 from raiden.transfer.state import (
     BalanceProofSignedState,
@@ -224,6 +225,12 @@ def target_init(transfer: LockedTransfer) -> ActionInitTarget:
     from_transfer = lockedtransfersigned_from_message(transfer)
     from_route = RouteState(transfer.sender, from_transfer.balance_proof.channel_identifier)
     return ActionInitTarget(from_route, from_transfer)
+
+
+def target_init_light(transfer: LockedTransfer) -> ActionInitTargetLight:
+    from_transfer = lockedtransfersigned_from_message(transfer)
+    from_route = RouteState(transfer.sender, from_transfer.balance_proof.channel_identifier)
+    return ActionInitTargetLight(from_route, from_transfer, transfer)
 
 
 class PaymentStatus(NamedTuple):
@@ -1352,6 +1359,11 @@ class RaidenService(Runnable):
         self.start_health_check_for(Address(transfer.initiator))
         init_target_statechange = target_init(transfer)
         self.handle_and_track_state_change(init_target_statechange)
+
+    def target_mediated_transfer_light(self, transfer: LockedTransfer):
+        self.start_health_check_for(Address(transfer.initiator))
+        init_target_light__statechange = target_init_light(transfer)
+        self.handle_and_track_state_change(init_target_light__statechange)
 
     def maybe_upgrade_db(self) -> None:
         manager = UpgradeManager(

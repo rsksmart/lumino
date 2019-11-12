@@ -1696,8 +1696,8 @@ class RaidenAPI:
                                          locked_transfer.payment_identifier)
             # Persist the light_client_protocol_message associated
             order = 1
-            payment_row_id = LightClientMessageHandler.store_light_client_payment(payment, self.raiden.wal)
-            light_client_message_id = LightClientMessageHandler.store_light_client_protocol_message(
+            LightClientMessageHandler.store_light_client_payment(payment, self.raiden.wal.storage)
+            LightClientMessageHandler.store_light_client_protocol_message(
                 locked_transfer.message_identifier,
                 locked_transfer,
                 False,
