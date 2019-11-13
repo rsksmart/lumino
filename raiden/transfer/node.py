@@ -35,7 +35,7 @@ from raiden.transfer.mediated_transfer.state_change import (
     ReceiveTransferRefund,
     ReceiveTransferRefundCancelRoute,
     ActionInitInitiatorLight, ReceiveSecretRequestLight, ActionSendSecretRevealLight, ReceiveSecretRevealLight,
-    ActionSendUnlockLight, ActionInitTargetLight)
+    ActionSendUnlockLight, ActionInitTargetLight, ActionSendSecretRequestLight)
 from raiden.transfer.state import (
     ChainState,
     InitiatorTask,
@@ -271,7 +271,7 @@ def subdispatch_to_paymenttask(
                     token_network_address=token_network_identifier,
                     channel_identifier=channel_identifier,
                 ),
-                address=chain_state.our_address
+                address=sub_task.target_state.transfer.target
             )
 
             if channel_state:
@@ -740,6 +740,14 @@ def handle_init_reveal_secret_light(
     return subdispatch_to_paymenttask(chain_state, state_change, secrethash)
 
 
+def handle_init_secret_request_light(
+    chain_state: ChainState, state_change: ActionSendSecretRequestLight
+) -> TransitionResult[ChainState]:
+    secret_request = state_change.secret_request
+    secrethash = secret_request.secrethash
+    return subdispatch_to_paymenttask(chain_state, state_change, secrethash)
+
+
 def handle_init_mediator(
     chain_state: ChainState, state_change: ActionInitMediator
 ) -> TransitionResult[ChainState]:
@@ -964,6 +972,8 @@ def handle_state_change(
         iteration = handle_init_initiator_light(chain_state, state_change)
     elif type(state_change) == ActionSendSecretRevealLight:
         iteration = handle_init_reveal_secret_light(chain_state, state_change)
+    elif type(state_change) == ActionSendSecretRequestLight:
+        iteration = handle_init_secret_request_light(chain_state, state_change)
     elif type(state_change) == ReceiveSecretRevealLight:
         assert isinstance(state_change, ReceiveSecretRevealLight), MYPY_ANNOTATION
         iteration = handle_secret_reveal_light(chain_state, state_change)

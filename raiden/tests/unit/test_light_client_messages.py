@@ -12,10 +12,11 @@ secrethash = keccak(secret)
 
 from raiden.messages import (
     RevealSecret, Delivered,
-    LockedTransfer, Unlock)
+    LockedTransfer, Unlock, Processed, SecretRequest)
 
 
-def test_balance_proof():
+
+def test_balance_proof_11():
     dict_data = {"type": "Secret", "chain_id": 33, "message_identifier": 6263041337178146650,
                  "payment_identifier": 3135462385358726574,
                  "secret": "0x41580c4d5b4d412c642b64375a735e65432a495548676e67334c4d7a650d6a65", "nonce": 2,
@@ -52,6 +53,37 @@ def test_reveal_secret_7():
         "0x7ca28d3d760b4aa2b79e8d42cbdc187c7df9af40")
 
 
+def test_processed():
+    message = Processed(message_identifier=MessageID(8560298362786856489))
+    message.sign(signer)
+    data_was_signed = message._data_to_sign()
+    print("Delivered signature: " + message.signature.hex())
+    assert recover(data_was_signed, message.signature) == to_canonical_address(
+        "0x7ca28d3d760b4aa2b79e8d42cbdc187c7df9af40")
+
+
+def test_secret_request_5():
+    dict_data = {
+        "type": "SecretRequest",
+        "message_identifier": 364757616990455122,
+        "payment_identifier": 10417002507856398695,
+        "amount": 1000000000000000,
+        "expiration": 1624776,
+        "secrethash": "0xb152e0f30a67cdeffa8067ab0fa246004d890661beb17e73215e3ffffa206f79"
+    }
+    message = SecretRequest(message_identifier=dict_data["message_identifier"],
+                            payment_identifier=dict_data["payment_identifier"],
+                            secrethash=decode_hex(dict_data["secrethash"]),
+                            amount=dict_data["amount"],
+                            expiration=dict_data["expiration"]
+    )
+    message.sign(signer)
+    data_was_signed = message._data_to_sign()
+    print("Delivered signature: " + message.signature.hex())
+    assert recover(data_was_signed, message.signature) == to_canonical_address(
+        "0x7ca28d3d760b4aa2b79e8d42cbdc187c7df9af40")
+
+
 def test_delivered():
     dict_msg = {
         "type": "Delivered",
@@ -65,12 +97,12 @@ def test_delivered():
         "0x7ca28d3d760b4aa2b79e8d42cbdc187c7df9af40")
 
 
-def test_locked_transfer():
+def test_locked_transfer_1():
     dict_msg = {
         "type": "LockedTransfer",
         "chain_id": 33,
-        "message_identifier": 9285801864935496141,
-        "payment_identifier": 3135462385358726574,
+        "message_identifier": 5582513684436696034,
+        "payment_identifier": 3443356287795879818,
         "payment_hash_invoice": "0x",
         "nonce": 1,
         "token_network_address": "0x7351ed719de72db92a54c99ef2c4d287f69672a1",

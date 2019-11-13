@@ -8,6 +8,7 @@ from raiden.lightclient.lightclientmessages.light_client_payment import LightCli
 from raiden.messages import SecretRequest, LockedTransfer
 from raiden.transfer import channel, secret_registry
 from raiden.transfer.architecture import Event, StateChange, TransitionResult
+from raiden.transfer.channel import is_valid_lockedtransfer
 from raiden.transfer.events import EventPaymentReceivedSuccess, SendProcessed
 from raiden.transfer.mediated_transfer.events import (
     CHANNEL_IDENTIFIER_GLOBAL_QUEUE,
@@ -15,14 +16,14 @@ from raiden.transfer.mediated_transfer.events import (
     EventUnlockClaimSuccess,
     SendSecretRequest,
     SendSecretReveal,
-    StoreMessageEvent)
+    StoreMessageEvent, SendSecretRequestLight)
 from raiden.transfer.mediated_transfer.mediator import is_safe_to_wait
 from raiden.transfer.mediated_transfer.state import TargetTransferState
 from raiden.transfer.mediated_transfer.state_change import (
     ActionInitTarget,
     ReceiveLockExpired,
     ReceiveSecretReveal,
-    ActionInitTargetLight)
+    ActionInitTargetLight, ActionSendSecretRequestLight)
 from raiden.transfer.state import NettingChannelState, message_identifier_from_prng
 from raiden.transfer.state_change import Block, ContractReceiveSecretReveal, ReceiveUnlock
 from raiden.transfer.utils import is_valid_secret_reveal
@@ -255,6 +256,58 @@ def handle_inittarget_light(
     return iteration
 
 
+def handle_send_secret_request_light(
+    target_state: TargetTransferState,
+    state_change: ActionSendSecretRequestLight,
+    channel_state: NettingChannelState,
+    block_number: BlockNumber,
+    storage
+) -> TransitionResult[TargetTransferState]:
+    """ Handles an ActionInitTarget state change. """
+    transfer = target_state.transfer
+
+    assert channel_state.identifier == transfer.balance_proof.channel_identifier
+
+    events = list()
+
+    safe_to_wait, _ = is_safe_to_wait(
+        transfer.lock.expiration, channel_state.reveal_timeout, block_number
+    )
+
+    # If there is not enough time to safely unlock the lock on-chain
+    # silently let the transfer expire. The target task must be created to
+    # handle the ReceiveLockExpired state change, which will clear the
+    # expired lock.
+    #
+    # We add a new validation.
+    # It is verified that if there was an invoice it was paid successfully,
+    # if it was not, the payment is interrupted
+    # by not generating an event send secret request
+    if safe_to_wait:
+        secret_request_light = SendSecretRequestLight(
+            sender=Address(target_state.transfer.target),
+            recipient=Address(target_state.transfer.initiator),
+            channel_identifier=CHANNEL_IDENTIFIER_GLOBAL_QUEUE,
+            message_identifier=state_change.secret_request.message_identifier,
+            payment_identifier=transfer.payment_identifier,
+            amount=transfer.lock.amount,
+            expiration=transfer.lock.expiration,
+            secrethash=transfer.lock.secrethash,
+            signed_secret_request=state_change.secret_request
+        )
+
+        store_secret_request_event = StoreMessageEvent(state_change.secret_request.message_identifier,
+                                                       transfer.payment_identifier,
+                                                       5,
+                                                       state_change.secret_request,
+                                                       False)
+        events.append(secret_request_light)
+        events.append(store_secret_request_event)
+        iteration = TransitionResult(target_state, events)
+
+    return iteration
+
+
 def handle_offchain_secretreveal(
     target_state: TargetTransferState,
     state_change: ReceiveSecretReveal,
@@ -453,6 +506,12 @@ def state_transition(
             iteration = handle_inittarget_light(
                 state_change, channel_state, pseudo_random_generator, block_number, storage
             )
+    elif type(state_change) == ActionSendSecretRequestLight:
+        assert isinstance(state_change, ActionSendSecretRequestLight), MYPY_ANNOTATION
+        assert target_state, "ActionSendSecretRequestLight should be accompanied by a valid target state"
+        iteration = handle_send_secret_request_light(
+            target_state, state_change, channel_state, block_number, storage
+        )
     elif type(state_change) == Block:
         assert isinstance(state_change, Block), MYPY_ANNOTATION
         assert state_change.block_number == block_number
