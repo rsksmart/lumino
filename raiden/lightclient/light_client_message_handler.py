@@ -118,6 +118,7 @@ class LightClientMessageHandler:
         switcher_delivered = {
             LockedTransfer.__name__: 2,
             RevealSecret.__name__: 8,
+            SecretRequest.__name__: 5,
             Secret.__name__: 12,
         }
         if ack_type.lower() == "processed":
