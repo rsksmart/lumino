@@ -112,6 +112,15 @@ def handle_channel_new(raiden: "RaidenService", event: Event):
             opened_block_number=block_number,
         )
 
+        # Swap our_state and partner_state in order to have the LC from our_side of the channel
+        if is_participant1_handled_lc or is_participant2_handled_lc:
+            if is_participant1_handled_lc:
+                if participant1 != channel_state.our_state.address:
+                    channel_state.our_state, channel_state.partner_state = channel_state.partner_state, channel_state.our_state
+            else:
+                if participant2 != channel_state.our_state.address:
+                    channel_state.our_state, channel_state.partner_state = channel_state.partner_state, channel_state.our_state
+
         new_channel = ContractReceiveChannelNew(
             transaction_hash=transaction_hash,
             channel_state=channel_state,

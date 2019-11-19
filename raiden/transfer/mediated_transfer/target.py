@@ -494,13 +494,15 @@ def handle_unlock(
             transfer.payment_identifier, transfer.lock.secrethash
         )
 
-        send_processed = SendProcessed(
-            recipient=balance_proof_sender,
-            channel_identifier=CHANNEL_IDENTIFIER_GLOBAL_QUEUE,
-            message_identifier=state_change.message_identifier,
-        )
+        #FIXME mmartinez crear unlock light
 
-        events.extend([payment_received_success, unlock_success, send_processed])
+        # send_processed = SendProcessed(
+        #     recipient=balance_proof_sender,
+        #     channel_identifier=CHANNEL_IDENTIFIER_GLOBAL_QUEUE,
+        #     message_identifier=state_change.message_identifier,
+        # )
+
+        events.extend([payment_received_success, unlock_success])
         next_target_state = None
 
     return TransitionResult(next_target_state, events)

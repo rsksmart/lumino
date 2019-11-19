@@ -15,7 +15,6 @@ from raiden.messages import (
     LockedTransfer, Unlock, Processed, SecretRequest)
 
 
-
 def test_balance_proof_11():
     dict_data = {"type": "Secret", "chain_id": 33, "message_identifier": 6263041337178146650,
                  "payment_identifier": 3135462385358726574,
@@ -54,7 +53,20 @@ def test_reveal_secret_7():
 
 
 def test_processed():
-    message = Processed(message_identifier=MessageID(8560298362786856489))
+    message = Processed(message_identifier=MessageID(16599718387235485260))
+    message.sign(signer)
+    data_was_signed = message._data_to_sign()
+    print("Processed signature: " + message.signature.hex())
+    assert recover(data_was_signed, message.signature) == to_canonical_address(
+        "0x7ca28d3d760b4aa2b79e8d42cbdc187c7df9af40")
+
+
+def test_delivered():
+    dict_msg = {
+        "type": "Delivered",
+        "delivered_message_identifier": 16599718387235485260
+    }
+    message = Delivered.from_dict_unsigned(dict_msg)
     message.sign(signer)
     data_was_signed = message._data_to_sign()
     print("Delivered signature: " + message.signature.hex())
@@ -65,18 +77,18 @@ def test_processed():
 def test_secret_request_5():
     dict_data = {
         "type": "SecretRequest",
-        "message_identifier": 11830796048202304011,
-        "payment_identifier": 17624816782097112522,
+        "message_identifier": 4445977899194097730,
+        "payment_identifier": 12421780631870675027,
         "amount": 1000000000000000,
         "expiration": 12000000,
-        "secrethash": "0x576a7856da7af831f7acb87da9451e02224bcee0800981945cfb0e581270c65e"
+        "secrethash": "0x24ec0f88c88fc5aec1ae3dd05f97f164dd113021e8c64805509c491ce8e0c408"
     }
     message = SecretRequest(message_identifier=dict_data["message_identifier"],
                             payment_identifier=dict_data["payment_identifier"],
                             secrethash=decode_hex(dict_data["secrethash"]),
                             amount=dict_data["amount"],
                             expiration=dict_data["expiration"]
-    )
+                            )
     message.sign(signer)
     data_was_signed = message._data_to_sign()
     print("SR signature: " + message.signature.hex())
@@ -85,22 +97,11 @@ def test_secret_request_5():
 
 
 def test_reveal_secret_9():
-    message = RevealSecret(message_identifier=MessageID(2225799524225862565), secret=Secret(decode_hex("0x62080ee2de6e9d81a563b7177d274babab1090f440e756f3d0e4756586f017c8")))
+    message = RevealSecret(message_identifier=MessageID(7754584014596521927), secret=Secret(
+        decode_hex("0xa5ecea7a428d816ccfb2252baabecf37955b087427517fe0e0d44fa478303eef")))
     message.sign(signer)
     data_was_signed = message._data_to_sign()
     print("Reveal Secret signature: " + message.signature.hex())
-    assert recover(data_was_signed, message.signature) == to_canonical_address(
-        "0x7ca28d3d760b4aa2b79e8d42cbdc187c7df9af40")
-
-def test_delivered():
-    dict_msg = {
-        "type": "Delivered",
-        "delivered_message_identifier": 8560298362786856489
-    }
-    message = Delivered.from_dict_unsigned(dict_msg)
-    message.sign(signer)
-    data_was_signed = message._data_to_sign()
-    print("Delivered signature: " + message.signature.hex())
     assert recover(data_was_signed, message.signature) == to_canonical_address(
         "0x7ca28d3d760b4aa2b79e8d42cbdc187c7df9af40")
 
