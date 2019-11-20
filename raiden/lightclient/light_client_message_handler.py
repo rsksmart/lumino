@@ -2,6 +2,8 @@ import json
 import string
 
 import structlog
+from eth_utils import to_checksum_address
+
 from raiden.lightclient.lightclientmessages.light_client_payment import LightClientPayment
 from raiden.lightclient.lightclientmessages.light_client_protocol_message import LightClientProtocolMessage, \
     DbLightClientProtocolMessage
@@ -54,8 +56,8 @@ class LightClientMessageHandler:
 
     @classmethod
     def store_received_locked_transfer(cls, identifier: int, message: Message, signed: bool, payment_id: int,
-                                            order: int,
-                                            storage: SerializedSQLiteStorage):
+                                       order: int,
+                                       storage: SerializedSQLiteStorage):
         return storage.write_light_client_protocol_message(
             message,
             build_light_client_protocol_message(identifier, message, signed,
@@ -99,27 +101,23 @@ class LightClientMessageHandler:
         return LightClientProtocolMessage(message[3] is not None, message[1], message[4], message[0], message[2],
                                           message[3])
 
-    @staticmethod
-    def get_order_principal(messagetype: string):
-        switcher = {
-            LockedTransfer.__name__: 1,
-            SecretRequest.__name__: 5,
-            RevealSecret.__name__: 9,
-        }
-        return switcher.get(messagetype, -1)
+    @classmethod
+    def get_light_client_payment_locked_transfer(cls, payment_identifier: int, wal: WriteAheadLog):
+        message = wal.storage.get_light_client_payment_locked_transfer(payment_identifier)
+        return LightClientProtocolMessage(message[3] is not None, message[1], message[4], message[0], message[2],
+                                          message[3])
 
     @staticmethod
-    def get_order_for_ack(ack_parent_type: string, ack_type: string):
+    def get_order_for_ack(ack_parent_type: string, ack_type: string, is_delivered_from_initiator: bool = False):
         switcher_processed = {
             LockedTransfer.__name__: 3,
-            RevealSecret.__name__: 10,
             Secret.__name__: 13,
         }
         switcher_delivered = {
-            LockedTransfer.__name__: 2,
-            RevealSecret.__name__: 8,
-            SecretRequest.__name__: 5,
-            Secret.__name__: 12,
+            LockedTransfer.__name__: 4 if is_delivered_from_initiator else 2,
+            RevealSecret.__name__: 10 if is_delivered_from_initiator else 8,
+            SecretRequest.__name__: 6,
+            Secret.__name__: 14 if is_delivered_from_initiator else 12,
         }
         if ack_type.lower() == "processed":
             return switcher_processed.get(ack_parent_type, -1)
@@ -131,15 +129,38 @@ class LightClientMessageHandler:
         return wal.storage.exists_payment(payment_id)
 
     @classmethod
-    def store_ack_message(cls, message: Union[Processed, Delivered], wal: WriteAheadLog):
+    def store_lc_processed(cls, message: Processed, wal: WriteAheadLog):
         # If exists for that payment, the same message by the order, then discard it.
-        is_delivered = type(message) == Delivered
-        message_identifier = None
-        if is_delivered:
-            message_identifier = message.delivered_message_identifier
+        message_identifier = message.message_identifier
+        # get first principal message by message identifier
+        protocol_message = LightClientMessageHandler.get_light_client_protocol_message_by_identifier(
+            message_identifier, wal)
+        json_message = None
+        if protocol_message.signed_message is None:
+            json_message = protocol_message.unsigned_message
         else:
-            message_identifier = message.message_identifier
+            json_message = protocol_message.signed_message
+        json_message = json.loads(json_message)
 
+        order = LightClientMessageHandler.get_order_for_ack(json_message["type"], message.__class__.__name__.lower())
+        if order == -1:
+            cls.log.error("Unable to find principal message for {} {}: ".format(message.__class__.__name__,
+                                                                                message_identifier))
+        else:
+            exists = LightClientMessageHandler.is_light_client_protocol_message_already_stored_message_id(
+                message_identifier, protocol_message.light_client_payment_id, order, wal)
+            if not exists:
+                LightClientMessageHandler.store_light_client_protocol_message(
+                    message_identifier, message, True, protocol_message.light_client_payment_id, order,
+                    wal)
+            else:
+                cls.log.info("Message for lc already received, ignoring db storage")
+
+    @classmethod
+    def store_lc_delivered(cls, message: Delivered, wal: WriteAheadLog):
+        # If exists for that payment, the same message by the order, then discard it.
+        message_identifier = message.delivered_message_identifier
+        # get first by message identifier
         protocol_message = LightClientMessageHandler.get_light_client_protocol_message_by_identifier(
             message_identifier, wal)
         json_message = None
@@ -149,7 +170,26 @@ class LightClientMessageHandler:
             json_message = protocol_message.signed_message
 
         json_message = json.loads(json_message)
-        order = LightClientMessageHandler.get_order_for_ack(json_message["type"], message.__class__.__name__.lower())
+
+        first_message_is_lt = protocol_message.message_order == 1
+        is_delivered_from_initiator = True
+        delivered_sender = message.sender
+        if not first_message_is_lt:
+            # get lt to get the payment identifier
+            locked_transfer = LightClientMessageHandler.get_light_client_payment_locked_transfer(
+                protocol_message.light_client_payment_id, wal)
+            signed_locked_transfer_message = json.loads(locked_transfer.signed_message)
+            payment_initiator = signed_locked_transfer_message["initiator"]
+            if to_checksum_address(delivered_sender) != to_checksum_address(payment_initiator):
+                is_delivered_from_initiator = False
+        else:
+            # message is the lt
+            payment_initiator = json_message["initiator"]
+            if to_checksum_address(delivered_sender) != to_checksum_address(payment_initiator):
+                is_delivered_from_initiator = False
+
+        order = LightClientMessageHandler.get_order_for_ack(json_message["type"], message.__class__.__name__.lower(),
+                                                            is_delivered_from_initiator)
         if order == -1:
             cls.log.error("Unable to find principal message for {} {}: ".format(message.__class__.__name__,
                                                                                 message_identifier))

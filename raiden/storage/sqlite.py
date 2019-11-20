@@ -1329,6 +1329,18 @@ class SQLiteStorage:
         )
         return cursor.fetchone()
 
+    def get_light_client_payment_locked_transfer(self, payment_identifier):
+        cursor = self.conn.cursor()
+        cursor.execute(
+            "SELECT identifier, message_order, unsigned_message, signed_message, light_client_payment_id" +
+            " FROM light_client_protocol_message A INNER JOIN light_client_payment B" +
+            " ON A.light_client_payment_id = B.payment_id" +
+            " WHERE A.message_order = 1" +
+            " AND B.payment_id = ?",
+            (str(payment_identifier),),
+        )
+        return cursor.fetchone()
+
     def __del__(self):
         self.conn.close()
 
@@ -1338,6 +1350,7 @@ class SerializedSQLiteStorage(SQLiteStorage):
         super().__init__(database_path)
 
         self.serializer = serializer
+
 
     def get_light_client_messages(self, from_message, light_client):
         messages = super().get_light_client_messages(from_message, light_client)

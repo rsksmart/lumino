@@ -26,7 +26,7 @@ from raiden.transfer.mediated_transfer.state_change import (
     ReceiveSecretReveal,
     ActionInitTargetLight, ActionSendSecretRequestLight, ReceiveSecretRevealLight, ActionSendSecretRevealLight)
 from raiden.transfer.state import NettingChannelState, message_identifier_from_prng
-from raiden.transfer.state_change import Block, ContractReceiveSecretReveal, ReceiveUnlock
+from raiden.transfer.state_change import Block, ContractReceiveSecretReveal, ReceiveUnlock, ReceiveUnlockLight
 from raiden.transfer.utils import is_valid_secret_reveal
 from raiden.utils.typing import (
     MYPY_ANNOTATION,
@@ -273,8 +273,9 @@ def handle_send_secret_reveal_light(
         secret=state_change.reveal_secret.secret,
         signed_secret_reveal=state_change.reveal_secret
     )
-
-    iteration = TransitionResult(target_state, [revealsecret])
+    store_reveal_secret_event = StoreMessageEvent(message_identifier, transfer.payment_identifier, 9,
+                                                  state_change.reveal_secret, True)
+    iteration = TransitionResult(target_state, [revealsecret, store_reveal_secret_event])
     return iteration
 
 
@@ -469,6 +470,44 @@ def handle_onchain_secretreveal(
     return TransitionResult(target_state, list())
 
 
+def handle_unlock_light(
+    target_state: TargetTransferState,
+    state_change: ReceiveUnlockLight,
+    channel_state: NettingChannelState,
+) -> TransitionResult[TargetTransferState]:
+    """ Handles a ReceiveUnlockLight state change. """
+
+    is_valid, events, _ = channel.handle_unlock_light(channel_state, state_change)
+    next_target_state: Optional[TargetTransferState] = target_state
+
+    if is_valid:
+        transfer = target_state.transfer
+        payment_received_success = EventPaymentReceivedSuccess(
+            payment_network_identifier=channel_state.payment_network_identifier,
+            token_network_identifier=TokenNetworkID(channel_state.token_network_identifier),
+            identifier=transfer.payment_identifier,
+            amount=TokenAmount(transfer.lock.amount),
+            initiator=transfer.initiator,
+        )
+
+        unlock_success = EventUnlockClaimSuccess(
+            transfer.payment_identifier, transfer.lock.secrethash
+        )
+
+        store_unlock_message = StoreMessageEvent(
+            state_change.signed_unlock.message_identifier,
+            state_change.signed_unlock.payment_identifier,
+            11,
+            state_change.signed_unlock,
+            True
+        )
+
+        events.extend([payment_received_success, unlock_success, store_unlock_message])
+        next_target_state = None
+
+    return TransitionResult(next_target_state, events)
+
+
 def handle_unlock(
     target_state: TargetTransferState,
     state_change: ReceiveUnlock,
@@ -494,15 +533,13 @@ def handle_unlock(
             transfer.payment_identifier, transfer.lock.secrethash
         )
 
-        #FIXME mmartinez crear unlock light
+        send_processed = SendProcessed(
+            recipient=balance_proof_sender,
+            channel_identifier=CHANNEL_IDENTIFIER_GLOBAL_QUEUE,
+            message_identifier=state_change.message_identifier,
+        )
 
-        # send_processed = SendProcessed(
-        #     recipient=balance_proof_sender,
-        #     channel_identifier=CHANNEL_IDENTIFIER_GLOBAL_QUEUE,
-        #     message_identifier=state_change.message_identifier,
-        # )
-
-        events.extend([payment_received_success, unlock_success])
+        events.extend([payment_received_success, unlock_success, send_processed])
         next_target_state = None
 
     return TransitionResult(next_target_state, events)
@@ -648,6 +685,12 @@ def state_transition(
         assert isinstance(state_change, ReceiveUnlock), MYPY_ANNOTATION
         assert target_state, "ReceiveUnlock should be accompanied by a valid target state"
         iteration = handle_unlock(
+            target_state=target_state, state_change=state_change, channel_state=channel_state
+        )
+    elif type(state_change) == ReceiveUnlockLight:
+        assert isinstance(state_change, ReceiveUnlockLight), MYPY_ANNOTATION
+        assert target_state, "ReceiveUnlock should be accompanied by a valid target state"
+        iteration = handle_unlock_light(
             target_state=target_state, state_change=state_change, channel_state=channel_state
         )
     elif type(state_change) == ReceiveLockExpired:
