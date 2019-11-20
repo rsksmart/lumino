@@ -621,7 +621,7 @@ class ReceiveTransferRefund(BalanceProofStateChange):
 
 
 class ActionSendSecretRevealLight(AuthenticatedSenderStateChange):
-    """ A SecretReveal message must be sent to a light client. """
+    """ A SecretReveal message must be sent from a light client. """
 
     def __init__(self, reveal_secret: RevealSecret, sender: Address, receiver: Address) -> None:
         super().__init__(sender)
@@ -645,7 +645,7 @@ class ActionSendSecretRevealLight(AuthenticatedSenderStateChange):
 
     def to_dict(self) -> Dict[str, Any]:
         return {
-            "reveal_secret": self.reveal_secret.to_dict(),
+            "reveal_secret": self.reveal_secret,
             "sender": to_checksum_address(self.sender),
             "receiver": to_checksum_address(self.receiver)
         }
@@ -653,7 +653,47 @@ class ActionSendSecretRevealLight(AuthenticatedSenderStateChange):
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "ActionSendSecretRevealLight":
         instance = cls(
-            reveal_secret=RevealSecret(data["reveal_secret"]),
+            reveal_secret=data["reveal_secret"],
+            sender=to_canonical_address(data["sender"]),
+            receiver=to_canonical_address(data["receiver"])
+        )
+        return instance
+
+
+class ActionSendSecretRequestLight(AuthenticatedSenderStateChange):
+    """ A SecretRequest message must be sent from a  light client. """
+
+    def __init__(self, secret_request: SecretRequest, sender: Address, receiver: Address) -> None:
+        super().__init__(sender)
+        self.receiver = receiver
+        self.secret_request = secret_request
+
+    def __repr__(self) -> str:
+        return "<ActionSendSecretRequestLight reveal_secret:{} sender:{}>".format(
+            pex(self.secret_request.__repr__()), pex(self.sender)
+        )
+
+    def __eq__(self, other: Any) -> bool:
+        return (
+            isinstance(other, ActionSendSecretRequestLight)
+            and self.secret_request.__eq__(other.secret_request)
+            and super().__eq__(other)
+        )
+
+    def __ne__(self, other: Any) -> bool:
+        return not self.__eq__(other)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "secret_request": self.secret_request.to_dict(),
+            "sender": to_checksum_address(self.sender),
+            "receiver": to_checksum_address(self.receiver)
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "ActionSendSecretRequestLight":
+        instance = cls(
+            secret_request=SecretRequest.from_dict(data["secret_request"]),
             sender=to_canonical_address(data["sender"]),
             receiver=to_canonical_address(data["receiver"])
         )

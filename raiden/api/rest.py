@@ -22,7 +22,7 @@ from raiden.api.validations.api_error_builder import ApiErrorBuilder
 from raiden.api.validations.api_status_codes import ERROR_STATUS_CODES
 from raiden.api.validations.channel_validator import ChannelValidator
 from raiden.lightclient.light_client_service import LightClientService
-from raiden.messages import LockedTransfer, Delivered, RevealSecret, Unlock
+from raiden.messages import LockedTransfer, Delivered, RevealSecret, Unlock, SecretRequest
 from raiden.rns_constants import RNS_ADDRESS_ZERO
 from raiden.utils.rns import is_rns_address
 from webargs.flaskparser import parser
@@ -1473,6 +1473,12 @@ class RestAPI:
                                     ):
         self.raiden_api.initiate_send_balance_proof(sender_address, receiver_address, unlock)
 
+    def initiate_send_secret_request_light(self, sender_address: typing.Address, receiver_address: typing.Address,
+                                    secret_request: SecretRequest
+                                    ):
+        self.raiden_api.initiate_send_secret_request_light(sender_address, receiver_address, secret_request, 5, secret_request.payment_identifier)
+
+
     def initiate_payment_light(
         self,
         registry_address: typing.PaymentNetworkID,
@@ -2054,6 +2060,9 @@ class RestAPI:
         elif message["type"] == "Secret":
             unlock = Unlock.from_dict(message)
             self.initiate_send_balance_proof(sender, receiver, unlock)
+        elif message["type"] == "SecretRequest":
+            secret_request = SecretRequest.from_dict(message)
+            self.initiate_send_secret_request_light(sender, receiver, secret_request)
 
         return api_response("Received, message should be sent to partner")
 

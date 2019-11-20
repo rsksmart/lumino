@@ -1,6 +1,6 @@
 # pylint: disable=too-many-arguments,too-few-public-methods
 from eth_utils import to_canonical_address, to_checksum_address
-from raiden.messages import RevealSecret, Unlock, Message
+from raiden.messages import RevealSecret, Unlock, Message, SecretRequest
 
 from raiden.transfer.architecture import Event, SendMessageEvent
 from raiden.transfer.mediated_transfer.state import LockedTransferUnsignedState
@@ -580,6 +580,88 @@ class SendBalanceProofLight(SendMessageEvent):
             secret=deserialize_secret(data["secret"]),
             balance_proof=data["balance_proof"],
             signed_balance_proof=data["signed_balance_proof"]
+        )
+
+        return restored
+
+
+class SendSecretRequestLight(SendMessageEvent):
+    """ Sends a signed SecretRequest to another node.
+    """
+
+    def __init__(
+        self,
+        sender: Address,
+        recipient: Address,
+        channel_identifier: ChannelID,
+        message_identifier: MessageID,
+        payment_identifier: PaymentID,
+        amount: PaymentWithFeeAmount,
+        expiration: BlockExpiration,
+        secrethash: SecretHash,
+        signed_secret_request: SecretRequest
+    ) -> None:
+        super().__init__(recipient, channel_identifier, message_identifier)
+        self.sender = sender
+        self.payment_identifier = payment_identifier
+        self.amount = amount
+        self.expiration = expiration
+        self.secrethash = secrethash
+        self.signed_secret_request = signed_secret_request
+
+    def __repr__(self) -> str:
+        return (
+            "<SendSecretRequestLight "
+            "msgid:{} paymentid:{} amount:{} expiration:{} secrethash:{} recipient:{}"
+            ">"
+        ).format(
+            self.message_identifier,
+            self.payment_identifier,
+            self.amount,
+            self.expiration,
+            pex(self.secrethash),
+            pex(self.recipient),
+        )
+
+    def __eq__(self, other: Any) -> bool:
+        return (
+            isinstance(other, SendSecretRequestLight)
+            and self.payment_identifier == other.payment_identifier
+            and self.amount == other.amount
+            and self.expiration == other.expiration
+            and self.secrethash == other.secrethash
+            and self.recipient == other.recipient
+            and super().__eq__(other)
+        )
+
+    def __ne__(self, other: Any) -> bool:
+        return not self.__eq__(other)
+
+    def to_dict(self) -> Dict[str, Any]:
+        result = {
+            "recipient": to_checksum_address(self.recipient),
+            "channel_identifier": str(self.queue_identifier.channel_identifier),
+            "message_identifier": str(self.message_identifier),
+            "payment_identifier": str(self.payment_identifier),
+            "amount": str(self.amount),
+            "expiration": str(self.expiration),
+            "secrethash": serialize_bytes(self.secrethash),
+            "signed_secret_request": self.signed_secret_request
+        }
+
+        return result
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "SendSecretRequestLight":
+        restored = cls(
+            recipient=to_canonical_address(data["recipient"]),
+            channel_identifier=ChannelID(int(data["channel_identifier"])),
+            message_identifier=MessageID(int(data["message_identifier"])),
+            payment_identifier=PaymentID(int(data["payment_identifier"])),
+            amount=PaymentWithFeeAmount(int(data["amount"])),
+            expiration=BlockExpiration(int(data["expiration"])),
+            secrethash=deserialize_secret_hash(data["secrethash"]),
+            signed_secret_request=data["signed_secret_request"]
         )
 
         return restored
