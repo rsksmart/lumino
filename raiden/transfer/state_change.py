@@ -3,6 +3,7 @@ from random import Random
 
 from eth_utils import to_canonical_address, to_checksum_address
 
+from raiden.messages import Unlock
 from raiden.transfer.architecture import (
     AuthenticatedSenderStateChange,
     BalanceProofStateChange,
@@ -659,7 +660,6 @@ class ContractReceiveChannelSettled(ContractReceiveStateChange):
         return not self.__eq__(other)
 
     def to_dict(self) -> Dict[str, Any]:
-
         return {
             "transaction_hash": serialize_bytes(self.transaction_hash),
             "our_onchain_locksroot": serialize_bytes(self.our_onchain_locksroot),
@@ -667,12 +667,11 @@ class ContractReceiveChannelSettled(ContractReceiveStateChange):
             "canonical_identifier": self.canonical_identifier.to_dict(),
             "block_number": str(self.block_number),
             "block_hash": serialize_bytes(self.block_hash),
-            "participant1" : to_checksum_address(self.participant1)
+            "participant1": to_checksum_address(self.participant1)
         }
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "ContractReceiveChannelSettled":
-
         return cls(
             transaction_hash=deserialize_transactionhash(data["transaction_hash"]),
             canonical_identifier=CanonicalIdentifier.from_dict(data["canonical_identifier"]),
@@ -1208,6 +1207,58 @@ class ContractReceiveUpdateTransfer(ContractReceiveStateChange):
             nonce=Nonce(int(data["nonce"])),
             block_number=BlockNumber(int(data["block_number"])),
             block_hash=BlockHash(deserialize_bytes(data["block_hash"])),
+        )
+
+
+class ReceiveUnlockLight(BalanceProofStateChange):
+    def __init__(
+        self, message_identifier: MessageID, secret: Secret, balance_proof: BalanceProofSignedState,
+        signed_unlock: Unlock
+    ) -> None:
+        if not isinstance(balance_proof, BalanceProofSignedState):
+            raise ValueError("balance_proof must be an instance of BalanceProofSignedState")
+
+        super().__init__(balance_proof)
+
+        secrethash: SecretHash = SecretHash(sha3(secret))
+
+        self.message_identifier = message_identifier
+        self.secret = secret
+        self.secrethash = secrethash
+        self.signed_unlock = signed_unlock
+
+    def __repr__(self) -> str:
+        return "<ReceiveUnlockLight msgid:{} secrethash:{} balance_proof:{}>".format(
+            self.message_identifier, pex(self.secrethash), self.balance_proof
+        )
+
+    def __eq__(self, other: Any) -> bool:
+        return (
+            isinstance(other, ReceiveUnlockLight)
+            and self.message_identifier == other.message_identifier
+            and self.secret == other.secret
+            and self.secrethash == other.secrethash
+            and super().__eq__(other)
+        )
+
+    def __ne__(self, other: Any) -> bool:
+        return not self.__eq__(other)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "message_identifier": str(self.message_identifier),
+            "secret": serialize_bytes(self.secret),
+            "balance_proof": self.balance_proof,
+            "signed_unlock": self.signed_unlock
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "ReceiveUnlockLight":
+        return cls(
+            message_identifier=MessageID(int(data["message_identifier"])),
+            secret=deserialize_secret(data["secret"]),
+            balance_proof=data["balance_proof"],
+            signed_unlock=data["signed_unlock"]
         )
 
 

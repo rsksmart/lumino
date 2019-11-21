@@ -186,7 +186,8 @@ class RaidenEventHandler(EventHandler):
                                                                             store_message_event.payment_id,
                                                                             store_message_event.message_order,
                                                                             raiden.wal)
-            log.info("Message for lc already received, ignoring db storage")
+            else:
+                log.info("Message for lc already received, ignoring db storage")
 
     @staticmethod
     def handle_send_lockexpired(raiden: "RaidenService", send_lock_expired: SendLockExpired):

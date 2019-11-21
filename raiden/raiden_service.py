@@ -38,7 +38,7 @@ from raiden.messages import (
     Message,
     RequestMonitoring,
     SignedMessage,
-    RevealSecret, Unlock, Delivered, SecretRequest)
+    RevealSecret, Unlock, Delivered, SecretRequest, Processed)
 from raiden.network.blockchain_service import BlockChainService
 from raiden.network.proxies.secret_registry import SecretRegistry
 from raiden.network.proxies.service_registry import ServiceRegistry
@@ -1332,6 +1332,20 @@ class RaidenService(Runnable):
                 self.wal
             )
             lc_transport.send_for_light_client_with_retry(receiver_address, delivered)
+
+    def initiate_send_processed_light(self, sender_address: Address, receiver_address: Address,
+                                      processed: Processed, msg_order: int, payment_id: int):
+        lc_transport = self.get_light_client_transport(to_checksum_address(sender_address))
+        if lc_transport:
+            LightClientMessageHandler.store_light_client_protocol_message(
+                processed.message_identifier,
+                processed,
+                True,
+                payment_id,
+                msg_order,
+                self.wal
+            )
+            lc_transport.send_for_light_client_with_retry(receiver_address, processed)
 
     def initiate_send_secret_reveal_light(
         self,

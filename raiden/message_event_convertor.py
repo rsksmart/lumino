@@ -4,7 +4,7 @@ from raiden.transfer.architecture import SendMessageEvent
 from raiden.transfer.events import SendProcessed
 from raiden.transfer.mediated_transfer.events import SendLockedTransfer, SendLockedTransferLight, SendSecretReveal, \
     SendBalanceProof, SendBalanceProofLight, SendSecretRequest, SendRefundTransfer, SendLockExpired, \
-    SendSecretRequestLight
+    SendSecretRequestLight, SendSecretRevealLight
 from raiden.utils.typing import MYPY_ANNOTATION
 
 
@@ -18,6 +18,9 @@ def message_from_sendevent(send_event: SendMessageEvent) -> Message:
     elif type(send_event) == SendSecretReveal:
         assert isinstance(send_event, SendSecretReveal), MYPY_ANNOTATION
         message = RevealSecret.from_event(send_event)
+    elif type(send_event) == SendSecretRevealLight:
+        assert isinstance(send_event, SendSecretRevealLight), MYPY_ANNOTATION
+        message = send_event.signed_secret_reveal
     elif type(send_event) == SendBalanceProof:
         assert isinstance(send_event, SendBalanceProof), MYPY_ANNOTATION
         message = Unlock.from_event(send_event)

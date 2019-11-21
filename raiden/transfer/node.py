@@ -69,7 +69,7 @@ from raiden.transfer.state_change import (
     ReceiveDelivered,
     ReceiveProcessed,
     ReceiveUnlock,
-)
+    ReceiveUnlockLight)
 from raiden.utils import sha3
 from raiden.utils.typing import (
     MYPY_ANNOTATION,
@@ -832,6 +832,12 @@ def handle_receive_unlock(
     secrethash = state_change.secrethash
     return subdispatch_to_paymenttask(chain_state, state_change, secrethash)
 
+def handle_receive_unlock_light(
+    chain_state: ChainState, state_change: ReceiveUnlockLight
+) -> TransitionResult[ChainState]:
+    secrethash = state_change.secrethash
+    return subdispatch_to_paymenttask(chain_state, state_change, secrethash)
+
 
 def handle_update_transport_authdata(
     chain_state: ChainState, state_change: ActionUpdateTransportAuthData
@@ -965,6 +971,9 @@ def handle_state_change(
     elif type(state_change) == ReceiveUnlock:
         assert isinstance(state_change, ReceiveUnlock), MYPY_ANNOTATION
         iteration = handle_receive_unlock(chain_state, state_change)
+    elif type(state_change) == ReceiveUnlockLight:
+        assert isinstance(state_change, ReceiveUnlockLight), MYPY_ANNOTATION
+        iteration = handle_receive_unlock_light(chain_state, state_change)
     elif type(state_change) == ReceiveLockExpired:
         assert isinstance(state_change, ReceiveLockExpired), MYPY_ANNOTATION
         iteration = handle_receive_lock_expired(chain_state, state_change)
