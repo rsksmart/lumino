@@ -283,8 +283,7 @@ def handle_send_secret_request_light(
     target_state: TargetTransferState,
     state_change: ActionSendSecretRequestLight,
     channel_state: NettingChannelState,
-    block_number: BlockNumber,
-    storage
+    block_number: BlockNumber
 ) -> TransitionResult[TargetTransferState]:
     """ Handles an ActionInitTarget state change. """
     transfer = target_state.transfer
@@ -638,7 +637,7 @@ def state_transition(
         assert isinstance(state_change, ActionSendSecretRequestLight), MYPY_ANNOTATION
         assert target_state, "ActionSendSecretRequestLight should be accompanied by a valid target state"
         iteration = handle_send_secret_request_light(
-            target_state, state_change, channel_state, block_number, storage
+            target_state, state_change, channel_state, block_number
         )
     elif type(state_change) == ActionSendSecretRevealLight:
         assert isinstance(state_change, ActionSendSecretRevealLight), MYPY_ANNOTATION

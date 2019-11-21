@@ -10,7 +10,7 @@ from raiden.lightclient.lightclientmessages.light_client_protocol_message import
 from raiden.messages import Message, LockedTransfer, SecretRequest, RevealSecret, Secret, Processed, Delivered
 from raiden.storage.sqlite import SerializedSQLiteStorage
 from raiden.storage.wal import WriteAheadLog
-from typing import List, Union
+from typing import List
 
 
 def build_light_client_protocol_message(identifier: int, message: Message, signed: bool, payment_id: int,
