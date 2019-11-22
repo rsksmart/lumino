@@ -69,7 +69,7 @@ from raiden.transfer.state_change import (
     ReceiveDelivered,
     ReceiveProcessed,
     ReceiveUnlock,
-    ReceiveUnlockLight)
+    ReceiveUnlockLight, ContractReceiveChannelClosedLight)
 from raiden.utils import sha3
 from raiden.utils.typing import (
     MYPY_ANNOTATION,
@@ -577,6 +577,7 @@ def handle_token_network_action(
             block_hash=chain_state.block_hash,
         )
 
+        # TODO marcosmartinez7 take a look at this
         # Investigate behavior of this @GASPAR MEDINA
         # assert iteration.new_state, "No token network state transition leads to None"
 
@@ -588,7 +589,7 @@ def handle_token_network_action(
 
 
 def handle_contract_receive_channel_closed(
-    chain_state: ChainState, state_change: ContractReceiveChannelClosed
+    chain_state: ChainState, state_change: ContractReceiveChannelClosed, our_side_address: AddressHex
 ) -> TransitionResult[ChainState]:
     # cleanup queue for channel
     channel_state = views.get_channelstate_by_canonical_identifier_and_address(
@@ -599,7 +600,7 @@ def handle_contract_receive_channel_closed(
             channel_identifier=state_change.channel_identifier,
         ),
 
-        address=chain_state.our_address
+        address=our_side_address
     )
     if channel_state:
         queue_id = QueueIdentifier(
@@ -928,7 +929,10 @@ def handle_state_change(
         iteration = handle_token_network_action(chain_state, state_change)
     elif type(state_change) == ContractReceiveChannelClosed:
         assert isinstance(state_change, ContractReceiveChannelClosed), MYPY_ANNOTATION
-        iteration = handle_contract_receive_channel_closed(chain_state, state_change)
+        iteration = handle_contract_receive_channel_closed(chain_state, state_change, chain_state.our_address)
+    elif type(state_change) == ContractReceiveChannelClosedLight:
+        assert isinstance(state_change, ContractReceiveChannelClosedLight), MYPY_ANNOTATION
+        iteration = handle_contract_receive_channel_closed(chain_state, state_change, state_change.light_client_address)
     elif type(state_change) == ContractReceiveChannelNewBalance:
         assert isinstance(state_change, ContractReceiveChannelNewBalance), MYPY_ANNOTATION
         iteration = handle_token_network_action(chain_state, state_change)

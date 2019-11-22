@@ -15,7 +15,7 @@ from raiden.transfer.state_change import (
     ContractReceiveRouteClosed,
     ContractReceiveRouteNew,
     ContractReceiveUpdateTransfer,
-)
+    ContractReceiveChannelClosedLight)
 from raiden.utils.typing import MYPY_ANNOTATION, BlockHash, BlockNumber, List, Union, Dict, ChannelID, Address, \
     AddressHex, Tuple
 
@@ -297,6 +297,9 @@ def state_transition(
         iteration = handle_balance(token_network_state, state_change, block_number, block_hash, client_address)
     elif type(state_change) == ContractReceiveChannelClosed:
         assert isinstance(state_change, ContractReceiveChannelClosed), MYPY_ANNOTATION
+        iteration = handle_closed(token_network_state, state_change, block_number, block_hash)
+    elif type(state_change) == ContractReceiveChannelClosedLight:
+        assert isinstance(state_change, ContractReceiveChannelClosedLight), MYPY_ANNOTATION
         iteration = handle_closed(token_network_state, state_change, block_number, block_hash)
     elif type(state_change) == ContractReceiveChannelSettled:
         assert isinstance(state_change, ContractReceiveChannelSettled), MYPY_ANNOTATION

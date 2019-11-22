@@ -53,7 +53,7 @@ def test_reveal_secret_7():
 
 
 def test_processed():
-    message = Processed(message_identifier=MessageID(16833642366464490059))
+    message = Processed(message_identifier=MessageID(11216354378731595960))
     message.sign(signer)
     data_was_signed = message._data_to_sign()
     print("Processed signature: " + message.signature.hex())
@@ -64,7 +64,7 @@ def test_processed():
 def test_delivered():
     dict_msg = {
         "type": "Delivered",
-        "delivered_message_identifier": 16833642366464490059
+        "delivered_message_identifier": 11216354378731595960
     }
     message = Delivered.from_dict_unsigned(dict_msg)
     message.sign(signer)
@@ -77,11 +77,11 @@ def test_delivered():
 def test_secret_request_5():
     dict_data = {
         "type": "SecretRequest",
-        "message_identifier": 6000167777009150270,
-        "payment_identifier": 18003491100761792563,
+        "message_identifier": 9385825773267654381,
+        "payment_identifier": 2270593331832456699,
         "amount": 100000000000000000,
         "expiration": 12000000,
-        "secrethash": "0xf075bab7e22ff3142edfc6c077cf6a4a1e8f25f351adb040cd3b96192084dce6"
+        "secrethash": "0x9283f736244fa54d5823dfbf955aa8955137888a89978ec12eb0defbfef6d3cc"
     }
     message = SecretRequest(message_identifier=dict_data["message_identifier"],
                             payment_identifier=dict_data["payment_identifier"],
@@ -97,8 +97,8 @@ def test_secret_request_5():
 
 
 def test_reveal_secret_9():
-    message = RevealSecret(message_identifier=MessageID(17588799389831300565), secret=Secret(
-        decode_hex("0x59216a957b8b214d5f38a3cab2d0afe7b871b49cfe8a0928d657ab6a5c4d6fe0")))
+    message = RevealSecret(message_identifier=MessageID(13710090224553266470), secret=Secret(
+        decode_hex("0x0a36c79e06613e511f17d1a35d5e49804cd906aa4253c1a1fcf9ff274ca30425")))
     message.sign(signer)
     data_was_signed = message._data_to_sign()
     print("Reveal Secret signature: " + message.signature.hex())

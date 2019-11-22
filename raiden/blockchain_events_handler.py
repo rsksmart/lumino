@@ -25,7 +25,7 @@ from raiden.transfer.state_change import (
     ContractReceiveRouteNew,
     ContractReceiveSecretReveal,
     ContractReceiveUpdateTransfer,
-)
+    ContractReceiveChannelClosedLight)
 from raiden.transfer.utils import (
     get_event_with_balance_proof_by_locksroot,
     get_state_change_with_balance_proof_by_locksroot,
@@ -204,7 +204,7 @@ def handle_channel_new_balance(raiden: "RaidenService", event: Event):
         )
         raiden.handle_and_track_state_change(newbalance_statechange)
 
-        ## TODO CHECK THIS AND HANDLE DIFERENTLY FOR LIGHT CLIENTS
+        ## TODO mmartinez CHECK THIS AND HANDLE DIFERENTLY FOR LIGHT CLIENTS
         # if balance_was_zero and participant_address != raiden.address:
         #     connection_manager = raiden.connection_manager_for_token_network(
         #         token_network_identifier
@@ -241,14 +241,26 @@ def handle_channel_closed(raiden: "RaidenService", event: Event):
     if channel_state:
         # The from address is included in the ChannelClosed event as the
         # closing_participant field
-        channel_closed = ContractReceiveChannelClosed(
-            transaction_hash=transaction_hash,
-            transaction_from=args["closing_participant"],
-            canonical_identifier=channel_state.canonical_identifier,
-            block_number=block_number,
-            block_hash=block_hash,
-        )
-        raiden.handle_and_track_state_change(channel_closed)
+        if raiden.address == channel_state.our_state.address:
+            channel_closed = ContractReceiveChannelClosed(
+                transaction_hash=transaction_hash,
+                transaction_from=args["closing_participant"],
+                canonical_identifier=channel_state.canonical_identifier,
+                block_number=block_number,
+                block_hash=block_hash,
+            )
+            raiden.handle_and_track_state_change(channel_closed)
+        else:
+            # Must be a light client
+            channel_closed = ContractReceiveChannelClosedLight(
+                transaction_hash=transaction_hash,
+                transaction_from=args["closing_participant"],
+                canonical_identifier=channel_state.canonical_identifier,
+                block_number=block_number,
+                block_hash=block_hash,
+                light_client_address=channel_state.our_state.address
+            )
+            raiden.handle_and_track_state_change(channel_closed)
     else:
         # This is a channel close event of a channel we're not a participant of
         route_closed = ContractReceiveRouteClosed(

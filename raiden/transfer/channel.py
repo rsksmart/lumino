@@ -75,7 +75,7 @@ from raiden.transfer.state_change import (
     ContractReceiveChannelSettled,
     ContractReceiveUpdateTransfer,
     ReceiveUnlock,
-)
+    ContractReceiveChannelClosedLight)
 from raiden.transfer.utils import hash_balance_data
 from raiden.utils import pex
 from raiden.utils.signer import recover
@@ -1782,7 +1782,6 @@ def handle_channel_closed(
     channel_state: NettingChannelState, state_change: ContractReceiveChannelClosed
 ) -> TransitionResult[NettingChannelState]:
     events: List[Event] = list()
-
     just_closed = (
         state_change.channel_identifier == channel_state.identifier
         and get_status(channel_state) in CHANNEL_STATES_PRIOR_TO_CLOSED
@@ -1798,6 +1797,46 @@ def handle_channel_closed(
             and channel_state.update_transaction is None
         )
         if call_update:
+            expiration = BlockExpiration(state_change.block_number + channel_state.settle_timeout)
+            # silence mypy: partner's balance proof is always signed
+            assert isinstance(balance_proof, BalanceProofSignedState)
+            # The channel was closed by our partner, if there is a balance
+            # proof available update this node half of the state
+            update = ContractSendChannelUpdateTransfer(
+                expiration=expiration,
+                balance_proof=balance_proof,
+                triggered_by_block_hash=state_change.block_hash,
+            )
+            channel_state.update_transaction = TransactionExecutionStatus(
+                started_block_number=state_change.block_number,
+                finished_block_number=None,
+                result=None,
+            )
+            events.append(update)
+
+    return TransitionResult(channel_state, events)
+
+
+def handle_channel_closed_light(
+    channel_state: NettingChannelState, state_change: ContractReceiveChannelClosedLight
+) -> TransitionResult[NettingChannelState]:
+    events: List[Event] = list()
+    just_closed = (
+        state_change.channel_identifier == channel_state.identifier
+        and get_status(channel_state) in CHANNEL_STATES_PRIOR_TO_CLOSED
+    )
+
+    if just_closed:
+        set_closed(channel_state, state_change.block_number)
+
+        balance_proof = channel_state.partner_state.balance_proof
+        call_update = (
+            state_change.transaction_from != channel_state.our_state.address
+            and balance_proof is not None
+            and channel_state.update_transaction is None
+        )
+        if call_update:
+            # TODO marcosmartinez7 modifiy this logic to get the signed balance proof provided by the lc to the hub (hub acts a watchtower in this situation
             expiration = BlockExpiration(state_change.block_number + channel_state.settle_timeout)
             # silence mypy: partner's balance proof is always signed
             assert isinstance(balance_proof, BalanceProofSignedState)
@@ -1951,6 +1990,9 @@ def state_transition(
         iteration = handle_action_set_fee(channel_state=channel_state, set_fee=state_change)
     elif type(state_change) == ContractReceiveChannelClosed:
         assert isinstance(state_change, ContractReceiveChannelClosed), MYPY_ANNOTATION
+        iteration = handle_channel_closed(channel_state, state_change)
+    elif type(state_change) == ContractReceiveChannelClosedLight:
+        assert isinstance(state_change, ContractReceiveChannelClosedLight), MYPY_ANNOTATION
         iteration = handle_channel_closed(channel_state, state_change)
     elif type(state_change) == ContractReceiveUpdateTransfer:
         assert isinstance(state_change, ContractReceiveUpdateTransfer), MYPY_ANNOTATION
