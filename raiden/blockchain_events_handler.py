@@ -8,6 +8,7 @@ from raiden.blockchain.events import Event
 from raiden.blockchain.state import get_channel_state
 from raiden.connection_manager import ConnectionManager
 from raiden.lightclient.client_model import ClientModel
+from raiden.lightclient.light_client_message_handler import LightClientMessageHandler
 from raiden.lightclient.light_client_service import LightClientService
 from raiden.network.proxies.utils import get_onchain_locksroots
 from raiden.transfer import views
@@ -252,13 +253,16 @@ def handle_channel_closed(raiden: "RaidenService", event: Event):
             raiden.handle_and_track_state_change(channel_closed)
         else:
             # Must be a light client
+            latest_non_closing_balance_proof = LightClientMessageHandler.get_latest_light_client_non_closing_balance_proof(
+                channel_state.identifier, raiden.wal.storage)
             channel_closed = ContractReceiveChannelClosedLight(
                 transaction_hash=transaction_hash,
                 transaction_from=args["closing_participant"],
                 canonical_identifier=channel_state.canonical_identifier,
                 block_number=block_number,
                 block_hash=block_hash,
-                light_client_address=channel_state.our_state.address
+                light_client_address=channel_state.our_state.address,
+                latest_update_non_closing_balance_proof_data=latest_non_closing_balance_proof
             )
             raiden.handle_and_track_state_change(channel_closed)
     else:

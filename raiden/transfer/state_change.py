@@ -3,6 +3,8 @@ from random import Random
 
 from eth_utils import to_canonical_address, to_checksum_address
 
+from raiden.lightclient.lightclientmessages.light_client_blinded_balance_proof_tx import \
+    LightClientNonClosingBalanceProof
 from raiden.messages import Unlock
 from raiden.transfer.architecture import (
     AuthenticatedSenderStateChange,
@@ -443,13 +445,15 @@ class ContractReceiveChannelClosedLight(ContractReceiveStateChange):
         canonical_identifier: CanonicalIdentifier,
         block_number: BlockNumber,
         block_hash: BlockHash,
-        light_client_address: Address
+        light_client_address: Address,
+        latest_update_non_closing_balance_proof_data: LightClientNonClosingBalanceProof
     ) -> None:
         super().__init__(transaction_hash, block_number, block_hash)
 
         self.transaction_from = transaction_from
         self.canonical_identifier = canonical_identifier
         self.light_client_address = light_client_address
+        self.latest_update_non_closing_balance_proof_data = latest_update_non_closing_balance_proof_data
 
     @property
     def channel_identifier(self) -> ChannelID:

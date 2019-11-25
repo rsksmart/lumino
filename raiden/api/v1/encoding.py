@@ -383,7 +383,6 @@ class CreatePaymentLightPostSchema(BaseSchema):
         decoding_class = dict
 
 
-
 class PaymentLightGetSchema(BaseSchema):
     from_message = fields.Int(required=True)
 
@@ -399,12 +398,25 @@ class PaymentLightPutSchema(BaseSchema):
     sender = AddressField(required=True)
     receiver = AddressField(required=True)
 
-
     class Meta:
         strict = True
         # decoding to a dict is required by the @use_kwargs decorator from webargs:
         decoding_class = dict
 
+
+class WatchtowerPutResource(BaseSchema):
+    sender = AddressField(required=True)
+    light_client_payment_id = fields.Integer(required=True)
+    secret_hash = SecretHashField(required=True)
+    nonce = fields.Integer(required=True)
+    channel_id = fields.Integer(required=True)
+    token_network_address = AddressField(required=True)
+    signed_blinded_balance_proof = fields.Dict(required=True)
+
+    class Meta:
+        strict = True
+        # decoding to a dict is required by the @use_kwargs decorator from webargs:
+        decoding_class = dict
 
 
 class ChannelPutLuminoSchema(BaseSchema):
@@ -504,7 +516,7 @@ class TokenActionSchema(BaseSchema):
 
 
 class InvoiceCreateSchema(BaseSchema):
-    description= fields.String(required=True, missing=None)
+    description = fields.String(required=True, missing=None)
     currency_symbol = fields.String(required=True, missing=None)
     token_address = AddressField(required=True)
     partner_address = AddressField(required=True)

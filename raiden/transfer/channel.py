@@ -1829,7 +1829,9 @@ def handle_channel_closed_light(
     if just_closed:
         set_closed(channel_state, state_change.block_number)
 
-        balance_proof = channel_state.partner_state.balance_proof
+        balance_proof = None
+        if state_change.latest_update_non_closing_balance_proof_data is not None:
+            balance_proof = state_change.latest_update_non_closing_balance_proof_data.signed_blinded_balance_proof
         call_update = (
             state_change.transaction_from != channel_state.our_state.address
             and balance_proof is not None
@@ -1993,7 +1995,7 @@ def state_transition(
         iteration = handle_channel_closed(channel_state, state_change)
     elif type(state_change) == ContractReceiveChannelClosedLight:
         assert isinstance(state_change, ContractReceiveChannelClosedLight), MYPY_ANNOTATION
-        iteration = handle_channel_closed(channel_state, state_change)
+        iteration = handle_channel_closed_light(channel_state, state_change)
     elif type(state_change) == ContractReceiveUpdateTransfer:
         assert isinstance(state_change, ContractReceiveUpdateTransfer), MYPY_ANNOTATION
         iteration = handle_channel_updated_transfer(channel_state, state_change, block_number)
