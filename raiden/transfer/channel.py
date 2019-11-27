@@ -2,7 +2,7 @@
 import heapq
 import random
 
-from eth_utils import encode_hex
+from eth_utils import encode_hex, decode_hex
 
 from raiden.constants import (
     EMPTY_HASH_KECCAK,
@@ -25,7 +25,7 @@ from raiden.transfer.events import (
     EventInvalidReceivedTransferRefund,
     EventInvalidReceivedUnlock,
     SendProcessed,
-)
+    ContractSendChannelUpdateTransferLight)
 from raiden.transfer.identifiers import CanonicalIdentifier
 from raiden.transfer.mediated_transfer.events import (
     CHANNEL_IDENTIFIER_GLOBAL_QUEUE,
@@ -64,7 +64,7 @@ from raiden.transfer.state import (
     UnlockPartialProofState,
     make_empty_merkle_tree,
     message_identifier_from_prng,
-)
+    balanceproof_from_envelope)
 from raiden.transfer.state_change import (
     ActionChannelClose,
     ActionChannelSetFee,
@@ -112,7 +112,7 @@ from raiden.utils.typing import (
     Tuple,
     Union,
     cast,
-)
+    Signature)
 
 from raiden.billing.invoices.handlers.invoice_handler import handle_received_invoice
 
@@ -1831,23 +1831,27 @@ def handle_channel_closed_light(
 
         balance_proof = None
         if state_change.latest_update_non_closing_balance_proof_data is not None:
-            balance_proof = state_change.latest_update_non_closing_balance_proof_data.signed_blinded_balance_proof
+            balance_proof_msg = state_change.latest_update_non_closing_balance_proof_data.light_client_balance_proof
+            balance_proof = balanceproof_from_envelope(balance_proof_msg)
+
         call_update = (
             state_change.transaction_from != channel_state.our_state.address
             and balance_proof is not None
             and channel_state.update_transaction is None
         )
         if call_update:
-            # TODO marcosmartinez7 modifiy this logic to get the signed balance proof provided by the lc to the hub (hub acts a watchtower in this situation
             expiration = BlockExpiration(state_change.block_number + channel_state.settle_timeout)
             # silence mypy: partner's balance proof is always signed
             assert isinstance(balance_proof, BalanceProofSignedState)
             # The channel was closed by our partner, if there is a balance
             # proof available update this node half of the state
-            update = ContractSendChannelUpdateTransfer(
+            update = ContractSendChannelUpdateTransferLight(
+                lc_address=state_change.light_client_address,
                 expiration=expiration,
                 balance_proof=balance_proof,
                 triggered_by_block_hash=state_change.block_hash,
+                lc_bp_signature=Signature(
+                    state_change.latest_update_non_closing_balance_proof_data.lc_balance_proof_signature)
             )
             channel_state.update_transaction = TransactionExecutionStatus(
                 started_block_number=state_change.block_number,
@@ -1855,7 +1859,6 @@ def handle_channel_closed_light(
                 result=None,
             )
             events.append(update)
-
     return TransitionResult(channel_state, events)
 
 

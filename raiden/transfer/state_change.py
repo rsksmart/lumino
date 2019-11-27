@@ -3,7 +3,7 @@ from random import Random
 
 from eth_utils import to_canonical_address, to_checksum_address
 
-from raiden.lightclient.lightclientmessages.light_client_blinded_balance_proof_tx import \
+from raiden.lightclient.lightclientmessages.light_client_non_closing_balance_proof import \
     LightClientNonClosingBalanceProof
 from raiden.messages import Unlock
 from raiden.transfer.architecture import (
@@ -489,24 +489,32 @@ class ContractReceiveChannelClosedLight(ContractReceiveStateChange):
         return not self.__eq__(other)
 
     def to_dict(self) -> Dict[str, Any]:
+        latest_update_non_closing_balance_proof_data = None
+        if self.latest_update_non_closing_balance_proof_data is not None:
+            latest_update_non_closing_balance_proof_data = self.latest_update_non_closing_balance_proof_data.to_dict()
         return {
             "transaction_hash": serialize_bytes(self.transaction_hash),
             "transaction_from": to_checksum_address(self.transaction_from),
             "canonical_identifier": self.canonical_identifier.to_dict(),
             "block_number": str(self.block_number),
             "block_hash": serialize_bytes(self.block_hash),
-            "light_client_address": to_checksum_address(self.light_client_address)
+            "light_client_address": to_checksum_address(self.light_client_address),
+            "latest_update_non_closing_balance_proof_data": latest_update_non_closing_balance_proof_data
         }
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "ContractReceiveChannelClosedLight":
+        latest_update_non_closing_balance_proof_data = None
+        if data["latest_update_non_closing_balance_proof_data"] is not None:
+            latest_update_non_closing_balance_proof_data = LightClientNonClosingBalanceProof.from_dict(data["latest_update_non_closing_balance_proof_data"])
         return cls(
             transaction_hash=deserialize_transactionhash(data["transaction_hash"]),
             transaction_from=to_canonical_address(data["transaction_from"]),
             canonical_identifier=CanonicalIdentifier.from_dict(data["canonical_identifier"]),
             block_number=BlockNumber(int(data["block_number"])),
             block_hash=BlockHash(deserialize_bytes(data["block_hash"])),
-            light_client_address=to_canonical_address(data["light_client_address"])
+            light_client_address=to_canonical_address(data["light_client_address"]),
+            latest_update_non_closing_balance_proof_data=latest_update_non_closing_balance_proof_data
         )
 
 

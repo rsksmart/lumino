@@ -4,7 +4,7 @@ import string
 import structlog
 from eth_utils import to_checksum_address
 
-from raiden.lightclient.lightclientmessages.light_client_blinded_balance_proof_tx import \
+from raiden.lightclient.lightclientmessages.light_client_non_closing_balance_proof import \
     LightClientNonClosingBalanceProof
 from raiden.lightclient.lightclientmessages.light_client_payment import LightClientPayment
 from raiden.lightclient.lightclientmessages.light_client_protocol_message import LightClientProtocolMessage, \
@@ -220,7 +220,8 @@ class LightClientMessageHandler:
                                                      latest_update_balance_proof_data[4],
                                                      latest_update_balance_proof_data[5],
                                                      latest_update_balance_proof_data[6],
-                                                     latest_update_balance_proof_data[7],
+                                                     json.loads(latest_update_balance_proof_data[7]),
+                                                     latest_update_balance_proof_data[8],
                                                      latest_update_balance_proof_data[0]
                                                      )
         return None

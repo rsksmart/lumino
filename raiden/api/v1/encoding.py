@@ -411,7 +411,8 @@ class WatchtowerPutResource(BaseSchema):
     nonce = fields.Integer(required=True)
     channel_id = fields.Integer(required=True)
     token_network_address = AddressField(required=True)
-    signed_blinded_balance_proof = fields.Dict(required=True)
+    lc_bp_signature = fields.String(required=True)
+    partner_balance_proof= fields.Dict(required=True)
 
     class Meta:
         strict = True

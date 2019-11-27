@@ -131,7 +131,8 @@ CREATE TABLE IF NOT EXISTS light_client_balance_proof (
     nonce INTEGER,
     channel_id INTEGER,
     token_network_address TEXT,
-    signed_blinded_balance_proof JSON,
+    balance_proof JSON,
+    lc_balance_proof_signature TEXT,
     FOREIGN KEY(light_client_payment_id) REFERENCES light_client_payment(payment_id)
     );
 """

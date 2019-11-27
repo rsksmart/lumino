@@ -30,7 +30,7 @@ from raiden.api.v1.encoding import (
     CreatePaymentLightPostSchema,
     PaymentLightGetSchema,
     WatchtowerPutResource)
-from raiden.messages import SignedBlindedBalanceProof
+from raiden.messages import SignedBlindedBalanceProof, Unlock
 
 from raiden.utils import typing
 
@@ -533,7 +533,8 @@ class WatchtowerResource(BaseResource):
             nonce: int,
             channel_id: int,
             token_network_address: typing.TokenNetworkAddress,
-            signed_blinded_balance_proof: SignedBlindedBalanceProof
+            lc_bp_signature: typing.Signature,
+            partner_balance_proof: Unlock
             ):
         """
         put a signed balance proof to be used by the hub, submitting it when the channel between a light client
@@ -541,4 +542,4 @@ class WatchtowerResource(BaseResource):
         """
         return self.rest_api.receive_light_client_update_balance_proof(sender, light_client_payment_id, secret_hash,
                                                                        nonce, channel_id, token_network_address,
-                                                                       signed_blinded_balance_proof)
+                                                                       lc_bp_signature, partner_balance_proof)

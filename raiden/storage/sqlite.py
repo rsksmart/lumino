@@ -1334,7 +1334,7 @@ class SQLiteStorage:
         cursor.execute(
             """
            SELECT internal_bp_identifier, sender, light_client_payment_id, secret_hash, nonce, channel_id, 
-            token_network_address, signed_blinded_balance_proof 
+            token_network_address, balance_proof, lc_balance_proof_signature
             FROM light_client_balance_proof
             WHERE channel_id  = ?
             ORDER BY nonce DESC
@@ -1520,15 +1520,18 @@ class SerializedSQLiteStorage(SQLiteStorage):
                 "nonce, "
                 "channel_id, "
                 "token_network_address, "
-                "signed_blinded_balance_proof "
-                ") VALUES(?, ?, ?, ?, ?,  ?, ?)",
+                "balance_proof, "
+                "lc_balance_proof_signature "
+                ") VALUES(?, ?, ?, ?, ?,  ?, ?, ?)",
                 (to_checksum_address(light_client_balance_proof.sender),
                  str(light_client_balance_proof.light_client_payment_id),
                  light_client_balance_proof.secret_hash,
                  light_client_balance_proof.nonce,
                  light_client_balance_proof.channel_id,
                  to_checksum_address(light_client_balance_proof.token_network_address),
-                 self.serializer.serialize(light_client_balance_proof.signed_blinded_balance_proof))
+                 self.serializer.serialize(light_client_balance_proof.light_client_balance_proof),
+                 light_client_balance_proof.lc_balance_proof_signature
+                 )
             )
             last_id = cursor.lastrowid
         return last_id

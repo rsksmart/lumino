@@ -22,7 +22,7 @@ from raiden.api.validations.api_error_builder import ApiErrorBuilder
 from raiden.api.validations.api_status_codes import ERROR_STATUS_CODES
 from raiden.api.validations.channel_validator import ChannelValidator
 from raiden.lightclient.light_client_service import LightClientService
-from raiden.lightclient.lightclientmessages.light_client_blinded_balance_proof_tx import \
+from raiden.lightclient.lightclientmessages.light_client_non_closing_balance_proof import \
     LightClientNonClosingBalanceProof
 from raiden.messages import LockedTransfer, Delivered, RevealSecret, Unlock, SecretRequest, Processed, \
     SignedBlindedBalanceProof
@@ -2040,7 +2040,8 @@ class RestAPI:
                                                   nonce: int,
                                                   channel_id: int,
                                                   token_network_address: typing.TokenNetworkAddress,
-                                                  signed_blinded_balance_proof: SignedBlindedBalanceProof):
+                                                  lc_bp_signature: typing.Signature,
+                                                  partner_balance_proof: Unlock):
         headers = request.headers
         api_key = headers.get("x-api-key")
         if not api_key:
@@ -2053,9 +2054,14 @@ class RestAPI:
                                                                    nonce,
                                                                    channel_id,
                                                                    token_network_address,
-                                                                   signed_blinded_balance_proof)
+                                                                   partner_balance_proof,
+                                                                   lc_bp_signature)
+
         stored = LightClientMessageHandler.store_update_non_closing_balance_proof(non_closing_bp_tx_data,
                                                                                   self.raiden_api.raiden.wal.storage)
+
+        latest = LightClientMessageHandler.get_latest_light_client_non_closing_balance_proof(channel_id,
+                                                                                             self.raiden_api.raiden.wal.storage)
 
         return api_response(str(stored))
 
