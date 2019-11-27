@@ -22,7 +22,7 @@ from raiden.api.validations.api_error_builder import ApiErrorBuilder
 from raiden.api.validations.api_status_codes import ERROR_STATUS_CODES
 from raiden.api.validations.channel_validator import ChannelValidator
 from raiden.lightclient.light_client_service import LightClientService
-from raiden.messages import LockedTransfer, Delivered, RevealSecret, Unlock
+from raiden.messages import LockedTransfer, Delivered, RevealSecret, Unlock, SecretRequest, Processed
 from raiden.rns_constants import RNS_ADDRESS_ZERO
 from raiden.utils.rns import is_rns_address
 from webargs.flaskparser import parser
@@ -1484,6 +1484,11 @@ class RestAPI:
         self.raiden_api.initiate_send_delivered_light(sender_address, receiver_address, delivered, msg_order,
                                                       payment_id)
 
+    def initiate_send_processed_light(self, sender_address: typing.Address, receiver_address: typing.Address,
+                                      processed: Processed, msg_order: int, payment_id: int):
+        self.raiden_api.initiate_send_processed_light(sender_address, receiver_address, processed, msg_order,
+                                                      payment_id)
+
     def initiate_send_secret_reveal_light(self, sender_address: typing.Address, receiver_address: typing.Address,
                                           reveal_secret: RevealSecret):
         self.raiden_api.initiate_send_secret_reveal_light(sender_address, receiver_address, reveal_secret)
@@ -1492,6 +1497,12 @@ class RestAPI:
                                     unlock: Unlock
                                     ):
         self.raiden_api.initiate_send_balance_proof(sender_address, receiver_address, unlock)
+
+    def initiate_send_secret_request_light(self, sender_address: typing.Address, receiver_address: typing.Address,
+                                           secret_request: SecretRequest
+                                           ):
+        self.raiden_api.initiate_send_secret_request_light(sender_address, receiver_address, secret_request, 5,
+                                                           secret_request.payment_identifier)
 
     def initiate_payment_light(
         self,
@@ -2053,8 +2064,9 @@ class RestAPI:
         if not api_key:
             return ApiErrorBuilder.build_and_log_error(errors="Missing api_key auth header",
                                                        status_code=HTTPStatus.BAD_REQUEST, log=log)
+
         message = parse_message_number(message)
-        payment_request = LightClientService.get_light_client_payment(message_id, self.raiden_api.raiden.wal)
+        payment_request = LightClientService.get_light_client_payment(message_id, self.raiden_api.raiden.wal.storage)
         if not payment_request:
             return ApiErrorBuilder.build_and_log_error(errors="No payment associated",
                                                        status_code=HTTPStatus.BAD_REQUEST, log=log)
@@ -2068,12 +2080,18 @@ class RestAPI:
         elif message["type"] == "Delivered":
             delivered = Delivered.from_dict(message)
             self.initiate_send_delivered_light(sender, receiver, delivered, message_order, payment_request.payment_id)
+        elif message["type"] == "Processed":
+            processed = Processed.from_dict(message)
+            self.initiate_send_processed_light(sender, receiver, processed, message_order, payment_request.payment_id)
         elif message["type"] == "RevealSecret":
             reveal_secret = RevealSecret.from_dict(message)
             self.initiate_send_secret_reveal_light(sender, receiver, reveal_secret)
         elif message["type"] == "Secret":
             unlock = Unlock.from_dict(message)
             self.initiate_send_balance_proof(sender, receiver, unlock)
+        elif message["type"] == "SecretRequest":
+            secret_request = SecretRequest.from_dict(message)
+            self.initiate_send_secret_request_light(sender, receiver, secret_request)
 
         return api_response("Received, message should be sent to partner")
 

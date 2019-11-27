@@ -12,10 +12,10 @@ secrethash = keccak(secret)
 
 from raiden.messages import (
     RevealSecret, Delivered,
-    LockedTransfer, Unlock)
+    LockedTransfer, Unlock, Processed, SecretRequest)
 
 
-def test_balance_proof():
+def test_balance_proof_11():
     dict_data = {"type": "Secret", "chain_id": 33, "message_identifier": 6263041337178146650,
                  "payment_identifier": 3135462385358726574,
                  "secret": "0x41580c4d5b4d412c642b64375a735e65432a495548676e67334c4d7a650d6a65", "nonce": 2,
@@ -44,7 +44,7 @@ def test_balance_proof():
 def test_reveal_secret_7():
     print("Secret {} ".format(secret.hex()))
     print("SecretHash {} ".format(secrethash.hex()))
-    message = RevealSecret(message_identifier=MessageID(4813013428748786508), secret=secret)
+    message = RevealSecret(message_identifier=MessageID(2226977946511089099), secret=secret)
     message.sign(signer)
     data_was_signed = message._data_to_sign()
     print("Reveal Secret signature: " + message.signature.hex())
@@ -52,10 +52,19 @@ def test_reveal_secret_7():
         "0x7ca28d3d760b4aa2b79e8d42cbdc187c7df9af40")
 
 
+def test_processed():
+    message = Processed(message_identifier=MessageID(16833642366464490059))
+    message.sign(signer)
+    data_was_signed = message._data_to_sign()
+    print("Processed signature: " + message.signature.hex())
+    assert recover(data_was_signed, message.signature) == to_canonical_address(
+        "0x7ca28d3d760b4aa2b79e8d42cbdc187c7df9af40")
+
+
 def test_delivered():
     dict_msg = {
         "type": "Delivered",
-        "delivered_message_identifier": 8560298362786856489
+        "delivered_message_identifier": 16833642366464490059
     }
     message = Delivered.from_dict_unsigned(dict_msg)
     message.sign(signer)
@@ -65,12 +74,44 @@ def test_delivered():
         "0x7ca28d3d760b4aa2b79e8d42cbdc187c7df9af40")
 
 
-def test_locked_transfer():
+def test_secret_request_5():
+    dict_data = {
+        "type": "SecretRequest",
+        "message_identifier": 6000167777009150270,
+        "payment_identifier": 18003491100761792563,
+        "amount": 100000000000000000,
+        "expiration": 12000000,
+        "secrethash": "0xf075bab7e22ff3142edfc6c077cf6a4a1e8f25f351adb040cd3b96192084dce6"
+    }
+    message = SecretRequest(message_identifier=dict_data["message_identifier"],
+                            payment_identifier=dict_data["payment_identifier"],
+                            secrethash=decode_hex(dict_data["secrethash"]),
+                            amount=dict_data["amount"],
+                            expiration=dict_data["expiration"]
+                            )
+    message.sign(signer)
+    data_was_signed = message._data_to_sign()
+    print("SR signature: " + message.signature.hex())
+    assert recover(data_was_signed, message.signature) == to_canonical_address(
+        "0x7ca28d3d760b4aa2b79e8d42cbdc187c7df9af40")
+
+
+def test_reveal_secret_9():
+    message = RevealSecret(message_identifier=MessageID(17588799389831300565), secret=Secret(
+        decode_hex("0x59216a957b8b214d5f38a3cab2d0afe7b871b49cfe8a0928d657ab6a5c4d6fe0")))
+    message.sign(signer)
+    data_was_signed = message._data_to_sign()
+    print("Reveal Secret signature: " + message.signature.hex())
+    assert recover(data_was_signed, message.signature) == to_canonical_address(
+        "0x7ca28d3d760b4aa2b79e8d42cbdc187c7df9af40")
+
+
+def test_locked_transfer_1():
     dict_msg = {
         "type": "LockedTransfer",
         "chain_id": 33,
-        "message_identifier": 9285801864935496141,
-        "payment_identifier": 3135462385358726574,
+        "message_identifier": 5582513684436696034,
+        "payment_identifier": 3443356287795879818,
         "payment_hash_invoice": "0x",
         "nonce": 1,
         "token_network_address": "0x7351ed719de72db92a54c99ef2c4d287f69672a1",

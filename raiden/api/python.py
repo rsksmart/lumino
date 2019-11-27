@@ -50,7 +50,7 @@ from raiden.lightclient.light_client_utils import LightClientUtils
 from raiden.lightclient.lightclientmessages.hub_message import HubMessage
 from raiden.lightclient.lightclientmessages.light_client_payment import LightClientPayment, LightClientPaymentStatus
 
-from raiden.messages import RequestMonitoring, LockedTransfer, RevealSecret, Unlock, Delivered
+from raiden.messages import RequestMonitoring, LockedTransfer, RevealSecret, Unlock, Delivered, SecretRequest, Processed
 from raiden.settings import DEFAULT_RETRY_TIMEOUT, DEVELOPMENT_CONTRACT_VERSION
 from raiden.transfer import architecture, views, channel
 from raiden.transfer.events import (
@@ -1137,6 +1137,15 @@ class RaidenAPI:
                                       delivered: Delivered, msg_order: int, payment_id: int):
         self.raiden.initiate_send_delivered_light(sender_address, receiver_address, delivered, msg_order, payment_id)
 
+    def initiate_send_processed_light(self, sender_address: typing.Address, receiver_address: typing.Address,
+                                      processed: Processed, msg_order: int, payment_id: int):
+        self.raiden.initiate_send_processed_light(sender_address, receiver_address, processed, msg_order, payment_id)
+
+    def initiate_send_secret_request_light(self, sender_address: typing.Address, receiver_address: typing.Address,
+                                      secret_request: SecretRequest, msg_order: int, payment_id: int):
+        self.raiden.initiate_send_secret_request_light(sender_address, receiver_address, secret_request)
+
+
 
     def get_raiden_events_payment_history_with_timestamps_v2(
         self,
@@ -1696,8 +1705,8 @@ class RaidenAPI:
                                          locked_transfer.payment_identifier)
             # Persist the light_client_protocol_message associated
             order = 1
-            payment_row_id = LightClientMessageHandler.store_light_client_payment(payment, self.raiden.wal)
-            light_client_message_id = LightClientMessageHandler.store_light_client_protocol_message(
+            LightClientMessageHandler.store_light_client_payment(payment, self.raiden.wal.storage)
+            LightClientMessageHandler.store_light_client_protocol_message(
                 locked_transfer.message_identifier,
                 locked_transfer,
                 False,

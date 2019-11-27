@@ -34,7 +34,7 @@ from raiden.transfer.mediated_transfer.events import (
     SendLockExpired,
     SendRefundTransfer,
     refund_from_sendmediated,
-    SendBalanceProofLight)
+    SendBalanceProofLight, StoreMessageEvent)
 from raiden.transfer.mediated_transfer.state import (
     LockedTransferSignedState,
     LockedTransferUnsignedState,
@@ -1658,6 +1658,41 @@ def handle_receive_lockedtransfer(
     return is_valid, events, msg, handle_invoice_result
 
 
+def handle_receive_lockedtransfer_light(
+    channel_state: NettingChannelState, mediated_transfer: LockedTransferSignedState, storage
+) -> EventsOrError:
+    """Register the latest known transfer.
+
+    The receiver needs to use this method to update the container with a
+    _valid_ transfer, otherwise the locksroot will not contain the pending
+    transfer. The receiver needs to ensure that the merkle root has the
+    secrethash included, otherwise it won't be able to claim it.
+    """
+    events: List[Event]
+    is_valid, msg, merkletree, handle_invoice_result = is_valid_lockedtransfer(
+        mediated_transfer, channel_state, channel_state.partner_state, channel_state.our_state, storage
+    )
+
+    if is_valid:
+        assert merkletree, "is_valid_lock_expired should return merkletree if valid"
+        channel_state.partner_state.balance_proof = mediated_transfer.balance_proof
+        channel_state.partner_state.merkletree = merkletree
+
+        lock = mediated_transfer.lock
+        channel_state.partner_state.secrethashes_to_lockedlocks[lock.secrethash] = lock
+        events = []
+
+
+    else:
+        assert msg, "is_valid_lock_expired should return error msg if not valid"
+        invalid_locked = EventInvalidReceivedLockedTransfer(
+            payment_identifier=mediated_transfer.payment_identifier, reason=msg
+        )
+        events = [invalid_locked]
+
+    return is_valid, events, msg, handle_invoice_result
+
+
 def handle_receive_refundtransfercancelroute(
     channel_state: NettingChannelState, refund_transfer: LockedTransferSignedState
 ) -> EventsOrError:
@@ -1682,6 +1717,26 @@ def handle_unlock(channel_state: NettingChannelState, unlock: ReceiveUnlock) -> 
             message_identifier=unlock.message_identifier,
         )
         events: List[Event] = [send_processed]
+    else:
+        assert msg, "is_valid_unlock should return error msg if not valid"
+        invalid_unlock = EventInvalidReceivedUnlock(secrethash=unlock.secrethash, reason=msg)
+        events = [invalid_unlock]
+
+    return is_valid, events, msg
+
+
+def handle_unlock_light(channel_state: NettingChannelState, unlock: ReceiveUnlock) -> EventsOrError:
+    is_valid, msg, unlocked_merkletree = is_valid_unlock(
+        unlock, channel_state, channel_state.partner_state
+    )
+
+    if is_valid:
+        assert unlocked_merkletree, "is_valid_unlock should return merkletree if valid"
+        channel_state.partner_state.balance_proof = unlock.balance_proof
+        channel_state.partner_state.merkletree = unlocked_merkletree
+
+        _del_lock(channel_state.partner_state, unlock.secrethash)
+        events: List[Event] = []
     else:
         assert msg, "is_valid_unlock should return error msg if not valid"
         invalid_unlock = EventInvalidReceivedUnlock(secrethash=unlock.secrethash, reason=msg)
