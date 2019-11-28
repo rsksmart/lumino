@@ -545,93 +545,90 @@ class RaidenEventHandler(EventHandler):
         payment_channel: PaymentChannel = raiden.chain.payment_channel(
             canonical_identifier=canonical_identifier
         )
-        # token_network_proxy: TokenNetwork = payment_channel.token_network
-        # if not token_network_proxy.client.can_query_state_for_block(triggered_by_block_hash):
-        #     # The only time this can happen is during restarts after a long time
-        #     # when the triggered block ends up getting pruned
-        #     # In that case it's safe to just use the latest view of the chain to
-        #     # query the on-chain participant/channel details
-        #     triggered_by_block_hash = token_network_proxy.client.blockhash_from_blocknumber(
-        #         "latest"
-        #     )
-        # participants_details = token_network_proxy.detail_participants(
-        #     participant1=payment_channel.participant1,
-        #     participant2=payment_channel.participant2,
-        #     block_identifier=triggered_by_block_hash,
-        #     channel_identifier=channel_settle_event.channel_identifier,
-        # )
-        # our_details = participants_details.our_details
-        # partner_details = participants_details.partner_details
-        # log_details = {
-        #     "chain_id": canonical_identifier.chain_identifier,
-        #     "token_network_identifier": canonical_identifier.token_network_address,
-        #     "channel_identifier": canonical_identifier.channel_identifier,
-        #     "node": pex(raiden.address),
-        #     "partner": to_checksum_address(partner_details.address),
-        #     "our_deposit": our_details.deposit,
-        #     "our_withdrawn": our_details.withdrawn,
-        #     "our_is_closer": our_details.is_closer,
-        #     "our_balance_hash": to_hex(our_details.balance_hash),
-        #     "our_nonce": our_details.nonce,
-        #     "our_locksroot": to_hex(our_details.locksroot),
-        #     "our_locked_amount": our_details.locked_amount,
-        #     "partner_deposit": partner_details.deposit,
-        #     "partner_withdrawn": partner_details.withdrawn,
-        #     "partner_is_closer": partner_details.is_closer,
-        #     "partner_balance_hash": to_hex(partner_details.balance_hash),
-        #     "partner_nonce": partner_details.nonce,
-        #     "partner_locksroot": to_hex(partner_details.locksroot),
-        #     "partner_locked_amount": partner_details.locked_amount,
-        # }
-        # if our_details.balance_hash != EMPTY_HASH:
-        #     event_record = get_event_with_balance_proof_by_balance_hash(
-        #         storage=raiden.wal.storage,
-        #         canonical_identifier=canonical_identifier,
-        #         balance_hash=our_details.balance_hash,
-        #     )
-        #     if event_record.data is None:
-        #         log.critical("our balance proof not found", **log_details)
-        #         raise RaidenUnrecoverableError(
-        #             "Our balance proof could not be found in the database"
-        #         )
-        #     our_balance_proof = event_record.data.balance_proof
-        #     our_transferred_amount = our_balance_proof.transferred_amount
-        #     our_locked_amount = our_balance_proof.locked_amount
-        #     our_locksroot = our_balance_proof.locksroot
-        # else:
-        #     our_transferred_amount = 0
-        #     our_locked_amount = 0
-        #     our_locksroot = EMPTY_HASH
-        # if partner_details.balance_hash != EMPTY_HASH:
-        #     state_change_record = get_state_change_with_balance_proof_by_balance_hash(
-        #         storage=raiden.wal.storage,
-        #         canonical_identifier=canonical_identifier,
-        #         balance_hash=partner_details.balance_hash,
-        #         sender=participants_details.partner_details.address,
-        #     )
-        #     if state_change_record.data is None:
-        #         log.critical("partner balance proof not found", **log_details)
-        #         raise RaidenUnrecoverableError(
-        #             "Partner balance proof could not be found in the database"
-        #         )
-        #     partner_balance_proof = state_change_record.data.balance_proof
-        #     partner_transferred_amount = partner_balance_proof.transferred_amount
-        #     partner_locked_amount = partner_balance_proof.locked_amount
-        #     partner_locksroot = partner_balance_proof.locksroot
-        # else:
-        #     partner_transferred_amount = 0
-        #     partner_locked_amount = 0
-        #     partner_locksroot = EMPTY_HASH
-        if canonical_identifier.channel_identifier == 5:
-            payment_channel.settle_light(
-                "0xf9018b0b85098bca5a00830304b194b3df4fbd04d29a04d9d0666c009713076e36410980b901249cadb15900000000000000000000000000000000000000000000000000000000000000050000000000000000000000007ca28d3d760b4aa2b79e8d42cbdc187c7df9af4000000000000000000000000000000000000000000000000000038d7ea4c680000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000029021129f5d038897f01bd4bc050525ca01a475800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000066a05a34e43456d768985de05b50e707633abaf2d387091c1fb80e52129e72894043a022b1bd178f0622a7673ee032e1d6524f6d9df635b98683c463b20c3519f9f6a3")
+        token_network_proxy: TokenNetwork = payment_channel.token_network
+        if not token_network_proxy.client.can_query_state_for_block(triggered_by_block_hash):
+            # The only time this can happen is during restarts after a long time
+            # when the triggered block ends up getting pruned
+            # In that case it's safe to just use the latest view of the chain to
+            # query the on-chain participant/channel details
+            triggered_by_block_hash = token_network_proxy.client.blockhash_from_blocknumber(
+                "latest"
+            )
+        participants_details = token_network_proxy.detail_participants(
+            participant1=payment_channel.participant1,
+            participant2=payment_channel.participant2,
+            block_identifier=triggered_by_block_hash,
+            channel_identifier=channel_settle_event.channel_identifier,
+        )
+        our_details = participants_details.our_details
+        partner_details = participants_details.partner_details
+        log_details = {
+            "chain_id": canonical_identifier.chain_identifier,
+            "token_network_identifier": canonical_identifier.token_network_address,
+            "channel_identifier": canonical_identifier.channel_identifier,
+            "node": pex(raiden.address),
+            "partner": to_checksum_address(partner_details.address),
+            "our_deposit": our_details.deposit,
+            "our_withdrawn": our_details.withdrawn,
+            "our_is_closer": our_details.is_closer,
+            "our_balance_hash": to_hex(our_details.balance_hash),
+            "our_nonce": our_details.nonce,
+            "our_locksroot": to_hex(our_details.locksroot),
+            "our_locked_amount": our_details.locked_amount,
+            "partner_deposit": partner_details.deposit,
+            "partner_withdrawn": partner_details.withdrawn,
+            "partner_is_closer": partner_details.is_closer,
+            "partner_balance_hash": to_hex(partner_details.balance_hash),
+            "partner_nonce": partner_details.nonce,
+            "partner_locksroot": to_hex(partner_details.locksroot),
+            "partner_locked_amount": partner_details.locked_amount,
+        }
+        if our_details.balance_hash != EMPTY_HASH:
+            event_record = get_event_with_balance_proof_by_balance_hash(
+                storage=raiden.wal.storage,
+                canonical_identifier=canonical_identifier,
+                balance_hash=our_details.balance_hash,
+            )
+            if event_record.data is None:
+                log.critical("our balance proof not found", **log_details)
+                raise RaidenUnrecoverableError(
+                    "Our balance proof could not be found in the database"
+                )
+            our_balance_proof = event_record.data.balance_proof
+            our_transferred_amount = our_balance_proof.transferred_amount
+            our_locked_amount = our_balance_proof.locked_amount
+            our_locksroot = our_balance_proof.locksroot
+        else:
+            our_transferred_amount = 0
+            our_locked_amount = 0
+            our_locksroot = EMPTY_HASH
+        if partner_details.balance_hash != EMPTY_HASH:
+            state_change_record = get_state_change_with_balance_proof_by_balance_hash(
+                storage=raiden.wal.storage,
+                canonical_identifier=canonical_identifier,
+                balance_hash=partner_details.balance_hash,
+                sender=participants_details.partner_details.address,
+            )
+            if state_change_record.data is None:
+                log.critical("partner balance proof not found", **log_details)
+                raise RaidenUnrecoverableError(
+                    "Partner balance proof could not be found in the database"
+                )
+            partner_balance_proof = state_change_record.data.balance_proof
+            partner_transferred_amount = partner_balance_proof.transferred_amount
+            partner_locked_amount = partner_balance_proof.locked_amount
+            partner_locksroot = partner_balance_proof.locksroot
+        else:
+            partner_transferred_amount = 0
+            partner_locked_amount = 0
+            partner_locksroot = EMPTY_HASH
 
-        # payment_channel.settle(
-        #     transferred_amount=our_transferred_amount,
-        #     locked_amount=our_locked_amount,
-        #     locksroot=our_locksroot,
-        #     partner_transferred_amount=partner_transferred_amount,
-        #     partner_locked_amount=partner_locked_amount,
-        #     partner_locksroot=partner_locksroot,
-        #     block_identifier=triggered_by_block_hash,
-        # )
+        payment_channel.settle(
+            transferred_amount=our_transferred_amount,
+            locked_amount=our_locked_amount,
+            locksroot=our_locksroot,
+            partner_transferred_amount=partner_transferred_amount,
+            partner_locked_amount=partner_locked_amount,
+            partner_locksroot=partner_locksroot,
+            block_identifier=triggered_by_block_hash,
+        )
