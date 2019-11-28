@@ -9,6 +9,7 @@ from raiden.transfer.architecture import (
     Event,
     SendMessageEvent,
 )
+from raiden.transfer.state import BalanceProofSignedState, NettingChannelState
 from raiden.transfer.identifiers import CanonicalIdentifier
 from raiden.utils import pex, serialization, sha3
 from raiden.utils.serialization import deserialize_bytes, serialize_bytes
@@ -36,7 +37,7 @@ from raiden.utils.typing import (
 
 if TYPE_CHECKING:
     # pylint: disable=unused-import
-    from raiden.transfer.state import BalanceProofSignedState, NettingChannelEndState, NettingChannelState
+    from raiden.transfer.state import BalanceProofSignedState
 
 
 # pylint: disable=too-many-arguments,too-few-public-methods
@@ -124,8 +125,8 @@ class ContractSendChannelSettle(ContractSendEvent):
     ):
         super().__init__(triggered_by_block_hash)
         canonical_identifier.validate()
+        self.chanel_state= channel_state
         self.canonical_identifier = canonical_identifier
-        self.channel_state = channel_state
 
     @property
     def token_network_identifier(self) -> TokenNetworkAddress:

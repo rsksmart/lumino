@@ -649,3 +649,5 @@ class RaidenEventHandler(EventHandler):
                 partner_locksroot=partner_locksroot,
                 block_identifier=triggered_by_block_hash,
             )
+        else:
+            log.info("Ignoring settlement cause is a light client")
