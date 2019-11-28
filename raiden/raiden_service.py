@@ -38,7 +38,7 @@ from raiden.messages import (
     Message,
     RequestMonitoring,
     SignedMessage,
-    RevealSecret, Unlock, Delivered)
+    RevealSecret, Unlock, Delivered, SecretRequest, Processed)
 from raiden.network.blockchain_service import BlockChainService
 from raiden.network.proxies.secret_registry import SecretRegistry
 from raiden.network.proxies.service_registry import ServiceRegistry
@@ -60,7 +60,7 @@ from raiden.transfer.mediated_transfer.state_change import (
     ActionInitMediator,
     ActionInitTarget,
     ActionInitTargetLight,
-    ActionInitInitiatorLight, ActionSendSecretRevealLight, ActionSendUnlockLight)
+    ActionInitInitiatorLight, ActionSendSecretRevealLight, ActionSendUnlockLight, ActionSendSecretRequestLight)
 from raiden.transfer.state import (
     BalanceProofSignedState,
     BalanceProofUnsignedState,
@@ -1333,6 +1333,20 @@ class RaidenService(Runnable):
             )
             lc_transport.send_for_light_client_with_retry(receiver_address, delivered)
 
+    def initiate_send_processed_light(self, sender_address: Address, receiver_address: Address,
+                                      processed: Processed, msg_order: int, payment_id: int):
+        lc_transport = self.get_light_client_transport(to_checksum_address(sender_address))
+        if lc_transport:
+            LightClientMessageHandler.store_light_client_protocol_message(
+                processed.message_identifier,
+                processed,
+                True,
+                payment_id,
+                msg_order,
+                self.wal
+            )
+            lc_transport.send_for_light_client_with_retry(receiver_address, processed)
+
     def initiate_send_secret_reveal_light(
         self,
         sender: Address,
@@ -1340,6 +1354,15 @@ class RaidenService(Runnable):
         reveal_secret: RevealSecret
     ):
         init_state = ActionSendSecretRevealLight(reveal_secret, sender, receiver)
+        self.handle_and_track_state_change(init_state)
+
+    def initiate_send_secret_request_light(
+        self,
+        sender: Address,
+        receiver: Address,
+        secret_request: SecretRequest
+    ):
+        init_state = ActionSendSecretRequestLight(secret_request, sender, receiver)
         self.handle_and_track_state_change(init_state)
 
     def initiate_send_balance_proof(

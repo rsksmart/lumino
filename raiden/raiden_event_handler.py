@@ -43,7 +43,7 @@ from raiden.transfer.mediated_transfer.events import (
     SendRefundTransfer,
     SendSecretRequest,
     SendSecretReveal,
-    SendLockedTransferLight, StoreMessageEvent, SendSecretRevealLight, SendBalanceProofLight)
+    SendLockedTransferLight, StoreMessageEvent, SendSecretRevealLight, SendBalanceProofLight, SendSecretRequestLight)
 from raiden.transfer.state import ChainState, NettingChannelEndState
 from raiden.transfer.utils import (
     get_event_with_balance_proof_by_balance_hash,
@@ -124,6 +124,9 @@ class RaidenEventHandler(EventHandler):
         elif type(event) == SendSecretRequest:
             assert isinstance(event, SendSecretRequest), MYPY_ANNOTATION
             self.handle_send_secretrequest(raiden, event)
+        elif type(event) == SendSecretRequestLight:
+            assert isinstance(event, SendSecretRequestLight), MYPY_ANNOTATION
+            self.handle_send_secretrequest_light(raiden, event)
         elif type(event) == SendRefundTransfer:
             assert isinstance(event, SendRefundTransfer), MYPY_ANNOTATION
             self.handle_send_refundtransfer(raiden, event)
@@ -183,7 +186,8 @@ class RaidenEventHandler(EventHandler):
                                                                             store_message_event.payment_id,
                                                                             store_message_event.message_order,
                                                                             raiden.wal)
-            log.info("Message for lc already received, ignoring db storage")
+            else:
+                log.info("Message for lc already received, ignoring db storage")
 
     @staticmethod
     def handle_send_lockexpired(raiden: "RaidenService", send_lock_expired: SendLockExpired):
@@ -250,6 +254,17 @@ class RaidenEventHandler(EventHandler):
         secret_request_message = message_from_sendevent(secret_request_event)
         raiden.sign(secret_request_message)
         raiden.transport.hub_transport.send_async(secret_request_event.queue_identifier, secret_request_message)
+
+    @staticmethod
+    def handle_send_secretrequest_light(
+        raiden: "RaidenService", secret_request_event: SendSecretRequestLight
+    ):
+        secret_request_message = message_from_sendevent(secret_request_event)
+        lc_transport = raiden.get_light_client_transport(to_checksum_address(secret_request_event.sender))
+        if lc_transport:
+            lc_transport.send_async(secret_request_event.queue_identifier, secret_request_message)
+
+
 
     @staticmethod
     def handle_send_refundtransfer(
