@@ -160,6 +160,7 @@ class ContractSendChannelSettle(ContractSendEvent):
         result = {
             "canonical_identifier": self.canonical_identifier.to_dict(),
             "triggered_by_block_hash": serialize_bytes(self.triggered_by_block_hash),
+            "channel_state": self.channel_state.to_dict()
         }
         return result
 
@@ -168,6 +169,7 @@ class ContractSendChannelSettle(ContractSendEvent):
         restored = cls(
             canonical_identifier=CanonicalIdentifier.from_dict(data["canonical_identifier"]),
             triggered_by_block_hash=BlockHash(deserialize_bytes(data["triggered_by_block_hash"])),
+            channel_state=NettingChannelState.from_dict(data["channel_state"])
         )
         return restored
 
