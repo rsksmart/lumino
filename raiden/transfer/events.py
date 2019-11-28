@@ -36,7 +36,8 @@ from raiden.utils.typing import (
 
 if TYPE_CHECKING:
     # pylint: disable=unused-import
-    from raiden.transfer.state import BalanceProofSignedState
+    from raiden.transfer.state import BalanceProofSignedState, NettingChannelEndState, NettingChannelState
+
 
 # pylint: disable=too-many-arguments,too-few-public-methods
 
@@ -119,12 +120,12 @@ class ContractSendChannelSettle(ContractSendEvent):
     """ Event emitted if the netting channel must be settled. """
 
     def __init__(
-        self, canonical_identifier: CanonicalIdentifier, triggered_by_block_hash: BlockHash
+        self, canonical_identifier: CanonicalIdentifier, triggered_by_block_hash: BlockHash, channel_state: NettingChannelState
     ):
         super().__init__(triggered_by_block_hash)
         canonical_identifier.validate()
-
         self.canonical_identifier = canonical_identifier
+        self.channel_state = channel_state
 
     @property
     def token_network_identifier(self) -> TokenNetworkAddress:
