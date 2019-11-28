@@ -125,7 +125,7 @@ class ContractSendChannelSettle(ContractSendEvent):
     ):
         super().__init__(triggered_by_block_hash)
         canonical_identifier.validate()
-        self.chanel_state= channel_state
+        self.channel_state= channel_state
         self.canonical_identifier = canonical_identifier
 
     @property
