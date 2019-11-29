@@ -1449,7 +1449,8 @@ class TokenNetwork:
             "closing_signature": encode_hex(closing_signature)
         }
         log.debug("updateNonClosingBalanceProof called", **log_details)
-
+        from eth_utils import decode_hex
+        non_closing_signature = decode_hex(non_closing_signature)
         if balance_hash is EMPTY_HASH:
             raise RaidenUnrecoverableError("update_transfer called with an empty balance_hash")
 
@@ -1602,7 +1603,7 @@ class TokenNetwork:
                         "though an assert is triggered, or the smart contract code "
                         "has an conditional assert."
                     )
-                    raise RaidenUnrecoverableError(msg)
+                    raise RaidenRecoverableError(msg)
 
                 channel_data = self._detail_channel(
                     participant1=lc_address,
@@ -1909,7 +1910,7 @@ class TokenNetwork:
                         "though an assert is triggered, or the smart contract code "
                         "has an conditional assert."
                     )
-                    raise RaidenUnrecoverableError(msg)
+                    raise RaidenRecoverableError(msg)
 
                 channel_data = self._detail_channel(
                     participant1=self.node_address,

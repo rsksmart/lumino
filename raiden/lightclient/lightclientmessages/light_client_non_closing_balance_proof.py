@@ -38,10 +38,9 @@ class LightClientNonClosingBalanceProof:
             "nonce": self.nonce,
             "channel_id": self.channel_id,
             "token_network_address": self.token_network_address,
-            "lc_balance_proof_signature": serialize_bytes(self.lc_balance_proof_signature),
+            "lc_balance_proof_signature": self.lc_balance_proof_signature,
             "light_client_balance_proof": self.light_client_balance_proof
         }
-
         return result
 
     @classmethod
@@ -54,7 +53,7 @@ class LightClientNonClosingBalanceProof:
             nonce=data["nonce"],
             channel_id=data["channel_id"],
             token_network_address=to_canonical_address(data["token_network_address"]),
-            lc_balance_proof_signature=decode_hex((data["lc_balance_proof_signature"])),
+            lc_balance_proof_signature=data["lc_balance_proof_signature"],
             light_client_balance_proof=Unlock.from_dict(data["light_client_balance_proof"]),
         )
         return result
