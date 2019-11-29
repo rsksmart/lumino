@@ -589,6 +589,26 @@ class APIServer(Runnable):
         return api_error([str(exception)], HTTPStatus.INTERNAL_SERVER_ERROR)
 
 
+def parse_message_number(message):
+    if message["type"] == "LockedTransfer":
+        message["payment_identifier"] = int(message["payment_identifier"])
+        message["message_identifier"] = int(message["message_identifier"])
+        message["transferred_amount"] = int(message["transferred_amount"])
+    elif message["type"] == "Delivered":
+        message["delivered_message_identifier"] = int(message["delivered_message_identifier"])
+    elif message["type"] == "RevealSecret":
+        message["message_identifier"] = int(message["message_identifier"])
+    elif message["type"] == "Secret":
+        message["payment_identifier"] = int(message["payment_identifier"])
+        message["message_identifier"] = int(message["message_identifier"])
+        message["transferred_amount"] = int(message["transferred_amount"])
+    elif message["type"] == "Processed":
+        message["message_identifier"] = int(message["message_identifier"])
+    elif message["type"] == "SecretRequest":
+        message["payment_identifier"] = int(message["payment_identifier"])
+        message["message_identifier"] = int(message["message_identifier"])
+    return message
+
 class RestAPI:
     """
     This wraps around the actual RaidenAPI in api/python.
@@ -2081,6 +2101,7 @@ class RestAPI:
             return ApiErrorBuilder.build_and_log_error(errors="Missing api_key auth header",
                                                        status_code=HTTPStatus.BAD_REQUEST, log=log)
 
+        message = parse_message_number(message)
         payment_request = LightClientService.get_light_client_payment(message_id, self.raiden_api.raiden.wal.storage)
         if not payment_request:
             return ApiErrorBuilder.build_and_log_error(errors="No payment associated",

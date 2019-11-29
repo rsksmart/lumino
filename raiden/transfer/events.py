@@ -9,6 +9,7 @@ from raiden.transfer.architecture import (
     Event,
     SendMessageEvent,
 )
+from raiden.transfer.state import BalanceProofSignedState, NettingChannelState
 from raiden.transfer.identifiers import CanonicalIdentifier
 from raiden.utils import pex, serialization, sha3
 from raiden.utils.serialization import deserialize_bytes, serialize_bytes
@@ -120,11 +121,11 @@ class ContractSendChannelSettle(ContractSendEvent):
     """ Event emitted if the netting channel must be settled. """
 
     def __init__(
-        self, canonical_identifier: CanonicalIdentifier, triggered_by_block_hash: BlockHash
+        self, canonical_identifier: CanonicalIdentifier, triggered_by_block_hash: BlockHash, channel_state: NettingChannelState
     ):
         super().__init__(triggered_by_block_hash)
         canonical_identifier.validate()
-
+        self.channel_state= channel_state
         self.canonical_identifier = canonical_identifier
 
     @property
@@ -159,6 +160,7 @@ class ContractSendChannelSettle(ContractSendEvent):
         result = {
             "canonical_identifier": self.canonical_identifier.to_dict(),
             "triggered_by_block_hash": serialize_bytes(self.triggered_by_block_hash),
+            "channel_state": self.channel_state.to_dict()
         }
         return result
 
@@ -167,6 +169,7 @@ class ContractSendChannelSettle(ContractSendEvent):
         restored = cls(
             canonical_identifier=CanonicalIdentifier.from_dict(data["canonical_identifier"]),
             triggered_by_block_hash=BlockHash(deserialize_bytes(data["triggered_by_block_hash"])),
+            channel_state=NettingChannelState.from_dict(data["channel_state"])
         )
         return restored
 

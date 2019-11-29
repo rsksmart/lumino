@@ -1768,6 +1768,7 @@ def handle_block(
             event = ContractSendChannelSettle(
                 canonical_identifier=channel_state.canonical_identifier,
                 triggered_by_block_hash=state_change.block_hash,
+                channel_state= channel_state
             )
             events.append(event)
 
