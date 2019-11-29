@@ -46,8 +46,10 @@ class LightClientService:
             unsigned_msg = message[3]
             signed_msg = message[4]
             identifier = message[5]
+            internal_identifier = message[6]
             result.append(
-                LightClientProtocolMessage(signed, order, payment_id, identifier, unsigned_msg, signed_msg))
+                LightClientProtocolMessage(signed, order, payment_id, identifier, unsigned_msg, signed_msg,
+                                           internal_identifier))
         return result
 
     @classmethod
@@ -78,4 +80,3 @@ class LightClientService:
                 if type(message_order) is not int:
                     return False
         return True
-

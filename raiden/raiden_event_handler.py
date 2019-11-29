@@ -30,7 +30,7 @@ from raiden.transfer.events import (
     EventPaymentSentFailed,
     EventPaymentSentSuccess,
     SendProcessed,
-)
+    ContractSendChannelUpdateTransferLight)
 from raiden.transfer.identifiers import CanonicalIdentifier
 from raiden.transfer.mediated_transfer.events import (
     EventUnlockClaimFailed,
@@ -151,6 +151,9 @@ class RaidenEventHandler(EventHandler):
         elif type(event) == ContractSendChannelUpdateTransfer:
             assert isinstance(event, ContractSendChannelUpdateTransfer), MYPY_ANNOTATION
             self.handle_contract_send_channelupdate(raiden, event)
+        elif type(event) == ContractSendChannelUpdateTransferLight:
+            assert isinstance(event, ContractSendChannelUpdateTransferLight), MYPY_ANNOTATION
+            self.handle_contract_send_channelupdate_light(raiden, event)
         elif type(event) == ContractSendChannelBatchUnlock:
             assert isinstance(event, ContractSendChannelBatchUnlock), MYPY_ANNOTATION
             self.handle_contract_send_channelunlock(raiden, chain_state, event)
@@ -173,11 +176,11 @@ class RaidenEventHandler(EventHandler):
             raiden.wal)
         if not existing_message:
             LightClientMessageHandler.store_light_client_protocol_message(store_message_event.message_id,
-                                                                              store_message_event.message,
-                                                                              store_message_event.is_signed,
-                                                                              store_message_event.payment_id,
-                                                                              store_message_event.message_order,
-                                                                              raiden.wal)
+                                                                          store_message_event.message,
+                                                                          store_message_event.is_signed,
+                                                                          store_message_event.payment_id,
+                                                                          store_message_event.message_order,
+                                                                          raiden.wal)
         else:
             stored_but_unsigned = existing_message.signed_message is None
             if stored_but_unsigned and store_message_event.is_signed:
@@ -263,8 +266,6 @@ class RaidenEventHandler(EventHandler):
         lc_transport = raiden.get_light_client_transport(to_checksum_address(secret_request_event.sender))
         if lc_transport:
             lc_transport.send_async(secret_request_event.queue_identifier, secret_request_message)
-
-
 
     @staticmethod
     def handle_send_refundtransfer(
@@ -406,6 +407,31 @@ class RaidenEventHandler(EventHandler):
                 additional_hash=balance_proof.message_hash,
                 partner_signature=balance_proof.signature,
                 signature=our_signature,
+                block_identifier=channel_update_event.triggered_by_block_hash,
+            )
+
+    @staticmethod
+    def handle_contract_send_channelupdate_light(
+        raiden: "RaidenService", channel_update_event: ContractSendChannelUpdateTransferLight
+    ):
+        balance_proof = channel_update_event.balance_proof
+
+        if balance_proof:
+            canonical_identifier = balance_proof.canonical_identifier
+            channel = raiden.chain.payment_channel(canonical_identifier=canonical_identifier)
+            partner_address= None
+            if channel_update_event.lc_address == channel.participant2:
+                partner_address = channel.participant1
+            else:
+                partner_address = channel.participant2
+            channel.update_transfer_light(
+                lc_address=channel_update_event.lc_address,
+                partner_address=partner_address,
+                nonce=balance_proof.nonce,
+                balance_hash=balance_proof.balance_hash,
+                additional_hash=balance_proof.message_hash,
+                partner_signature=balance_proof.signature,
+                signature=channel_update_event.lc_bp_signature,
                 block_identifier=channel_update_event.triggered_by_block_hash,
             )
 
@@ -651,3 +677,4 @@ class RaidenEventHandler(EventHandler):
             )
         else:
             log.info("Ignoring settlement cause is a light client")
+

@@ -1305,7 +1305,7 @@ class SQLiteStorage:
     def get_light_client_messages(self, from_message, light_client):
         cursor = self.conn.cursor()
         cursor.execute(
-            "SELECT identifier, message_order, unsigned_message, signed_message, light_client_payment_id" +
+            "SELECT identifier, message_order, unsigned_message, signed_message, light_client_payment_id, internal_msg_identifier" +
             " FROM light_client_protocol_message A INNER JOIN light_client_payment B" +
             " ON A.light_client_payment_id = B.payment_id" +
             " WHERE A.internal_msg_identifier >= ?" +
@@ -1326,6 +1326,20 @@ class SQLiteStorage:
             ORDER BY message_order ASC
             """,
             (str(identifier),),
+        )
+        return cursor.fetchone()
+
+    def get_latest_light_client_non_closing_balance_proof(self, channel_id):
+        cursor = self.conn.cursor()
+        cursor.execute(
+            """
+           SELECT internal_bp_identifier, sender, light_client_payment_id, secret_hash, nonce, channel_id, 
+            token_network_address, balance_proof, lc_balance_proof_signature
+            FROM light_client_balance_proof
+            WHERE channel_id  = ?
+            ORDER BY nonce DESC
+            """,
+            (channel_id,),
         )
         return cursor.fetchone()
 
@@ -1351,7 +1365,6 @@ class SerializedSQLiteStorage(SQLiteStorage):
 
         self.serializer = serializer
 
-
     def get_light_client_messages(self, from_message, light_client):
         messages = super().get_light_client_messages(from_message, light_client)
         result = []
@@ -1370,7 +1383,7 @@ class SerializedSQLiteStorage(SQLiteStorage):
                     serialized_unsigned_msg = None
                 result.append(
                     (signed, message[1], message[4], serialized_unsigned_msg,
-                     serialized_signed_msg, message[0]))
+                     serialized_signed_msg, message[0], message[5]))
         return result
 
     def update_light_client_protocol_message_set_signed_data(self, payment_id, msg_order, signed_message):
@@ -1496,3 +1509,29 @@ class SerializedSQLiteStorage(SQLiteStorage):
     def get_events(self, limit: int = None, offset: int = None):
         events = super().get_events(limit, offset)
         return [self.serializer.deserialize(event) for event in events]
+
+    def write_light_client_non_closing_balance_proof(self, light_client_balance_proof):
+        with self.write_lock, self.conn:
+            cursor = self.conn.execute(
+                "INSERT INTO light_client_balance_proof("
+                "sender, "
+                "light_client_payment_id, "
+                "secret_hash, "
+                "nonce, "
+                "channel_id, "
+                "token_network_address, "
+                "balance_proof, "
+                "lc_balance_proof_signature "
+                ") VALUES(?, ?, ?, ?, ?,  ?, ?, ?)",
+                (to_checksum_address(light_client_balance_proof.sender),
+                 str(light_client_balance_proof.light_client_payment_id),
+                 light_client_balance_proof.secret_hash,
+                 light_client_balance_proof.nonce,
+                 light_client_balance_proof.channel_id,
+                 to_checksum_address(light_client_balance_proof.token_network_address),
+                 self.serializer.serialize(light_client_balance_proof.light_client_balance_proof),
+                 light_client_balance_proof.lc_balance_proof_signature
+                 )
+            )
+            last_id = cursor.lastrowid
+        return last_id

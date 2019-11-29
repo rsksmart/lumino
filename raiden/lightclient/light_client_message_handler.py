@@ -4,6 +4,8 @@ import string
 import structlog
 from eth_utils import to_checksum_address
 
+from raiden.lightclient.lightclientmessages.light_client_non_closing_balance_proof import \
+    LightClientNonClosingBalanceProof
 from raiden.lightclient.lightclientmessages.light_client_payment import LightClientPayment
 from raiden.lightclient.lightclientmessages.light_client_protocol_message import LightClientProtocolMessage, \
     DbLightClientProtocolMessage
@@ -202,3 +204,24 @@ class LightClientMessageHandler:
                     wal)
             else:
                 cls.log.info("Message for lc already received, ignoring db storage")
+
+    @classmethod
+    def store_update_non_closing_balance_proof(cls, non_closing_balance_proof_data: LightClientNonClosingBalanceProof,
+                                               storage: SerializedSQLiteStorage):
+        return storage.write_light_client_non_closing_balance_proof(non_closing_balance_proof_data)
+
+    @classmethod
+    def get_latest_light_client_non_closing_balance_proof(cls, channel_id: int, storage: SerializedSQLiteStorage):
+        latest_update_balance_proof_data = storage.get_latest_light_client_non_closing_balance_proof(channel_id)
+        if latest_update_balance_proof_data:
+            return LightClientNonClosingBalanceProof(latest_update_balance_proof_data[1],
+                                                     latest_update_balance_proof_data[2],
+                                                     latest_update_balance_proof_data[3],
+                                                     latest_update_balance_proof_data[4],
+                                                     latest_update_balance_proof_data[5],
+                                                     latest_update_balance_proof_data[6],
+                                                     json.loads(latest_update_balance_proof_data[7]),
+                                                     latest_update_balance_proof_data[8],
+                                                     latest_update_balance_proof_data[0]
+                                                     )
+        return None

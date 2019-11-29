@@ -22,7 +22,10 @@ from raiden.api.validations.api_error_builder import ApiErrorBuilder
 from raiden.api.validations.api_status_codes import ERROR_STATUS_CODES
 from raiden.api.validations.channel_validator import ChannelValidator
 from raiden.lightclient.light_client_service import LightClientService
-from raiden.messages import LockedTransfer, Delivered, RevealSecret, Unlock, SecretRequest, Processed
+from raiden.lightclient.lightclientmessages.light_client_non_closing_balance_proof import \
+    LightClientNonClosingBalanceProof
+from raiden.messages import LockedTransfer, Delivered, RevealSecret, Unlock, SecretRequest, Processed, \
+    SignedBlindedBalanceProof
 from raiden.rns_constants import RNS_ADDRESS_ZERO
 from raiden.utils.rns import is_rns_address
 from webargs.flaskparser import parser
@@ -81,7 +84,7 @@ from raiden.api.v1.resources import (
     LightClientMatrixCredentialsBuildResource,
     LightClientResource,
     PaymentLightResource,
-    CreatePaymentLightResource)
+    CreatePaymentLightResource, WatchtowerResource)
 
 from raiden.constants import GENESIS_BLOCK_NUMBER, UINT256_MAX, Environment, EMPTY_PAYMENT_HASH_INVOICE
 
@@ -115,7 +118,8 @@ from raiden.transfer.events import (
     EventPaymentSentFailed,
     EventPaymentSentSuccess,
 )
-from raiden.transfer.state import CHANNEL_STATE_CLOSED, CHANNEL_STATE_OPENED, NettingChannelState
+from raiden.transfer.state import CHANNEL_STATE_CLOSED, CHANNEL_STATE_OPENED, NettingChannelState, \
+    BalanceProofSignedState
 from raiden.utils import (
     create_default_identifier,
     optional_address_to_string,
@@ -171,7 +175,7 @@ URLS_V1 = [
     ("/payments_light/get_messages", PaymentLightResource, "Message poling"),
 
     ("/payments_light/create", CreatePaymentLightResource, "create_payment"),
-
+    ("/watchtower", WatchtowerResource),
     ("/tokens", TokensResource),
     ("/tokens/<hexaddress:token_address>/partners", PartnersResourceByTokenAddress),
     ("/tokens/<hexaddress:token_address>", RegisterTokenResource),
@@ -2048,6 +2052,38 @@ class RestAPI:
                                                                 self.raiden_api.raiden.wal)
         response = [message.to_dict() for message in messages]
         return api_response(response)
+
+    def receive_light_client_update_balance_proof(self,
+                                                  sender: typing.AddressHex,
+                                                  light_client_payment_id: int,
+                                                  secret_hash: typing.SecretHash,
+                                                  nonce: int,
+                                                  channel_id: int,
+                                                  token_network_address: typing.TokenNetworkAddress,
+                                                  lc_bp_signature: typing.Signature,
+                                                  partner_balance_proof: Unlock):
+        headers = request.headers
+        api_key = headers.get("x-api-key")
+        if not api_key:
+            return ApiErrorBuilder.build_and_log_error(errors="Missing api_key auth header",
+                                                       status_code=HTTPStatus.BAD_REQUEST, log=log)
+
+        non_closing_bp_tx_data = LightClientNonClosingBalanceProof(sender,
+                                                                   light_client_payment_id,
+                                                                   secret_hash,
+                                                                   nonce,
+                                                                   channel_id,
+                                                                   token_network_address,
+                                                                   partner_balance_proof,
+                                                                   lc_bp_signature)
+
+        stored = LightClientMessageHandler.store_update_non_closing_balance_proof(non_closing_bp_tx_data,
+                                                                                  self.raiden_api.raiden.wal.storage)
+
+        latest = LightClientMessageHandler.get_latest_light_client_non_closing_balance_proof(channel_id,
+                                                                                             self.raiden_api.raiden.wal.storage)
+
+        return api_response(str(stored))
 
     def receive_light_client_protocol_message(self,
                                               message_id: int,

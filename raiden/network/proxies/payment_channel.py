@@ -221,6 +221,30 @@ class PaymentChannel:
             signed_close_tx=signed_close_tx
         )
 
+    def update_transfer_light(
+        self,
+        lc_address: Address,
+        partner_address: Address,
+        nonce: Nonce,
+        balance_hash: BalanceHash,
+        additional_hash: AdditionalHash,
+        partner_signature: Signature,
+        signature: Signature,
+        block_identifier: BlockSpecification,
+    ):
+        """ Updates the channel using the provided balance proof. """
+        self.token_network.update_transfer_light(
+            channel_identifier=self.channel_identifier,
+            lc_address=lc_address,
+            partner=partner_address,
+            balance_hash=balance_hash,
+            nonce=nonce,
+            additional_hash=additional_hash,
+            closing_signature=partner_signature,
+            non_closing_signature=signature,
+            given_block_identifier=block_identifier,
+        )
+
     def update_transfer(
         self,
         nonce: Nonce,

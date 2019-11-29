@@ -27,7 +27,10 @@ from raiden.api.v1.encoding import (
     LightClientSchema,
     LightClientMatrixCredentialsBuildSchema,
     PaymentLightPutSchema,
-    CreatePaymentLightPostSchema, PaymentLightGetSchema)
+    CreatePaymentLightPostSchema,
+    PaymentLightGetSchema,
+    WatchtowerPutResource)
+from raiden.messages import SignedBlindedBalanceProof, Unlock
 
 from raiden.utils import typing
 
@@ -388,6 +391,7 @@ class DashboardResource(BaseResource):
             table_limit=table_limit
         )
 
+
 class PaymentResourceLumino(BaseResource):
     get_schema = RaidenEventsRequestSchemaV2()
 
@@ -517,3 +521,25 @@ class LightClientResource(BaseResource):
             seed_retry=seed_retry
         )
 
+
+class WatchtowerResource(BaseResource):
+    put_schema = WatchtowerPutResource
+
+    @use_kwargs(put_schema, locations=("json",))
+    def put(self,
+            sender: typing.AddressHex,
+            light_client_payment_id: int,
+            secret_hash: typing.SecretHash,
+            nonce: int,
+            channel_id: int,
+            token_network_address: typing.TokenNetworkAddress,
+            lc_bp_signature: typing.Signature,
+            partner_balance_proof: Unlock
+            ):
+        """
+        put a signed balance proof to be used by the hub, submitting it when the channel between a light client
+        and a partner is closed by the partner. The signed balance proof is submitted as a tokenNetwork.updateNonClosingBalanceProf transaction.
+        """
+        return self.rest_api.receive_light_client_update_balance_proof(sender, light_client_payment_id, secret_hash,
+                                                                       nonce, channel_id, token_network_address,
+                                                                       lc_bp_signature, partner_balance_proof)
