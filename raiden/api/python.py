@@ -1655,8 +1655,9 @@ class RaidenAPI:
                 result = {"message": "An unexpected error has occurred.",
                           "result_code": 1}
         else:
-            result = {"message": "The client you are trying to register has already registered.",
-                      "result_code": 2}
+            result = {"address": light_client['address'],
+                        "api_key": light_client['api_key'],
+                        "result_code": 2}
 
         return result
 
