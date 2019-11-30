@@ -54,6 +54,6 @@ class LightClientNonClosingBalanceProof:
             channel_id=data["channel_id"],
             token_network_address=to_canonical_address(data["token_network_address"]),
             lc_balance_proof_signature=data["lc_balance_proof_signature"],
-            light_client_balance_proof=Unlock.from_dict(data["light_client_balance_proof"]),
+            light_client_balance_proof=data["light_client_balance_proof"],
         )
         return result

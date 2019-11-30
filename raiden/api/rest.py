@@ -2080,9 +2080,6 @@ class RestAPI:
         stored = LightClientMessageHandler.store_update_non_closing_balance_proof(non_closing_bp_tx_data,
                                                                                   self.raiden_api.raiden.wal.storage)
 
-        latest = LightClientMessageHandler.get_latest_light_client_non_closing_balance_proof(channel_id,
-                                                                                             self.raiden_api.raiden.wal.storage)
-
         return api_response(str(stored))
 
     def receive_light_client_protocol_message(self,

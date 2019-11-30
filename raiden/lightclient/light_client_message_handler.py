@@ -9,7 +9,7 @@ from raiden.lightclient.lightclientmessages.light_client_non_closing_balance_pro
 from raiden.lightclient.lightclientmessages.light_client_payment import LightClientPayment
 from raiden.lightclient.lightclientmessages.light_client_protocol_message import LightClientProtocolMessage, \
     DbLightClientProtocolMessage
-from raiden.messages import Message, LockedTransfer, SecretRequest, RevealSecret, Secret, Processed, Delivered
+from raiden.messages import Message, LockedTransfer, SecretRequest, RevealSecret, Secret, Processed, Delivered, Unlock
 from raiden.storage.sqlite import SerializedSQLiteStorage
 from raiden.storage.wal import WriteAheadLog
 from typing import List
@@ -214,13 +214,14 @@ class LightClientMessageHandler:
     def get_latest_light_client_non_closing_balance_proof(cls, channel_id: int, storage: SerializedSQLiteStorage):
         latest_update_balance_proof_data = storage.get_latest_light_client_non_closing_balance_proof(channel_id)
         if latest_update_balance_proof_data:
+            balance_proof = Unlock.from_dict(json.loads(latest_update_balance_proof_data[7]))
             return LightClientNonClosingBalanceProof(latest_update_balance_proof_data[1],
                                                      latest_update_balance_proof_data[2],
                                                      latest_update_balance_proof_data[3],
                                                      latest_update_balance_proof_data[4],
                                                      latest_update_balance_proof_data[5],
                                                      latest_update_balance_proof_data[6],
-                                                     json.loads(latest_update_balance_proof_data[7]),
+                                                     balance_proof,
                                                      latest_update_balance_proof_data[8],
                                                      latest_update_balance_proof_data[0]
                                                      )
