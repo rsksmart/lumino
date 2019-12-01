@@ -593,20 +593,25 @@ def parse_message_number(message):
     if message["type"] == "LockedTransfer":
         message["payment_identifier"] = int(message["payment_identifier"])
         message["message_identifier"] = int(message["message_identifier"])
+        message["locked_amount"] = int(message["locked_amount"])
         message["transferred_amount"] = int(message["transferred_amount"])
+        message["lock"]["amount"] = int(message["lock"]["amount"])
     elif message["type"] == "Delivered":
         message["delivered_message_identifier"] = int(message["delivered_message_identifier"])
     elif message["type"] == "RevealSecret":
         message["message_identifier"] = int(message["message_identifier"])
     elif message["type"] == "Secret":
         message["payment_identifier"] = int(message["payment_identifier"])
-        message["message_identifier"] = int(message["message_identifier"])
         message["transferred_amount"] = int(message["transferred_amount"])
+        message["message_identifier"] = int(message["message_identifier"])
+        message["locked_amount"] = int(message["locked_amount"])
     elif message["type"] == "Processed":
         message["message_identifier"] = int(message["message_identifier"])
     elif message["type"] == "SecretRequest":
         message["payment_identifier"] = int(message["payment_identifier"])
         message["message_identifier"] = int(message["message_identifier"])
+        message["amount"] = int(message["amount"])
+
     return message
 
 class RestAPI:
