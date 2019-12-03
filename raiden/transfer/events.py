@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING
 
-from eth_utils import to_bytes, to_canonical_address, to_checksum_address, to_hex
+from eth_utils import to_bytes, to_canonical_address, to_checksum_address, to_hex, to_normalized_address
 
 from raiden.constants import UINT256_MAX
 from raiden.transfer.architecture import (
@@ -285,7 +285,8 @@ class ContractSendChannelUpdateTransferLight(ContractSendExpirableEvent):
             "expiration": str(self.expiration),
             "balance_proof": self.balance_proof,
             "triggered_by_block_hash": serialize_bytes(self.triggered_by_block_hash),
-            "lc_bp_signature": self.lc_bp_signature
+            "lc_bp_signature": self.lc_bp_signature,
+            "lc_address": to_normalized_address(self.lc_address)
         }
 
         return result
@@ -296,7 +297,8 @@ class ContractSendChannelUpdateTransferLight(ContractSendExpirableEvent):
             expiration=BlockExpiration(int(data["expiration"])),
             balance_proof=data["balance_proof"],
             triggered_by_block_hash=BlockHash(deserialize_bytes(data["triggered_by_block_hash"])),
-            lc_bp_signature=data["lc_bp_signature"]
+            lc_bp_signature=data["lc_bp_signature"],
+            lc_address=to_canonical_address(data["lc_address"])
         )
 
         return restored

@@ -56,7 +56,7 @@ def test_reveal_secret_7():
 
 
 def test_processed():
-    message = Processed(message_identifier=MessageID(10357160083943892196))
+    message = Processed(message_identifier=MessageID(18237677588114994956))
     message.sign(signer)
     data_was_signed = message._data_to_sign()
     print("Processed signature: " + message.signature.hex())
@@ -67,7 +67,7 @@ def test_processed():
 def test_delivered():
     dict_msg = {
         "type": "Delivered",
-        "delivered_message_identifier": 10357160083943892196
+        "delivered_message_identifier": 18237677588114994956
     }
     message = Delivered.from_dict_unsigned(dict_msg)
     message.sign(signer)
@@ -80,11 +80,11 @@ def test_delivered():
 def test_secret_request_5():
     dict_data = {
         "type": "SecretRequest",
-        "message_identifier": 11859868579443731927,
-        "payment_identifier": 4323273060934284161,
+        "message_identifier": 9443946215632930647,
+        "payment_identifier": 1322351847924173620,
         "amount": 100000000000000000,
         "expiration": 12000000,
-        "secrethash": "0x7be309bc15b0d513fff11a3df169fb4ad4ef68796713f66cb87fdf6a64f53d65"
+        "secrethash": "0xaf1ca2932cb5c3e3045eedb17ce760419d2b3e5234eeefe6fd82475adeb4da10"
     }
     message = SecretRequest(message_identifier=dict_data["message_identifier"],
                             payment_identifier=dict_data["payment_identifier"],
@@ -100,8 +100,8 @@ def test_secret_request_5():
 
 
 def test_reveal_secret_9():
-    message = RevealSecret(message_identifier=MessageID(15943061285551736489), secret=Secret(
-        decode_hex("0xa4678d1f1db376f20854619fc8aa8021f88f318e14ff600aa051e8e4ded5d023")))
+    message = RevealSecret(message_identifier=MessageID(10945162236180065780), secret=Secret(
+        decode_hex("0xb8ed582d16853c82a9a9a384118fcd10889ab0a5a3224ec6008bd88582319fc3")))
     message.sign(signer)
     data_was_signed = message._data_to_sign()
     print("Reveal Secret signature 9: " + message.signature.hex())
@@ -144,16 +144,23 @@ def test_locked_transfer_1():
 
 
 def test_update_non_closing_balance_proof():
-    dict_data = {"type": "Secret", "chain_id": 33, "message_identifier": 10357160083943892196, "payment_identifier": 4323273060934284161, "secret": "0xa4678d1f1db376f20854619fc8aa8021f88f318e14ff600aa051e8e4ded5d023", "nonce": 2, "token_network_address": "0x7351ed719de72db92a54c99ef2c4d287f69672a1", "channel_identifier": 3, "transferred_amount": 100000000000000000, "locked_amount": 0, "locksroot": "0x0000000000000000000000000000000000000000000000000000000000000000", "signature": "0x5c805ba51ac4776d879c276d54c1ed97905399e227e7b9ef50aa4f36605ac25e5ab707641c4bd85a0d89549841beaf4f0e06c839ad5460aaf26d4c68b9af822c1b"}
+    dict_data = {"type": "Secret", "chain_id": 33, "message_identifier": 4174357123961474742,
+                 "payment_identifier": 5100335212362582814,
+                 "secret": "0xd1b2cb5b175436f60b6e59be64f4c7b59b3569b8f877c55f66c8f8a6ba8055f4", "nonce": 2,
+                 "token_network_address": "0x013b47e5eb40a476dc0e9a212d376899288561a2", "channel_identifier": 14,
+                 "transferred_amount": 20000000, "locked_amount": 0,
+                 "locksroot": "0x0000000000000000000000000000000000000000000000000000000000000000",
+                 "signature": "0x94d6dba985096b6259151664367443bcd83c5e8cc1913c34bd3542b4ac1b4e7772696e145445625eef4167080fddb3ebe730c71319bee66235864661d9dddc2b1c"}
+    # dict_data = {"type": "Secret", "chain_id": 33, "message_identifier": 18237677588114994956, "payment_identifier": 1322351847924173620, "secret": "0xa4678d1f1db376f20854619fc8aa8021f88f318e14ff600aa051e8e4ded5d023", "nonce": 2, "token_network_address": "0x7351ed719de72db92a54c99ef2c4d287f69672a1", "channel_identifier": 3, "transferred_amount": 100000000000000000, "locked_amount": 0, "locksroot": "0x0000000000000000000000000000000000000000000000000000000000000000", "signature": "0x5c805ba51ac4776d879c276d54c1ed97905399e227e7b9ef50aa4f36605ac25e5ab707641c4bd85a0d89549841beaf4f0e06c839ad5460aaf26d4c68b9af822c1b"}
     balance_proof_msg = Unlock.from_dict(dict_data)
     balance_proof = balanceproof_from_envelope(balance_proof_msg)
-    non_closing_signature = create_balance_proof_update_signature("0x7351ed719de72db92a54c99ef2c4d287f69672a1",
-                                                      3,
-                                                      balance_proof.balance_hash,
-                                                      2,
-                                                      balance_proof.message_hash,
-                                                      decode_hex(
-                                                          "0x5c805ba51ac4776d879c276d54c1ed97905399e227e7b9ef50aa4f36605ac25e5ab707641c4bd85a0d89549841beaf4f0e06c839ad5460aaf26d4c68b9af822c1b"))
+    non_closing_signature = create_balance_proof_update_signature("0x013b47e5eb40a476dc0e9a212d376899288561a2",
+                                                                  14,
+                                                                  balance_proof.balance_hash,
+                                                                  2,
+                                                                  balance_proof.message_hash,
+                                                                  decode_hex(
+                                                                      "0x94d6dba985096b6259151664367443bcd83c5e8cc1913c34bd3542b4ac1b4e7772696e145445625eef4167080fddb3ebe730c71319bee66235864661d9dddc2b1c"))
 
     our_signed_data = pack_balance_proof_update(
         nonce=balance_proof.nonce,
@@ -161,11 +168,12 @@ def test_update_non_closing_balance_proof():
         additional_hash=balance_proof.message_hash,
         canonical_identifier=balance_proof.canonical_identifier,
         partner_signature=Signature(decode_hex(
-            "0x5c805ba51ac4776d879c276d54c1ed97905399e227e7b9ef50aa4f36605ac25e5ab707641c4bd85a0d89549841beaf4f0e06c839ad5460aaf26d4c68b9af822c1b"))
+            "0x94d6dba985096b6259151664367443bcd83c5e8cc1913c34bd3542b4ac1b4e7772696e145445625eef4167080fddb3ebe730c71319bee66235864661d9dddc2b1c"))
     )
-    print(non_closing_signature.hex())
+
+    print("Update non consling blanace proof signature "+non_closing_signature.hex())
     our_recovered_address = recover(data=our_signed_data, signature=Signature(non_closing_signature))
-    print(our_recovered_address)
+    assert our_recovered_address == to_canonical_address("0x7ca28d3d760b4aa2b79e8d42cbdc187c7df9af40")
 
 
 def create_balance_proof_update_signature(
