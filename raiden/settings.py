@@ -15,14 +15,14 @@ DEFAULT_TRANSPORT_THROTTLE_CAPACITY = 10.0
 DEFAULT_TRANSPORT_THROTTLE_FILL_RATE = 10.0
 DEFAULT_TRANSPORT_UDP_RETRY_INTERVAL = 1.0
 # matrix gets spammed with the default retry-interval of 1s, wait a little more
-DEFAULT_TRANSPORT_MATRIX_RETRY_INTERVAL = 5.0
+DEFAULT_TRANSPORT_MATRIX_RETRY_INTERVAL = 15.0
 DEFAULT_MATRIX_KNOWN_SERVERS = {
     Environment.PRODUCTION: (
         "https://raw.githubusercontent.com/raiden-network/raiden-transport"
         "/master/known_servers.main.yaml"
     ),
     Environment.DEVELOPMENT: (
-        "https://raw.githubusercontent.com/raiden-network/raiden-transport/master/known_servers.test.yaml"
+        "https://raw.githubusercontent.com/marcosmartinez7/matrix-known-servers/master/known_servers.test.yaml"
     ),
 }
 

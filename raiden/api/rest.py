@@ -2068,6 +2068,7 @@ class RestAPI:
             return ApiErrorBuilder.build_and_log_error(errors="Missing api_key auth header",
                                                        status_code=HTTPStatus.BAD_REQUEST, log=log)
 
+        partner_balance_proof = parse_message_number(partner_balance_proof)
         non_closing_bp_tx_data = LightClientNonClosingBalanceProof(sender,
                                                                    light_client_payment_id,
                                                                    secret_hash,
