@@ -168,6 +168,7 @@ class NodeRunner:
                 cors_domain_list=domain_list,
                 web_ui=self._options["web_ui"],
                 eth_rpc_endpoint=self._options["eth_rpc_endpoint"],
+                hub_mode=self._options["hub_mode"],
             )
 
             try:

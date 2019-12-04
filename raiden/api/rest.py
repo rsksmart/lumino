@@ -148,18 +148,12 @@ from raiden.ui.app import get_matrix_light_client_instance
 
 log = structlog.get_logger(__name__)
 
-URLS_V1 = [
-    ("/address", AddressResource),
+URLS_FN_V1 = [
     ("/channels", ChannelsResource),
-    ("/light_channels", ChannelsResourceLight),
     ("/channels/<hexaddress:token_address>", ChannelsResourceByTokenAddress),
     (
         "/channels/<hexaddress:token_address>/<hexaddress:partner_address>",
         ChannelsResourceByTokenAndPartnerAddress,
-    ),
-    (
-        "/light_channels/<hexaddress:token_address>/<hexaddress:creator_address>/<hexaddress:partner_address>",
-        LightChannelsResourceByTokenAndPartnerAddress
     ),
     ("/connections/<hexaddress:token_address>", ConnectionsResource),
     ("/connections", ConnectionsInfoResource),
@@ -171,14 +165,7 @@ URLS_V1 = [
         PaymentResource,
         "token_target_paymentresource",
     ),
-    ("/payments_light", PaymentLightResource),
-    ("/payments_light/get_messages", PaymentLightResource, "Message poling"),
-
-    ("/payments_light/create", CreatePaymentLightResource, "create_payment"),
-    ("/watchtower", WatchtowerResource),
-    ("/tokens", TokensResource),
     ("/tokens/<hexaddress:token_address>/partners", PartnersResourceByTokenAddress),
-    ("/tokens/<hexaddress:token_address>", RegisterTokenResource),
     ("/pending_transfers", PendingTransfersResource, "pending_transfers_resource"),
     (
         "/pending_transfers/<hexaddress:token_address>",
@@ -233,6 +220,18 @@ URLS_V1 = [
         '/invoice',
         InvoiceResource,
     ),
+]
+
+URLS_HUB_V1 = [
+    ("/light_channels", ChannelsResourceLight),
+    (
+        "/light_channels/<hexaddress:token_address>/<hexaddress:creator_address>/<hexaddress:partner_address>",
+        LightChannelsResourceByTokenAndPartnerAddress
+    ),
+    ("/payments_light", PaymentLightResource),
+    ("/payments_light/get_messages", PaymentLightResource, "Message poling"),
+    ("/payments_light/create", CreatePaymentLightResource, "create_payment"),
+    ("/watchtower", WatchtowerResource),
     (
         '/light_clients/matrix/credentials',
         LightClientMatrixCredentialsBuildResource,
@@ -241,9 +240,13 @@ URLS_V1 = [
         '/light_clients/',
         LightClientResource
     ),
-
 ]
 
+URLS_COMMON_V1 = [
+    ("/tokens", TokensResource),
+    ("/tokens/<hexaddress:token_address>", RegisterTokenResource),
+    ("/address", AddressResource),
+]
 
 def api_response(result, status_code=HTTPStatus.OK):
     if status_code == HTTPStatus.NO_CONTENT:
@@ -388,7 +391,7 @@ class APIServer(Runnable):
     _api_prefix = "/api/1"
 
     def __init__(
-        self, rest_api, config, cors_domain_list=None, web_ui=False, eth_rpc_endpoint=None
+        self, rest_api, config, cors_domain_list=None, web_ui=False, eth_rpc_endpoint=None, hub_mode=False
     ):
         super().__init__()
         if rest_api.version != 1:
@@ -423,7 +426,7 @@ class APIServer(Runnable):
         restapi_setup_urls(
             flask_api_context,
             rest_api,
-            URLS_V1
+            URLS_COMMON_V1 + URLS_HUB_V1 if hub_mode else URLS_COMMON_V1 + URLS_FN_V1
         )
 
         self.config = config
@@ -613,6 +616,7 @@ def parse_message_number(message):
         message["amount"] = int(message["amount"])
 
     return message
+
 
 class RestAPI:
     """
