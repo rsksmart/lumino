@@ -220,6 +220,7 @@ URLS_LC_V1 = [
         '/invoice',
         InvoiceResource,
     ),
+    ("/tokens", TokensResource),
 ]
 
 URLS_HUB_V1 = [
@@ -234,7 +235,6 @@ URLS_HUB_V1 = [
     ("/payments_light/get_messages", PaymentLightResource, "Message poling"),
     ("/payments_light/create", CreatePaymentLightResource, "create_payment"),
     ("/watchtower", WatchtowerResource),
-    ("/tokens", TokensResource),
     (
         '/light_clients/matrix/credentials',
         LightClientMatrixCredentialsBuildResource,
@@ -243,8 +243,12 @@ URLS_HUB_V1 = [
         '/light_clients/',
         LightClientResource
     ),
+    ("/tokens", TokensResource),
 ]
 
+URLS_COMMON_V1 = [
+    ("/tokens", TokensResource),
+]
 
 def api_response(result, status_code=HTTPStatus.OK):
     if status_code == HTTPStatus.NO_CONTENT:
