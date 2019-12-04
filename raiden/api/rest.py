@@ -148,7 +148,7 @@ from raiden.ui.app import get_matrix_light_client_instance
 
 log = structlog.get_logger(__name__)
 
-URLS_LC_V1 = [
+URLS_FN_V1 = [
     ("/channels", ChannelsResource),
     ("/channels/<hexaddress:token_address>", ChannelsResourceByTokenAddress),
     (
@@ -220,17 +220,14 @@ URLS_LC_V1 = [
         '/invoice',
         InvoiceResource,
     ),
-    ("/tokens", TokensResource),
 ]
 
 URLS_HUB_V1 = [
-    ("/address", AddressResource),
     ("/light_channels", ChannelsResourceLight),
     (
         "/light_channels/<hexaddress:token_address>/<hexaddress:creator_address>/<hexaddress:partner_address>",
         LightChannelsResourceByTokenAndPartnerAddress
     ),
-    ("/tokens/<hexaddress:token_address>", RegisterTokenResource),
     ("/payments_light", PaymentLightResource),
     ("/payments_light/get_messages", PaymentLightResource, "Message poling"),
     ("/payments_light/create", CreatePaymentLightResource, "create_payment"),
@@ -243,11 +240,12 @@ URLS_HUB_V1 = [
         '/light_clients/',
         LightClientResource
     ),
-    ("/tokens", TokensResource),
 ]
 
 URLS_COMMON_V1 = [
     ("/tokens", TokensResource),
+    ("/tokens/<hexaddress:token_address>", RegisterTokenResource),
+    ("/address", AddressResource),
 ]
 
 def api_response(result, status_code=HTTPStatus.OK):
@@ -428,7 +426,7 @@ class APIServer(Runnable):
         restapi_setup_urls(
             flask_api_context,
             rest_api,
-            URLS_HUB_V1 if hub_mode else URLS_LC_V1
+            URLS_COMMON_V1 + URLS_HUB_V1 if hub_mode else URLS_COMMON_V1 + URLS_FN_V1
         )
 
         self.config = config
