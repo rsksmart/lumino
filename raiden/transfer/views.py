@@ -166,9 +166,11 @@ def get_token_network_identifier_by_token_address(
 def get_token_address_by_token_network_identifier(
     chain_state: ChainState, payment_network_id: PaymentNetworkID, token_network: TokenNetworkID
 ) -> Optional[TokenAddress]:
-    token_address = get_token_address_by_token_network(
+    token_network_state = get_token_address_by_token_network(
         chain_state, payment_network_id, token_network
     )
+
+    token_address = getattr(token_network_state, "token_address", None)
 
     return token_address
 
@@ -237,7 +239,7 @@ def get_token_address_by_token_network(
     payment_network = chain_state.identifiers_to_paymentnetworks.get(payment_network_id)
 
     if payment_network is not None:
-        return payment_network.tokennetworks_to_tokenaddresses.get(token_network)
+        return payment_network.tokenidentifiers_to_tokennetworks.get(token_network)
 
     return None
 
