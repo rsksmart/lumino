@@ -501,6 +501,7 @@ class PaymentNetworkState(State):
         "address",
         "tokenidentifiers_to_tokennetworks",
         "tokenaddresses_to_tokenidentifiers",
+        "tokennetworks_to_tokenaddresses",
     )
 
     def __init__(
@@ -515,6 +516,10 @@ class PaymentNetworkState(State):
         }
         self.tokenaddresses_to_tokenidentifiers: Dict[TokenAddress, TokenNetworkID] = {
             token_network.token_address: token_network.address
+            for token_network in token_network_list
+        }
+        self.tokennetworks_to_tokenaddresses: Dict[TokenNetworkID, TokenAddress] = {
+            token_network.address: token_network.token_address
             for token_network in token_network_list
         }
 

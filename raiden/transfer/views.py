@@ -163,6 +163,15 @@ def get_token_network_identifier_by_token_address(
 
     return token_network_id
 
+def get_token_address_by_token_network_identifier(
+    chain_state: ChainState, payment_network_id: PaymentNetworkID, token_network: TokenNetworkID
+) -> Optional[TokenAddress]:
+    token_address = get_token_address_by_token_network(
+        chain_state, payment_network_id, token_network
+    )
+
+    return token_address
+
 
 def get_token_network_identifiers(
     chain_state: ChainState, payment_network_id: PaymentNetworkID
@@ -218,6 +227,17 @@ def get_token_network_by_token_address(
 
         if token_network_id:
             return payment_network.tokenidentifiers_to_tokennetworks.get(token_network_id)
+
+    return None
+
+
+def get_token_address_by_token_network(
+    chain_state: ChainState, payment_network_id: PaymentNetworkID, token_network: TokenNetworkID
+) -> Optional[TokenAddress]:
+    payment_network = chain_state.identifiers_to_paymentnetworks.get(payment_network_id)
+
+    if payment_network is not None:
+        return payment_network.tokennetworks_to_tokenaddresses.get(token_network)
 
     return None
 
@@ -282,7 +302,8 @@ def get_channelstate_for(
 
             if channel is not None:
                 if channel.close_transaction is None or channel.close_transaction.result != 'success':
-                    channels.append(token_network.channelidentifiers_to_channels[address_to_get_channel_state][channel_id])
+                    channels.append(
+                        token_network.channelidentifiers_to_channels[address_to_get_channel_state][channel_id])
             channel = None
 
         states = filter_channels_by_status(channels, [CHANNEL_STATE_UNUSABLE])
@@ -321,7 +342,8 @@ def get_channelstate_for_close_channel(
 
                 if channel is not None:
                     if channel.close_transaction is not None and channel.close_transaction.result == 'success':
-                        channels.append(token_network.channelidentifiers_to_channels[address_to_get_channel_state][channel_id])
+                        channels.append(
+                            token_network.channelidentifiers_to_channels[address_to_get_channel_state][channel_id])
 
         states = filter_channels_by_status(channels, [CHANNEL_STATE_UNUSABLE])
         # If multiple channel states are found, return the last one.
@@ -350,7 +372,6 @@ def get_channelstate_by_token_network_and_partner(
             channel_state = states[-1]
 
     return channel_state
-
 
 
 def get_channelstate_by_canonical_identifier_and_address(
@@ -384,7 +405,7 @@ def get_lc_address_by_channel_id_and_partner(token_network_state: TokenNetworkSt
         for channel_id in channel_ids:
             if channel_id == canonical_identifier.channel_identifier:
                 if len(token_network_state.network_graph.channel_identifier_to_participants) > 0 \
-                        and channel_id in token_network_state.network_graph.channel_identifier_to_participants:
+                    and channel_id in token_network_state.network_graph.channel_identifier_to_participants:
                     participants: Tuple[Address, Address] = \
                         token_network_state.network_graph.channel_identifier_to_participants[channel_id]
                 if participants is not None:

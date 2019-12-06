@@ -71,6 +71,7 @@ from raiden.api.v1.resources import (
     PendingTransfersResourceByTokenAndPartnerAddress,
     RaidenInternalEventsResource,
     RegisterTokenResource,
+    GetTokenResource,
     TokensResource,
     DashboardResource,
     create_blueprint,
@@ -245,6 +246,7 @@ URLS_HUB_V1 = [
 URLS_COMMON_V1 = [
     ("/tokens", TokensResource),
     ("/tokens/<hexaddress:token_address>", RegisterTokenResource),
+    ("/tokens/network/<hexaddress:token_network>", GetTokenResource),
     ("/address", AddressResource),
 ]
 
@@ -977,6 +979,25 @@ class RestAPI:
         else:
             pretty_address = to_checksum_address(token_address)
             message = f'No token network registered for token "{pretty_address}"'
+            return api_error(message, status_code=HTTPStatus.NOT_FOUND)
+
+    def get_token_for_token_network(
+        self, registry_address: typing.PaymentNetworkID, token_network: typing.TokenNetworkID
+    ):
+        log.debug(
+            "Getting token for token network",
+            node=pex(self.raiden_api.address),
+            token_network=to_checksum_address(token_network),
+        )
+        token_address = self.raiden_api.get_token_address_for_token_network_address(
+            registry_address=registry_address, token_network=token_network
+        )
+
+        if token_address is not None:
+            return api_response(result=to_checksum_address(token_address))
+        else:
+            pretty_address = to_checksum_address(token_network)
+            message = f'No token registered for token network "{pretty_address}"'
             return api_error(message, status_code=HTTPStatus.NOT_FOUND)
 
     def get_blockchain_events_network(
