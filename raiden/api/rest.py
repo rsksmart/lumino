@@ -598,20 +598,25 @@ def parse_message_number(message):
     if message["type"] == "LockedTransfer":
         message["payment_identifier"] = int(message["payment_identifier"])
         message["message_identifier"] = int(message["message_identifier"])
+        message["locked_amount"] = int(message["locked_amount"])
         message["transferred_amount"] = int(message["transferred_amount"])
+        message["lock"]["amount"] = int(message["lock"]["amount"])
     elif message["type"] == "Delivered":
         message["delivered_message_identifier"] = int(message["delivered_message_identifier"])
     elif message["type"] == "RevealSecret":
         message["message_identifier"] = int(message["message_identifier"])
     elif message["type"] == "Secret":
         message["payment_identifier"] = int(message["payment_identifier"])
-        message["message_identifier"] = int(message["message_identifier"])
         message["transferred_amount"] = int(message["transferred_amount"])
+        message["message_identifier"] = int(message["message_identifier"])
+        message["locked_amount"] = int(message["locked_amount"])
     elif message["type"] == "Processed":
         message["message_identifier"] = int(message["message_identifier"])
     elif message["type"] == "SecretRequest":
         message["payment_identifier"] = int(message["payment_identifier"])
         message["message_identifier"] = int(message["message_identifier"])
+        message["amount"] = int(message["amount"])
+
     return message
 
 
@@ -2093,6 +2098,7 @@ class RestAPI:
             return ApiErrorBuilder.build_and_log_error(errors="Missing api_key auth header",
                                                        status_code=HTTPStatus.BAD_REQUEST, log=log)
 
+        partner_balance_proof = parse_message_number(partner_balance_proof)
         non_closing_bp_tx_data = LightClientNonClosingBalanceProof(sender,
                                                                    light_client_payment_id,
                                                                    secret_hash,
@@ -2104,9 +2110,6 @@ class RestAPI:
 
         stored = LightClientMessageHandler.store_update_non_closing_balance_proof(non_closing_bp_tx_data,
                                                                                   self.raiden_api.raiden.wal.storage)
-
-        latest = LightClientMessageHandler.get_latest_light_client_non_closing_balance_proof(channel_id,
-                                                                                             self.raiden_api.raiden.wal.storage)
 
         return api_response(str(stored))
 
