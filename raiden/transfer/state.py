@@ -501,7 +501,6 @@ class PaymentNetworkState(State):
         "address",
         "tokenidentifiers_to_tokennetworks",
         "tokenaddresses_to_tokenidentifiers",
-        "tokennetworks_to_tokenaddresses",
     )
 
     def __init__(
@@ -518,10 +517,6 @@ class PaymentNetworkState(State):
             token_network.token_address: token_network.address
             for token_network in token_network_list
         }
-        self.tokennetworks_to_tokenaddresses: Dict[TokenNetworkID, TokenAddress] = {
-            token_network.address: token_network.token_address
-            for token_network in token_network_list
-        }
 
     def __repr__(self) -> str:
         return "<PaymentNetworkState id:{}>".format(pex(self.address))
@@ -532,7 +527,6 @@ class PaymentNetworkState(State):
             and self.address == other.address
             and self.tokenaddresses_to_tokenidentifiers == other.tokenaddresses_to_tokenidentifiers
             and self.tokenidentifiers_to_tokennetworks == other.tokenidentifiers_to_tokennetworks
-            and self.tokennetworks_to_tokenaddresses == other.tokennetworks_to_tokenaddresses
         )
 
     def __ne__(self, other: Any) -> bool:
