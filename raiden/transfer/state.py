@@ -532,6 +532,7 @@ class PaymentNetworkState(State):
             and self.address == other.address
             and self.tokenaddresses_to_tokenidentifiers == other.tokenaddresses_to_tokenidentifiers
             and self.tokenidentifiers_to_tokennetworks == other.tokenidentifiers_to_tokennetworks
+            and self.tokennetworks_to_tokenaddresses == other.tokennetworks_to_tokenaddresses
         )
 
     def __ne__(self, other: Any) -> bool:
