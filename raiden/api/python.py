@@ -50,7 +50,7 @@ from raiden.lightclient.light_client_utils import LightClientUtils
 from raiden.lightclient.lightclientmessages.hub_message import HubMessage
 from raiden.lightclient.lightclientmessages.light_client_payment import LightClientPayment, LightClientPaymentStatus
 
-from raiden.messages import RequestMonitoring, LockedTransfer, RevealSecret, Unlock, Delivered
+from raiden.messages import RequestMonitoring, LockedTransfer, RevealSecret, Unlock, Delivered, SecretRequest, Processed
 from raiden.settings import DEFAULT_RETRY_TIMEOUT, DEVELOPMENT_CONTRACT_VERSION
 from raiden.transfer import architecture, views, channel
 from raiden.transfer.events import (
@@ -231,7 +231,7 @@ class RaidenAPI:
         token_address: TokenAddress,
         creator_address: Address,
         partner_address: Address,
-        channel_id_to_check: ChannelID= None
+        channel_id_to_check: ChannelID = None
     ) -> NettingChannelState:
         if not is_binary_address(token_address):
             raise InvalidAddress("Expected binary address format for token in get_channel")
@@ -242,7 +242,8 @@ class RaidenAPI:
         if not is_binary_address(partner_address):
             raise InvalidAddress("Expected binary address format for partner in get_channel")
 
-        channel_list = self.get_channel_list(registry_address, token_address, creator_address, partner_address, channel_id_to_check)
+        channel_list = self.get_channel_list(registry_address, token_address, creator_address, partner_address,
+                                             channel_id_to_check)
         assert len(channel_list) <= 1
 
         if not channel_list:
@@ -958,6 +959,15 @@ class RaidenAPI:
             token_address=token_address,
         )
 
+    def get_token_address_for_token_network_address(
+        self, registry_address: PaymentNetworkID, token_network: TokenNetworkID
+    ) -> Optional[TokenAddress]:
+        return views.get_token_address_by_token_network_identifier(
+            chain_state=views.state_from_raiden(self.raiden),
+            payment_network_id=registry_address,
+            token_network=token_network,
+        )
+
     def transfer_and_wait(
         self,
         registry_address: PaymentNetworkID,
@@ -1130,13 +1140,20 @@ class RaidenAPI:
         self.raiden.initiate_send_secret_reveal_light(sender_address, receiver_address, reveal_secret)
 
     def initiate_send_balance_proof(self, sender_address: typing.Address, receiver_address: typing.Address,
-                                          unlock: Unlock):
+                                    unlock: Unlock):
         self.raiden.initiate_send_balance_proof(sender_address, receiver_address, unlock)
 
     def initiate_send_delivered_light(self, sender_address: typing.Address, receiver_address: typing.Address,
                                       delivered: Delivered, msg_order: int, payment_id: int):
         self.raiden.initiate_send_delivered_light(sender_address, receiver_address, delivered, msg_order, payment_id)
 
+    def initiate_send_processed_light(self, sender_address: typing.Address, receiver_address: typing.Address,
+                                      processed: Processed, msg_order: int, payment_id: int):
+        self.raiden.initiate_send_processed_light(sender_address, receiver_address, processed, msg_order, payment_id)
+
+    def initiate_send_secret_request_light(self, sender_address: typing.Address, receiver_address: typing.Address,
+                                           secret_request: SecretRequest, msg_order: int, payment_id: int):
+        self.raiden.initiate_send_secret_request_light(sender_address, receiver_address, secret_request)
 
     def get_raiden_events_payment_history_with_timestamps_v2(
         self,
@@ -1617,15 +1634,15 @@ class RaidenAPI:
 
         light_client = self.raiden.wal.storage.get_light_client(address)
 
+        pubhex = self.raiden.config["pubkey"].hex()
+        encrypt_signed_password = encrypt(pubhex, signed_password.encode())
+        encrypt_signed_display_name = encrypt(pubhex, signed_display_name.encode())
+        encrypt_signed_seed_retry = encrypt(pubhex, signed_seed_retry.encode())
+
         if light_client is None:
 
             api_key = hexlify(os.urandom(20))
             api_key = api_key.decode("utf-8")
-
-            pubhex = self.raiden.config["pubkey"].hex()
-            encrypt_signed_password = encrypt(pubhex, signed_password.encode())
-            encrypt_signed_display_name = encrypt(pubhex, signed_display_name.encode())
-            encrypt_signed_seed_retry = encrypt(pubhex, signed_seed_retry.encode())
 
             result = self.raiden.wal.storage.save_light_client(
                 api_key=api_key,
@@ -1646,7 +1663,12 @@ class RaidenAPI:
                 result = {"message": "An unexpected error has occurred.",
                           "result_code": 1}
         else:
-            result = {"message": "The client you are trying to register has already registered.",
+            result = {"address": address,
+                      "encrypt_signed_password": encrypt_signed_password.hex(),
+                      "encrypt_signed_display_name": encrypt_signed_display_name.hex(),
+                      "api_key": light_client['api_key'],
+                      "encrypt_signed_seed_retry": encrypt_signed_seed_retry.hex(),
+                      "message": "Already registered",
                       "result_code": 2}
 
         return result
@@ -1680,9 +1702,8 @@ class RaidenAPI:
                 lt_autogenerated_values.message_identifier,
                 lt_autogenerated_values.payment_identifier,
                 EMPTY_PAYMENT_HASH_INVOICE,
-                BlockExpiration(1624776),
+                lt_autogenerated_values.lock_expiration,
                 secrethash)
-
 
             # Get the LockedTransfer message
             locked_transfer = LockedTransfer.from_event(locked_transfer)
@@ -1696,8 +1717,8 @@ class RaidenAPI:
                                          locked_transfer.payment_identifier)
             # Persist the light_client_protocol_message associated
             order = 1
-            payment_row_id = LightClientMessageHandler.store_light_client_payment(payment, self.raiden.wal)
-            light_client_message_id = LightClientMessageHandler.store_light_client_protocol_message(
+            LightClientMessageHandler.store_light_client_payment(payment, self.raiden.wal.storage)
+            LightClientMessageHandler.store_light_client_protocol_message(
                 locked_transfer.message_identifier,
                 locked_transfer,
                 False,
@@ -1709,4 +1730,3 @@ class RaidenAPI:
             return HubMessage(payment.payment_id, order, locked_transfer)
         else:
             raise ChannelNotFound("Channel with given partner address doesnt exists")
-

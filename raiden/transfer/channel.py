@@ -2,7 +2,7 @@
 import heapq
 import random
 
-from eth_utils import encode_hex
+from eth_utils import encode_hex, decode_hex
 
 from raiden.constants import (
     EMPTY_HASH_KECCAK,
@@ -25,7 +25,7 @@ from raiden.transfer.events import (
     EventInvalidReceivedTransferRefund,
     EventInvalidReceivedUnlock,
     SendProcessed,
-)
+    ContractSendChannelUpdateTransferLight)
 from raiden.transfer.identifiers import CanonicalIdentifier
 from raiden.transfer.mediated_transfer.events import (
     CHANNEL_IDENTIFIER_GLOBAL_QUEUE,
@@ -34,7 +34,7 @@ from raiden.transfer.mediated_transfer.events import (
     SendLockExpired,
     SendRefundTransfer,
     refund_from_sendmediated,
-    SendBalanceProofLight)
+    SendBalanceProofLight, StoreMessageEvent)
 from raiden.transfer.mediated_transfer.state import (
     LockedTransferSignedState,
     LockedTransferUnsignedState,
@@ -64,7 +64,7 @@ from raiden.transfer.state import (
     UnlockPartialProofState,
     make_empty_merkle_tree,
     message_identifier_from_prng,
-)
+    balanceproof_from_envelope)
 from raiden.transfer.state_change import (
     ActionChannelClose,
     ActionChannelSetFee,
@@ -75,7 +75,7 @@ from raiden.transfer.state_change import (
     ContractReceiveChannelSettled,
     ContractReceiveUpdateTransfer,
     ReceiveUnlock,
-)
+    ContractReceiveChannelClosedLight)
 from raiden.transfer.utils import hash_balance_data
 from raiden.utils import pex
 from raiden.utils.signer import recover
@@ -112,7 +112,7 @@ from raiden.utils.typing import (
     Tuple,
     Union,
     cast,
-)
+    Signature)
 
 from raiden.billing.invoices.handlers.invoice_handler import handle_received_invoice
 
@@ -1658,6 +1658,41 @@ def handle_receive_lockedtransfer(
     return is_valid, events, msg, handle_invoice_result
 
 
+def handle_receive_lockedtransfer_light(
+    channel_state: NettingChannelState, mediated_transfer: LockedTransferSignedState, storage
+) -> EventsOrError:
+    """Register the latest known transfer.
+
+    The receiver needs to use this method to update the container with a
+    _valid_ transfer, otherwise the locksroot will not contain the pending
+    transfer. The receiver needs to ensure that the merkle root has the
+    secrethash included, otherwise it won't be able to claim it.
+    """
+    events: List[Event]
+    is_valid, msg, merkletree, handle_invoice_result = is_valid_lockedtransfer(
+        mediated_transfer, channel_state, channel_state.partner_state, channel_state.our_state, storage
+    )
+
+    if is_valid:
+        assert merkletree, "is_valid_lock_expired should return merkletree if valid"
+        channel_state.partner_state.balance_proof = mediated_transfer.balance_proof
+        channel_state.partner_state.merkletree = merkletree
+
+        lock = mediated_transfer.lock
+        channel_state.partner_state.secrethashes_to_lockedlocks[lock.secrethash] = lock
+        events = []
+
+
+    else:
+        assert msg, "is_valid_lock_expired should return error msg if not valid"
+        invalid_locked = EventInvalidReceivedLockedTransfer(
+            payment_identifier=mediated_transfer.payment_identifier, reason=msg
+        )
+        events = [invalid_locked]
+
+    return is_valid, events, msg, handle_invoice_result
+
+
 def handle_receive_refundtransfercancelroute(
     channel_state: NettingChannelState, refund_transfer: LockedTransferSignedState
 ) -> EventsOrError:
@@ -1690,6 +1725,26 @@ def handle_unlock(channel_state: NettingChannelState, unlock: ReceiveUnlock) -> 
     return is_valid, events, msg
 
 
+def handle_unlock_light(channel_state: NettingChannelState, unlock: ReceiveUnlock) -> EventsOrError:
+    is_valid, msg, unlocked_merkletree = is_valid_unlock(
+        unlock, channel_state, channel_state.partner_state
+    )
+
+    if is_valid:
+        assert unlocked_merkletree, "is_valid_unlock should return merkletree if valid"
+        channel_state.partner_state.balance_proof = unlock.balance_proof
+        channel_state.partner_state.merkletree = unlocked_merkletree
+
+        _del_lock(channel_state.partner_state, unlock.secrethash)
+        events: List[Event] = []
+    else:
+        assert msg, "is_valid_unlock should return error msg if not valid"
+        invalid_unlock = EventInvalidReceivedUnlock(secrethash=unlock.secrethash, reason=msg)
+        events = [invalid_unlock]
+
+    return is_valid, events, msg
+
+
 def handle_block(
     channel_state: NettingChannelState, state_change: Block, block_number: BlockNumber
 ) -> TransitionResult[NettingChannelState]:
@@ -1713,6 +1768,7 @@ def handle_block(
             event = ContractSendChannelSettle(
                 canonical_identifier=channel_state.canonical_identifier,
                 triggered_by_block_hash=state_change.block_hash,
+                channel_state= channel_state
             )
             events.append(event)
 
@@ -1727,7 +1783,6 @@ def handle_channel_closed(
     channel_state: NettingChannelState, state_change: ContractReceiveChannelClosed
 ) -> TransitionResult[NettingChannelState]:
     events: List[Event] = list()
-
     just_closed = (
         state_change.channel_identifier == channel_state.identifier
         and get_status(channel_state) in CHANNEL_STATES_PRIOR_TO_CLOSED
@@ -1760,6 +1815,50 @@ def handle_channel_closed(
             )
             events.append(update)
 
+    return TransitionResult(channel_state, events)
+
+
+def handle_channel_closed_light(
+    channel_state: NettingChannelState, state_change: ContractReceiveChannelClosedLight
+) -> TransitionResult[NettingChannelState]:
+    events: List[Event] = list()
+    just_closed = (
+        state_change.channel_identifier == channel_state.identifier
+        and get_status(channel_state) in CHANNEL_STATES_PRIOR_TO_CLOSED
+    )
+
+    if just_closed:
+        set_closed(channel_state, state_change.block_number)
+
+        balance_proof = None
+        if state_change.latest_update_non_closing_balance_proof_data is not None:
+            balance_proof_msg = state_change.latest_update_non_closing_balance_proof_data.light_client_balance_proof
+            balance_proof = balanceproof_from_envelope(balance_proof_msg)
+
+        call_update = (
+            state_change.transaction_from != channel_state.our_state.address
+            and balance_proof is not None
+            and channel_state.update_transaction is None
+        )
+        if call_update:
+            expiration = BlockExpiration(state_change.block_number + channel_state.settle_timeout)
+            # silence mypy: partner's balance proof is always signed
+            assert isinstance(balance_proof, BalanceProofSignedState)
+            # The channel was closed by our partner, if there is a balance
+            # proof available update this node half of the state
+            update = ContractSendChannelUpdateTransferLight(
+                lc_address=state_change.light_client_address,
+                expiration=expiration,
+                balance_proof=balance_proof,
+                triggered_by_block_hash=state_change.block_hash,
+                lc_bp_signature=state_change.latest_update_non_closing_balance_proof_data.lc_balance_proof_signature
+            )
+            channel_state.update_transaction = TransactionExecutionStatus(
+                started_block_number=state_change.block_number,
+                finished_block_number=None,
+                result=None,
+            )
+            events.append(update)
     return TransitionResult(channel_state, events)
 
 
@@ -1897,6 +1996,9 @@ def state_transition(
     elif type(state_change) == ContractReceiveChannelClosed:
         assert isinstance(state_change, ContractReceiveChannelClosed), MYPY_ANNOTATION
         iteration = handle_channel_closed(channel_state, state_change)
+    elif type(state_change) == ContractReceiveChannelClosedLight:
+        assert isinstance(state_change, ContractReceiveChannelClosedLight), MYPY_ANNOTATION
+        iteration = handle_channel_closed_light(channel_state, state_change)
     elif type(state_change) == ContractReceiveUpdateTransfer:
         assert isinstance(state_change, ContractReceiveUpdateTransfer), MYPY_ANNOTATION
         iteration = handle_channel_updated_transfer(channel_state, state_change, block_number)

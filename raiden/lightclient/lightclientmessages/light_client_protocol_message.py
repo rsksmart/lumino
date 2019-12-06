@@ -13,7 +13,8 @@ class LightClientProtocolMessage:
         light_client_payment_id: int,
         identifier: string,
         unsigned_message: Message = None,
-        signed_message: Message = None
+        signed_message: Message = None,
+        internal_msg_identifier: int = None
     ):
         self.identifier = int(identifier)
         self.is_signed = is_signed
@@ -21,6 +22,7 @@ class LightClientProtocolMessage:
         self.unsigned_message = unsigned_message
         self.signed_message = signed_message
         self.light_client_payment_id = light_client_payment_id
+        self.internal_msg_identifier = internal_msg_identifier
 
     def to_dict(self):
         signed_msg_dict = None
@@ -36,7 +38,8 @@ class LightClientProtocolMessage:
             "message_order": self.message_order,
             "unsigned_message": unsigned_msg_dict,
             "signed_message": signed_msg_dict,
-            "light_client_payment_id": self.light_client_payment_id
+            "light_client_payment_id": self.light_client_payment_id,
+            "internal_msg_identifer": self.internal_msg_identifier
         }
 
         return result

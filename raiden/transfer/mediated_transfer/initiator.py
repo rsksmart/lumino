@@ -133,7 +133,7 @@ def handle_block(
     )
 
     events: List[Event] = list()
-    # FIXME mmartinez7
+    # FIXME expiration mmartinez7
     lock_has_expired = False
     if lock_has_expired and initiator_state.transfer_state != "transfer_expired":
         is_channel_open = channel.get_status(channel_state) == CHANNEL_STATE_OPENED

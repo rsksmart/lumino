@@ -3,6 +3,7 @@ from eth_utils.typing import ChecksumAddress
 from raiden.lightclient.lightclientmessages.light_client_payment import LightClientPayment
 from raiden.lightclient.lightclientmessages.light_client_protocol_message import DbLightClientProtocolMessage, \
     LightClientProtocolMessage
+from raiden.storage.sqlite import SerializedSQLiteStorage
 from raiden.storage.wal import WriteAheadLog
 from .client_model import ClientModel, ClientType
 from raiden.utils.typing import List, Optional
@@ -45,8 +46,10 @@ class LightClientService:
             unsigned_msg = message[3]
             signed_msg = message[4]
             identifier = message[5]
+            internal_identifier = message[6]
             result.append(
-                LightClientProtocolMessage(signed, order, payment_id, identifier, unsigned_msg, signed_msg))
+                LightClientProtocolMessage(signed, order, payment_id, identifier, unsigned_msg, signed_msg,
+                                           internal_identifier))
         return result
 
     @classmethod
@@ -54,8 +57,8 @@ class LightClientService:
         return message.message_order >= msg_order
 
     @classmethod
-    def get_light_client_payment(cls, payment_id, wal: WriteAheadLog):
-        payment = wal.storage.get_light_client_payment(payment_id)
+    def get_light_client_payment(cls, payment_id, storage: SerializedSQLiteStorage):
+        payment = storage.get_light_client_payment(payment_id)
         if payment:
             payment = LightClientPayment(payment[1], payment[2], payment[3], payment[4], payment[5],
                                          payment[6], payment[7], payment[0])
@@ -77,4 +80,3 @@ class LightClientService:
                 if type(message_order) is not int:
                     return False
         return True
-

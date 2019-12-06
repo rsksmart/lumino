@@ -35,7 +35,7 @@ from raiden.transfer.mediated_transfer.state_change import (
     ReceiveTransferRefund,
     ReceiveTransferRefundCancelRoute,
     ActionInitInitiatorLight, ReceiveSecretRequestLight, ActionSendSecretRevealLight, ReceiveSecretRevealLight,
-    ActionSendUnlockLight)
+    ActionSendUnlockLight, ActionInitTargetLight, ActionSendSecretRequestLight)
 from raiden.transfer.state import (
     ChainState,
     InitiatorTask,
@@ -69,7 +69,7 @@ from raiden.transfer.state_change import (
     ReceiveDelivered,
     ReceiveProcessed,
     ReceiveUnlock,
-)
+    ReceiveUnlockLight, ContractReceiveChannelClosedLight)
 from raiden.utils import sha3
 from raiden.utils.typing import (
     MYPY_ANNOTATION,
@@ -85,7 +85,7 @@ from raiden.utils.typing import (
     TokenNetworkID,
     Tuple,
     Union,
-    Address)
+    Address, AddressHex)
 
 from eth_utils import to_canonical_address, keccak, decode_hex
 
@@ -245,7 +245,7 @@ def subdispatch_to_paymenttask(
             )
 
             if token_network_state:
-                channelids_to_channels = token_network_state.channelidentifiers_to_channels
+                channelids_to_channels = token_network_state.channelidentifiers_to_channels.get(chain_state.our_address)
                 sub_iteration = mediator.state_transition(
                     mediator_state=sub_task.mediator_state,
                     state_change=state_change,
@@ -271,7 +271,7 @@ def subdispatch_to_paymenttask(
                     token_network_address=token_network_identifier,
                     channel_identifier=channel_identifier,
                 ),
-                address=chain_state.our_address
+                address=sub_task.target_state.transfer.target
             )
 
             if channel_state:
@@ -388,7 +388,7 @@ def subdispatch_mediatortask(
             iteration = mediator.state_transition(
                 mediator_state=mediator_state,
                 state_change=state_change,
-                channelidentifiers_to_channels=token_network_state.channelidentifiers_to_channels,
+                channelidentifiers_to_channels=token_network_state.channelidentifiers_to_channels.get(chain_state.our_address),
                 nodeaddresses_to_networkstates=chain_state.nodeaddresses_to_networkstates,
                 pseudo_random_generator=pseudo_random_generator,
                 block_number=block_number,
@@ -411,6 +411,7 @@ def subdispatch_targettask(
     token_network_identifier: TokenNetworkID,
     channel_identifier: ChannelID,
     secrethash: SecretHash,
+    initiator: AddressHex,
     storage
 ) -> TransitionResult[ChainState]:
     block_number = chain_state.block_number
@@ -436,7 +437,7 @@ def subdispatch_targettask(
                 token_network_address=token_network_identifier,
                 channel_identifier=channel_identifier,
             ),
-            address=chain_state.our_address
+            address=initiator
         )
 
     if channel_state:
@@ -576,6 +577,7 @@ def handle_token_network_action(
             block_hash=chain_state.block_hash,
         )
 
+        # TODO marcosmartinez7 take a look at this
         # Investigate behavior of this @GASPAR MEDINA
         # assert iteration.new_state, "No token network state transition leads to None"
 
@@ -587,7 +589,7 @@ def handle_token_network_action(
 
 
 def handle_contract_receive_channel_closed(
-    chain_state: ChainState, state_change: ContractReceiveChannelClosed
+    chain_state: ChainState, state_change: ContractReceiveChannelClosed, our_side_address: AddressHex
 ) -> TransitionResult[ChainState]:
     # cleanup queue for channel
     channel_state = views.get_channelstate_by_canonical_identifier_and_address(
@@ -598,7 +600,7 @@ def handle_contract_receive_channel_closed(
             channel_identifier=state_change.channel_identifier,
         ),
 
-        address=chain_state.our_address
+        address=our_side_address
     )
     if channel_state:
         queue_id = QueueIdentifier(
@@ -739,6 +741,14 @@ def handle_init_reveal_secret_light(
     return subdispatch_to_paymenttask(chain_state, state_change, secrethash)
 
 
+def handle_init_secret_request_light(
+    chain_state: ChainState, state_change: ActionSendSecretRequestLight
+) -> TransitionResult[ChainState]:
+    secret_request = state_change.secret_request
+    secrethash = secret_request.secrethash
+    return subdispatch_to_paymenttask(chain_state, state_change, secrethash)
+
+
 def handle_init_mediator(
     chain_state: ChainState, state_change: ActionInitMediator
 ) -> TransitionResult[ChainState]:
@@ -752,7 +762,7 @@ def handle_init_mediator(
 
 
 def handle_init_target(
-    chain_state: ChainState, state_change: ActionInitTarget, storage
+    chain_state: ChainState, state_change: ActionInitTarget, storage, initiator: Address
 ) -> TransitionResult[ChainState]:
     transfer = state_change.transfer
     secrethash = transfer.lock.secrethash
@@ -765,6 +775,7 @@ def handle_init_target(
         TokenNetworkID(token_network_identifier),
         channel_identifier,
         secrethash,
+        initiator,
         storage
     )
 
@@ -818,6 +829,12 @@ def handle_processed(
 
 def handle_receive_unlock(
     chain_state: ChainState, state_change: ReceiveUnlock
+) -> TransitionResult[ChainState]:
+    secrethash = state_change.secrethash
+    return subdispatch_to_paymenttask(chain_state, state_change, secrethash)
+
+def handle_receive_unlock_light(
+    chain_state: ChainState, state_change: ReceiveUnlockLight
 ) -> TransitionResult[ChainState]:
     secrethash = state_change.secrethash
     return subdispatch_to_paymenttask(chain_state, state_change, secrethash)
@@ -891,7 +908,10 @@ def handle_state_change(
         iteration = handle_init_mediator(chain_state, state_change)
     elif type(state_change) == ActionInitTarget:
         assert isinstance(state_change, ActionInitTarget), MYPY_ANNOTATION
-        iteration = handle_init_target(chain_state, state_change, storage)
+        iteration = handle_init_target(chain_state, state_change, storage, chain_state.our_address)
+    elif type(state_change) == ActionInitTargetLight:
+        assert isinstance(state_change, ActionInitTargetLight), MYPY_ANNOTATION
+        iteration = handle_init_target(chain_state, state_change, storage, state_change.transfer.initiator)
     elif type(state_change) == ActionUpdateTransportAuthData:
         assert isinstance(state_change, ActionUpdateTransportAuthData), MYPY_ANNOTATION
         iteration = handle_update_transport_authdata(chain_state, state_change)
@@ -909,7 +929,10 @@ def handle_state_change(
         iteration = handle_token_network_action(chain_state, state_change)
     elif type(state_change) == ContractReceiveChannelClosed:
         assert isinstance(state_change, ContractReceiveChannelClosed), MYPY_ANNOTATION
-        iteration = handle_contract_receive_channel_closed(chain_state, state_change)
+        iteration = handle_contract_receive_channel_closed(chain_state, state_change, chain_state.our_address)
+    elif type(state_change) == ContractReceiveChannelClosedLight:
+        assert isinstance(state_change, ContractReceiveChannelClosedLight), MYPY_ANNOTATION
+        iteration = handle_contract_receive_channel_closed(chain_state, state_change, state_change.light_client_address)
     elif type(state_change) == ContractReceiveChannelNewBalance:
         assert isinstance(state_change, ContractReceiveChannelNewBalance), MYPY_ANNOTATION
         iteration = handle_token_network_action(chain_state, state_change)
@@ -952,6 +975,9 @@ def handle_state_change(
     elif type(state_change) == ReceiveUnlock:
         assert isinstance(state_change, ReceiveUnlock), MYPY_ANNOTATION
         iteration = handle_receive_unlock(chain_state, state_change)
+    elif type(state_change) == ReceiveUnlockLight:
+        assert isinstance(state_change, ReceiveUnlockLight), MYPY_ANNOTATION
+        iteration = handle_receive_unlock_light(chain_state, state_change)
     elif type(state_change) == ReceiveLockExpired:
         assert isinstance(state_change, ReceiveLockExpired), MYPY_ANNOTATION
         iteration = handle_receive_lock_expired(chain_state, state_change)
@@ -959,6 +985,8 @@ def handle_state_change(
         iteration = handle_init_initiator_light(chain_state, state_change)
     elif type(state_change) == ActionSendSecretRevealLight:
         iteration = handle_init_reveal_secret_light(chain_state, state_change)
+    elif type(state_change) == ActionSendSecretRequestLight:
+        iteration = handle_init_secret_request_light(chain_state, state_change)
     elif type(state_change) == ReceiveSecretRevealLight:
         assert isinstance(state_change, ReceiveSecretRevealLight), MYPY_ANNOTATION
         iteration = handle_secret_reveal_light(chain_state, state_change)

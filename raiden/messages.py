@@ -1564,7 +1564,7 @@ class SignedBlindedBalanceProof:
         additional_hash: AdditionalHash,
         chain_id: ChainID,
         signature: Signature,
-        balance_hash: BalanceHash,
+        balance_hash: BalanceHash
     ):
         if not signature:
             raise ValueError("balance proof is not signed")

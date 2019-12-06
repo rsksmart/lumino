@@ -109,7 +109,8 @@ class ActionInitInitiatorLight(StateChange):
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "ActionInitInitiatorLight":
-        return cls(transfer_description=data["transfer"], routes=data["routes"], signed_locked_transfer=data["signed_locked_transfer"])
+        return cls(transfer_description=data["transfer"], routes=data["routes"],
+                   signed_locked_transfer=data["signed_locked_transfer"])
 
 
 class ActionInitMediator(BalanceProofStateChange):
@@ -214,6 +215,55 @@ class ActionInitTarget(BalanceProofStateChange):
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "ActionInitTarget":
         return cls(route=data["route"], transfer=data["transfer"])
+
+
+class ActionInitTargetLight(BalanceProofStateChange):
+    """ Initial state for a new target that is a handled light client.
+
+    Args:
+        route: The payee route.
+        transfer: The payee transfer.
+    """
+
+    def __init__(self, route: RouteState, transfer: LockedTransferSignedState,
+                 signed_lockedtransfer: LockedTransfer) -> None:
+        if not isinstance(route, RouteState):
+            raise ValueError("route must be a RouteState instance")
+
+        if not isinstance(transfer, LockedTransferSignedState):
+            raise ValueError("transfer must be a LockedTransferSignedState instance")
+
+        super().__init__(transfer.balance_proof)
+        self.route = route
+        self.transfer = transfer
+        self.signed_lockedtransfer = signed_lockedtransfer
+
+    def __repr__(self) -> str:
+        return "<ActionInitTargetLight route:{} transfer:{} signed_lockedtransfer:{}>".format(self.route, self.transfer,
+                                                                                              self.signed_lockedtransfer)
+
+    def __eq__(self, other: Any) -> bool:
+        return (
+            isinstance(other, ActionInitTargetLight)
+            and self.route == other.route
+            and self.transfer == other.transfer
+            and self.signed_lockedtransfer == other.signed_lockedtransfer
+        )
+
+    def __ne__(self, other: Any) -> bool:
+        return not self.__eq__(other)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "route": self.route,
+            "transfer": self.transfer,
+            "balance_proof": self.balance_proof,
+            "signed_lockedtransfer": self.signed_lockedtransfer
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "ActionInitTargetLight":
+        return cls(route=data["route"], transfer=data["transfer"], signed_lockedtransfer=data["signed_lockedtransfer"])
 
 
 class ReceiveLockExpired(BalanceProofStateChange):
@@ -385,7 +435,6 @@ class ReceiveSecretRequestLight(AuthenticatedSenderStateChange):
         return instance
 
 
-
 class ReceiveSecretReveal(AuthenticatedSenderStateChange):
     """ A SecretReveal message received. """
 
@@ -473,6 +522,7 @@ class ReceiveSecretRevealLight(AuthenticatedSenderStateChange):
         )
         instance.secrethash = deserialize_bytes(data["secrethash"])
         return instance
+
 
 class ReceiveTransferRefundCancelRoute(BalanceProofStateChange):
     """ A RefundTransfer message received by the initiator will cancel the current
@@ -571,7 +621,7 @@ class ReceiveTransferRefund(BalanceProofStateChange):
 
 
 class ActionSendSecretRevealLight(AuthenticatedSenderStateChange):
-    """ A SecretReveal message must be sent to a light client. """
+    """ A SecretReveal message must be sent from a light client. """
 
     def __init__(self, reveal_secret: RevealSecret, sender: Address, receiver: Address) -> None:
         super().__init__(sender)
@@ -595,7 +645,7 @@ class ActionSendSecretRevealLight(AuthenticatedSenderStateChange):
 
     def to_dict(self) -> Dict[str, Any]:
         return {
-            "reveal_secret": self.reveal_secret.to_dict(),
+            "reveal_secret": self.reveal_secret,
             "sender": to_checksum_address(self.sender),
             "receiver": to_checksum_address(self.receiver)
         }
@@ -603,7 +653,47 @@ class ActionSendSecretRevealLight(AuthenticatedSenderStateChange):
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "ActionSendSecretRevealLight":
         instance = cls(
-            reveal_secret=RevealSecret(data["reveal_secret"]),
+            reveal_secret=data["reveal_secret"],
+            sender=to_canonical_address(data["sender"]),
+            receiver=to_canonical_address(data["receiver"])
+        )
+        return instance
+
+
+class ActionSendSecretRequestLight(AuthenticatedSenderStateChange):
+    """ A SecretRequest message must be sent from a  light client. """
+
+    def __init__(self, secret_request: SecretRequest, sender: Address, receiver: Address) -> None:
+        super().__init__(sender)
+        self.receiver = receiver
+        self.secret_request = secret_request
+
+    def __repr__(self) -> str:
+        return "<ActionSendSecretRequestLight reveal_secret:{} sender:{}>".format(
+            pex(self.secret_request.__repr__()), pex(self.sender)
+        )
+
+    def __eq__(self, other: Any) -> bool:
+        return (
+            isinstance(other, ActionSendSecretRequestLight)
+            and self.secret_request.__eq__(other.secret_request)
+            and super().__eq__(other)
+        )
+
+    def __ne__(self, other: Any) -> bool:
+        return not self.__eq__(other)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "secret_request": self.secret_request.to_dict(),
+            "sender": to_checksum_address(self.sender),
+            "receiver": to_checksum_address(self.receiver)
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "ActionSendSecretRequestLight":
+        instance = cls(
+            secret_request=SecretRequest.from_dict(data["secret_request"]),
             sender=to_canonical_address(data["sender"]),
             receiver=to_canonical_address(data["receiver"])
         )

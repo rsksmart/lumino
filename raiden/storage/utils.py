@@ -122,10 +122,25 @@ CREATE TABLE IF NOT EXISTS light_client_protocol_message (
     );
 """
 
+DB_CREATE_LIGHT_CLIENT_BALANCE_PROOF = """
+CREATE TABLE IF NOT EXISTS light_client_balance_proof (
+    internal_bp_identifier INTEGER PRIMARY KEY AUTOINCREMENT,
+    sender TEXT,
+    light_client_payment_id TEXT,
+    secret_hash TEXT,
+    nonce INTEGER,
+    channel_id INTEGER,
+    token_network_address TEXT,
+    balance_proof JSON,
+    lc_balance_proof_signature TEXT,
+    FOREIGN KEY(light_client_payment_id) REFERENCES light_client_payment(payment_id)
+    );
+"""
+
 DB_SCRIPT_CREATE_TABLES = """
 PRAGMA foreign_keys=off;
 BEGIN TRANSACTION;
-{}{}{}{}{}{}{}{}{}{}{}
+{}{}{}{}{}{}{}{}{}{}{}{}
 COMMIT;
 PRAGMA foreign_keys=on;
 """.format(
@@ -139,7 +154,8 @@ PRAGMA foreign_keys=on;
     DB_CREATE_INVOICES_PAYMENTS,
     DB_CREATE_CLIENT,
     DB_CREATE_LIGHT_CLIENT_PAYMENT,
-    DB_CREATE_LIGHT_CLIENT_PROTOCOL_MESSAGE
+    DB_CREATE_LIGHT_CLIENT_PROTOCOL_MESSAGE,
+    DB_CREATE_LIGHT_CLIENT_BALANCE_PROOF
 )
 
 DB_STATE_EVENT_ADD_CLIENT_FK = """

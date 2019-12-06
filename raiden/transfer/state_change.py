@@ -3,6 +3,9 @@ from random import Random
 
 from eth_utils import to_canonical_address, to_checksum_address
 
+from raiden.lightclient.lightclientmessages.light_client_non_closing_balance_proof import \
+    LightClientNonClosingBalanceProof
+from raiden.messages import Unlock
 from raiden.transfer.architecture import (
     AuthenticatedSenderStateChange,
     BalanceProofStateChange,
@@ -432,6 +435,89 @@ class ContractReceiveChannelClosed(ContractReceiveStateChange):
         )
 
 
+class ContractReceiveChannelClosedLight(ContractReceiveStateChange):
+    """ A channel to which a handled light client participant was closed. """
+
+    def __init__(
+        self,
+        transaction_hash: TransactionHash,
+        transaction_from: Address,
+        canonical_identifier: CanonicalIdentifier,
+        block_number: BlockNumber,
+        block_hash: BlockHash,
+        light_client_address: Address,
+        latest_update_non_closing_balance_proof_data: LightClientNonClosingBalanceProof
+    ) -> None:
+        super().__init__(transaction_hash, block_number, block_hash)
+
+        self.transaction_from = transaction_from
+        self.canonical_identifier = canonical_identifier
+        self.light_client_address = light_client_address
+        self.latest_update_non_closing_balance_proof_data = latest_update_non_closing_balance_proof_data
+
+    @property
+    def channel_identifier(self) -> ChannelID:
+        return self.canonical_identifier.channel_identifier
+
+    @property
+    def token_network_identifier(self) -> TokenNetworkAddress:
+        return TokenNetworkAddress(self.canonical_identifier.token_network_address)
+
+    def __repr__(self) -> str:
+        return (
+            "<ContractReceiveChannelClosedLight"
+            " token_network:{} channel:{} closer:{} light_client:{} closed_at:{}"
+            ">"
+        ).format(
+            pex(self.token_network_identifier),
+            self.channel_identifier,
+            pex(self.transaction_from),
+            pex(self.light_client_address),
+            self.block_number,
+        )
+
+    def __eq__(self, other: Any) -> bool:
+        return (
+            isinstance(other, ContractReceiveChannelClosedLight)
+            and self.transaction_from == other.transaction_from
+            and self.canonical_identifier == other.canonical_identifier
+            and self.light_client_address == other.light_client_address
+            and super().__eq__(other)
+        )
+
+    def __ne__(self, other: Any) -> bool:
+        return not self.__eq__(other)
+
+    def to_dict(self) -> Dict[str, Any]:
+        latest_update_non_closing_balance_proof_data = None
+        if self.latest_update_non_closing_balance_proof_data is not None:
+            latest_update_non_closing_balance_proof_data = self.latest_update_non_closing_balance_proof_data.to_dict()
+        return {
+            "transaction_hash": serialize_bytes(self.transaction_hash),
+            "transaction_from": to_checksum_address(self.transaction_from),
+            "canonical_identifier": self.canonical_identifier.to_dict(),
+            "block_number": str(self.block_number),
+            "block_hash": serialize_bytes(self.block_hash),
+            "light_client_address": to_checksum_address(self.light_client_address),
+            "latest_update_non_closing_balance_proof_data": latest_update_non_closing_balance_proof_data
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "ContractReceiveChannelClosedLight":
+        latest_update_non_closing_balance_proof_data = None
+        if data["latest_update_non_closing_balance_proof_data"] is not None:
+            latest_update_non_closing_balance_proof_data = LightClientNonClosingBalanceProof.from_dict(data["latest_update_non_closing_balance_proof_data"])
+        return cls(
+            transaction_hash=deserialize_transactionhash(data["transaction_hash"]),
+            transaction_from=to_canonical_address(data["transaction_from"]),
+            canonical_identifier=CanonicalIdentifier.from_dict(data["canonical_identifier"]),
+            block_number=BlockNumber(int(data["block_number"])),
+            block_hash=BlockHash(deserialize_bytes(data["block_hash"])),
+            light_client_address=to_canonical_address(data["light_client_address"]),
+            latest_update_non_closing_balance_proof_data=latest_update_non_closing_balance_proof_data
+        )
+
+
 class ActionInitChain(StateChange):
     def __init__(
         self,
@@ -659,7 +745,6 @@ class ContractReceiveChannelSettled(ContractReceiveStateChange):
         return not self.__eq__(other)
 
     def to_dict(self) -> Dict[str, Any]:
-
         return {
             "transaction_hash": serialize_bytes(self.transaction_hash),
             "our_onchain_locksroot": serialize_bytes(self.our_onchain_locksroot),
@@ -667,12 +752,11 @@ class ContractReceiveChannelSettled(ContractReceiveStateChange):
             "canonical_identifier": self.canonical_identifier.to_dict(),
             "block_number": str(self.block_number),
             "block_hash": serialize_bytes(self.block_hash),
-            "participant1" : to_checksum_address(self.participant1)
+            "participant1": to_checksum_address(self.participant1)
         }
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "ContractReceiveChannelSettled":
-
         return cls(
             transaction_hash=deserialize_transactionhash(data["transaction_hash"]),
             canonical_identifier=CanonicalIdentifier.from_dict(data["canonical_identifier"]),
@@ -1208,6 +1292,58 @@ class ContractReceiveUpdateTransfer(ContractReceiveStateChange):
             nonce=Nonce(int(data["nonce"])),
             block_number=BlockNumber(int(data["block_number"])),
             block_hash=BlockHash(deserialize_bytes(data["block_hash"])),
+        )
+
+
+class ReceiveUnlockLight(BalanceProofStateChange):
+    def __init__(
+        self, message_identifier: MessageID, secret: Secret, balance_proof: BalanceProofSignedState,
+        signed_unlock: Unlock
+    ) -> None:
+        if not isinstance(balance_proof, BalanceProofSignedState):
+            raise ValueError("balance_proof must be an instance of BalanceProofSignedState")
+
+        super().__init__(balance_proof)
+
+        secrethash: SecretHash = SecretHash(sha3(secret))
+
+        self.message_identifier = message_identifier
+        self.secret = secret
+        self.secrethash = secrethash
+        self.signed_unlock = signed_unlock
+
+    def __repr__(self) -> str:
+        return "<ReceiveUnlockLight msgid:{} secrethash:{} balance_proof:{}>".format(
+            self.message_identifier, pex(self.secrethash), self.balance_proof
+        )
+
+    def __eq__(self, other: Any) -> bool:
+        return (
+            isinstance(other, ReceiveUnlockLight)
+            and self.message_identifier == other.message_identifier
+            and self.secret == other.secret
+            and self.secrethash == other.secrethash
+            and super().__eq__(other)
+        )
+
+    def __ne__(self, other: Any) -> bool:
+        return not self.__eq__(other)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "message_identifier": str(self.message_identifier),
+            "secret": serialize_bytes(self.secret),
+            "balance_proof": self.balance_proof,
+            "signed_unlock": self.signed_unlock
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "ReceiveUnlockLight":
+        return cls(
+            message_identifier=MessageID(int(data["message_identifier"])),
+            secret=deserialize_secret(data["secret"]),
+            balance_proof=data["balance_proof"],
+            signed_unlock=data["signed_unlock"]
         )
 
 
