@@ -163,6 +163,15 @@ def get_token_network_identifier_by_token_address(
 
     return token_network_id
 
+def get_token_address_by_token_network_identifier(
+    chain_state: ChainState, payment_network_id: PaymentNetworkID, token_network: TokenNetworkID
+) -> Optional[TokenAddress]:
+    token_address = get_token_address_by_token_network(
+        chain_state, payment_network_id, token_network
+    )
+
+    return token_address
+
 
 def get_token_network_identifiers(
     chain_state: ChainState, payment_network_id: PaymentNetworkID
@@ -218,6 +227,17 @@ def get_token_network_by_token_address(
 
         if token_network_id:
             return payment_network.tokenidentifiers_to_tokennetworks.get(token_network_id)
+
+    return None
+
+
+def get_token_address_by_token_network(
+    chain_state: ChainState, payment_network_id: PaymentNetworkID, token_network: TokenNetworkID
+) -> Optional[TokenAddress]:
+    payment_network = chain_state.identifiers_to_paymentnetworks.get(payment_network_id)
+
+    if payment_network is not None:
+        return payment_network.tokennetworks_to_tokenaddresses.get(token_network)
 
     return None
 
@@ -350,7 +370,6 @@ def get_channelstate_by_token_network_and_partner(
             channel_state = states[-1]
 
     return channel_state
-
 
 
 def get_channelstate_by_canonical_identifier_and_address(

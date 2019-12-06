@@ -959,6 +959,15 @@ class RaidenAPI:
             token_address=token_address,
         )
 
+    def get_token_address_for_token_network_address(
+        self, registry_address: PaymentNetworkID, token_network: TokenNetworkID
+    ) -> Optional[TokenAddress]:
+        return views.get_token_address_by_token_network_identifier(
+            chain_state=views.state_from_raiden(self.raiden),
+            payment_network_id=registry_address,
+            token_network=token_network,
+        )
+
     def transfer_and_wait(
         self,
         registry_address: PaymentNetworkID,
