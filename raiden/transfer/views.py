@@ -302,8 +302,7 @@ def get_channelstate_for(
 
             if channel is not None:
                 if channel.close_transaction is None or channel.close_transaction.result != 'success':
-                    channels.append(
-                        token_network.channelidentifiers_to_channels[address_to_get_channel_state][channel_id])
+                    channels.append(token_network.channelidentifiers_to_channels[address_to_get_channel_state][channel_id])
             channel = None
 
         states = filter_channels_by_status(channels, [CHANNEL_STATE_UNUSABLE])
@@ -342,8 +341,7 @@ def get_channelstate_for_close_channel(
 
                 if channel is not None:
                     if channel.close_transaction is not None and channel.close_transaction.result == 'success':
-                        channels.append(
-                            token_network.channelidentifiers_to_channels[address_to_get_channel_state][channel_id])
+                        channels.append(token_network.channelidentifiers_to_channels[address_to_get_channel_state][channel_id])
 
         states = filter_channels_by_status(channels, [CHANNEL_STATE_UNUSABLE])
         # If multiple channel states are found, return the last one.
@@ -405,7 +403,7 @@ def get_lc_address_by_channel_id_and_partner(token_network_state: TokenNetworkSt
         for channel_id in channel_ids:
             if channel_id == canonical_identifier.channel_identifier:
                 if len(token_network_state.network_graph.channel_identifier_to_participants) > 0 \
-                    and channel_id in token_network_state.network_graph.channel_identifier_to_participants:
+                        and channel_id in token_network_state.network_graph.channel_identifier_to_participants:
                     participants: Tuple[Address, Address] = \
                         token_network_state.network_graph.channel_identifier_to_participants[channel_id]
                 if participants is not None:
