@@ -138,6 +138,8 @@ def subdispatch_to_initiatortransfer(
     channelidentifiers_to_channels: ChannelMap,
     pseudo_random_generator: random.Random,
 ) -> TransitionResult[InitiatorTransferState]:
+    print("Block initiator manager subdispatch_to_all_initiatortransfer 1")
+
     channel_identifier = initiator_state.channel_identifier
     channel_state = channelidentifiers_to_channels[initiator_state.transfer_description.initiator].get(
         channel_identifier)
@@ -152,8 +154,6 @@ def subdispatch_to_initiatortransfer(
     )
 
     if sub_iteration.new_state is None:
-        print(state_change.__repr__())
-        print("Del 6")
         del payment_state.initiator_transfers[initiator_state.transfer.lock.secrethash]
 
     return sub_iteration
@@ -170,6 +170,7 @@ def subdispatch_to_all_initiatortransfer(
     will alter the `initiator_transfers` list and this is not
     allowed if iterating over the original list.
     """
+    print("Block initiator manager subdispatch_to_all_initiatortransfer")
     for secrethash in list(payment_state.initiator_transfers.keys()):
         initiator_state = payment_state.initiator_transfers[secrethash]
         sub_iteration = subdispatch_to_initiatortransfer(

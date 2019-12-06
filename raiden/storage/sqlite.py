@@ -193,7 +193,7 @@ class SQLiteStorage:
                  msg_dto.message_order,
                  msg_dto.unsigned_message,
                  msg_dto.signed_message,
-                 str(msg_dto.light_client_payment_id),
+                 str(msg_dto.light_client_payment_id) if msg_dto.light_client_payment_id else None
                  ),
             )
             last_id = cursor.lastrowid

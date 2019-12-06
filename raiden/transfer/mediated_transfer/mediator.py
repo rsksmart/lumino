@@ -114,8 +114,7 @@ def is_safe_to_wait(
         f" timeout must be larger than {reveal_timeout}, but it is {lock_timeout}."
         f" expiration: {lock_expiration} block_number: {block_number}"
     )
-    #FIXME expiration marcosmartinez7
-    return True, msg
+    return False, msg
 
 def is_channel_usable(
     candidate_channel_state: NettingChannelState,
