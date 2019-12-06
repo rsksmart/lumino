@@ -104,7 +104,7 @@ def is_safe_to_wait(
 
     lock_timeout = lock_expiration - block_number
 
-    # A node may wait for a new balance proof while there are reveal_timeout
+    # A node may wait for a new balance proof while there are reveal_tim
     # blocks left, at that block and onwards it is not safe to wait.
     if lock_timeout > reveal_timeout:
         return True, None
@@ -114,8 +114,7 @@ def is_safe_to_wait(
         f" timeout must be larger than {reveal_timeout}, but it is {lock_timeout}."
         f" expiration: {lock_expiration} block_number: {block_number}"
     )
-    #FIXME expiration marcosmartinez7
-    return True, msg
+    return False, msg
 
 def is_channel_usable(
     candidate_channel_state: NettingChannelState,
