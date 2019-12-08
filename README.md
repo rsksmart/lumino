@@ -6,8 +6,8 @@
 
 ## Install your own Lumino Node
 
-* [Install on Ubuntu](docs/0.0.3/install_ubuntu.md)
-* [Install on MacOS](docs/0.0.3/install_macos.md)
+* [Install on Ubuntu](docs/0.0.4/install_ubuntu.md)
+* [Install on MacOS](docs/0.0.4/install_macos.md)
 
 ## Lumino Contracts
 
@@ -21,7 +21,7 @@ The following are the addresses of the set of contracts for Lumino Network per r
 | `$SECRET_REGISTRY_CONTRACT_ADDRESS`       | TBD | 0x4Dea623Ae7c5cb1F4aF9B46721D9a72d93C42BE9  |
 | `$ENDPOINT_REGISTRY_CONTRACT_ADDRESS`     | TBD | 0x7d1E6f17baa2744B5213b697ae4C1D287bB10df0 |
 
-# Node release 0.0.3
+# Node release 0.0.4
 
 
 | Contract                                | TestNet                                    | MainNet        |
