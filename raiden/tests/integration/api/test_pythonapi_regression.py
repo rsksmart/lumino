@@ -3,14 +3,26 @@ import pytest
 
 from raiden import waiting
 from raiden.api.python import RaidenAPI
+from raiden.tests.utils.detect_failure import raise_on_failure
+from raiden.constants import EMPTY_PAYMENT_HASH_INVOICE
 
 
-@pytest.mark.parametrize('number_of_nodes', [2])
-@pytest.mark.parametrize('channels_per_node', [1])
+@pytest.mark.parametrize("number_of_nodes", [2])
+@pytest.mark.parametrize("channels_per_node", [1])
 def test_close_regression(raiden_network, deposit, token_addresses):
     """ The python api was using the wrong balance proof to close the channel,
     thus the close was failing if a transfer was made.
     """
+    raise_on_failure(
+        raiden_network,
+        run_test_close_regression,
+        raiden_network=raiden_network,
+        deposit=deposit,
+        token_addresses=token_addresses,
+    )
+
+
+def run_test_close_regression(raiden_network, deposit, token_addresses):
     app0, app1 = raiden_network
     registry_address = app0.raiden.default_registry.address
     token_address = token_addresses[0]
@@ -30,19 +42,13 @@ def test_close_regression(raiden_network, deposit, token_addresses):
     amount = 10
     identifier = 42
     assert api1.transfer(
-        registry_address,
-        token_address,
-        amount,
-        api2.address,
-        identifier=identifier,
+        registry_address, token_address, amount, api2.address, identifier=identifier,
+        payment_hash_invoice=EMPTY_PAYMENT_HASH_INVOICE
     )
-    exception = ValueError('Waiting for transfer received success in the WAL timed out')
+    exception = ValueError("Waiting for transfer received success in the WAL timed out")
     with gevent.Timeout(seconds=5, exception=exception):
         waiting.wait_for_transfer_success(
-            app1.raiden,
-            identifier,
-            amount,
-            app1.raiden.alarm.sleep_time,
+            app1.raiden, identifier, amount, app1.raiden.alarm.sleep_time
         )
 
     api2.channel_close(registry_address, token_address, api1.address)

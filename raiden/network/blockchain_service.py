@@ -1,68 +1,79 @@
 import gevent
-from cachetools.func import ttl_cache
 from eth_utils import is_binary_address
 from gevent.lock import Semaphore
-from raiden.network.rpc.smartcontract_proxy import ContractProxy
-from raiden.rns_constants import RNS_RESOLVER_ADDRESS, RNS_RESOLVER_ABI
 
-from raiden.network.proxies import (
-    Discovery,
-    PaymentChannel,
-    SecretRegistry,
-    Token,
-    TokenNetwork,
-    TokenNetworkRegistry,
-)
+from raiden.network.proxies.discovery import Discovery
+from raiden.network.proxies.payment_channel import PaymentChannel
+from raiden.network.proxies.secret_registry import SecretRegistry
+from raiden.network.proxies.service_registry import ServiceRegistry
+from raiden.network.proxies.token import Token
+from raiden.network.proxies.token_network import TokenNetwork
+from raiden.network.proxies.token_network_registry import TokenNetworkRegistry
+from raiden.network.proxies.user_deposit import UserDeposit
 from raiden.network.rpc.client import JSONRPCClient
-from raiden.utils.namehash.namehash import namehash
+from raiden.transfer.identifiers import CanonicalIdentifier
 from raiden.utils.typing import (
     Address,
+    BlockHash,
+    BlockNumber,
+    ChainID,
     ChannelID,
+    Dict,
     PaymentNetworkID,
     T_ChannelID,
     TokenNetworkAddress,
+    Tuple,
 )
 from raiden_contracts.contract_manager import ContractManager
+from raiden.utils.namehash.namehash import namehash
+from raiden.network.rpc.smartcontract_proxy import ContractProxy
+from raiden.rns_constants import RNS_RESOLVER_ADDRESS, RNS_RESOLVER_ABI
 
 
 class BlockChainService:
     """ Exposes the blockchain's state through JSON-RPC. """
+
     # pylint: disable=too-many-instance-attributes
 
-    def __init__(
-            self,
-            jsonrpc_client: JSONRPCClient,
-            contract_manager: ContractManager = None,
-    ):
-        self.address_to_discovery = dict()
-        self.address_to_secret_registry = dict()
-        self.address_to_token = dict()
-        self.address_to_token_network = dict()
-        self.address_to_token_network_registry = dict()
-        self.identifier_to_payment_channel = dict()
+    def __init__(self, jsonrpc_client: JSONRPCClient, contract_manager: ContractManager):
+        self.address_to_discovery: Dict[Address, Discovery] = dict()
+        self.address_to_secret_registry: Dict[Address, SecretRegistry] = dict()
+        self.address_to_token: Dict[Address, Token] = dict()
+        self.address_to_token_network: Dict[TokenNetworkAddress, TokenNetwork] = dict()
+        self.address_to_token_network_registry: Dict[Address, TokenNetworkRegistry] = dict()
+        self.address_to_user_deposit: Dict[Address, UserDeposit] = dict()
+        self.address_to_service_registry: Dict[Address, ServiceRegistry] = dict()
+        self.identifier_to_payment_channel: Dict[
+            Tuple[TokenNetworkAddress, ChannelID], PaymentChannel
+        ] = dict()
 
         self.client = jsonrpc_client
         self.contract_manager = contract_manager
+
+        # Ask for the network id only once and store it here
+        self.network_id = ChainID(int(self.client.web3.version.network))
 
         self._token_creation_lock = Semaphore()
         self._discovery_creation_lock = Semaphore()
         self._token_network_creation_lock = Semaphore()
         self._token_network_registry_creation_lock = Semaphore()
         self._secret_registry_creation_lock = Semaphore()
+        self._service_registry_creation_lock = Semaphore()
         self._payment_channel_creation_lock = Semaphore()
+        self._user_deposit_creation_lock = Semaphore()
 
     @property
     def node_address(self) -> Address:
         return self.client.address
 
-    def block_number(self) -> int:
+    def block_number(self) -> BlockNumber:
         return self.client.block_number()
+
+    def block_hash(self) -> BlockHash:
+        return self.client.blockhash_from_blocknumber("latest")
 
     def get_block(self, block_identifier):
         return self.client.web3.eth.getBlock(block_identifier=block_identifier)
-
-    def inject_contract_manager(self, contract_manager: ContractManager):
-        self.contract_manager = contract_manager
 
     def is_synced(self) -> bool:
         result = self.client.web3.eth.syncing
@@ -72,7 +83,7 @@ class BlockChainService:
             return True
 
         current_block = self.block_number()
-        highest_block = result['highestBlock']
+        highest_block = result["highestBlock"]
 
         if highest_block - current_block > 2:
             return False
@@ -96,8 +107,8 @@ class BlockChainService:
         else:
             interval = last_block_number - oldest
         assert interval > 0
-        last_timestamp = self.get_block_header(last_block_number)['timestamp']
-        first_timestamp = self.get_block_header(last_block_number - interval)['timestamp']
+        last_timestamp = self.get_block_header(last_block_number)["timestamp"]
+        first_timestamp = self.get_block_header(last_block_number - interval)["timestamp"]
         delta = last_timestamp - first_timestamp
         return delta / interval
 
@@ -107,6 +118,7 @@ class BlockChainService:
     def next_block(self) -> int:
         target_block_number = self.block_number() + 1
         self.wait_until_block(target_block_number=target_block_number)
+        return target_block_number
 
     def wait_until_block(self, target_block_number):
         current_block = self.block_number()
@@ -120,7 +132,7 @@ class BlockChainService:
     def token(self, token_address: Address) -> Token:
         """ Return a proxy to interact with a token. """
         if not is_binary_address(token_address):
-            raise ValueError('token_address must be a valid address')
+            raise ValueError("token_address must be a valid address")
 
         with self._token_creation_lock:
             if token_address not in self.address_to_token:
@@ -135,7 +147,7 @@ class BlockChainService:
     def discovery(self, discovery_address: Address) -> Discovery:
         """ Return a proxy to interact with the discovery. """
         if not is_binary_address(discovery_address):
-            raise ValueError('discovery_address must be a valid address')
+            raise ValueError("discovery_address must be a valid address")
 
         with self._discovery_creation_lock:
             if discovery_address not in self.address_to_discovery:
@@ -149,7 +161,7 @@ class BlockChainService:
 
     def token_network_registry(self, address: Address) -> TokenNetworkRegistry:
         if not is_binary_address(address):
-            raise ValueError('address must be a valid address')
+            raise ValueError("address must be a valid address")
 
         with self._token_network_registry_creation_lock:
             if address not in self.address_to_token_network_registry:
@@ -163,7 +175,7 @@ class BlockChainService:
 
     def token_network(self, address: TokenNetworkAddress) -> TokenNetwork:
         if not is_binary_address(address):
-            raise ValueError('address must be a valid address')
+            raise ValueError("address must be a valid address")
 
         with self._token_network_creation_lock:
             if address not in self.address_to_token_network:
@@ -177,7 +189,7 @@ class BlockChainService:
 
     def secret_registry(self, address: Address) -> SecretRegistry:
         if not is_binary_address(address):
-            raise ValueError('address must be a valid address')
+            raise ValueError("address must be a valid address")
 
         with self._secret_registry_creation_lock:
             if address not in self.address_to_secret_registry:
@@ -189,23 +201,26 @@ class BlockChainService:
 
         return self.address_to_secret_registry[address]
 
-    def get_address_from_rns(self, address=None) -> str:
-        contract = self.client.new_contract(RNS_RESOLVER_ABI, RNS_RESOLVER_ADDRESS)
-        proxy = ContractProxy(self.client, contract)
-        eip137hash = namehash(address)
-        resolved_address = proxy.contract.functions.addr(eip137hash).call()
-        return resolved_address
+    def service_registry(self, address: Address) -> ServiceRegistry:
+        with self._service_registry_creation_lock:
+            if address not in self.address_to_service_registry:
+                self.address_to_service_registry[address] = ServiceRegistry(
+                    jsonrpc_client=self.client,
+                    service_registry_address=address,
+                    contract_manager=self.contract_manager,
+                )
 
-    def payment_channel(
-            self,
-            token_network_address: TokenNetworkAddress,
-            channel_id: ChannelID,
-    ) -> PaymentChannel:
+        return self.address_to_service_registry[address]
+
+    def payment_channel(self, canonical_identifier: CanonicalIdentifier) -> PaymentChannel:
+
+        token_network_address = TokenNetworkAddress(canonical_identifier.token_network_address)
+        channel_id = canonical_identifier.channel_identifier
 
         if not is_binary_address(token_network_address):
-            raise ValueError('address must be a valid address')
+            raise ValueError("address must be a valid address")
         if not isinstance(channel_id, T_ChannelID):
-            raise ValueError('channel identifier must be of type T_ChannelID')
+            raise ValueError("channel identifier must be of type T_ChannelID")
 
         with self._payment_channel_creation_lock:
             dict_key = (token_network_address, channel_id)
@@ -221,9 +236,23 @@ class BlockChainService:
 
         return self.identifier_to_payment_channel[dict_key]
 
-    @property
-    @ttl_cache(ttl=30)
-    def network_id(self) -> int:
-        return int(self.client.web3.version.network)
+    def user_deposit(self, address: Address) -> UserDeposit:
+        if not is_binary_address(address):
+            raise ValueError("address must be a valid address")
 
+        with self._user_deposit_creation_lock:
+            if address not in self.address_to_user_deposit:
+                self.address_to_user_deposit[address] = UserDeposit(
+                    jsonrpc_client=self.client,
+                    user_deposit_address=address,
+                    contract_manager=self.contract_manager,
+                )
 
+        return self.address_to_user_deposit[address]
+
+    def get_address_from_rns(self, address=None) -> str:
+        contract = self.client.new_contract(RNS_RESOLVER_ABI, RNS_RESOLVER_ADDRESS)
+        proxy = ContractProxy(self.client, contract)
+        eip137hash = namehash(address)
+        resolved_address = proxy.contract.functions.addr(eip137hash).call()
+        return resolved_address

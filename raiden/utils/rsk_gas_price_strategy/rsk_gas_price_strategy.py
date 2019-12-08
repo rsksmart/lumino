@@ -4,7 +4,7 @@ import operator
 
 from eth_utils import (
     to_tuple,
-)
+    is_hex)
 
 from web3.exceptions import (
     InsufficientData,
@@ -167,10 +167,12 @@ def construct_time_based_gas_price_strategy(max_wait_seconds,
         )
         latest = web3.eth.getBlock('latest')
         latest_block_gas_price = latest.minimumGasPrice
+        if is_hex(latest_block_gas_price):
+            latest_block_gas_price = int(latest_block_gas_price, 16)
+        else:
+            latest_block_gas_price = int(latest_block_gas_price)
         gas_price = _compute_gas_price(probabilities, probability / 100)
-
-        max_gas = max(gas_price, int(latest_block_gas_price))
-        print(max_gas)
+        max_gas = max(gas_price, latest_block_gas_price)
         return max_gas
     return time_based_gas_price_strategy
 

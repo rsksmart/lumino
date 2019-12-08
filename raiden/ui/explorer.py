@@ -1,18 +1,27 @@
 import requests
+import structlog
+from datetime import datetime
 
-explorer_endpoint = "https://api.lumino.rifos.org/lumino-explorer-1.0/"
+log = structlog.get_logger(__name__)
 
 
-def register(rsk_address, rns_domain):
+def register(explorer_endpoint, rsk_address, rns_domain):
     try:
-        r = requests.post(explorer_endpoint + 'luminoNode/',
-                          json={'node_address': rsk_address, 'rns_address': rns_domain})
-        if r.status_code == 200:
-            print("Succesfully registered into Lumino Explorer")
+
+        if rns_domain is None:
+            rns_domain = ''
+
+        data_registry = {'node_address': rsk_address,
+                         'rns_address': rns_domain,
+                         'last_alive_signal': datetime.utcnow().isoformat()}
+
+        response = requests.post(explorer_endpoint + 'luminoNode/', json=data_registry)
+        if response.status_code == 200:
+            log.info("Succesfully registered into Lumino Explorer")
         else:
-            print("Warning: There was an error registering into Lumino Explorer. Status: " + str(r.status_code))
+            log.info("Warning: There was an error registering into Lumino Explorer. Status: " + str(response.status_code))
     except requests.exceptions.RequestException as e:
-        print("Warning: Could not connect to Lumino Explorer. Your node will not be registered.")
+        log.info("Warning: Could not connect to Lumino Explorer. Your node will not be registered.")
 
 
 

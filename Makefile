@@ -39,32 +39,32 @@ clean-test:
 	rm -f .coverage
 	rm -fr htmlcov/
 
-ISORT_PARAMS = --ignore-whitespace --settings-path ./ --recursive raiden/ -sg */node_modules/*
+LINT_PATHS = raiden/ tools/
+ISORT_PARAMS = --ignore-whitespace --settings-path ./ --skip-glob '*/node_modules/*' --recursive $(LINT_PATHS)
+BLACK_PATHS = raiden/ tools/ setup.py
 
-lint:
+lint: mypy mypy-all
 	flake8 raiden/ tools/
 	isort $(ISORT_PARAMS) --diff --check-only
-	pylint --rcfile .pylint.rc raiden/
+	black --check --diff $(BLACK_PATHS)
+	pylint $(LINT_PATHS)
 	python setup.py check --restructuredtext --strict
-
-mypy:
-	# We are starting small with a few files and directories here,
-	# but mypy should run on the whole codebase soon.
-	mypy raiden/transfer raiden/api raiden/messages.py raiden/blockchain \
-	raiden/encoding raiden/storage raiden/network \
-	--ignore-missing-imports | grep error > mypy-out.txt || true
-	# Expecting status code 1 from `grep`, which indicates no match.
-	# Again, we are starting small, detecting only errors related to
-	# 'BlockNumber', 'Address', 'ChannelID' etc, but all mypy errors should be
-	# detected soon.
-	grep BlockNumber mypy-out.txt; [ $$? -eq 1 ]
-	grep Address mypy-out.txt; [ $$? -eq 1 ]
-	grep ChannelID mypy-out.txt; [ $$? -eq 1 ]
-	grep BalanceProof mypy-out.txt; [ $$? -eq 1 ]
-	grep SendSecret mypy-out.txt; [ $$? -eq 1 ]
 
 isort:
 	isort $(ISORT_PARAMS)
+
+mypy:
+	mypy raiden
+
+mypy-all:
+	# Be aware, that we currently ignore all mypy errors in `raiden.tests.*` through `setup.cfg`.
+	# Remaining errors in tests:
+	mypy --config-file /dev/null raiden --ignore-missing-imports | grep error | wc -l
+
+black:
+	black $(BLACK_PATHS)
+
+format: isort black
 
 test:
 	python setup.py test
@@ -89,8 +89,11 @@ ARCHIVE_TAG_ARG=
 ifdef ARCHIVE_TAG
 ARCHIVE_TAG_ARG=--build-arg ARCHIVE_TAG=$(ARCHIVE_TAG)
 else
-ARCHIVE_TAG=v$(shell python setup.py --version)
+ARCHIVE_TAG_ARG=--build-arg ARCHIVE_TAG=v$(shell python setup.py --version)
 endif
+
+# architecture needs to be asked in docker because docker can be run on remote host to create binary for different architectures
+ARCHITECTURE_TAG=$(shell docker run --rm python:3.7 uname -m)
 
 GITHUB_ACCESS_TOKEN_ARG=
 ifdef GITHUB_ACCESS_TOKEN
@@ -99,11 +102,11 @@ endif
 
 
 bundle-docker:
-	@docker build -t pyinstallerbuilder --build-arg GETH_URL_LINUX=$(GETH_URL_LINUX) --build-arg SOLC_URL_LINUX=$(SOLC_URL_LINUX) $(ARCHIVE_TAG_ARG) $(GITHUB_ACCESS_TOKEN_ARG) -f docker/build.Dockerfile .
+	@docker build -t pyinstallerbuilder --build-arg GETH_URL_LINUX=$(GETH_URL_LINUX) --build-arg SOLC_URL_LINUX=$(SOLC_URL_LINUX) --build-arg ARCHITECTURE_TAG=$(ARCHITECTURE_TAG) $(ARCHIVE_TAG_ARG) $(GITHUB_ACCESS_TOKEN_ARG) -f docker/build.Dockerfile .
 	-(docker rm builder)
 	docker create --name builder pyinstallerbuilder
 	mkdir -p dist/archive
-	docker cp builder:/raiden/raiden-$(ARCHIVE_TAG)-linux.tar.gz dist/archive/raiden-$(ARCHIVE_TAG)-linux.tar.gz
+	docker cp builder:/raiden/raiden-$(ARCHIVE_TAG)-linux-$(ARCHITECTURE_TAG).tar.gz dist/archive/raiden-$(ARCHIVE_TAG)-linux-$(ARCHITECTURE_TAG).tar.gz
 	docker rm builder
 
 bundle:
@@ -118,8 +121,11 @@ dist: clean
 	python setup.py bdist_wheel
 	ls -l dist
 
-install: clean
-	python setup.py install
+install: clean-pyc
+	pip install -c constraints.txt -r requirements.txt .
+
+install-dev: clean-pyc
+	pip install -c constraints-dev.txt -r requirements-dev.txt -e .
 
 logging_settings = :info,contracts:debug
 mkfile_root := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))
