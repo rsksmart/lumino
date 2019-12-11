@@ -51,7 +51,7 @@ from raiden.lightclient.lightclientmessages.hub_message import HubMessage
 from raiden.lightclient.lightclientmessages.light_client_payment import LightClientPayment, LightClientPaymentStatus
 
 from raiden.messages import RequestMonitoring, LockedTransfer, RevealSecret, Unlock, Delivered, SecretRequest, Processed
-from raiden.settings import DEFAULT_RETRY_TIMEOUT, DEVELOPMENT_CONTRACT_VERSION
+from raiden.settings import DEFAULT_RETRY_TIMEOUT, DEVELOPMENT_CONTRACT_VERSION, MAX_ONBOARDINGS_HUB
 from raiden.transfer import architecture, views, channel
 from raiden.transfer.events import (
     EventPaymentReceivedSuccess,
@@ -1643,25 +1643,29 @@ class RaidenAPI:
 
             api_key = hexlify(os.urandom(20))
             api_key = api_key.decode("utf-8")
+            #Check for limit light client
+            if MAX_ONBOARDINGS_HUB > len(self.raiden.wal.storage.get_all_light_clients()):
+                result = self.raiden.wal.storage.save_light_client(
+                    api_key=api_key,
+                    address=address,
+                    encrypt_signed_password=encrypt_signed_password.hex(),
+                    encrypt_signed_display_name=encrypt_signed_display_name.hex(),
+                    encrypt_signed_seed_retry=encrypt_signed_seed_retry.hex())
 
-            result = self.raiden.wal.storage.save_light_client(
-                api_key=api_key,
-                address=address,
-                encrypt_signed_password=encrypt_signed_password.hex(),
-                encrypt_signed_display_name=encrypt_signed_display_name.hex(),
-                encrypt_signed_seed_retry=encrypt_signed_seed_retry.hex())
-
-            if result > 0:
-                result = {"address": address,
-                          "encrypt_signed_password": encrypt_signed_password.hex(),
-                          "encrypt_signed_display_name": encrypt_signed_display_name.hex(),
-                          "api_key": api_key,
-                          "encrypt_signed_seed_retry": encrypt_signed_seed_retry.hex(),
-                          "message": "successfully registered",
-                          "result_code": 0}
+                if result > 0:
+                    result = {"address": address,
+                              "encrypt_signed_password": encrypt_signed_password.hex(),
+                              "encrypt_signed_display_name": encrypt_signed_display_name.hex(),
+                              "api_key": api_key,
+                              "encrypt_signed_seed_retry": encrypt_signed_seed_retry.hex(),
+                              "message": "successfully registered",
+                              "result_code": 0}
+                else:
+                    result = {"message": "An unexpected error has occurred.",
+                              "result_code": 1}
             else:
-                result = {"message": "An unexpected error has occurred.",
-                          "result_code": 1}
+                result = {"message": "Max limit reached of onboardings.",
+                          "result_code": 3}
         else:
             result = {"address": address,
                       "encrypt_signed_password": encrypt_signed_password.hex(),
