@@ -768,6 +768,81 @@ class ContractReceiveChannelSettled(ContractReceiveStateChange):
         )
 
 
+class ContractReceiveChannelSettledLight(ContractReceiveStateChange):
+    """ A channel to which this node as a hub handles one of the participants was settled. """
+
+    def __init__(
+        self,
+        transaction_hash: TransactionHash,
+        canonical_identifier: CanonicalIdentifier,
+        our_onchain_locksroot: Locksroot,
+        partner_onchain_locksroot: Locksroot,
+        block_number: BlockNumber,
+        block_hash: BlockHash,
+        participant1: Address,
+        participant2: Address
+    ) -> None:
+        super().__init__(transaction_hash, block_number, block_hash)
+
+        self.our_onchain_locksroot = our_onchain_locksroot
+        self.partner_onchain_locksroot = partner_onchain_locksroot
+        self.canonical_identifier = canonical_identifier
+        self.participant1 = participant1
+        self.participant2 = participant2
+
+    @property
+    def channel_identifier(self) -> ChannelID:
+        return self.canonical_identifier.channel_identifier
+
+    @property
+    def token_network_identifier(self) -> TokenNetworkAddress:
+        return TokenNetworkAddress(self.canonical_identifier.token_network_address)
+
+    def __repr__(self) -> str:
+        return (
+            "<ContractReceiveChannelSettledLight token_network:{} channel:{} settle_block:{}>"
+        ).format(pex(self.token_network_identifier), self.channel_identifier, self.block_number)
+
+    def __eq__(self, other: Any) -> bool:
+        return (
+            isinstance(other, ContractReceiveChannelSettledLight)
+            and self.canonical_identifier == other.canonical_identifier
+            and self.our_onchain_locksroot == other.our_onchain_locksroot
+            and self.partner_onchain_locksroot == other.partner_onchain_locksroot
+            and self.participant1 == other.participant1
+            and self.participant2 == other.participant2
+            and super().__eq__(other)
+        )
+
+    def __ne__(self, other: Any) -> bool:
+        return not self.__eq__(other)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "transaction_hash": serialize_bytes(self.transaction_hash),
+            "our_onchain_locksroot": serialize_bytes(self.our_onchain_locksroot),
+            "partner_onchain_locksroot": serialize_bytes(self.partner_onchain_locksroot),
+            "canonical_identifier": self.canonical_identifier.to_dict(),
+            "block_number": str(self.block_number),
+            "block_hash": serialize_bytes(self.block_hash),
+            "participant1": to_checksum_address(self.participant1),
+            "participant2": to_checksum_address(self.participant2)
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "ContractReceiveChannelSettledLight":
+        return cls(
+            transaction_hash=deserialize_transactionhash(data["transaction_hash"]),
+            canonical_identifier=CanonicalIdentifier.from_dict(data["canonical_identifier"]),
+            our_onchain_locksroot=deserialize_locksroot(data["our_onchain_locksroot"]),
+            partner_onchain_locksroot=deserialize_locksroot(data["partner_onchain_locksroot"]),
+            block_number=BlockNumber(int(data["block_number"])),
+            block_hash=BlockHash(deserialize_bytes(data["block_hash"])),
+            participant1=to_canonical_address(data["participant1"]),
+            participant2 = to_canonical_address(data["participant2"])
+        )
+
+
 class ActionLeaveAllNetworks(StateChange):
     """ User is quitting all payment networks. """
 
