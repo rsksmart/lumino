@@ -51,7 +51,7 @@ from raiden.lightclient.lightclientmessages.hub_message import HubMessage
 from raiden.lightclient.lightclientmessages.light_client_payment import LightClientPayment, LightClientPaymentStatus
 
 from raiden.messages import RequestMonitoring, LockedTransfer, RevealSecret, Unlock, Delivered, SecretRequest, Processed
-from raiden.settings import DEFAULT_RETRY_TIMEOUT, DEVELOPMENT_CONTRACT_VERSION, MAX_ONBOARDINGS_HUB
+from raiden.settings import DEFAULT_RETRY_TIMEOUT, DEVELOPMENT_CONTRACT_VERSION, HUB_MAX_LIGHT_CLIENTS
 from raiden.transfer import architecture, views, channel
 from raiden.transfer.events import (
     EventPaymentReceivedSuccess,
@@ -1644,7 +1644,7 @@ class RaidenAPI:
             api_key = hexlify(os.urandom(20))
             api_key = api_key.decode("utf-8")
             #Check for limit light client
-            if MAX_ONBOARDINGS_HUB > len(self.get_all_light_clients()):
+            if HUB_MAX_LIGHT_CLIENTS > len(self.get_all_light_clients()):
                 result = self.raiden.wal.storage.save_light_client(
                     api_key=api_key,
                     address=address,
@@ -1664,7 +1664,7 @@ class RaidenAPI:
                     result = {"message": "An unexpected error has occurred.",
                               "result_code": 1}
             else:
-                result = {"message": "Max limit reached of onboardings.",
+                result = {"message": "Limit of registered light clients reached.",
                           "result_code": 3}
         else:
             result = {"address": address,
