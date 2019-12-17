@@ -1644,7 +1644,7 @@ class RaidenAPI:
             api_key = hexlify(os.urandom(20))
             api_key = api_key.decode("utf-8")
             #Check for limit light client
-            if MAX_ONBOARDINGS_HUB > len(self.raiden.wal.storage.get_all_light_clients()):
+            if MAX_ONBOARDINGS_HUB > len(self.get_all_light_clients()):
                 result = self.raiden.wal.storage.save_light_client(
                     api_key=api_key,
                     address=address,
