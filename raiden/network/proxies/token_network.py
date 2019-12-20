@@ -311,7 +311,7 @@ class TokenNetwork:
                         creator=self.node_address, partner=partner, block=receipt_or_none["blockNumber"]
                     )
                     log.critical("new_netting_channel failed", **log_details)
-                    raise RaidenUnrecoverableError("creating new channel failed")
+                    raise RaidenRecoverableError("creating new channel failed")
 
             except Exception as e:
                 log.critical("new_netting_channel failed", **log_details)
