@@ -1438,7 +1438,6 @@ class TokenNetwork:
         non_closing_signature: Signature,
         given_block_identifier: BlockSpecification,
     ):
-        #FIXME mmartinez log details
         log_details = {
             "token_network": pex(self.address),
             "node": pex(self.node_address),

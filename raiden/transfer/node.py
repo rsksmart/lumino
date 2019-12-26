@@ -69,7 +69,7 @@ from raiden.transfer.state_change import (
     ReceiveDelivered,
     ReceiveProcessed,
     ReceiveUnlock,
-    ReceiveUnlockLight, ContractReceiveChannelClosedLight)
+    ReceiveUnlockLight, ContractReceiveChannelClosedLight, ContractReceiveChannelSettledLight)
 from raiden.utils import sha3
 from raiden.utils.typing import (
     MYPY_ANNOTATION,
@@ -938,6 +938,9 @@ def handle_state_change(
         iteration = handle_token_network_action(chain_state, state_change)
     elif type(state_change) == ContractReceiveChannelSettled:
         assert isinstance(state_change, ContractReceiveChannelSettled), MYPY_ANNOTATION
+        iteration = handle_token_network_action(chain_state, state_change)
+    elif type(state_change) == ContractReceiveChannelSettledLight:
+        assert isinstance(state_change, ContractReceiveChannelSettledLight), MYPY_ANNOTATION
         iteration = handle_token_network_action(chain_state, state_change)
     elif type(state_change) == ContractReceiveRouteNew:
         assert isinstance(state_change, ContractReceiveRouteNew), MYPY_ANNOTATION
