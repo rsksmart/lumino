@@ -11,6 +11,7 @@ from raiden.constants import (
     UINT256_MAX,
     EMPTY_PAYMENT_HASH_INVOICE
 )
+from raiden.exceptions import InsufficientFunds
 from raiden.messages import Unlock
 from raiden.settings import DEFAULT_NUMBER_OF_BLOCK_CONFIRMATIONS
 from raiden.transfer.architecture import Event, StateChange, TransitionResult
@@ -1098,8 +1099,10 @@ def create_sendlockedtransfer(
     partner_state = channel_state.partner_state
     our_balance_proof = our_state.balance_proof
 
-    msg = "caller must make sure there is enough balance"
-    assert amount <= get_distributable(our_state, partner_state), msg
+    msg = "Caller must have balance in the channel"
+    # assert amount <= get_distributable(our_state, partner_state), msg
+    if amount > get_distributable(our_state, partner_state):
+        raise InsufficientFunds(msg)
 
     msg = "caller must make sure the channel is open"
     assert get_status(channel_state) == CHANNEL_STATE_OPENED, msg
