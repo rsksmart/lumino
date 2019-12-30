@@ -1,10 +1,12 @@
 # pylint: disable=too-many-arguments,too-few-public-methods
 from eth_utils import to_canonical_address, to_checksum_address
+from raiden.messages import RevealSecret, Unlock, Message, SecretRequest
 
 from raiden.transfer.architecture import Event, SendMessageEvent
 from raiden.transfer.mediated_transfer.state import LockedTransferUnsignedState
 from raiden.transfer.state import BalanceProofUnsignedState
-from raiden.utils import pex, serialization, sha3
+from raiden.utils import pex, sha3
+from raiden.utils.serialization import deserialize_secret, deserialize_secret_hash, serialize_bytes
 from raiden.utils.typing import (
     Address,
     Any,
@@ -13,10 +15,10 @@ from raiden.utils.typing import (
     Dict,
     MessageID,
     PaymentID,
+    PaymentWithFeeAmount,
     Secret,
     SecretHash,
     TokenAddress,
-    TokenAmount,
 )
 
 # According to the smart contracts as of 07/08:
@@ -27,7 +29,9 @@ from raiden.utils.typing import (
 CHANNEL_IDENTIFIER_GLOBAL_QUEUE = ChannelID(0)
 
 
-def refund_from_sendmediated(send_lockedtransfer_event):
+def refund_from_sendmediated(
+    send_lockedtransfer_event: "SendLockedTransfer",
+) -> "SendRefundTransfer":
     return SendRefundTransfer(
         recipient=send_lockedtransfer_event.recipient,
         channel_identifier=send_lockedtransfer_event.queue_identifier.channel_identifier,
@@ -36,58 +40,149 @@ def refund_from_sendmediated(send_lockedtransfer_event):
     )
 
 
+class StoreMessageEvent(Event):
+    """ Marker used for events which represent database persistance of light client messages
+
+    """
+
+    def __init__(
+        self, message_id: int, payment_id: int, message_order: int, message: Message, is_signed: bool
+    ) -> None:
+        self.message_id = message_id
+        self.payment_id = payment_id
+        self.message_order = message_order
+        self.message = message
+        self.is_signed = is_signed
+
+    def __eq__(self, other: Any) -> bool:
+        return (
+            isinstance(other, StoreMessageEvent)
+            and self.payment_id == other.payment_id
+            and self.message_order == other.message_order
+            and self.message == other.message
+            and self.is_signed == other.is_signed
+        )
+
+    def __ne__(self, other: Any) -> bool:
+        return not self.__eq__(other)
+
+    def to_dict(self) -> Dict[str, Any]:
+        result = {
+            "payment_id": str(self.payment_id),
+            "message_id": str(self.message_id),
+            "message_order": str(self.message_order)
+        }
+        return result
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "StoreMessageEvent":
+        restored = cls(
+            payment_id=int(data["payment_id"]),
+            message_id=int(data["message_id"]),
+            message_order=int(data["message_order"])
+        )
+        return restored
+
+
 class SendLockExpired(SendMessageEvent):
     def __init__(
-            self,
-            recipient: Address,
-            message_identifier: MessageID,
-            balance_proof: BalanceProofUnsignedState,
-            secrethash: SecretHash,
-    ):
+        self,
+        recipient: Address,
+        message_identifier: MessageID,
+        balance_proof: BalanceProofUnsignedState,
+        secrethash: SecretHash,
+    ) -> None:
         super().__init__(recipient, balance_proof.channel_identifier, message_identifier)
 
         self.balance_proof = balance_proof
         self.secrethash = secrethash
 
-    def __repr__(self):
-        return '<SendLockExpired msgid:{} balance_proof:{} secrethash:{} recipient:{}>'.format(
-            self.message_identifier,
-            self.balance_proof,
-            pex(self.secrethash),
-            pex(self.recipient),
+    def __repr__(self) -> str:
+        return "<SendLockExpired msgid:{} balance_proof:{} secrethash:{} recipient:{}>".format(
+            self.message_identifier, self.balance_proof, pex(self.secrethash), pex(self.recipient)
         )
 
-    def __eq__(self, other):
+    def __eq__(self, other: Any) -> bool:
         return (
-            isinstance(other, SendLockExpired) and
-            self.message_identifier == other.message_identifier and
-            self.balance_proof == other.balance_proof and
-            self.secrethash == other.secrethash and
-            self.recipient == other.recipient
+            isinstance(other, SendLockExpired)
+            and self.message_identifier == other.message_identifier
+            and self.balance_proof == other.balance_proof
+            and self.secrethash == other.secrethash
+            and self.recipient == other.recipient
         )
 
-    def __ne__(self, other):
+    def __ne__(self, other: Any) -> bool:
         return not self.__eq__(other)
 
     def to_dict(self) -> Dict[str, Any]:
         result = {
-            'message_identifier': str(self.message_identifier),
-            'balance_proof': self.balance_proof,
-            'secrethash': serialization.serialize_bytes(self.secrethash),
-            'recipient': to_checksum_address(self.recipient),
+            "message_identifier": str(self.message_identifier),
+            "balance_proof": self.balance_proof,
+            "secrethash": serialize_bytes(self.secrethash),
+            "recipient": to_checksum_address(self.recipient),
         }
 
         return result
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'SendLockExpired':
+    def from_dict(cls, data: Dict[str, Any]) -> "SendLockExpired":
         restored = cls(
-            recipient=to_canonical_address(data['recipient']),
-            message_identifier=int(data['message_identifier']),
-            balance_proof=data['balance_proof'],
-            secrethash=serialization.deserialize_bytes(data['secrethash']),
+            recipient=to_canonical_address(data["recipient"]),
+            message_identifier=MessageID(int(data["message_identifier"])),
+            balance_proof=data["balance_proof"],
+            secrethash=deserialize_secret_hash(data["secrethash"]),
         )
 
+        return restored
+
+
+class SendLockedTransferLight(SendMessageEvent):
+    """ A locked transfer generated by a light client that must be sent to `recipient`. """
+
+    def __init__(
+        self,
+        recipient: Address,
+        channel_identifier: ChannelID,
+        message_identifier: MessageID,
+        signed_locked_transfer: LockedTransferUnsignedState
+    ) -> None:
+        super().__init__(recipient, channel_identifier, message_identifier)
+
+        self.signed_locked_transfer = signed_locked_transfer
+
+    def __repr__(self) -> str:
+        return "<SendLockedTransferLight msgid:{} signed_locked_transfer:{} recipient:{}>".format(
+            self.message_identifier, self.signed_locked_transfer, pex(self.recipient)
+        )
+
+    def __eq__(self, other: Any) -> bool:
+        return (
+            isinstance(other, SendLockedTransferLight)
+            and self.signed_locked_transfer == other.signed_locked_transfer
+            and super().__eq__(other)
+        )
+
+    def __ne__(self, other: Any) -> bool:
+        return not self.__eq__(other)
+
+    def to_dict(self) -> Dict[str, Any]:
+        result = {
+            "recipient": to_checksum_address(self.recipient),
+            "channel_identifier": str(self.queue_identifier.channel_identifier),
+            "message_identifier": str(self.message_identifier),
+            "signed_locked_transfer": self.signed_locked_transfer,
+        }
+
+        return result
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "SendLockedTransferLight":
+        restored = cls(
+            recipient=to_canonical_address(data["recipient"]),
+            channel_identifier=ChannelID(int(data["channel_identifier"])),
+            message_identifier=MessageID(int(data["message_identifier"])),
+            signed_locked_transfer=data["signed_locked_transfer"],
+        )
         return restored
 
 
@@ -95,58 +190,56 @@ class SendLockedTransfer(SendMessageEvent):
     """ A locked transfer that must be sent to `recipient`. """
 
     def __init__(
-            self,
-            recipient: Address,
-            channel_identifier: ChannelID,
-            message_identifier: MessageID,
-            transfer: LockedTransferUnsignedState,
-    ):
+        self,
+        recipient: Address,
+        channel_identifier: ChannelID,
+        message_identifier: MessageID,
+        transfer: LockedTransferUnsignedState,
+    ) -> None:
         if not isinstance(transfer, LockedTransferUnsignedState):
-            raise ValueError('transfer must be a LockedTransferUnsignedState instance')
+            raise ValueError("transfer must be a LockedTransferUnsignedState instance")
 
         super().__init__(recipient, channel_identifier, message_identifier)
 
         self.transfer = transfer
 
     @property
-    def balance_proof(self):
+    def balance_proof(self) -> BalanceProofUnsignedState:
         return self.transfer.balance_proof
 
-    def __repr__(self):
-        return '<SendLockedTransfer msgid:{} transfer:{} recipient:{}>'.format(
-            self.message_identifier,
-            self.transfer,
-            pex(self.recipient),
+    def __repr__(self) -> str:
+        return "<SendLockedTransfer msgid:{} transfer:{} recipient:{}>".format(
+            self.message_identifier, self.transfer, pex(self.recipient)
         )
 
-    def __eq__(self, other):
+    def __eq__(self, other: Any) -> bool:
         return (
-            isinstance(other, SendLockedTransfer) and
-            self.transfer == other.transfer and
-            super().__eq__(other)
+            isinstance(other, SendLockedTransfer)
+            and self.transfer == other.transfer
+            and super().__eq__(other)
         )
 
-    def __ne__(self, other):
+    def __ne__(self, other: Any) -> bool:
         return not self.__eq__(other)
 
     def to_dict(self) -> Dict[str, Any]:
         result = {
-            'recipient': to_checksum_address(self.recipient),
-            'channel_identifier': str(self.queue_identifier.channel_identifier),
-            'message_identifier': str(self.message_identifier),
-            'transfer': self.transfer,
-            'balance_proof': self.transfer.balance_proof,
+            "recipient": to_checksum_address(self.recipient),
+            "channel_identifier": str(self.queue_identifier.channel_identifier),
+            "message_identifier": str(self.message_identifier),
+            "transfer": self.transfer,
+            "balance_proof": self.transfer.balance_proof,
         }
 
         return result
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'SendLockedTransfer':
+    def from_dict(cls, data: Dict[str, Any]) -> "SendLockedTransfer":
         restored = cls(
-            recipient=to_canonical_address(data['recipient']),
-            channel_identifier=ChannelID(int(data['channel_identifier'])),
-            message_identifier=int(data['message_identifier']),
-            transfer=data['transfer'],
+            recipient=to_canonical_address(data["recipient"]),
+            channel_identifier=ChannelID(int(data["channel_identifier"])),
+            message_identifier=MessageID(int(data["message_identifier"])),
+            transfer=data["transfer"],
         )
 
         return restored
@@ -182,12 +275,12 @@ class SendSecretReveal(SendMessageEvent):
     """
 
     def __init__(
-            self,
-            recipient: Address,
-            channel_identifier: ChannelID,
-            message_identifier: MessageID,
-            secret: Secret,
-    ):
+        self,
+        recipient: Address,
+        channel_identifier: ChannelID,
+        message_identifier: MessageID,
+        secret: Secret,
+    ) -> None:
         secrethash = sha3(secret)
 
         super().__init__(recipient, channel_identifier, message_identifier)
@@ -195,41 +288,103 @@ class SendSecretReveal(SendMessageEvent):
         self.secret = secret
         self.secrethash = secrethash
 
-    def __repr__(self):
-        return '<SendSecretReveal msgid:{} secrethash:{} recipient:{}>'.format(
-            self.message_identifier,
-            pex(self.secrethash),
-            pex(self.recipient),
+    def __repr__(self) -> str:
+        return "<SendSecretReveal msgid:{} secrethash:{} recipient:{}>".format(
+            self.message_identifier, pex(self.secrethash), pex(self.recipient)
         )
 
-    def __eq__(self, other):
+    def __eq__(self, other: Any) -> bool:
         return (
-            isinstance(other, SendSecretReveal) and
-            self.secret == other.secret and
-            self.secrethash == other.secrethash and
-            super().__eq__(other)
+            isinstance(other, SendSecretReveal)
+            and self.secret == other.secret
+            and self.secrethash == other.secrethash
+            and super().__eq__(other)
         )
 
-    def __ne__(self, other):
+    def __ne__(self, other: Any) -> bool:
         return not self.__eq__(other)
 
     def to_dict(self) -> Dict[str, Any]:
         result = {
-            'recipient': to_checksum_address(self.recipient),
-            'channel_identifier': str(self.queue_identifier.channel_identifier),
-            'message_identifier': str(self.message_identifier),
-            'secret': serialization.serialize_bytes(self.secret),
+            "recipient": to_checksum_address(self.recipient),
+            "channel_identifier": str(self.queue_identifier.channel_identifier),
+            "message_identifier": str(self.message_identifier),
+            "secret": serialize_bytes(self.secret),
         }
 
         return result
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'SendSecretReveal':
+    def from_dict(cls, data: Dict[str, Any]) -> "SendSecretReveal":
         restored = cls(
-            recipient=to_canonical_address(data['recipient']),
-            channel_identifier=ChannelID(int(data['channel_identifier'])),
-            message_identifier=MessageID(int(data['message_identifier'])),
-            secret=Secret(serialization.deserialize_bytes(data['secret'])),
+            recipient=to_canonical_address(data["recipient"]),
+            channel_identifier=ChannelID(int(data["channel_identifier"])),
+            message_identifier=MessageID(int(data["message_identifier"])),
+            secret=deserialize_secret(data["secret"]),
+        )
+
+        return restored
+
+
+class SendSecretRevealLight(SendMessageEvent):
+    """ Sends a signed SecretReveal to another node.
+    """
+
+    def __init__(
+        self,
+        sender: Address,
+        recipient: Address,
+        channel_identifier: ChannelID,
+        message_identifier: MessageID,
+        secret: Secret,
+        signed_secret_reveal: RevealSecret
+    ) -> None:
+        secrethash = sha3(secret)
+
+        super().__init__(recipient, channel_identifier, message_identifier)
+        self.sender = sender
+        self.secret = secret
+        self.secrethash = secrethash
+        self.signed_secret_reveal = signed_secret_reveal
+
+    def __repr__(self) -> str:
+        return "<SendSecretRevealLight msgid:{} secrethash:{} sender:{} recipient:{}>".format(
+            self.message_identifier, pex(self.secrethash), pex(self.sender), pex(self.recipient)
+        )
+
+    def __eq__(self, other: Any) -> bool:
+        return (
+            isinstance(other, SendSecretRevealLight)
+            and self.secret == other.secret
+            and self.secrethash == other.secrethash
+            and self.sender == other.sender
+            and super().__eq__(other)
+        )
+
+    def __ne__(self, other: Any) -> bool:
+        return not self.__eq__(other)
+
+    def to_dict(self) -> Dict[str, Any]:
+        result = {
+            "sender": to_checksum_address(self.sender),
+            "recipient": to_checksum_address(self.recipient),
+            "channel_identifier": str(self.queue_identifier.channel_identifier),
+            "message_identifier": str(self.message_identifier),
+            "secret": serialize_bytes(self.secret),
+            "signed_secret_reveal": self.signed_secret_reveal.to_dict()
+        }
+
+        return result
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "SendSecretRevealLight":
+        restored = cls(
+            sender=to_canonical_address(data["sender"]),
+            recipient=to_canonical_address(data["recipient"]),
+            channel_identifier=ChannelID(int(data["channel_identifier"])),
+            message_identifier=MessageID(int(data["message_identifier"])),
+            secret=deserialize_secret(data["secret"]),
+            signed_secret_reveal=RevealSecret.from_dict(data["signed_secret_reveal"])
         )
 
         return restored
@@ -254,15 +409,15 @@ class SendBalanceProof(SendMessageEvent):
     """
 
     def __init__(
-            self,
-            recipient: Address,
-            channel_identifier: ChannelID,
-            message_identifier: MessageID,
-            payment_identifier: PaymentID,
-            token_address: TokenAddress,
-            secret: Secret,
-            balance_proof: BalanceProofUnsignedState,
-    ):
+        self,
+        recipient: Address,
+        channel_identifier: ChannelID,
+        message_identifier: MessageID,
+        payment_identifier: PaymentID,
+        token_address: TokenAddress,
+        secret: Secret,
+        balance_proof: BalanceProofUnsignedState,
+    ) -> None:
         super().__init__(recipient, channel_identifier, message_identifier)
 
         self.payment_identifier = payment_identifier
@@ -271,12 +426,12 @@ class SendBalanceProof(SendMessageEvent):
         self.secrethash = sha3(secret)
         self.balance_proof = balance_proof
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return (
-            '<'
-            'SendBalanceProof msgid:{} paymentid:{} token:{} secrethash:{} recipient:{} '
-            'balance_proof:{}'
-            '>'
+            "<"
+            "SendBalanceProof msgid:{} paymentid:{} token:{} secrethash:{} recipient:{} "
+            "balance_proof:{}"
+            ">"
         ).format(
             self.message_identifier,
             self.payment_identifier,
@@ -286,43 +441,227 @@ class SendBalanceProof(SendMessageEvent):
             self.balance_proof,
         )
 
-    def __eq__(self, other):
+    def __eq__(self, other: Any) -> bool:
         return (
-            isinstance(other, SendBalanceProof) and
-            self.payment_identifier == other.payment_identifier and
-            self.token == other.token and
-            self.recipient == other.recipient and
-            self.secret == other.secret and
-            self.balance_proof == other.balance_proof and
-            super().__eq__(other)
+            isinstance(other, SendBalanceProof)
+            and self.payment_identifier == other.payment_identifier
+            and self.token == other.token
+            and self.recipient == other.recipient
+            and self.secret == other.secret
+            and self.balance_proof == other.balance_proof
+            and super().__eq__(other)
         )
 
-    def __ne__(self, other):
+    def __ne__(self, other: Any) -> bool:
         return not self.__eq__(other)
 
     def to_dict(self) -> Dict[str, Any]:
         result = {
-            'recipient': to_checksum_address(self.recipient),
-            'channel_identifier': str(self.queue_identifier.channel_identifier),
-            'message_identifier': str(self.message_identifier),
-            'payment_identifier': str(self.payment_identifier),
-            'token_address': to_checksum_address(self.token),
-            'secret': serialization.serialize_bytes(self.secret),
-            'balance_proof': self.balance_proof,
+            "recipient": to_checksum_address(self.recipient),
+            "channel_identifier": str(self.queue_identifier.channel_identifier),
+            "message_identifier": str(self.message_identifier),
+            "payment_identifier": str(self.payment_identifier),
+            "token_address": to_checksum_address(self.token),
+            "secret": serialize_bytes(self.secret),
+            "balance_proof": self.balance_proof,
         }
 
         return result
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'SendBalanceProof':
+    def from_dict(cls, data: Dict[str, Any]) -> "SendBalanceProof":
         restored = cls(
-            recipient=to_canonical_address(data['recipient']),
-            channel_identifier=ChannelID(int(data['channel_identifier'])),
-            message_identifier=MessageID(int(data['message_identifier'])),
-            payment_identifier=PaymentID(int(data['payment_identifier'])),
-            token_address=to_canonical_address(data['token_address']),
-            secret=Secret(serialization.deserialize_bytes(data['secret'])),
-            balance_proof=data['balance_proof'],
+            recipient=to_canonical_address(data["recipient"]),
+            channel_identifier=ChannelID(int(data["channel_identifier"])),
+            message_identifier=MessageID(int(data["message_identifier"])),
+            payment_identifier=PaymentID(int(data["payment_identifier"])),
+            token_address=to_canonical_address(data["token_address"]),
+            secret=deserialize_secret(data["secret"]),
+            balance_proof=data["balance_proof"],
+        )
+
+        return restored
+
+
+class SendBalanceProofLight(SendMessageEvent):
+    """ Event to send a balance-proof to the counter-party, used after a lock
+    is unlocked locally allowing the counter-party to claim it.
+
+    Used by payers: The initiator and mediator nodes.
+
+    Note:
+        This event has a dual role, it serves as a synchronization and as
+        balance-proof for the netting channel smart contract.
+
+        Nodes need to keep the last known merkle root synchronized. This is
+        required by the receiving end of a transfer in order to properly
+        validate. The rule is "only the party that owns the current payment
+        channel may change it" (remember that a netting channel is composed of
+        two uni-directional channels), as a consequence the merkle root is only
+        updated by the recipient once a balance proof message is received.
+    """
+
+    def __init__(
+        self,
+        sender: Address,
+        recipient: Address,
+        channel_identifier: ChannelID,
+        message_identifier: MessageID,
+        payment_identifier: PaymentID,
+        token_address: TokenAddress,
+        secret: Secret,
+        balance_proof: BalanceProofUnsignedState,
+        signed_balance_proof: Unlock
+    ) -> None:
+        super().__init__(recipient, channel_identifier, message_identifier)
+        self.sender = sender
+        self.payment_identifier = payment_identifier
+        self.token = token_address
+        self.secret = secret
+        self.secrethash = sha3(secret)
+        self.balance_proof = balance_proof
+        self.signed_balance_proof = signed_balance_proof
+
+    def __repr__(self) -> str:
+        return (
+            "<"
+            "SendBalanceProofLight msgid:{} paymentid:{} token:{} secrethash:{} sender: {} recipient:{} "
+            "balance_proof:{}"
+            ">"
+        ).format(
+            self.message_identifier,
+            self.payment_identifier,
+            pex(self.token),
+            pex(self.secrethash),
+            pex(self.sender),
+            pex(self.recipient),
+            self.balance_proof,
+        )
+
+    def __eq__(self, other: Any) -> bool:
+        return (
+            isinstance(other, SendBalanceProofLight)
+            and self.payment_identifier == other.payment_identifier
+            and self.token == other.token
+            and self.sender == other.sender
+            and self.recipient == other.recipient
+            and self.secret == other.secret
+            and self.balance_proof == other.balance_proof
+            and super().__eq__(other)
+        )
+
+    def __ne__(self, other: Any) -> bool:
+        return not self.__eq__(other)
+
+    def to_dict(self) -> Dict[str, Any]:
+        result = {
+            "sender": to_checksum_address(self.sender),
+            "recipient": to_checksum_address(self.recipient),
+            "channel_identifier": str(self.queue_identifier.channel_identifier),
+            "message_identifier": str(self.message_identifier),
+            "payment_identifier": str(self.payment_identifier),
+            "token_address": to_checksum_address(self.token),
+            "secret": serialize_bytes(self.secret),
+            "balance_proof": self.balance_proof,
+            "signed_balance_proof": self.signed_balance_proof
+        }
+
+        return result
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "SendBalanceProofLight":
+        restored = cls(
+            sender=to_canonical_address(data["sender"]),
+            recipient=to_canonical_address(data["recipient"]),
+            channel_identifier=ChannelID(int(data["channel_identifier"])),
+            message_identifier=MessageID(int(data["message_identifier"])),
+            payment_identifier=PaymentID(int(data["payment_identifier"])),
+            token_address=to_canonical_address(data["token_address"]),
+            secret=deserialize_secret(data["secret"]),
+            balance_proof=data["balance_proof"],
+            signed_balance_proof=data["signed_balance_proof"]
+        )
+
+        return restored
+
+
+class SendSecretRequestLight(SendMessageEvent):
+    """ Sends a signed SecretRequest to another node.
+    """
+
+    def __init__(
+        self,
+        sender: Address,
+        recipient: Address,
+        channel_identifier: ChannelID,
+        message_identifier: MessageID,
+        payment_identifier: PaymentID,
+        amount: PaymentWithFeeAmount,
+        expiration: BlockExpiration,
+        secrethash: SecretHash,
+        signed_secret_request: SecretRequest
+    ) -> None:
+        super().__init__(recipient, channel_identifier, message_identifier)
+        self.sender = sender
+        self.payment_identifier = payment_identifier
+        self.amount = amount
+        self.expiration = expiration
+        self.secrethash = secrethash
+        self.signed_secret_request = signed_secret_request
+
+    def __repr__(self) -> str:
+        return (
+            "<SendSecretRequestLight "
+            "msgid:{} paymentid:{} amount:{} expiration:{} secrethash:{} recipient:{}"
+            ">"
+        ).format(
+            self.message_identifier,
+            self.payment_identifier,
+            self.amount,
+            self.expiration,
+            pex(self.secrethash),
+            pex(self.recipient),
+        )
+
+    def __eq__(self, other: Any) -> bool:
+        return (
+            isinstance(other, SendSecretRequestLight)
+            and self.payment_identifier == other.payment_identifier
+            and self.amount == other.amount
+            and self.expiration == other.expiration
+            and self.secrethash == other.secrethash
+            and self.recipient == other.recipient
+            and super().__eq__(other)
+        )
+
+    def __ne__(self, other: Any) -> bool:
+        return not self.__eq__(other)
+
+    def to_dict(self) -> Dict[str, Any]:
+        result = {
+            "recipient": to_checksum_address(self.recipient),
+            "channel_identifier": str(self.queue_identifier.channel_identifier),
+            "message_identifier": str(self.message_identifier),
+            "payment_identifier": str(self.payment_identifier),
+            "amount": str(self.amount),
+            "expiration": str(self.expiration),
+            "secrethash": serialize_bytes(self.secrethash),
+            "signed_secret_request": self.signed_secret_request
+        }
+
+        return result
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "SendSecretRequestLight":
+        restored = cls(
+            recipient=to_canonical_address(data["recipient"]),
+            channel_identifier=ChannelID(int(data["channel_identifier"])),
+            message_identifier=MessageID(int(data["message_identifier"])),
+            payment_identifier=PaymentID(int(data["payment_identifier"])),
+            amount=PaymentWithFeeAmount(int(data["amount"])),
+            expiration=BlockExpiration(int(data["expiration"])),
+            secrethash=deserialize_secret_hash(data["secrethash"]),
+            signed_secret_request=data["signed_secret_request"]
         )
 
         return restored
@@ -334,16 +673,15 @@ class SendSecretRequest(SendMessageEvent):
     """
 
     def __init__(
-            self,
-            recipient: Address,
-            channel_identifier: ChannelID,
-            message_identifier: MessageID,
-            payment_identifier: PaymentID,
-            amount: TokenAmount,
-            expiration: BlockExpiration,
-            secrethash: SecretHash,
-    ):
-
+        self,
+        recipient: Address,
+        channel_identifier: ChannelID,
+        message_identifier: MessageID,
+        payment_identifier: PaymentID,
+        amount: PaymentWithFeeAmount,
+        expiration: BlockExpiration,
+        secrethash: SecretHash,
+    ) -> None:
         super().__init__(recipient, channel_identifier, message_identifier)
 
         self.payment_identifier = payment_identifier
@@ -351,11 +689,11 @@ class SendSecretRequest(SendMessageEvent):
         self.expiration = expiration
         self.secrethash = secrethash
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return (
-            '<SendSecretRequest '
-            'msgid:{} paymentid:{} amount:{} expiration:{} secrethash:{} recipient:{}'
-            '>'
+            "<SendSecretRequest "
+            "msgid:{} paymentid:{} amount:{} expiration:{} secrethash:{} recipient:{}"
+            ">"
         ).format(
             self.message_identifier,
             self.payment_identifier,
@@ -365,43 +703,43 @@ class SendSecretRequest(SendMessageEvent):
             pex(self.recipient),
         )
 
-    def __eq__(self, other):
+    def __eq__(self, other: Any) -> bool:
         return (
-            isinstance(other, SendSecretRequest) and
-            self.payment_identifier == other.payment_identifier and
-            self.amount == other.amount and
-            self.expiration == other.expiration and
-            self.secrethash == other.secrethash and
-            self.recipient == other.recipient and
-            super().__eq__(other)
+            isinstance(other, SendSecretRequest)
+            and self.payment_identifier == other.payment_identifier
+            and self.amount == other.amount
+            and self.expiration == other.expiration
+            and self.secrethash == other.secrethash
+            and self.recipient == other.recipient
+            and super().__eq__(other)
         )
 
-    def __ne__(self, other):
+    def __ne__(self, other: Any) -> bool:
         return not self.__eq__(other)
 
     def to_dict(self) -> Dict[str, Any]:
         result = {
-            'recipient': to_checksum_address(self.recipient),
-            'channel_identifier': str(self.queue_identifier.channel_identifier),
-            'message_identifier': str(self.message_identifier),
-            'payment_identifier': str(self.payment_identifier),
-            'amount': str(self.amount),
-            'expiration': str(self.expiration),
-            'secrethash': serialization.serialize_bytes(self.secrethash),
+            "recipient": to_checksum_address(self.recipient),
+            "channel_identifier": str(self.queue_identifier.channel_identifier),
+            "message_identifier": str(self.message_identifier),
+            "payment_identifier": str(self.payment_identifier),
+            "amount": str(self.amount),
+            "expiration": str(self.expiration),
+            "secrethash": serialize_bytes(self.secrethash),
         }
 
         return result
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'SendSecretRequest':
+    def from_dict(cls, data: Dict[str, Any]) -> "SendSecretRequest":
         restored = cls(
-            recipient=to_canonical_address(data['recipient']),
-            channel_identifier=ChannelID(int(data['channel_identifier'])),
-            message_identifier=MessageID(int(data['message_identifier'])),
-            payment_identifier=PaymentID(int(data['payment_identifier'])),
-            amount=TokenAmount(int(data['amount'])),
-            expiration=BlockExpiration(int(data['expiration'])),
-            secrethash=SecretHash(serialization.deserialize_bytes(data['secrethash'])),
+            recipient=to_canonical_address(data["recipient"]),
+            channel_identifier=ChannelID(int(data["channel_identifier"])),
+            message_identifier=MessageID(int(data["message_identifier"])),
+            payment_identifier=PaymentID(int(data["payment_identifier"])),
+            amount=PaymentWithFeeAmount(int(data["amount"])),
+            expiration=BlockExpiration(int(data["expiration"])),
+            secrethash=deserialize_secret_hash(data["secrethash"]),
         )
 
         return restored
@@ -415,57 +753,56 @@ class SendRefundTransfer(SendMessageEvent):
     """
 
     def __init__(
-            self,
-            recipient: Address,
-            channel_identifier: ChannelID,
-            message_identifier: MessageID,
-            transfer: LockedTransferUnsignedState,
-    ):
-
+        self,
+        recipient: Address,
+        channel_identifier: ChannelID,
+        message_identifier: MessageID,
+        transfer: LockedTransferUnsignedState,
+    ) -> None:
         super().__init__(recipient, channel_identifier, message_identifier)
 
         self.transfer = transfer
 
     @property
-    def balance_proof(self):
+    def balance_proof(self) -> BalanceProofUnsignedState:
         return self.transfer.balance_proof
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return (
-            f'<'
-            f'SendRefundTransfer msgid:{self.message_identifier} transfer:{self.transfer} '
-            f'recipient:{pex(self.recipient)} '
-            f'>'
+            f"<"
+            f"SendRefundTransfer msgid:{self.message_identifier} transfer:{self.transfer} "
+            f"recipient:{pex(self.recipient)} "
+            f">"
         )
 
-    def __eq__(self, other):
+    def __eq__(self, other: Any) -> bool:
         return (
-            isinstance(other, SendRefundTransfer) and
-            self.transfer == other.transfer and
-            super().__eq__(other)
+            isinstance(other, SendRefundTransfer)
+            and self.transfer == other.transfer
+            and super().__eq__(other)
         )
 
-    def __ne__(self, other):
+    def __ne__(self, other: Any) -> bool:
         return not self.__eq__(other)
 
     def to_dict(self) -> Dict[str, Any]:
         result = {
-            'recipient': to_checksum_address(self.recipient),
-            'channel_identifier': str(self.queue_identifier.channel_identifier),
-            'message_identifier': str(self.message_identifier),
-            'transfer': self.transfer,
-            'balance_proof': self.transfer.balance_proof,
+            "recipient": to_checksum_address(self.recipient),
+            "channel_identifier": str(self.queue_identifier.channel_identifier),
+            "message_identifier": str(self.message_identifier),
+            "transfer": self.transfer,
+            "balance_proof": self.transfer.balance_proof,
         }
 
         return result
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'SendRefundTransfer':
+    def from_dict(cls, data: Dict[str, Any]) -> "SendRefundTransfer":
         restored = cls(
-            recipient=to_canonical_address(data['recipient']),
-            channel_identifier=ChannelID(int(data['channel_identifier'])),
-            message_identifier=int(data['message_identifier']),
-            transfer=data['transfer'],
+            recipient=to_canonical_address(data["recipient"]),
+            channel_identifier=ChannelID(int(data["channel_identifier"])),
+            message_identifier=MessageID(int(data["message_identifier"])),
+            transfer=data["transfer"],
         )
 
         return restored
@@ -474,39 +811,38 @@ class SendRefundTransfer(SendMessageEvent):
 class EventUnlockSuccess(Event):
     """ Event emitted when a lock unlock succeded. """
 
-    def __init__(self, identifier: PaymentID, secrethash: SecretHash):
+    def __init__(self, identifier: PaymentID, secrethash: SecretHash) -> None:
         self.identifier = identifier
         self.secrethash = secrethash
 
-    def __repr__(self):
-        return '<EventUnlockSuccess id:{} secrethash:{}>'.format(
-            self.identifier,
-            pex(self.secrethash),
+    def __repr__(self) -> str:
+        return "<EventUnlockSuccess id:{} secrethash:{}>".format(
+            self.identifier, pex(self.secrethash)
         )
 
-    def __eq__(self, other):
+    def __eq__(self, other: Any) -> bool:
         return (
-            isinstance(other, EventUnlockSuccess) and
-            self.identifier == other.identifier and
-            self.secrethash == other.secrethash
+            isinstance(other, EventUnlockSuccess)
+            and self.identifier == other.identifier
+            and self.secrethash == other.secrethash
         )
 
-    def __ne__(self, other):
+    def __ne__(self, other: Any) -> bool:
         return not self.__eq__(other)
 
     def to_dict(self) -> Dict[str, Any]:
         result = {
-            'identifier': str(self.identifier),
-            'secrethash': serialization.serialize_bytes(self.secrethash),
+            "identifier": str(self.identifier),
+            "secrethash": serialize_bytes(self.secrethash),
         }
 
         return result
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'EventUnlockSuccess':
+    def from_dict(cls, data: Dict[str, Any]) -> "EventUnlockSuccess":
         restored = cls(
-            identifier=int(data['identifier']),
-            secrethash=serialization.deserialize_bytes(data['secrethash']),
+            identifier=PaymentID(int(data["identifier"])),
+            secrethash=deserialize_secret_hash(data["secrethash"]),
         )
 
         return restored
@@ -515,48 +851,41 @@ class EventUnlockSuccess(Event):
 class EventUnlockFailed(Event):
     """ Event emitted when a lock unlock failed. """
 
-    def __init__(
-            self,
-            identifier: PaymentID,
-            secrethash: SecretHash,
-            reason: str,
-    ):
+    def __init__(self, identifier: PaymentID, secrethash: SecretHash, reason: str) -> None:
         self.identifier = identifier
         self.secrethash = secrethash
         self.reason = reason
 
-    def __repr__(self):
-        return '<EventUnlockFailed id:{} secrethash:{} reason:{}>'.format(
-            self.identifier,
-            pex(self.secrethash),
-            self.reason,
+    def __repr__(self) -> str:
+        return "<EventUnlockFailed id:{} secrethash:{} reason:{}>".format(
+            self.identifier, pex(self.secrethash), self.reason
         )
 
-    def __eq__(self, other):
+    def __eq__(self, other: Any) -> bool:
         return (
-            isinstance(other, EventUnlockFailed) and
-            self.identifier == other.identifier and
-            self.secrethash == other.secrethash
+            isinstance(other, EventUnlockFailed)
+            and self.identifier == other.identifier
+            and self.secrethash == other.secrethash
         )
 
-    def __ne__(self, other):
+    def __ne__(self, other: Any) -> bool:
         return not self.__eq__(other)
 
     def to_dict(self) -> Dict[str, Any]:
         result = {
-            'identifier': str(self.identifier),
-            'secrethash': serialization.serialize_bytes(self.secrethash),
-            'reason': self.reason,
+            "identifier": str(self.identifier),
+            "secrethash": serialize_bytes(self.secrethash),
+            "reason": self.reason,
         }
 
         return result
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'EventUnlockFailed':
+    def from_dict(cls, data: Dict[str, Any]) -> "EventUnlockFailed":
         restored = cls(
-            identifier=int(data['identifier']),
-            secrethash=serialization.deserialize_bytes(data['secrethash']),
-            reason=data['reason'],
+            identifier=PaymentID(int(data["identifier"])),
+            secrethash=deserialize_secret_hash(data["secrethash"]),
+            reason=data["reason"],
         )
 
         return restored
@@ -565,39 +894,38 @@ class EventUnlockFailed(Event):
 class EventUnlockClaimSuccess(Event):
     """ Event emitted when a lock claim succeded. """
 
-    def __init__(self, identifier: PaymentID, secrethash: SecretHash):
+    def __init__(self, identifier: PaymentID, secrethash: SecretHash) -> None:
         self.identifier = identifier
         self.secrethash = secrethash
 
-    def __repr__(self):
-        return '<EventUnlockClaimSuccess id:{} secrethash:{}>'.format(
-            self.identifier,
-            pex(self.secrethash),
+    def __repr__(self) -> str:
+        return "<EventUnlockClaimSuccess id:{} secrethash:{}>".format(
+            self.identifier, pex(self.secrethash)
         )
 
-    def __eq__(self, other):
+    def __eq__(self, other: Any) -> bool:
         return (
-            isinstance(other, EventUnlockClaimSuccess) and
-            self.identifier == other.identifier and
-            self.secrethash == other.secrethash
+            isinstance(other, EventUnlockClaimSuccess)
+            and self.identifier == other.identifier
+            and self.secrethash == other.secrethash
         )
 
-    def __ne__(self, other):
+    def __ne__(self, other: Any) -> bool:
         return not self.__eq__(other)
 
     def to_dict(self) -> Dict[str, Any]:
         result = {
-            'identifier': str(self.identifier),
-            'secrethash': serialization.serialize_bytes(self.secrethash),
+            "identifier": str(self.identifier),
+            "secrethash": serialize_bytes(self.secrethash),
         }
 
         return result
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'EventUnlockClaimSuccess':
+    def from_dict(cls, data: Dict[str, Any]) -> "EventUnlockClaimSuccess":
         restored = cls(
-            identifier=int(data['identifier']),
-            secrethash=serialization.deserialize_bytes(data['secrethash']),
+            identifier=PaymentID(int(data["identifier"])),
+            secrethash=deserialize_secret_hash(data["secrethash"]),
         )
 
         return restored
@@ -606,43 +934,41 @@ class EventUnlockClaimSuccess(Event):
 class EventUnlockClaimFailed(Event):
     """ Event emitted when a lock claim failed. """
 
-    def __init__(self, identifier: PaymentID, secrethash: SecretHash, reason: str):
+    def __init__(self, identifier: PaymentID, secrethash: SecretHash, reason: str) -> None:
         self.identifier = identifier
         self.secrethash = secrethash
         self.reason = reason
 
-    def __repr__(self):
-        return '<EventUnlockClaimFailed id:{} secrethash:{} reason:{}>'.format(
-            self.identifier,
-            pex(self.secrethash),
-            self.reason,
+    def __repr__(self) -> str:
+        return "<EventUnlockClaimFailed id:{} secrethash:{} reason:{}>".format(
+            self.identifier, pex(self.secrethash), self.reason
         )
 
-    def __eq__(self, other):
+    def __eq__(self, other: Any) -> bool:
         return (
-            isinstance(other, EventUnlockClaimFailed) and
-            self.identifier == other.identifier and
-            self.secrethash == other.secrethash
+            isinstance(other, EventUnlockClaimFailed)
+            and self.identifier == other.identifier
+            and self.secrethash == other.secrethash
         )
 
-    def __ne__(self, other):
+    def __ne__(self, other: Any) -> bool:
         return not self.__eq__(other)
 
     def to_dict(self) -> Dict[str, Any]:
         result = {
-            'identifier': str(self.identifier),
-            'secrethash': serialization.serialize_bytes(self.secrethash),
-            'reason': self.reason,
+            "identifier": str(self.identifier),
+            "secrethash": serialize_bytes(self.secrethash),
+            "reason": self.reason,
         }
 
         return result
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'EventUnlockClaimFailed':
+    def from_dict(cls, data: Dict[str, Any]) -> "EventUnlockClaimFailed":
         restored = cls(
-            identifier=int(data['identifier']),
-            secrethash=serialization.deserialize_bytes(data['secrethash']),
-            reason=data['reason'],
+            identifier=PaymentID(int(data["identifier"])),
+            secrethash=deserialize_secret_hash(data["secrethash"]),
+            reason=data["reason"],
         )
 
         return restored
@@ -655,41 +981,71 @@ class EventUnexpectedSecretReveal(Event):
         self.secrethash = secrethash
         self.reason = reason
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return (
-            f'<'
-            f'EventUnexpectedSecretReveal '
-            f'secrethash:{pex(self.secrethash)} '
-            f'reason:{self.reason}'
-            f'>'
+            f"<"
+            f"EventUnexpectedSecretReveal "
+            f"secrethash:{pex(self.secrethash)} "
+            f"reason:{self.reason}"
+            f">"
         )
 
-    def __eq__(self, other):
+    def __eq__(self, other: Any) -> bool:
         return (
-            isinstance(other, EventUnexpectedSecretReveal) and
-            self.secrethash == other.secrethash and
-            self.reason == other.reason
+            isinstance(other, EventUnexpectedSecretReveal)
+            and self.secrethash == other.secrethash
+            and self.reason == other.reason
         )
 
-    def __ne__(self, other):
+    def __ne__(self, other: Any) -> bool:
         return not self.__eq__(other)
 
     def to_dict(self) -> Dict[str, Any]:
-        result = {
-            'secrethash': serialization.serialize_bytes(self.secrethash),
-            'reason': self.reason,
-        }
+        result = {"secrethash": serialize_bytes(self.secrethash), "reason": self.reason}
 
         return result
 
     @classmethod
-    def from_dict(
-            cls,
-            data: Dict[str, Any],
-    )-> 'EventUnexpectedSecretReveal':
+    def from_dict(cls, data: Dict[str, Any]) -> "EventUnexpectedSecretReveal":
         restored = cls(
-            secrethash=serialization.deserialize_bytes(data['secrethash']),
-            reason=data['reason'],
+            secrethash=deserialize_secret_hash(data["secrethash"]), reason=data["reason"]
         )
 
         return restored
+
+
+class EventRouteFailed(Event):
+    """ Event emitted when a route failed.
+
+    As a payment can try different routes to reach the intended target
+    some of the routes can fail. This event is emitted when a route failed.
+
+    This means that multiple EventRouteFailed for a given payment and it's
+    therefore different to EventPaymentSentFailed.
+
+    A route can fail for two reasons:
+    - A refund transfer reaches the initiator (it's not important if this
+        refund transfer is unlocked or not)
+    - A lock expires
+    """
+
+    def __init__(self, secrethash: SecretHash):
+        self.secrethash = secrethash
+
+    def __repr__(self):
+        return f"<EventRouteFailed secrethash:{pex(self.secrethash)}>"
+
+    def __eq__(self, other: Any) -> bool:
+        return (
+            isinstance(other, EventUnexpectedSecretReveal) and self.secrethash == other.secrethash
+        )
+
+    def __ne__(self, other: Any) -> bool:
+        return not self.__eq__(other)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {"secrethash": serialize_bytes(self.secrethash)}
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "EventRouteFailed":
+        return cls(secrethash=deserialize_secret_hash(data["secrethash"]))

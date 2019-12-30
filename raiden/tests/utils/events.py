@@ -1,5 +1,6 @@
+from collections import Mapping
+
 import gevent
-from web3.datastructures import AttributeDict
 
 from raiden.raiden_service import RaidenService
 from raiden.transfer.architecture import Event, StateChange
@@ -25,7 +26,7 @@ def check_dict_nested_attrs(item: Dict, dict_data: Dict) -> bool:
 
         item_value = item[key]
 
-        if isinstance(item_value, (AttributeDict, dict)):
+        if isinstance(item_value, Mapping):
             if not check_dict_nested_attrs(item_value, value):
                 return False
         elif item_value != value:
@@ -53,7 +54,7 @@ def check_nested_attrs(item: Any, attributes: Dict) -> bool:
     for name, value in attributes.items():
         item_value = getattr(item, name, NOVALUE)
 
-        if isinstance(value, dict):
+        if isinstance(value, Mapping):
             if not check_nested_attrs(item_value, value):
                 return False
 
@@ -63,11 +64,7 @@ def check_nested_attrs(item: Any, attributes: Dict) -> bool:
     return True
 
 
-def search_for_item(
-        item_list: List,
-        item_type: Any,
-        attributes: Dict,
-) -> Optional[Any]:
+def search_for_item(item_list: List, item_type: Any, attributes: Dict) -> Optional[Any]:
     """ Search for the first item of type `item_type` with `attributes` in
     `item_list`.
 
@@ -81,9 +78,7 @@ def search_for_item(
 
 
 def raiden_events_search_for_item(
-        raiden: RaidenService,
-        item_type: Event,
-        attributes: Dict,
+    raiden: RaidenService, item_type: Event, attributes: Dict
 ) -> Optional[Event]:
     """ Search for the first event of type `item_type` with `attributes` in the
     `raiden` database.
@@ -94,9 +89,7 @@ def raiden_events_search_for_item(
 
 
 def raiden_state_changes_search_for_item(
-        raiden: RaidenService,
-        item_type: StateChange,
-        attributes: Dict,
+    raiden: RaidenService, item_type: StateChange, attributes: Dict
 ) -> Optional[StateChange]:
     """ Search for the first event of type `item_type` with `attributes` in the
     `raiden` database.
@@ -104,15 +97,13 @@ def raiden_state_changes_search_for_item(
     `attributes` are compared using the utility `check_nested_attrs`.
     """
     return search_for_item(
-        raiden.wal.storage.get_statechanges_by_identifier(0, 'latest'),
-        item_type,
-        attributes,
+        raiden.wal.storage.get_statechanges_by_identifier(0, "latest"), item_type, attributes
     )
 
 
 def must_have_event(event_list: List, dict_data: Dict):
     for item in event_list:
-        if isinstance(item, dict) and check_dict_nested_attrs(item, dict_data):
+        if isinstance(item, Mapping) and check_dict_nested_attrs(item, dict_data):
             return item
     return None
 
@@ -127,10 +118,7 @@ def must_have_events(event_list: List, *args) -> bool:
 
 
 def wait_for_raiden_event(
-        raiden: RaidenService,
-        item_type: Event,
-        attributes: Dict,
-        retry_timeout: float,
+    raiden: RaidenService, item_type: Event, attributes: Dict, retry_timeout: float
 ) -> Event:
     """Wait until an event is seen in the WAL events
 
@@ -145,10 +133,7 @@ def wait_for_raiden_event(
 
 
 def wait_for_state_change(
-        raiden: RaidenService,
-        item_type: StateChange,
-        attributes: Dict,
-        retry_timeout: float,
+    raiden: RaidenService, item_type: StateChange, attributes: Dict, retry_timeout: float
 ) -> StateChange:
     """Wait until a state change is seen in the WAL
 

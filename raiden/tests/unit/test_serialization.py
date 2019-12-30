@@ -8,11 +8,11 @@ from raiden.storage.serialize import JSONSerializer
 from raiden.tests.utils import factories
 from raiden.transfer import state, state_change
 from raiden.transfer.merkle_tree import compute_layers
-from raiden.transfer.state import EMPTY_MERKLE_TREE
+from raiden.transfer.state import make_empty_merkle_tree
 from raiden.utils import serialization
 
 
-class MockObject(object):
+class MockObject:
     """ Used for testing JSON encoding/decoding """
 
     def __init__(self, **kwargs):
@@ -20,10 +20,7 @@ class MockObject(object):
             setattr(self, key, value)
 
     def to_dict(self):
-        return {
-            key: value
-            for key, value in self.__dict__.items()
-        }
+        return {key: value for key, value in self.__dict__.items()}
 
     @classmethod
     def from_dict(cls, data):
@@ -45,22 +42,18 @@ class MockObject(object):
 def test_object_custom_serialization():
     # Simple encode/decode
     original_obj = MockObject(attr1="Hello", attr2="World")
-    decoded_obj = JSONSerializer.deserialize(
-        JSONSerializer.serialize(original_obj),
-    )
+    decoded_obj = JSONSerializer.deserialize(JSONSerializer.serialize(original_obj))
 
     assert original_obj == decoded_obj
 
     # Encode/Decode with embedded objects
-    embedded_obj = MockObject(amount=1, identifier='123')
+    embedded_obj = MockObject(amount=1, identifier="123")
     original_obj = MockObject(embedded=embedded_obj)
-    decoded_obj = JSONSerializer.deserialize(
-        JSONSerializer.serialize(original_obj),
-    )
+    decoded_obj = JSONSerializer.deserialize(JSONSerializer.serialize(original_obj))
 
     assert original_obj == decoded_obj
     assert decoded_obj.embedded.amount == 1
-    assert decoded_obj.embedded.identifier == '123'
+    assert decoded_obj.embedded.identifier == "123"
 
 
 def test_decode_with_unknown_type():
@@ -72,7 +65,7 @@ def test_decode_with_unknown_type():
 """
     with pytest.raises(TypeError) as m:
         JSONSerializer.deserialize(test_str)
-        assert str(m) == 'Module some.non.existent.package does not exist'
+        assert str(m) == "Module some.non.existent.package does not exist"
 
     test_str = """
 {
@@ -82,14 +75,14 @@ def test_decode_with_unknown_type():
 """
     with pytest.raises(TypeError) as m:
         JSONSerializer.deserialize(test_str)
-        assert str(m) == 'raiden.tests.unit.test_serialization.NonExistentClass'
+        assert str(m) == "raiden.tests.unit.test_serialization.NonExistentClass"
 
 
 def test_serialization_networkx_graph():
-    p1 = to_canonical_address('0x5522070585a1a275631ba69c444ac0451AA9Fe4C')
-    p2 = to_canonical_address('0x5522070585a1a275631ba69c444ac0451AA9Fe4D')
-    p3 = to_canonical_address('0x5522070585a1a275631ba69c444ac0451AA9Fe4E')
-    p4 = to_canonical_address('0x5522070585a1a275631ba69c444ac0451AA9Fe4F')
+    p1 = to_canonical_address("0x5522070585a1a275631ba69c444ac0451AA9Fe4C")
+    p2 = to_canonical_address("0x5522070585a1a275631ba69c444ac0451AA9Fe4D")
+    p3 = to_canonical_address("0x5522070585a1a275631ba69c444ac0451AA9Fe4E")
+    p4 = to_canonical_address("0x5522070585a1a275631ba69c444ac0451AA9Fe4F")
 
     e = [(p1, p2), (p2, p3), (p3, p4)]
     graph = Graph(e)
@@ -102,8 +95,8 @@ def test_serialization_networkx_graph():
 
 def test_serialization_participants_tuple():
     participants = (
-        to_canonical_address('0x5522070585a1a275631ba69c444ac0451AA9Fe4C'),
-        to_canonical_address('0xEF4f7c9962d8bAa8E268B72EC6DD4BDf09C84397'),
+        to_canonical_address("0x5522070585a1a275631ba69c444ac0451AA9Fe4C"),
+        to_canonical_address("0xEF4f7c9962d8bAa8E268B72EC6DD4BDf09C84397"),
     )
 
     data = serialization.serialize_participants_tuple(participants)
@@ -113,8 +106,8 @@ def test_serialization_participants_tuple():
 
 
 def test_serialization_merkletree_layers():
-    hash_0 = b'a' * 32
-    hash_1 = b'b' * 32
+    hash_0 = b"a" * 32
+    hash_1 = b"b" * 32
 
     leaves = [hash_0, hash_1]
     layers = compute_layers(leaves)
@@ -126,7 +119,7 @@ def test_serialization_merkletree_layers():
 
 
 def test_serialization_merkletree_layers_empty():
-    tree = EMPTY_MERKLE_TREE
+    tree = make_empty_merkle_tree()
 
     data = serialization.serialize_merkletree_layers(tree.layers)
     restored = serialization.deserialize_merkletree_layers(data)
@@ -157,15 +150,14 @@ def test_actioninitchain_restore():
     chain_id = 777
 
     original_obj = state_change.ActionInitChain(
-        pseudo_random_generator,
-        block_number,
-        our_address,
-        chain_id,
+        pseudo_random_generator=pseudo_random_generator,
+        block_number=block_number,
+        block_hash=factories.make_block_hash(),
+        our_address=our_address,
+        chain_id=chain_id,
     )
 
-    decoded_obj = JSONSerializer.deserialize(
-        JSONSerializer.serialize(original_obj),
-    )
+    decoded_obj = JSONSerializer.deserialize(JSONSerializer.serialize(original_obj))
 
     assert original_obj == decoded_obj
 
@@ -179,12 +171,11 @@ def test_chainstate_restore():
     original_obj = state.ChainState(
         pseudo_random_generator=pseudo_random_generator,
         block_number=block_number,
+        block_hash=factories.make_block_hash(),
         our_address=our_address,
         chain_id=chain_id,
     )
 
-    decoded_obj = JSONSerializer.deserialize(
-        JSONSerializer.serialize(original_obj),
-    )
+    decoded_obj = JSONSerializer.deserialize(JSONSerializer.serialize(original_obj))
 
     assert original_obj == decoded_obj

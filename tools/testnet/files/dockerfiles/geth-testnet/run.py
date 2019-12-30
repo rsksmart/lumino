@@ -13,7 +13,7 @@ import structlog
 from web3 import IPCProvider, Web3
 from web3.utils.compat.compat_stdlib import Timeout
 
-log = struct.get_logger(__name__)
+log = structlog.get_logger(__name__)
 
 # Since this will run inside a docker container and is written for Python 3 we
 # have to disable flake8 since it will run with Python 2 and break on Travis-CI
@@ -110,7 +110,7 @@ SYNC_FINISHED_PCT = 110
 
 def get_current_block_no():
     try:
-        return int(requests.get(ETHERSCAN_API_BLOCKNO).json()['result'], 0)
+        return int(requests.get(ETHERSCAN_API_BLOCKNO).json()["result"], 0)
     except (ValueError, KeyError):
         return 0
 
@@ -168,23 +168,26 @@ def main(bootnode):
                 sys.exit(2)
             continue
 
-        if sync_state['currentBlock'] / sync_state['highestBlock'] * 100 >= SYNC_FINISHED_PCT:
+        if sync_state["currentBlock"] / sync_state["highestBlock"] * 100 >= SYNC_FINISHED_PCT:
             log.info("Syncing done")
             synced = True
             break
         else:
             duration = time.monotonic() - start
-            blocks_synced = sync_state['currentBlock'] - sync_state['startingBlock']
-            blocks_remaining = sync_state['highestBlock'] - sync_state['currentBlock']
+            blocks_synced = sync_state["currentBlock"] - sync_state["startingBlock"]
+            blocks_remaining = sync_state["highestBlock"] - sync_state["currentBlock"]
             blocks_per_sec = blocks_synced / duration
             time_remaining = timedelta(
-                seconds=int(blocks_remaining / blocks_per_sec) if blocks_per_sec else 0)
-            log.info("Blocks remaining: {:,d}; blk/s: {:.1f}; ETA: {!s} / {:%H:%M}".format(
-                blocks_remaining,
-                blocks_per_sec,
-                time_remaining,
-                datetime.now() + time_remaining
-            ))
+                seconds=int(blocks_remaining / blocks_per_sec) if blocks_per_sec else 0
+            )
+            log.info(
+                "Blocks remaining: {:,d}; blk/s: {:.1f}; ETA: {!s} / {:%H:%M}".format(
+                    blocks_remaining,
+                    blocks_per_sec,
+                    time_remaining,
+                    datetime.now() + time_remaining,
+                )
+            )
 
     geth_proc.send_signal(signal.SIGINT)
     geth_proc.wait(10)
@@ -200,4 +203,4 @@ def main(bootnode):
 if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
 
-    main()
+    main()  # pylint: disable=no-value-for-parameter
