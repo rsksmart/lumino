@@ -1100,7 +1100,9 @@ def create_sendlockedtransfer(
     our_balance_proof = our_state.balance_proof
 
     msg = "Caller must have balance on the channel"
-    assert amount <= get_distributable(our_state, partner_state), msg
+    # assert amount <= get_distributable(our_state, partner_state), msg
+    if amount > get_distributable(our_state, partner_state):
+        raise InsufficientFunds(msg)
 
     msg = "caller must make sure the channel is open"
     assert get_status(channel_state) == CHANNEL_STATE_OPENED, msg
