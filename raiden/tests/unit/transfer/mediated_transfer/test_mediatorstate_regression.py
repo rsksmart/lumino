@@ -1,7 +1,7 @@
 # pylint: disable=invalid-name,too-many-locals,too-many-arguments,too-many-lines
 import random
 
-from raiden.messages import message_from_sendevent
+from raiden.message_event_convertor import message_from_sendevent
 from raiden.tests.utils import factories
 from raiden.tests.utils.events import search_for_item
 from raiden.tests.utils.factories import (
