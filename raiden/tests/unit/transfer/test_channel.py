@@ -83,6 +83,7 @@ def test_channel_cleared_after_two_unlocks():
         partner_onchain_locksroot=merkleroot(channel_state.partner_state.merkletree),
         block_number=1,
         block_hash=make_block_hash(),
+        participant1=""
     )
     iteration = channel.state_transition(channel_state, settle_channel, block_number, block_hash)
 
@@ -148,6 +149,7 @@ def test_channel_cleared_after_our_unlock():
         partner_onchain_locksroot=merkleroot(channel_state.partner_state.merkletree),
         block_number=1,
         block_hash=make_block_hash(),
+        participant1=""
     )
 
     assert settle_channel.our_onchain_locksroot is not EMPTY_MERKLE_ROOT
