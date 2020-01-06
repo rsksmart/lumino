@@ -1,4 +1,4 @@
-# Get your own RIF Lumino node up and running on MacOS
+# Get your own RIF Lumino node up and running on Ubuntu
 
 ## Prerequisites
 
@@ -6,76 +6,93 @@
 	1. Run your own node on TestNet or MainNet, see [https://github.com/rsksmart/rskj/wiki/Install-RskJ-and-join-the-RSK-Orchid-Mainnet-Beta](https://github.com/rsksmart/rskj/wiki/Install-RskJ-and-join-the-RSK-Orchid-Mainnet-Beta)
 	2. Compile and run a RSK node locally, see [https://github.com/rsksmart/rskj/wiki/Compile-and-run-a-RSK-node-locally](https://github.com/rsksmart/rskj/wiki/Compile-and-run-a-RSK-node-locally)
 2. An RSK account with an RBTC balance NOT lower than 0.001 RBTC
-3. XCode
+3. Ubuntu 18.04+
 
 ## Install required libraries/software
 
-### Install command line tools
-
-```
-xcode-select --install
-```
-
-### Install Homebrew
-
-From a Terminal window run:
-
-```
-/usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
-```
-
-### Install OpenSSL
-
-```
-brew install openssl
-export LC_ALL="en_US.UTF-8"\nexport LC_CTYPE="en_US.UTF-8"
-export LIBRARY_PATH=$LIBRARY_PATH:/usr/local/opt/openssl/lib/
-```
-
 ### Install Python 3.7
 
+Update your packages and install pre-requisites:
 
 ```
-brew install python3
+sudo apt update
+sudo apt install software-properties-common
+```
+
+Add deadsnakes PPA to your sources list:
+
+```
+sudo add-apt-repository ppa:deadsnakes/ppa
+```
+
+Once the repository is enabled install Python 3.7:
+
+```
+sudo apt install python3.7
+```
+
+
+### Install Python 3.7-dev
+
+If you didn't update your local APT repository:
+
+```
+sudo apt update
+```
+
+To install python 3.7-dev run the following command:
+
+```
+sudo apt-get install libpq-dev python3.7-dev
 ```
 
 ### Install PIP
 
+
+If you didn't update your local APT repository:
+
 ```
-sudo easy_install pip
+sudo apt update
+```
+
+Install pip3:
+
+```
+sudo apt-get install python3-pip
 ```
 
 ### Install virtualenv
 
-
-
-```
-pip3 install virtualenv
-```
-
-### Install libpq
+If you didn't update your local APT repository:
 
 ```
-brew install libpq
+sudo apt update
 ```
 
-### Install postgresql
+Install virtualenv:
 
 ```
-brew install postgresql
+sudo apt-get install virtualenv
 ```
 
-### Install psycopg2
+### Install Lumino Invoicing dependencies
+
+Lumino includes a billing that is based on the Lighting Network invoicing feature. In order to install Lumino, the following dependencies are required:
 
 ```
-env LDFLAGS="-I/usr/local/opt/openssl/include -L/usr/local/opt/openssl/lib" pip install psycopg2
+sudo apt install libsecp256k1-dev
+
+sudo apt-get install libssl-dev build-essential automake pkg-config libtool libffi-dev libgmp-dev libyaml-cpp-dev
+
 ```
+
 
 
 ## Build RIF Lumino from code
 
-1. Get the code from [https://github.com/rsksmart/lumino/releases/tag/0.0.2](https://github.com/rsksmart/lumino/releases/tag/0.0.2)
-2. Uncompress the downloaded file
+
+1. Get the code from [https://github.com/rsksmart/lumino/releases/tag/0.0.4](https://github.com/rsksmart/lumino/releases/tag/0.0.4)
+2. Uncompress the downloaded file 
 2. Go to the path you uncompressed the code in the previous step (lets call this path `$RIF_LUMINO_PATH`)
 3. Create python virtual env for RIF Lumino (this needs to be performed only once) and execute the following command:
 
@@ -84,7 +101,7 @@ virtualenv -p <PATH_TO_PYTHON3.7> clientEnv
 ```
 
 **Note:**
-Replace `<PATH_TO_PYTHON3.7>` with the path where Python3.7 is installed in your system. In the case of MacOS, this is usually `/usr/local/bin/python3.7`
+Replace `<PATH_TO_PYTHON3.7>` with the path where Python3.7 is installed in your system. In the case of Ubuntu OS, this is usually `/usr/bin/python3.7`
 
 4. Activate python virtual env, by executing the following command:
 
@@ -103,7 +120,8 @@ This command should output version 3.7.x
 6. Install RIF Lumino requirements. Inside the virtual environment run the following command (this could take a few minutes):
 
 ```
-pip install -c constraints.txt --upgrade -r requirements-dev.txt
+pip install -r requirements.txt -c constraints.txt -e .
+
 ```
 
 7. Run Lumino setup with the following command:
