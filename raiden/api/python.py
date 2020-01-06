@@ -1659,13 +1659,13 @@ class RaidenAPI:
                               "api_key": api_key,
                               "encrypt_signed_seed_retry": encrypt_signed_seed_retry.hex(),
                               "message": "successfully registered",
-                              "result_code": 0}
+                              "result_code": 200}
                 else:
                     result = {"message": "An unexpected error has occurred.",
-                              "result_code": 1}
+                              "result_code": 500}
             else:
                 result = {"message": "Limit of registered light clients reached.",
-                          "result_code": 3}
+                          "result_code": 403}
         else:
             result = {"address": address,
                       "encrypt_signed_password": encrypt_signed_password.hex(),
@@ -1673,7 +1673,7 @@ class RaidenAPI:
                       "api_key": light_client['api_key'],
                       "encrypt_signed_seed_retry": encrypt_signed_seed_retry.hex(),
                       "message": "Already registered",
-                      "result_code": 2}
+                      "result_code": 409}
 
         return result
 
