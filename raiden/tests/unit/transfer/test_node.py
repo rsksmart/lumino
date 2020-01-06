@@ -33,6 +33,7 @@ def test_is_transaction_effect_satisfied(chain_state, token_network_id, netting_
     # now call normally with us being the partner and not the participant
     state_change.partner = netting_channel_state.partner_state.address
     state_change.participant = netting_channel_state.our_state.address
+    chain_state.our_address = canonical_identifier
     assert not is_transaction_effect_satisfied(chain_state, transaction, state_change)
     # finally call with us being the participant and not the partner which should check out
     state_change.participant = netting_channel_state.partner_state.address
@@ -49,6 +50,7 @@ def test_is_transaction_effect_satisfied(chain_state, token_network_id, netting_
         partner_onchain_locksroot=EMPTY_MERKLE_ROOT,
         block_number=1,
         block_hash=make_block_hash(),
+        participant1=state_change.participant
     )
 
     iteration = state_transition(chain_state=chain_state, state_change=channel_settled, storage=None)

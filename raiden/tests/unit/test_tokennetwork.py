@@ -140,6 +140,7 @@ def test_channel_settle_must_properly_cleanup(channel_properties):
         block_hash=factories.make_block_hash(),
         our_onchain_locksroot=EMPTY_MERKLE_ROOT,
         partner_onchain_locksroot=EMPTY_MERKLE_ROOT,
+        participant1=channel_state.our_state.address
     )
 
     channel_settled_iteration = token_network.state_transition(
@@ -329,6 +330,7 @@ def test_mediator_clear_pairs_after_batch_unlock(
         block_hash=factories.make_block_hash(),
         our_onchain_locksroot=factories.make_32bytes(),
         partner_onchain_locksroot=EMPTY_MERKLE_ROOT,
+        participant1=channel_state.our_state.address
     )
 
     channel_settled_iteration = token_network.state_transition(
@@ -439,6 +441,7 @@ def test_multiple_channel_states(chain_state, token_network_state, channel_prope
         block_hash=factories.make_block_hash(),
         our_onchain_locksroot=factories.make_32bytes(),
         partner_onchain_locksroot=EMPTY_MERKLE_ROOT,
+        participant1=channel_state.our_state.address
     )
 
     channel_settled_iteration = token_network.state_transition(
