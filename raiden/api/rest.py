@@ -71,6 +71,7 @@ from raiden.api.v1.resources import (
     PendingTransfersResourceByTokenAndPartnerAddress,
     RaidenInternalEventsResource,
     RegisterTokenResource,
+    GetTokenResource,
     TokensResource,
     DashboardResource,
     create_blueprint,
@@ -148,18 +149,12 @@ from raiden.ui.app import get_matrix_light_client_instance
 
 log = structlog.get_logger(__name__)
 
-URLS_V1 = [
-    ("/address", AddressResource),
+URLS_FN_V1 = [
     ("/channels", ChannelsResource),
-    ("/light_channels", ChannelsResourceLight),
     ("/channels/<hexaddress:token_address>", ChannelsResourceByTokenAddress),
     (
         "/channels/<hexaddress:token_address>/<hexaddress:partner_address>",
         ChannelsResourceByTokenAndPartnerAddress,
-    ),
-    (
-        "/light_channels/<hexaddress:token_address>/<hexaddress:creator_address>/<hexaddress:partner_address>",
-        LightChannelsResourceByTokenAndPartnerAddress
     ),
     ("/connections/<hexaddress:token_address>", ConnectionsResource),
     ("/connections", ConnectionsInfoResource),
@@ -171,14 +166,7 @@ URLS_V1 = [
         PaymentResource,
         "token_target_paymentresource",
     ),
-    ("/payments_light", PaymentLightResource),
-    ("/payments_light/get_messages", PaymentLightResource, "Message poling"),
-
-    ("/payments_light/create", CreatePaymentLightResource, "create_payment"),
-    ("/watchtower", WatchtowerResource),
-    ("/tokens", TokensResource),
     ("/tokens/<hexaddress:token_address>/partners", PartnersResourceByTokenAddress),
-    ("/tokens/<hexaddress:token_address>", RegisterTokenResource),
     ("/pending_transfers", PendingTransfersResource, "pending_transfers_resource"),
     (
         "/pending_transfers/<hexaddress:token_address>",
@@ -233,6 +221,18 @@ URLS_V1 = [
         '/invoice',
         InvoiceResource,
     ),
+]
+
+URLS_HUB_V1 = [
+    ("/light_channels", ChannelsResourceLight),
+    (
+        "/light_channels/<hexaddress:token_address>/<hexaddress:creator_address>/<hexaddress:partner_address>",
+        LightChannelsResourceByTokenAndPartnerAddress
+    ),
+    ("/payments_light", PaymentLightResource),
+    ("/payments_light/get_messages", PaymentLightResource, "Message poling"),
+    ("/payments_light/create", CreatePaymentLightResource, "create_payment"),
+    ("/watchtower", WatchtowerResource),
     (
         '/light_clients/matrix/credentials',
         LightClientMatrixCredentialsBuildResource,
@@ -241,9 +241,14 @@ URLS_V1 = [
         '/light_clients/',
         LightClientResource
     ),
-
 ]
 
+URLS_COMMON_V1 = [
+    ("/tokens", TokensResource),
+    ("/tokens/<hexaddress:token_address>", RegisterTokenResource),
+    ("/tokens/network/<hexaddress:token_network>", GetTokenResource),
+    ("/address", AddressResource),
+]
 
 def api_response(result, status_code=HTTPStatus.OK):
     if status_code == HTTPStatus.NO_CONTENT:
@@ -388,7 +393,7 @@ class APIServer(Runnable):
     _api_prefix = "/api/1"
 
     def __init__(
-        self, rest_api, config, cors_domain_list=None, web_ui=False, eth_rpc_endpoint=None
+        self, rest_api, config, cors_domain_list=None, web_ui=False, eth_rpc_endpoint=None, hub_mode=False
     ):
         super().__init__()
         if rest_api.version != 1:
@@ -423,7 +428,7 @@ class APIServer(Runnable):
         restapi_setup_urls(
             flask_api_context,
             rest_api,
-            URLS_V1
+            URLS_COMMON_V1 + URLS_HUB_V1 if hub_mode else URLS_COMMON_V1 + URLS_FN_V1
         )
 
         self.config = config
@@ -593,21 +598,27 @@ def parse_message_number(message):
     if message["type"] == "LockedTransfer":
         message["payment_identifier"] = int(message["payment_identifier"])
         message["message_identifier"] = int(message["message_identifier"])
+        message["locked_amount"] = int(message["locked_amount"])
         message["transferred_amount"] = int(message["transferred_amount"])
+        message["lock"]["amount"] = int(message["lock"]["amount"])
     elif message["type"] == "Delivered":
         message["delivered_message_identifier"] = int(message["delivered_message_identifier"])
     elif message["type"] == "RevealSecret":
         message["message_identifier"] = int(message["message_identifier"])
     elif message["type"] == "Secret":
         message["payment_identifier"] = int(message["payment_identifier"])
-        message["message_identifier"] = int(message["message_identifier"])
         message["transferred_amount"] = int(message["transferred_amount"])
+        message["message_identifier"] = int(message["message_identifier"])
+        message["locked_amount"] = int(message["locked_amount"])
     elif message["type"] == "Processed":
         message["message_identifier"] = int(message["message_identifier"])
     elif message["type"] == "SecretRequest":
         message["payment_identifier"] = int(message["payment_identifier"])
         message["message_identifier"] = int(message["message_identifier"])
+        message["amount"] = int(message["amount"])
+
     return message
+
 
 class RestAPI:
     """
@@ -973,6 +984,25 @@ class RestAPI:
         else:
             pretty_address = to_checksum_address(token_address)
             message = f'No token network registered for token "{pretty_address}"'
+            return api_error(message, status_code=HTTPStatus.NOT_FOUND)
+
+    def get_token_for_token_network(
+        self, registry_address: typing.PaymentNetworkID, token_network: typing.TokenNetworkID
+    ):
+        log.debug(
+            "Getting token for token network",
+            node=pex(self.raiden_api.address),
+            token_network=to_checksum_address(token_network),
+        )
+        token_address = self.raiden_api.get_token_address_for_token_network_address(
+            registry_address=registry_address, token_network=token_network
+        )
+
+        if token_address is not None:
+            return api_response(result=to_checksum_address(token_address))
+        else:
+            pretty_address = to_checksum_address(token_network)
+            message = f'No token registered for token network "{pretty_address}"'
             return api_error(message, status_code=HTTPStatus.NOT_FOUND)
 
     def get_blockchain_events_network(

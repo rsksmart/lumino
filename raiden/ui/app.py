@@ -302,12 +302,13 @@ def run_app(
         )
     )
 
-    running_network = {"network_id": network_id,
-                       "token_network_registry": encode_hex(tokennetwork_registry_contract_address),
-                       "secret_registry": encode_hex(secret_registry_contract_address),
-                       "endpoint_registry": encode_hex(endpoint_registry_contract_address)}
+    # FIXME mmartinez this must be checksummed or compared on a standard way
+    # running_network = {"network_id": network_id,
+    #                    "token_network_registry": encode_hex(tokennetwork_registry_contract_address),
+    #                    "secret_registry": encode_hex(secret_registry_contract_address),
+    #                    "endpoint_registry": encode_hex(endpoint_registry_contract_address)}
 
-    check_network_params(running_network)
+    #  check_network_params(running_network)
 
     discovery = None
     if transport == "udp":

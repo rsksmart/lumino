@@ -233,6 +233,12 @@ class RegisterTokenResource(BaseResource):
             self.rest_api.raiden_api.raiden.default_registry.address, token_address
         )
 
+class GetTokenResource(BaseResource):
+    def get(self, token_network):
+        return self.rest_api.get_token_for_token_network(
+            self.rest_api.raiden_api.raiden.default_registry.address, token_network
+        )
+
 
 class ConnectionsResource(BaseResource):
     put_schema = ConnectionsConnectSchema()

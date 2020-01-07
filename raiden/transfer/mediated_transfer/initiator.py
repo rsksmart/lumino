@@ -134,6 +134,7 @@ def handle_block(
         lock_expiration_threshold=lock_expiration_threshold,
     )
     events: List[Event] = list()
+
     if lock_has_expired and initiator_state.transfer_state != "transfer_expired":
         is_channel_open = channel.get_status(channel_state) == CHANNEL_STATE_OPENED
         if is_channel_open:

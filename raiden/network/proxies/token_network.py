@@ -224,7 +224,7 @@ class TokenNetwork:
                         creator=creator, partner=partner, block=receipt_or_none["blockNumber"]
                     )
                     log.critical("new_netting_channel_light failed", **log_details)
-                    raise RaidenUnrecoverableError("creating new channel failed")
+                    raise RaidenRecoverableError("creating new channel failed")
             except HTTPError as e:
                 log.warning("new_netting_channel failed: transaction malformed", ex=e, **log_details)
                 new_open_channel_transaction.set_exception(e)
@@ -311,7 +311,7 @@ class TokenNetwork:
                         creator=self.node_address, partner=partner, block=receipt_or_none["blockNumber"]
                     )
                     log.critical("new_netting_channel failed", **log_details)
-                    raise RaidenUnrecoverableError("creating new channel failed")
+                    raise RaidenRecoverableError("creating new channel failed")
 
             except Exception as e:
                 log.critical("new_netting_channel failed", **log_details)

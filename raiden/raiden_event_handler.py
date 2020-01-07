@@ -475,6 +475,7 @@ class RaidenEventHandler(EventHandler):
         channel_state = get_channelstate_by_token_network_and_partner(
             chain_state=chain_state,
             token_network_id=TokenNetworkID(token_network_identifier),
+            creator_address=raiden.address,
             partner_address=participant,
         )
 

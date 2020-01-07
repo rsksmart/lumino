@@ -412,6 +412,12 @@ def options(func):
                 default=False,
             ),
             option(
+                '--hub-mode',
+                help='If specified then the node will be executing functions for light client.',
+                is_flag=True,
+                default=False,
+            ),
+            option(
                 '--explorer-endpoint',
                 help='The url to register node and indicate alive signal to the explorer api',
                 type=str,
