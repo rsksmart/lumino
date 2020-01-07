@@ -1120,7 +1120,7 @@ class RaidenService(Runnable):
             payment_hash_invoice=payment_hash_invoice,
             signed_locked_transfer=signed_locked_transfer
         )
-        # FIXME mmartinez7 return accordlty
+        # FIXME mmartinez7 return accordly
         return None
 
     def mediated_transfer_async(

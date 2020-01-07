@@ -9,7 +9,8 @@ from raiden.lightclient.lightclientmessages.light_client_non_closing_balance_pro
 from raiden.lightclient.lightclientmessages.light_client_payment import LightClientPayment
 from raiden.lightclient.lightclientmessages.light_client_protocol_message import LightClientProtocolMessage, \
     DbLightClientProtocolMessage
-from raiden.messages import Message, LockedTransfer, SecretRequest, RevealSecret, Secret, Processed, Delivered, Unlock
+from raiden.messages import Message, LockedTransfer, SecretRequest, RevealSecret, Secret, Processed, Delivered, Unlock, \
+    LockExpired
 from raiden.storage.sqlite import SerializedSQLiteStorage
 from raiden.storage.wal import WriteAheadLog
 from typing import List
@@ -114,12 +115,15 @@ class LightClientMessageHandler:
         switcher_processed = {
             LockedTransfer.__name__: 3,
             Secret.__name__: 13,
+            LockExpired.__name__: -3
         }
         switcher_delivered = {
             LockedTransfer.__name__: 4 if is_delivered_from_initiator else 2,
             RevealSecret.__name__: 10 if is_delivered_from_initiator else 8,
             SecretRequest.__name__: 6,
             Secret.__name__: 14 if is_delivered_from_initiator else 12,
+            LockExpired.__name__: -2
+
         }
         if ack_type.lower() == "processed":
             return switcher_processed.get(ack_parent_type, -1)
@@ -177,6 +181,7 @@ class LightClientMessageHandler:
         is_delivered_from_initiator = True
         delivered_sender = message.sender
         if not first_message_is_lt:
+            #
             # get lt to get the payment identifier
             locked_transfer = LightClientMessageHandler.get_light_client_payment_locked_transfer(
                 protocol_message.light_client_payment_id, wal)

@@ -19,7 +19,7 @@ from raiden.utils.typing import (
     Secret,
     SecretHash,
     TokenAddress,
-)
+    Optional)
 
 # According to the smart contracts as of 07/08:
 # https://github.com/raiden-network/raiden-contracts/blob/fff8646ebcf2c812f40891c2825e12ed03cc7628/raiden_contracts/contracts/TokenNetwork.sol#L213
@@ -46,7 +46,7 @@ class StoreMessageEvent(Event):
     """
 
     def __init__(
-        self, message_id: int, payment_id: int, message_order: int, message: Message, is_signed: bool
+        self, message_id: int, payment_id: Optional[int], message_order: int, message: Message, is_signed: bool
     ) -> None:
         self.message_id = message_id
         self.payment_id = payment_id
@@ -91,11 +91,13 @@ class SendLockExpired(SendMessageEvent):
         message_identifier: MessageID,
         balance_proof: BalanceProofUnsignedState,
         secrethash: SecretHash,
+        payment_identifier: int
     ) -> None:
         super().__init__(recipient, balance_proof.channel_identifier, message_identifier)
 
         self.balance_proof = balance_proof
         self.secrethash = secrethash
+        self.payment_identifier = payment_identifier
 
     def __repr__(self) -> str:
         return "<SendLockExpired msgid:{} balance_proof:{} secrethash:{} recipient:{}>".format(

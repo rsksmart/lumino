@@ -25,7 +25,7 @@ from raiden.lightclient.light_client_service import LightClientService
 from raiden.lightclient.lightclientmessages.light_client_non_closing_balance_proof import \
     LightClientNonClosingBalanceProof
 from raiden.messages import LockedTransfer, Delivered, RevealSecret, Unlock, SecretRequest, Processed, \
-    SignedBlindedBalanceProof
+    SignedBlindedBalanceProof, LockExpired
 from raiden.rns_constants import RNS_ADDRESS_ZERO
 from raiden.utils.rns import is_rns_address
 from webargs.flaskparser import parser
@@ -2122,6 +2122,10 @@ class RestAPI:
         # TODO mmartinez7 pending msg validations
         # TODO call from dict will work but we need to validate each parameter in order to know if there are no extra or missing params.
         # TODO we also need to check if message id an order received make sense
+
+        if message["type"] == "LockExpired":
+            le = LockExpired.from_dict(message)
+            self.raiden_api.raiden.transport.light_client_transports[0].send_for_light_client_with_retry(receiver, le)
 
         headers = request.headers
         api_key = headers.get("x-api-key")

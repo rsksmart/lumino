@@ -13,6 +13,7 @@ from raiden.network.proxies.payment_channel import PaymentChannel
 from raiden.network.proxies.token_network import TokenNetwork
 from raiden.network.resolver.client import reveal_secret_with_resolver
 from raiden.storage.restore import channel_state_until_state_change
+from raiden.transfer import views
 from raiden.transfer.architecture import Event
 from raiden.transfer.balance_proof import pack_balance_proof_update
 from raiden.transfer.channel import get_batch_unlock, get_batch_unlock_gain
@@ -53,7 +54,7 @@ from raiden.transfer.utils import (
 )
 from raiden.transfer.views import get_channelstate_by_token_network_and_partner
 from raiden.utils import pex
-from raiden.utils.typing import MYPY_ANNOTATION, Address, Nonce, TokenNetworkID, Secret
+from raiden.utils.typing import MYPY_ANNOTATION, Address, Nonce, TokenNetworkID, Secret, ChannelID, AddressHex
 
 from raiden.billing.invoices.handlers.invoice_handler import handle_receive_events_with_payments
 
@@ -97,12 +98,31 @@ class EventHandler(ABC):
 
 
 class RaidenEventHandler(EventHandler):
+
+    def event_from_light_client(self, chain_state: ChainState, partner_address: AddressHex,
+                                canonical_identifier: CanonicalIdentifier):
+        return views.get_channelstate_by_canonical_identifier_and_address(chain_state, canonical_identifier,
+                                                                          partner_address)
+
     def on_raiden_event(self, raiden: "RaidenService", chain_state: ChainState, event: Event):
         print("On raiden event " + str(type(event)))
         # pylint: disable=too-many-branches
         if type(event) == SendLockExpired:
             assert isinstance(event, SendLockExpired), MYPY_ANNOTATION
-            self.handle_send_lockexpired(raiden, event)
+            # If it is from a light client, store the message on light_client_protocol_message to be retrieved
+            canonical_identifier = CanonicalIdentifier(
+                chain_identifier=chain_state.chain_id,
+                token_network_address=event.balance_proof.token_network_identifier,
+                channel_identifier=event.balance_proof.channel_identifier,
+            )
+            channel_state = self.event_from_light_client(chain_state, event.recipient, canonical_identifier)
+            if channel_state.our_state.address == raiden.address:
+                self.handle_send_lockexpired(raiden, event)
+            else:
+                store_lock_expired = StoreMessageEvent(event.message_identifier, event.payment_identifier, -1,
+                                                       message_from_sendevent(event), False)
+                print("----- STORED LOCK EXPIRED -----")
+                self.handle_store_message(raiden, store_lock_expired)
         elif type(event) == SendLockedTransfer:
             assert isinstance(event, SendLockedTransfer), MYPY_ANNOTATION
             self.handle_send_lockedtransfer(raiden, event)
@@ -419,7 +439,7 @@ class RaidenEventHandler(EventHandler):
         if balance_proof:
             canonical_identifier = balance_proof.canonical_identifier
             channel = raiden.chain.payment_channel(canonical_identifier=canonical_identifier)
-            partner_address= None
+            partner_address = None
             if channel_update_event.lc_address == channel.participant2:
                 partner_address = channel.participant1
             else:
@@ -678,4 +698,3 @@ class RaidenEventHandler(EventHandler):
             )
         else:
             log.info("Ignoring settlement cause is a light client")
-

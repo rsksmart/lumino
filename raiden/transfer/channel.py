@@ -1370,6 +1370,7 @@ def create_sendexpiredlock(
     token_network_identifier: TokenNetworkID,
     channel_identifier: ChannelID,
     recipient: Address,
+    payment_identifier: int
 ) -> Tuple[Optional[SendLockExpired], Optional[MerkleTreeState]]:
     nonce = get_next_nonce(sender_end_state)
     locked_amount = get_amount_locked(sender_end_state)
@@ -1403,6 +1404,7 @@ def create_sendexpiredlock(
         message_identifier=message_identifier_from_prng(pseudo_random_generator),
         balance_proof=balance_proof,
         secrethash=locked_lock.secrethash,
+        payment_identifier= payment_identifier
     )
 
     return send_lock_expired, merkletree
@@ -1412,6 +1414,7 @@ def events_for_expired_lock(
     channel_state: NettingChannelState,
     locked_lock: LockType,
     pseudo_random_generator: random.Random,
+    payment_identifier: int
 ) -> List[SendLockExpired]:
     msg = "caller must make sure the channel is open"
     assert get_status(channel_state) == CHANNEL_STATE_OPENED, msg
@@ -1424,6 +1427,7 @@ def events_for_expired_lock(
         token_network_identifier=TokenNetworkID(channel_state.token_network_identifier),
         channel_identifier=channel_state.identifier,
         recipient=channel_state.partner_state.address,
+        payment_identifier = payment_identifier
     )
 
     if send_lock_expired:
