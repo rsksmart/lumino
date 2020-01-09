@@ -269,7 +269,7 @@ def test_set_payee():
     assert transfers_pair[1].payer_state == "payer_pending"
     assert transfers_pair[1].payee_state == "payee_pending"
 
-    mediator.set_offchain_reveal_state(transfers_pair, setup.channels.partner_address(0))
+    mediator.set_offchain_reveal_state(transfers_pair, setup.channels.ADDRESSES[0])
 
     # payer address was used, no payee state should change
     assert transfers_pair[0].payer_state == "payer_pending"
@@ -278,7 +278,7 @@ def test_set_payee():
     assert transfers_pair[1].payer_state == "payer_pending"
     assert transfers_pair[1].payee_state == "payee_pending"
 
-    mediator.set_offchain_reveal_state(transfers_pair, setup.channels.partner_address(1))
+    mediator.set_offchain_reveal_state(transfers_pair, setup.channels.ADDRESSES[1])
 
     # only the transfer where the address is a payee should change
     assert transfers_pair[0].payer_state == "payer_pending"
@@ -457,8 +457,8 @@ def test_events_for_balanceproof():
     last_pair.payee_state = "payee_secret_revealed"
 
     # the lock is not in the danger zone yet
-    payer_channel = mediator.get_payer_channel(setup.channel_map, last_pair)
-    payee_channel = mediator.get_payee_channel(setup.channel_map, last_pair)
+    payer_channel = mediator.get_payer_channel(setup.channels[factories.UNIT_TRANSFER_DESCRIPTION.initiator], last_pair)
+    payee_channel = mediator.get_payee_channel(setup.channels[factories.UNIT_TRANSFER_DESCRIPTION.initiator], last_pair)
     safe_block = last_pair.payee_transfer.lock.expiration - payer_channel.reveal_timeout - 1
 
     prng_copy = deepcopy(pseudo_random_generator)
@@ -1507,13 +1507,15 @@ def setup():
     channels = mediator_make_channel_pair()
     expiration = 30
     transfer_properties = LockedTransferSignedStateProperties(expiration=expiration)
-    transfer = factories.make_signed_transfer_for(channels[0], transfer_properties)
+    first_channel = channels.channels[factories.UNIT_TRANSFER_DESCRIPTION.initiator][
+        next(iter(channels.channels[factories.UNIT_TRANSFER_DESCRIPTION.initiator]))]
+    transfer = factories.make_signed_transfer_for(first_channel, transfer_properties)
 
     balance_proof = create(
         BalanceProofSignedStateProperties(
             nonce=2,
             transferred_amount=transfer.balance_proof.transferred_amount,
-            canonical_identifier=channels[0].canonical_identifier,
+            canonical_identifier=first_channel.canonical_identifier,
             message_hash=transfer.lock.secrethash,
         )
     )

@@ -132,7 +132,7 @@ def setup_initiator_tests(
         current_state=current_state,
         block_number=block_number,
         channel=first_channel,
-        channel_map=channels.channel_map,
+        channel_map=channels,
         available_routes=channels.get_routes(),
         prng=prng,
         lock=lock,
@@ -403,7 +403,7 @@ def channels_setup(amount, our_address, refund_address):
         factories.NettingChannelStateProperties(our_state=funded),
     ]
 
-    return factories.make_channel_set(properties=properties, token_address=our_address)
+    return factories.make_channel_set(properties=properties, token_address=factories.UNIT_TRANSFER_DESCRIPTION.initiator)
 
 
 def test_refund_transfer_next_route():
@@ -413,13 +413,15 @@ def test_refund_transfer_next_route():
     prng = random.Random()
 
     channels = channels_setup(amount, our_address, refund_address)
-    first_channel = channels.channels[our_address][
-        next(iter(channels.channels[our_address]))]
+    first_channel = channels.channels[factories.UNIT_TRANSFER_DESCRIPTION.initiator][
+        next(iter(channels.channels[factories.UNIT_TRANSFER_DESCRIPTION.initiator]))]
     block_number = 10
     current_state = make_initiator_manager_state(
         channels=channels, pseudo_random_generator=prng, block_number=block_number
     )
-
+    # current_state.initiator_transfers.get(factories.UNIT_TRANSFER_DESCRIPTION.secrethash).transfer_description.initiator = first_channel.identifier
+    # current_state.initiator_transfers.get(
+    #     factories.UNIT_TRANSFER_DESCRIPTION.secrethash).transfer.initiator = first_channel.identifier
     initiator_state = get_transfer_at_index(current_state, 0)
     original_transfer = initiator_state.transfer
 
@@ -767,12 +769,14 @@ def test_handle_offchain_emptyhash_secret():
 def test_initiator_lock_expired():
     amount = UNIT_TRANSFER_AMOUNT * 2
     pseudo_random_generator = random.Random()
-    channels = factories.make_channel_set_from_amounts([amount, 0])
+    channels = factories.make_channel_set_from_amounts(amounts=[amount, 0], token_address=factories.UNIT_TRANSFER_DESCRIPTION.initiator)
 
     block_number = 10
+    first_channel = channels.channels[factories.UNIT_TRANSFER_DESCRIPTION.initiator][
+        next(iter(channels.channels[factories.UNIT_TRANSFER_DESCRIPTION.initiator]))]
     transfer_description = factories.create(
         factories.TransferDescriptionProperties(
-            secret=UNIT_SECRET, payment_network_identifier=channels[0].payment_network_identifier
+            secret=UNIT_SECRET, payment_network_identifier=first_channel.payment_network_identifier
         )
     )
     current_state = make_initiator_manager_state(
@@ -782,7 +786,7 @@ def test_initiator_lock_expired():
     initiator_state = get_transfer_at_index(current_state, 0)
     transfer = initiator_state.transfer
 
-    assert transfer.lock.secrethash in channels[0].our_state.secrethashes_to_lockedlocks
+    assert transfer.lock.secrethash in first_channel.our_state.secrethashes_to_lockedlocks
 
     # Trigger lock expiry
     state_change = Block(
@@ -801,7 +805,7 @@ def test_initiator_lock_expired():
         {
             "balance_proof": {"nonce": 2, "transferred_amount": 0, "locked_amount": 0},
             "secrethash": transfer.lock.secrethash,
-            "recipient": channels[0].partner_state.address,
+            "recipient": first_channel.partner_state.address,
         },
     )
     assert lock_expired is not None
@@ -815,8 +819,8 @@ def test_initiator_lock_expired():
         iteration.events,
         EventPaymentSentFailed,
         {
-            "payment_network_identifier": channels[0].payment_network_identifier,
-            "token_network_identifier": channels[0].token_network_identifier,
+            "payment_network_identifier": first_channel.payment_network_identifier,
+            "token_network_identifier": first_channel.token_network_identifier,
             "identifier": UNIT_TRANSFER_IDENTIFIER,
             "target": transfer.target,
             "reason": "lock expired",
@@ -824,7 +828,7 @@ def test_initiator_lock_expired():
     )
     assert payment_failed is not None
 
-    assert transfer.lock.secrethash not in channels[0].our_state.secrethashes_to_lockedlocks
+    assert transfer.lock.secrethash not in first_channel.our_state.secrethashes_to_lockedlocks
     msg = "the initiator payment task must be deleted at block of the lock expiration"
     assert not iteration.new_state, msg
 
@@ -848,9 +852,9 @@ def test_initiator_lock_expired():
     initiator3_state = get_transfer_at_index(transfer3_state, 0)
     transfer3_lock = initiator3_state.transfer.lock
 
-    assert len(channels[0].our_state.secrethashes_to_lockedlocks) == 2
+    assert len(first_channel.our_state.secrethashes_to_lockedlocks) == 2
 
-    assert transfer2_lock.secrethash in channels[0].our_state.secrethashes_to_lockedlocks
+    assert transfer2_lock.secrethash in first_channel.our_state.secrethashes_to_lockedlocks
 
     expiration_block_number = channel.get_sender_expiration_threshold(transfer2_lock)
 
@@ -868,10 +872,10 @@ def test_initiator_lock_expired():
     )
 
     # Transfer 2 expired
-    assert transfer2_lock.secrethash not in channels[0].our_state.secrethashes_to_lockedlocks
+    assert transfer2_lock.secrethash not in first_channel.our_state.secrethashes_to_lockedlocks
 
     # Transfer 3 is still there
-    assert transfer3_lock.secrethash in channels[0].our_state.secrethashes_to_lockedlocks
+    assert transfer3_lock.secrethash in first_channel.our_state.secrethashes_to_lockedlocks
 
 
 def test_initiator_lock_expired_must_not_be_sent_if_channel_is_closed():
@@ -1420,7 +1424,7 @@ def test_state_wait_secretrequest_valid_amount_and_fee():
 
 
 def test_initiator_manager_drops_invalid_state_changes():
-    channels = factories.make_channel_set_from_amounts([10])
+    channels = factories.make_channel_set_from_amounts(amounts=[10], token_address=factories.UNIT_TRANSFER_DESCRIPTION.initiator)
     transfer = factories.create(factories.LockedTransferSignedStateProperties())
     secret = factories.UNIT_SECRET
     cancel_route = ReceiveTransferRefundCancelRoute(channels.get_routes(), transfer, secret)
@@ -1429,7 +1433,8 @@ def test_initiator_manager_drops_invalid_state_changes():
     lock_expired = ReceiveLockExpired(balance_proof, factories.UNIT_SECRETHASH, 1)
 
     prng = random.Random()
-
+    first_channel = channels.channels[factories.UNIT_TRANSFER_DESCRIPTION.initiator][
+        next(iter(channels.channels[factories.UNIT_TRANSFER_DESCRIPTION.initiator]))]
     for state_change in (cancel_route, lock_expired):
         state = InitiatorPaymentState(initiator_transfers=dict())
         iteration = initiator_manager.state_transition(
@@ -1439,7 +1444,7 @@ def test_initiator_manager_drops_invalid_state_changes():
 
         initiator_state = InitiatorTransferState(
             factories.UNIT_TRANSFER_DESCRIPTION,
-            channels[0].canonical_identifier.channel_identifier,
+            first_channel.canonical_identifier.channel_identifier,
             transfer,
             revealsecret=None,
         )
@@ -1473,8 +1478,9 @@ def test_regression_payment_unlock_failed_event_must_be_emitted_only_once():
         factories.NettingChannelStateProperties(our_state=our_state, partner_state=partner_state),
         factories.NettingChannelStateProperties(our_state=our_state),
     ]
-    channels = factories.make_channel_set(properties)
-
+    channels = factories.make_channel_set(properties=properties, token_address=factories.UNIT_TRANSFER_DESCRIPTION.initiator)
+    first_channel = channels.channels[factories.UNIT_TRANSFER_DESCRIPTION.initiator][
+        next(iter(channels.channels[factories.UNIT_TRANSFER_DESCRIPTION.initiator]))]
     block_number = 10
     current_state = make_initiator_manager_state(
         channels=channels,
@@ -1493,7 +1499,7 @@ def test_regression_payment_unlock_failed_event_must_be_emitted_only_once():
             target=original_transfer.target,
             expiration=original_transfer.lock.expiration,
             payment_identifier=original_transfer.payment_identifier,
-            canonical_identifier=channels.channels[0].canonical_identifier,
+            canonical_identifier=first_channel.canonical_identifier,
             sender=refund_address,
             pkey=refund_pkey,
         )
