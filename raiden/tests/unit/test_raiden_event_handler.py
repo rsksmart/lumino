@@ -20,7 +20,7 @@ def test_handle_contract_send_channelunlock_already_unlocked():
 
     Regression test for https://github.com/raiden-network/raiden/issues/3152
     """
-    channel_identifier = 1
+    channel_identifier = 2
     payment_network_identifier = make_address()
     token_network_identifier = make_address()
     creator = make_address()

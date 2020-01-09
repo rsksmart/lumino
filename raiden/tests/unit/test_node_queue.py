@@ -117,4 +117,5 @@ def test_channel_closed_must_clear_ordered_messages(
     )
 
     iteration = node.handle_state_change(chain_state, closed, None)
+    #No logro comprender bien que sucede aca, se triggerea un nuevo estado y nunca se setea?
     assert queue_identifier not in iteration.new_state.queueids_to_queues

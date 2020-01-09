@@ -57,6 +57,7 @@ from raiden.transfer.state_change import (
     ContractReceiveSecretReveal,
 )
 from raiden.utils import random_secret, typing
+from raiden.utils.typing import ChannelMap
 
 
 def get_transfer_at_index(
@@ -71,13 +72,16 @@ def make_initiator_manager_state(
     transfer_description: factories.TransferDescriptionWithSecretState = None,
     pseudo_random_generator: random.Random = None,
     block_number: typing.BlockNumber = 1,
+
 ):
+    transfer_desc = transfer_description or factories.UNIT_TRANSFER_DESCRIPTION
     init = ActionInitInitiator(
-        transfer_description or factories.UNIT_TRANSFER_DESCRIPTION, channels.get_routes()
+        transfer_desc, channels.get_routes()
     )
+    #init.transfer.initiator
     initial_state = None
     iteration = initiator_manager.state_transition(
-        initial_state, init, channels.channel_map, pseudo_random_generator, block_number
+        initial_state, init, channels.channels, pseudo_random_generator, block_number
     )
     return iteration.new_state
 
@@ -113,7 +117,8 @@ def setup_initiator_tests(
             balance=partner_balance, address=partner_address
         ),
     )
-    channels = factories.make_channel_set([properties])
+    channels = factories.make_channel_set(properties=[properties], token_address=factories.UNIT_TRANSFER_DESCRIPTION.initiator)
+    first_channel = channels.channels[factories.UNIT_TRANSFER_DESCRIPTION.initiator][next(iter(channels.channels[factories.UNIT_TRANSFER_DESCRIPTION.initiator]))]
     transfer_description = factories.create(
         factories.TransferDescriptionProperties(secret=UNIT_SECRET, allocated_fee=allocated_fee)
     )
@@ -122,11 +127,11 @@ def setup_initiator_tests(
     )
 
     initiator_state = get_transfer_at_index(current_state, 0)
-    lock = channel.get_lock(channels[0].our_state, initiator_state.transfer_description.secrethash)
+    lock = channel.get_lock(first_channel.our_state, initiator_state.transfer_description.secrethash)
     setup = InitiatorSetup(
         current_state=current_state,
         block_number=block_number,
-        channel=channels[0],
+        channel=first_channel,
         channel_map=channels.channel_map,
         available_routes=channels.get_routes(),
         prng=prng,
@@ -137,7 +142,7 @@ def setup_initiator_tests(
 
 def test_next_route():
     amount = UNIT_TRANSFER_AMOUNT
-    channels = factories.make_channel_set_from_amounts([amount, 0, amount])
+    channels = factories.make_channel_set_from_amounts([amount, 0, amount], factories.UNIT_TRANSFER_DESCRIPTION.initiator)
     prng = random.Random()
 
     block_number = 10
@@ -147,7 +152,7 @@ def test_next_route():
 
     msg = "an initialized state must use the first valid route"
     initiator_state = get_transfer_at_index(state, 0)
-    assert initiator_state.channel_identifier == channels[0].identifier, msg
+    assert initiator_state.channel_identifier == next(iter(channels.channels[initiator_state.transfer.initiator])), msg
     assert not state.cancelled_channels
 
     iteration = initiator_manager.maybe_try_new_route(
@@ -155,20 +160,20 @@ def test_next_route():
         initiator_state=initiator_state,
         transfer_description=initiator_state.transfer_description,
         available_routes=channels.get_routes(),
-        channelidentifiers_to_channels=channels.channel_map,
+        channelidentifiers_to_channels=channels.channels,
         pseudo_random_generator=prng,
         block_number=block_number,
     )
 
     # HOP3 should be ignored because it doesn't have enough balance
-    assert iteration.new_state.cancelled_channels == [channels[0].identifier]
+    assert iteration.new_state.cancelled_channels == [next(iter(channels.channels[initiator_state.transfer.initiator]))]
 
 
 def test_init_with_usable_routes():
     properties = factories.NettingChannelStateProperties(
         our_state=factories.NettingChannelEndStateProperties(balance=UNIT_TRANSFER_AMOUNT)
     )
-    channels = factories.make_channel_set([properties])
+    channels = factories.make_channel_set(properties=[properties], token_address=factories.UNIT_TRANSFER_DESCRIPTION.initiator)
     pseudo_random_generator = random.Random()
 
     init_state_change = ActionInitInitiator(
@@ -192,13 +197,14 @@ def test_init_with_usable_routes():
 
     send_mediated_transfer = mediated_transfers[0]
     transfer = send_mediated_transfer.transfer
-    expiration = initiator.get_initial_lock_expiration(block_number, channels[0].reveal_timeout)
+    first_channel = channels.channels[initiator_state.transfer.initiator][next(iter(channels.channels[initiator_state.transfer.initiator]))]
+    expiration = initiator.get_initial_lock_expiration(block_number, first_channel.reveal_timeout)
 
-    assert transfer.balance_proof.token_network_identifier == channels[0].token_network_identifier
+    assert transfer.balance_proof.token_network_identifier == first_channel.token_network_identifier
     assert transfer.lock.amount == factories.UNIT_TRANSFER_DESCRIPTION.amount
     assert transfer.lock.expiration == expiration
     assert transfer.lock.secrethash == factories.UNIT_TRANSFER_DESCRIPTION.secrethash
-    assert send_mediated_transfer.recipient == channels[0].partner_state.address
+    assert send_mediated_transfer.recipient == first_channel.partner_state.address
 
 
 def test_init_without_routes():
@@ -397,7 +403,7 @@ def channels_setup(amount, our_address, refund_address):
         factories.NettingChannelStateProperties(our_state=funded),
     ]
 
-    return factories.make_channel_set(properties)
+    return factories.make_channel_set(properties=properties, token_address=our_address)
 
 
 def test_refund_transfer_next_route():
@@ -407,7 +413,8 @@ def test_refund_transfer_next_route():
     prng = random.Random()
 
     channels = channels_setup(amount, our_address, refund_address)
-
+    first_channel = channels.channels[our_address][
+        next(iter(channels.channels[our_address]))]
     block_number = 10
     current_state = make_initiator_manager_state(
         channels=channels, pseudo_random_generator=prng, block_number=block_number
@@ -423,13 +430,13 @@ def test_refund_transfer_next_route():
             target=original_transfer.target,
             expiration=original_transfer.lock.expiration,
             payment_identifier=original_transfer.payment_identifier,
-            canonical_identifier=channels[0].canonical_identifier,
+            canonical_identifier=first_channel.canonical_identifier,
             sender=refund_address,
             pkey=refund_pkey,
         )
     )
 
-    assert channels[0].partner_state.address == refund_address
+    assert first_channel.partner_state.address == refund_address
 
     state_change = ReceiveTransferRefundCancelRoute(
         routes=channels.get_routes(), transfer=refund_transfer, secret=random_secret()

@@ -133,7 +133,7 @@ def make_uint256() -> int:
 
 
 def make_channel_identifier() -> ChannelID:
-    return ChannelID(make_uint256())
+    return ChannelID(make_uint64())
 
 
 def make_uint64() -> int:
@@ -794,7 +794,8 @@ class ChannelSet:
 
     def __init__(
         self,
-        channels: List[NettingChannelState],
+        #channels: List[NettingChannelState],
+        channels: Dict[AddressHex, Dict[ChannelID, NettingChannelState]],
         our_privatekeys: List[bytes],
         partner_privatekeys: List[bytes],
     ):
@@ -804,7 +805,7 @@ class ChannelSet:
 
     @property
     def channel_map(self) -> ChannelMap:
-        return {channel.identifier: channel for channel in self.channels}
+        return self.channels
 
     @property
     def nodeaddresses_to_networkstates(self) -> NodeNetworkStateMap:
@@ -816,25 +817,30 @@ class ChannelSet:
     def partner_address(self, index: int) -> Address:
         return self.channels[index].partner_state.address
 
-    def get_route(self, channel_index: int) -> RouteState:
-        return make_route_from_channel(self.channels[channel_index])
+    def get_route(self, key: str, channel_key: str) -> RouteState:
+        return make_route_from_channel(self.channels[key][channel_key])
 
     def get_routes(self, *args) -> List[RouteState]:
-        return [self.get_route(index) for index in (args or range(len(self.channels)))]
+        routes = []
+        for key in (args or self.channels.keys()):
+            for channel_key in self.channels[key].keys():
+                routes.append(self.get_route(key, channel_key))
+        return routes
 
     def __getitem__(self, item: int) -> NettingChannelState:
         return self.channels[item]
 
 
 def make_channel_set(
+    token_address: Address,
     properties: List[NettingChannelStateProperties] = None,
     defaults: NettingChannelStateProperties = NettingChannelStateProperties.DEFAULTS,
     number_of_channels: int = None,
+
 ) -> ChannelSet:
     if number_of_channels is None:
         number_of_channels = len(properties)
-
-    channels = list()
+    channels = dict()
     our_pkeys = [None] * number_of_channels
     partner_pkeys = [None] * number_of_channels
 
@@ -845,17 +851,20 @@ def make_channel_set(
 
     for i in range(number_of_channels):
         our_pkeys[i], partner_pkeys[i] = pkeys_from_channel_state(properties[i], defaults)
-        channels.append(create(properties[i], defaults))
+        # channels.append(create(properties[i], defaults))
+        channel_set = create(properties[i], defaults)
+        channels[channel_set.identifier] = channel_set
+    ret = dict()
+    ret[token_address] = channels
+    return ChannelSet(ret, our_pkeys, partner_pkeys)
 
-    return ChannelSet(channels, our_pkeys, partner_pkeys)
 
-
-def make_channel_set_from_amounts(amounts: List[TokenAmount]) -> ChannelSet:
+def make_channel_set_from_amounts(amounts: List[TokenAmount], token_address: Address) -> ChannelSet:
     properties = [
         NettingChannelStateProperties(our_state=NettingChannelEndStateProperties(balance=amount))
         for amount in amounts
     ]
-    return make_channel_set(properties)
+    return make_channel_set(token_address=token_address, properties=properties)
 
 
 def mediator_make_channel_pair(
