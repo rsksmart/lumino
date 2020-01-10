@@ -660,9 +660,9 @@ def test_events_for_onchain_secretreveal_once():
     """ Secret must be registered on-chain only once. """
     setup = factories.make_transfers_pair(4, block_number=1)
     pair = setup.transfers_pair[0]
-    channel_state = mediator.get_payer_channel(setup.channel_map, pair)
+    channel_state = mediator.get_payer_channel(setup.channels.sub_channel_map, pair)
 
-    for channel_state in setup.channel_map.values():
+    for channel_state in setup.channels.sub_channel_map.values():
         channel.register_offchain_secret(channel_state, UNIT_SECRET, UNIT_SECRETHASH)
 
     start_danger_zone_block_number = (
@@ -670,7 +670,7 @@ def test_events_for_onchain_secretreveal_once():
     )
 
     events = mediator.events_for_onchain_secretreveal_if_dangerzone(
-        channelmap=setup.channel_map,
+        channelmap=setup.channels.sub_channel_map,
         secrethash=UNIT_SECRETHASH,
         transfers_pair=setup.transfers_pair,
         block_number=start_danger_zone_block_number,
@@ -684,7 +684,7 @@ def test_events_for_onchain_secretreveal_once():
     end_danger_zone_block_number = pair.payer_transfer.lock.expiration - 1
 
     events = mediator.events_for_onchain_secretreveal_if_dangerzone(
-        channelmap=setup.channel_map,
+        channelmap=setup.channels.sub_channel_map,
         secrethash=UNIT_SECRETHASH,
         transfers_pair=setup.transfers_pair,
         block_number=end_danger_zone_block_number,
@@ -696,7 +696,7 @@ def test_events_for_onchain_secretreveal_once():
         assert pair.payer_state == "payer_waiting_secret_reveal"
 
     events = mediator.events_for_onchain_secretreveal_if_dangerzone(
-        channelmap=setup.channel_map,
+        channelmap=setup.channels.sub_channel_map,
         secrethash=UNIT_SECRETHASH,
         transfers_pair=setup.transfers_pair,
         block_number=pair.payer_transfer.lock.expiration,
