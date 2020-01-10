@@ -166,8 +166,8 @@ def test_channel_cleared_after_our_unlock():
 
 
 def test_is_balance_proof_usable_onchain_answer_is_false():
-    channel_state = factories.make_channel_set(number_of_channels=1, token_address=factories.UNIT_TRANSFER_DESCRIPTION.initiator)
-    channel_state = channel_state.get_sub_channel(0)
+    channel_set = factories.make_channel_set(number_of_channels=1, token_address=factories.UNIT_TRANSFER_DESCRIPTION.initiator)
+    channel_state = channel_set.get_sub_channel(0)
     balance_proof_wrong_channel = factories.create(factories.BalanceProofSignedStateProperties())
     result, msg = is_balance_proof_usable_onchain(
         received_balance_proof=balance_proof_wrong_channel,

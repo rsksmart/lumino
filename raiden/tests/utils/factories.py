@@ -935,7 +935,7 @@ def mediator_make_init_action(
 
 
 class MediatorTransfersPair(NamedTuple):
-    channels: ChannelSet
+    channel_set: ChannelSet
     transfers_pair: List[MediationPairState]
     amount: int
     block_number: BlockNumber
@@ -943,7 +943,7 @@ class MediatorTransfersPair(NamedTuple):
 
     @property
     def channel_map(self) -> ChannelMap:
-        return self.channels.channel_map
+        return self.channel_set.channel_map
 
 
 def make_transfers_pair(
@@ -970,14 +970,14 @@ def make_transfers_pair(
         )
         for i in range(number_of_channels)
     ]
-    channels = make_channel_set(properties=properties_list, defaults=defaults, token_address=UNIT_TRANSFER_DESCRIPTION.initiator)
+    channel_set = make_channel_set(properties=properties_list, defaults=defaults, token_address=UNIT_TRANSFER_DESCRIPTION.initiator)
 
     lock_expiration = block_number + UNIT_REVEAL_TIMEOUT * 2
     pseudo_random_generator = random.Random()
     transfers_pairs = list()
     payer_index = 0
-    for key in channels.channels[UNIT_TRANSFER_DESCRIPTION.initiator].keys():
-        receiver_channel = channels.channels[UNIT_TRANSFER_DESCRIPTION.initiator][key]
+    for key in channel_set.channels[UNIT_TRANSFER_DESCRIPTION.initiator].keys():
+        receiver_channel = channel_set.channels[UNIT_TRANSFER_DESCRIPTION.initiator][key]
         received_transfer = create(
             LockedTransferSignedStateProperties(
                 amount=amount,
@@ -985,7 +985,7 @@ def make_transfers_pair(
                 payment_identifier=UNIT_TRANSFER_IDENTIFIER,
                 canonical_identifier=receiver_channel.canonical_identifier,
                 sender=receiver_channel.partner_state.address,
-                pkey=channels.partner_privatekeys[payer_index],
+                pkey=channel_set.partner_privatekeys[payer_index],
             )
         )
 
@@ -1021,7 +1021,7 @@ def make_transfers_pair(
         payer_index += 1
 
     return MediatorTransfersPair(
-        channels=channels,
+        channel_set=channel_set,
         transfers_pair=transfers_pairs,
         amount=amount,
         block_number=block_number,

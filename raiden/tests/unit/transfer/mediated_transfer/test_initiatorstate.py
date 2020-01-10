@@ -68,7 +68,7 @@ def get_transfer_at_index(
 
 
 def make_initiator_manager_state(
-    channels: factories.ChannelSet,
+    channel_set: factories.ChannelSet,
     transfer_description: factories.TransferDescriptionWithSecretState = None,
     pseudo_random_generator: random.Random = None,
     block_number: typing.BlockNumber = 1,
@@ -76,12 +76,12 @@ def make_initiator_manager_state(
 ):
     transfer_desc = transfer_description or factories.UNIT_TRANSFER_DESCRIPTION
     init = ActionInitInitiator(
-        transfer_desc, channels.get_routes()
+        transfer_desc, channel_set.get_routes()
     )
     #init.transfer.initiator
     initial_state = None
     iteration = initiator_manager.state_transition(
-        initial_state, init, channels.channels, pseudo_random_generator, block_number
+        initial_state, init, channel_set.channels, pseudo_random_generator, block_number
     )
     return iteration.new_state
 
@@ -144,31 +144,31 @@ def setup_initiator_tests(
 
 def test_next_route():
     amount = UNIT_TRANSFER_AMOUNT
-    channels = factories.make_channel_set_from_amounts([amount, 0, amount], factories.UNIT_TRANSFER_DESCRIPTION.initiator)
+    channel_set = factories.make_channel_set_from_amounts([amount, 0, amount], factories.UNIT_TRANSFER_DESCRIPTION.initiator)
     prng = random.Random()
 
     block_number = 10
     state = make_initiator_manager_state(
-        channels=channels, pseudo_random_generator=prng, block_number=block_number
+        channels=channel_set, pseudo_random_generator=prng, block_number=block_number
     )
 
     msg = "an initialized state must use the first valid route"
     initiator_state = get_transfer_at_index(state, 0)
-    assert initiator_state.channel_identifier == next(iter(channels.channels[initiator_state.transfer.initiator])), msg
+    assert initiator_state.channel_identifier == next(iter(channel_set.channels[initiator_state.transfer.initiator])), msg
     assert not state.cancelled_channels
 
     iteration = initiator_manager.maybe_try_new_route(
         payment_state=state,
         initiator_state=initiator_state,
         transfer_description=initiator_state.transfer_description,
-        available_routes=channels.get_routes(),
-        channelidentifiers_to_channels=channels.channels,
+        available_routes=channel_set.get_routes(),
+        channelidentifiers_to_channels=channel_set.channels,
         pseudo_random_generator=prng,
         block_number=block_number,
     )
 
     # HOP3 should be ignored because it doesn't have enough balance
-    assert iteration.new_state.cancelled_channels == [next(iter(channels.channels[initiator_state.transfer.initiator]))]
+    assert iteration.new_state.cancelled_channels == [next(iter(channel_set.channels[initiator_state.transfer.initiator]))]
 
 
 def test_init_with_usable_routes():
@@ -609,7 +609,7 @@ def test_cancel_transfer():
     iteration = initiator_manager.state_transition(
         payment_state=setup.current_state,
         state_change=state_change,
-        channelidentifiers_to_channels=setup.channels.sub_channel_map,
+        channelidentifiers_to_channels=setup.channel_set.sub_channel_map,
         pseudo_random_generator=setup.prng,
         block_number=setup.block_number,
     )
@@ -630,7 +630,7 @@ def test_cancelpayment():
     iteration = initiator_manager.state_transition(
         payment_state=setup.current_state,
         state_change=state_change,
-        channelidentifiers_to_channels=setup.channels.sub_channel_map,
+        channelidentifiers_to_channels=setup.channel_set.sub_channel_map,
         pseudo_random_generator=setup.prng,
         block_number=setup.block_number,
     )
