@@ -705,7 +705,6 @@ class RaidenService(Runnable):
 
             state_changes_count = self.wal.storage.count_state_changes()
             new_snapshot_group = state_changes_count // SNAPSHOT_STATE_CHANGES_COUNT
-            # FIXME mmartinez
             if new_snapshot_group > self.snapshot_group:
                 log.info("Storing snapshot", snapshot_id=new_snapshot_group)
                 self.wal.snapshot()
