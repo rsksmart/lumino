@@ -15,7 +15,7 @@ from raiden.tests.utils.factories import (
     UNIT_TRANSFER_IDENTIFIER,
     UNIT_TRANSFER_INITIATOR,
     UNIT_TRANSFER_TARGET,
-)
+    ChannelSet)
 from raiden.tests.utils.transfer import assert_dropped
 from raiden.transfer import channel
 from raiden.transfer.architecture import State
@@ -89,6 +89,7 @@ def make_initiator_manager_state(
 class InitiatorSetup(NamedTuple):
     current_state: State
     block_number: typing.BlockNumber
+    channels: ChannelSet
     channel: NettingChannelState
     channel_map: typing.ChannelMap
     available_routes: typing.List[RouteState]
@@ -118,7 +119,7 @@ def setup_initiator_tests(
         ),
     )
     channels = factories.make_channel_set(properties=[properties], token_address=factories.UNIT_TRANSFER_DESCRIPTION.initiator)
-    first_channel = channels.channels[factories.UNIT_TRANSFER_DESCRIPTION.initiator][next(iter(channels.channels[factories.UNIT_TRANSFER_DESCRIPTION.initiator]))]
+
     transfer_description = factories.create(
         factories.TransferDescriptionProperties(secret=UNIT_SECRET, allocated_fee=allocated_fee)
     )
@@ -127,12 +128,13 @@ def setup_initiator_tests(
     )
 
     initiator_state = get_transfer_at_index(current_state, 0)
-    lock = channel.get_lock(first_channel.our_state, initiator_state.transfer_description.secrethash)
+    lock = channel.get_lock(channels.get_sub_channel(0).our_state, initiator_state.transfer_description.secrethash)
     setup = InitiatorSetup(
         current_state=current_state,
         block_number=block_number,
-        channel=first_channel,
-        channel_map=channels,
+        channel=channels.get_sub_channel(0),
+        channel_map=channels.channel_map,
+        channels= channels,
         available_routes=channels.get_routes(),
         prng=prng,
         lock=lock,
@@ -413,8 +415,7 @@ def test_refund_transfer_next_route():
     prng = random.Random()
 
     channels = channels_setup(amount, our_address, refund_address)
-    first_channel = channels.channels[factories.UNIT_TRANSFER_DESCRIPTION.initiator][
-        next(iter(channels.channels[factories.UNIT_TRANSFER_DESCRIPTION.initiator]))]
+
     block_number = 10
     current_state = make_initiator_manager_state(
         channels=channels, pseudo_random_generator=prng, block_number=block_number
@@ -432,20 +433,20 @@ def test_refund_transfer_next_route():
             target=original_transfer.target,
             expiration=original_transfer.lock.expiration,
             payment_identifier=original_transfer.payment_identifier,
-            canonical_identifier=first_channel.canonical_identifier,
+            canonical_identifier=channels.get_sub_channel(0).canonical_identifier,
             sender=refund_address,
             pkey=refund_pkey,
         )
     )
 
-    assert first_channel.partner_state.address == refund_address
+    assert channels.get_sub_channel(0).partner_state.address == refund_address
 
     state_change = ReceiveTransferRefundCancelRoute(
         routes=channels.get_routes(), transfer=refund_transfer, secret=random_secret()
     )
 
     iteration = initiator_manager.state_transition(
-        current_state, state_change, channels.channel_map, prng, block_number
+        current_state, state_change, channels.sub_channel_map, prng, block_number
     )
     assert iteration.new_state is not None
 
@@ -612,7 +613,7 @@ def test_cancel_transfer():
     iteration = initiator_manager.state_transition(
         payment_state=setup.current_state,
         state_change=state_change,
-        channelidentifiers_to_channels=setup.channel_map,
+        channelidentifiers_to_channels=setup.channels.sub_channel_map,
         pseudo_random_generator=setup.prng,
         block_number=setup.block_number,
     )
@@ -633,7 +634,7 @@ def test_cancelpayment():
     iteration = initiator_manager.state_transition(
         payment_state=setup.current_state,
         state_change=state_change,
-        channelidentifiers_to_channels=setup.channel_map,
+        channelidentifiers_to_channels=setup.channels.sub_channel_map,
         pseudo_random_generator=setup.prng,
         block_number=setup.block_number,
     )

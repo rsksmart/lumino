@@ -808,8 +808,12 @@ class ChannelSet:
         return self.channels
 
     @property
-    def first_channel_map(self) -> ChannelMap:
-        return self.channels[UNIT_TRANSFER_INITIATOR]
+    def sub_channel_map(self) -> Dict:
+        sub_channels = dict()
+        for key in self.channels.keys():
+            for sub_channel_key in self.channels[key].keys():
+                sub_channels[sub_channel_key] = self.channels[key][sub_channel_key]
+        return sub_channels
 
     @property
     def nodeaddresses_to_networkstates(self) -> NodeNetworkStateMap:
@@ -830,6 +834,29 @@ class ChannelSet:
             for channel_key in self.channels[key].keys():
                 routes.append(self.get_route(key, channel_key))
         return routes
+
+    def get_routes_by_index(self, *args) -> List[RouteState]:
+        counter = 0
+        ret_routes = []
+        for key in self.channels.keys():
+            for channel_key in self.channels[key].keys():
+                if counter in args:
+                    ret_routes.append(self.get_route(key, channel_key))
+                    counter += 1
+                else:
+                    counter += 1
+        return ret_routes
+
+    def get_sub_channel(self, item: int) -> NettingChannelState:
+        counter = 0
+        for key in self.channels.keys():
+            for sub_channel_key in self.channels[key].keys():
+                if counter == item:
+                    return self.channels[key][sub_channel_key]
+                else:
+                    counter += 1
+
+        return None
 
     def __getitem__(self, item: int) -> NettingChannelState:
         return self.channels[item]

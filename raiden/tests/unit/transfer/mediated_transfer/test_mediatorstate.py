@@ -144,7 +144,7 @@ def test_next_route_amount():
     amount = UNIT_TRANSFER_AMOUNT
 
     channels = factories.make_channel_set(
-        [
+        properties=[
             NettingChannelStateProperties(
                 our_state=NettingChannelEndStateProperties(balance=amount)
             ),
@@ -152,31 +152,33 @@ def test_next_route_amount():
             NettingChannelStateProperties(
                 our_state=NettingChannelEndStateProperties(balance=amount)
             ),
-        ]
+        ],
+        token_address=factories.UNIT_TRANSFER_DESCRIPTION.initiator
     )
 
     # the first available route should be used
     chosen_channel = mediator.next_channel_from_routes(
-        channels.get_routes(0), channels.channel_map, amount, timeout_blocks
+        channels.get_routes(), channels.sub_channel_map, amount, timeout_blocks
     )
-    assert chosen_channel.identifier == channels[0].identifier
+    assert chosen_channel.identifier == channels.get_sub_channel(0).identifier
 
     # additional routes do not change the order
     chosen_channel = mediator.next_channel_from_routes(
-        channels.get_routes(0, 1), channels.channel_map, amount, timeout_blocks
+        channels.get_routes(), channels.sub_channel_map, amount, timeout_blocks
     )
-    assert chosen_channel.identifier == channels[0].identifier
+    assert chosen_channel.identifier == channels.get_sub_channel(0).identifier
 
+    #As channels now are Dict, we cant check later for sub_channel 2, cause it always returns ordered, so it will be checking with sub_channel 0
     chosen_channel = mediator.next_channel_from_routes(
-        channels.get_routes(2, 0), channels.channel_map, amount, timeout_blocks
+        channels.get_routes_by_index(2), channels.sub_channel_map, amount, timeout_blocks
     )
-    assert chosen_channel.identifier == channels[2].identifier
+    assert chosen_channel.identifier == channels.get_sub_channel(2).identifier
 
     # a channel without capacity must be skipped
     chosen_channel = mediator.next_channel_from_routes(
-        channels.get_routes(1, 0), channels.channel_map, amount, timeout_blocks
+        channels.get_routes_by_index(1, 0), channels.sub_channel_map, amount, timeout_blocks
     )
-    assert chosen_channel.identifier == channels[0].identifier
+    assert chosen_channel.identifier == channels.get_sub_channel(0).identifier
 
 
 def test_next_route_reveal_timeout():
@@ -185,7 +187,7 @@ def test_next_route_reveal_timeout():
     identifiers = [make_canonical_identifier(channel_identifier=i) for i in range(1, 5)]
 
     channels = make_channel_set(
-        [
+        properties=[
             NettingChannelStateProperties(
                 canonical_identifier=identifiers[0], reveal_timeout=timeout_blocks * 2
             ),
@@ -198,13 +200,14 @@ def test_next_route_reveal_timeout():
             NettingChannelStateProperties(
                 canonical_identifier=identifiers[3], reveal_timeout=timeout_blocks
             ),
-        ]
+        ],
+        token_address=factories.UNIT_TRANSFER_DESCRIPTION.initiator
     )
 
     chosen_channel = mediator.next_channel_from_routes(
-        channels.get_routes(0, 1, 2, 3), channels.channel_map, UNIT_TRANSFER_AMOUNT, timeout_blocks
+        channels.get_routes_by_index(0, 1, 2, 3), channels.sub_channel_map, UNIT_TRANSFER_AMOUNT, timeout_blocks
     )
-    assert chosen_channel.identifier == channels[2].identifier
+    assert chosen_channel.identifier == channels.get_sub_channel(2).identifier
 
 
 def test_next_transfer_pair():
@@ -219,23 +222,24 @@ def test_next_transfer_pair():
     )
 
     channels = make_channel_set(
-        [
+        properties=[
             NettingChannelStateProperties(
                 our_state=NettingChannelEndStateProperties(balance=balance)
             )
-        ]
+        ],
+        token_address=factories.UNIT_TRANSFER_DESCRIPTION.initiator
     )
 
     pair, events = mediator.forward_transfer_pair(
         payer_transfer,
-        channels.get_routes(0),
-        channels.channel_map,
+        channels.get_routes_by_index(0),
+        channels.sub_channel_map,
         pseudo_random_generator,
         block_number,
     )
 
     assert pair.payer_transfer == payer_transfer
-    assert pair.payee_address == channels[0].partner_state.address
+    assert pair.payee_address == channels.get_sub_channel(0).partner_state.address
     assert pair.payee_transfer.lock.expiration == pair.payer_transfer.lock.expiration
 
     assert search_for_item(
@@ -296,14 +300,14 @@ def test_events_for_expired_pairs():
     first_unsafe_block = pair.payer_transfer.lock.expiration - UNIT_REVEAL_TIMEOUT
 
     mediator.events_for_expired_pairs(
-        setup.channel_map, setup.transfers_pair, None, first_unsafe_block
+        setup.channels.channel_map, setup.transfers_pair, None, first_unsafe_block
     )
     assert pair.payer_state == "payer_pending"
 
     # edge case for the lock expiration
     payee_expiration_block = pair.payee_transfer.lock.expiration
     mediator.events_for_expired_pairs(
-        setup.channel_map, setup.transfers_pair, None, payee_expiration_block
+        setup.channels.sub_channel_map, setup.transfers_pair, None, payee_expiration_block
     )
     assert pair.payer_state == "payer_pending"
 
@@ -312,7 +316,7 @@ def test_events_for_expired_pairs():
         pair.payer_transfer.lock
     )
     mediator.events_for_expired_pairs(
-        setup.channel_map, setup.transfers_pair, None, payer_lock_expiration_threshold
+        setup.channels.sub_channel_map, setup.transfers_pair, None, payer_lock_expiration_threshold
     )
     assert pair.payer_state == "payer_expired"
 
@@ -442,7 +446,7 @@ def test_events_for_secretreveal_all_states():
         assert search_for_item(
             events,
             SendSecretReveal,
-            {"secret": UNIT_SECRET, "recipient": setup.channels.partner_address(0)},
+            {"secret": UNIT_SECRET, "recipient": setup.channels.partner_privatekeys[0]},
         )
 
 
@@ -514,7 +518,7 @@ def test_events_for_balanceproof_channel_closed():
     for invalid_state in (CHANNEL_STATE_CLOSED, CHANNEL_STATE_SETTLED):
         setup = factories.make_transfers_pair(2)
         last_pair = setup.transfers_pair[-1]
-        last_channel = mediator.get_payee_channel(setup.channel_map, last_pair)
+        last_channel = mediator.get_payee_channel(setup.channels.sub_channel_map, last_pair)
 
         if invalid_state == CHANNEL_STATE_CLOSED:
             channel.set_closed(last_channel, setup.block_number)
@@ -523,7 +527,7 @@ def test_events_for_balanceproof_channel_closed():
 
         last_pair.payee_state = "payee_secret_revealed"
         events = mediator.events_for_balanceproof(
-            setup.channel_map,
+            setup.channels.sub_channel_map,
             setup.transfers_pair,
             pseudo_random_generator,
             setup.block_number,
@@ -623,16 +627,16 @@ def test_events_for_onchain_secretreveal():
     setup = factories.make_transfers_pair(2, block_number=1)
     pair = setup.transfers_pair[0]
 
-    channel_state = mediator.get_payer_channel(setup.channel_map, pair)
+    channel_state = mediator.get_payer_channel(setup.channels.sub_channel_map, pair)
     # Reveal the secret off-chain
-    for channel_state in setup.channel_map.values():
+    for channel_state in setup.channels.sub_channel_map.values():
         channel.register_offchain_secret(channel_state, UNIT_SECRET, UNIT_SECRETHASH)
 
     block_number = pair.payer_transfer.lock.expiration - channel_state.reveal_timeout
 
     # If we are not in the unsafe region, we must NOT emit ContractSendSecretReveal
     events = mediator.events_for_onchain_secretreveal_if_dangerzone(
-        channelmap=setup.channel_map,
+        channelmap=setup.channels.sub_channel_map,
         secrethash=UNIT_SECRETHASH,
         transfers_pair=setup.transfers_pair,
         block_number=block_number - 1,
@@ -642,7 +646,7 @@ def test_events_for_onchain_secretreveal():
 
     # If we are in the unsafe region, we must emit ContractSendSecretReveal
     events = mediator.events_for_onchain_secretreveal_if_dangerzone(
-        channelmap=setup.channel_map,
+        channelmap=setup.channels.sub_channel_map,
         secrethash=UNIT_SECRETHASH,
         transfers_pair=setup.transfers_pair,
         block_number=block_number,
