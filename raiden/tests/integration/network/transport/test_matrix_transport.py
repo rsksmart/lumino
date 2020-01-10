@@ -18,10 +18,10 @@ from raiden.messages import Delivered, Processed, SecretRequest, ToDevice
 from raiden.network.transport.matrix import AddressReachability, MatrixTransport, _RetryQueue
 from raiden.network.transport.matrix.client import Room
 from raiden.network.transport.matrix.utils import make_room_alias
-# from raiden.raiden_service import (
-#     update_monitoring_service_from_balance_proof,
-#     update_path_finding_service_from_balance_proof,
-# )
+from raiden.raiden_service import (
+    update_monitoring_service_from_balance_proof,
+    update_path_finding_service_from_balance_proof,
+)
 from raiden.tests.utils import factories
 from raiden.tests.utils.client import burn_eth
 from raiden.tests.utils.mocks import MockRaidenService
@@ -657,9 +657,9 @@ def test_monitoring_global_messages(
     monkeypatch.setattr(raiden.transfer.channel, "get_balance", lambda *a, **kw: 123)
     raiden_service.user_deposit.effective_balance.return_value = 100
 
-    # update_monitoring_service_from_balance_proof(
-    #     raiden=raiden_service, chain_state=None, new_balance_proof=balance_proof
-    # )
+    update_monitoring_service_from_balance_proof(
+        raiden=raiden_service, chain_state=None, new_balance_proof=balance_proof
+    )
     gevent.idle()
 
     with gevent.Timeout(2):
@@ -716,9 +716,9 @@ def test_pfs_global_messages(
         "get_channelstate_by_canonical_identifier",
         lambda *a, **kw: channel_state,
     )
-    # update_path_finding_service_from_balance_proof(
-    #     raiden=raiden_service, chain_state=None, new_balance_proof=balance_proof
-    # )
+    update_path_finding_service_from_balance_proof(
+        raiden=raiden_service, chain_state=None, new_balance_proof=balance_proof
+    )
     gevent.idle()
 
     with gevent.Timeout(2):
