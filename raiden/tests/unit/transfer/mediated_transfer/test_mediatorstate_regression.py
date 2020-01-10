@@ -58,7 +58,7 @@ def test_payer_enter_danger_zone_with_transfer_payed():
     pseudo_random_generator = random.Random()
 
     channels = factories.mediator_make_channel_pair()
-    payer_transfer = factories.make_signed_transfer_for(channels[0], LONG_EXPIRATION)
+    payer_transfer = factories.make_signed_transfer_for(channels.get_sub_channel(0), LONG_EXPIRATION)
 
     initial_iteration = mediator.state_transition(
         mediator_state=None,

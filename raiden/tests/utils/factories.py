@@ -817,13 +817,13 @@ class ChannelSet:
 
     @property
     def nodeaddresses_to_networkstates(self) -> NodeNetworkStateMap:
-        return {channel.partner_state.address: NODE_NETWORK_REACHABLE for channel in self.channels}
+        return {channel.partner_state.address: NODE_NETWORK_REACHABLE for channel in self.sub_channel_map.values()}
 
     def our_address(self, index: int) -> Address:
         return self.channels[index].our_state.address
 
     def partner_address(self, index: int) -> Address:
-        return self.channels[index].partner_state.address
+        return self.get_sub_channel(index).partner_state.address
 
     def get_route(self, key: str, channel_key: str) -> RouteState:
         return make_route_from_channel(self.channels[key][channel_key])
@@ -846,6 +846,16 @@ class ChannelSet:
                 else:
                     counter += 1
         return ret_routes
+
+    def get_route_by_index(self, *args) -> RouteState:
+        counter = 0
+        for key in self.channels.keys():
+            for channel_key in self.channels[key].keys():
+                if counter in args:
+                    return self.get_route(key, channel_key)
+                else:
+                    counter += 1
+        return None
 
     def get_sub_channel(self, item: int) -> NettingChannelState:
         counter = 0
@@ -921,7 +931,7 @@ def mediator_make_channel_pair(
 def mediator_make_init_action(
     channels: ChannelSet, transfer: LockedTransferSignedState
 ) -> ActionInitMediator:
-    return ActionInitMediator(channels.get_routes(1), channels.get_route(0), transfer)
+    return ActionInitMediator(channels.get_routes_by_index(1), channels.get_route_by_index(0), transfer)
 
 
 class MediatorTransfersPair(NamedTuple):

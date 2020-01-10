@@ -273,7 +273,7 @@ def test_set_payee():
     assert transfers_pair[1].payer_state == "payer_pending"
     assert transfers_pair[1].payee_state == "payee_pending"
 
-    mediator.set_offchain_reveal_state(transfers_pair, setup.channels.ADDRESSES[0])
+    mediator.set_offchain_reveal_state(transfers_pair, setup.channels.partner_address(0))
 
     # payer address was used, no payee state should change
     assert transfers_pair[0].payer_state == "payer_pending"
@@ -282,7 +282,7 @@ def test_set_payee():
     assert transfers_pair[1].payer_state == "payer_pending"
     assert transfers_pair[1].payee_state == "payee_pending"
 
-    mediator.set_offchain_reveal_state(transfers_pair, setup.channels.ADDRESSES[1])
+    mediator.set_offchain_reveal_state(transfers_pair, setup.channels.partner_address(1))
 
     # only the transfer where the address is a payee should change
     assert transfers_pair[0].payer_state == "payer_pending"
@@ -469,7 +469,7 @@ def test_events_for_balanceproof():
     msg_identifier = message_identifier_from_prng(prng_copy)
 
     events = mediator.events_for_balanceproof(
-        setup.channel_map,
+        setup.channels.sub_channel_map,
         setup.transfers_pair,
         pseudo_random_generator,
         safe_block,
@@ -553,7 +553,7 @@ def test_events_for_balanceproof_middle_secret():
     middle_pair.payee_state = "payee_secret_revealed"
 
     events = mediator.events_for_balanceproof(
-        setup.channel_map,
+        setup.channels.sub_channel_map,
         setup.transfers_pair,
         pseudo_random_generator,
         setup.block_number,
@@ -711,13 +711,13 @@ def test_events_for_onchain_secretreveal_once():
 def secret_learned_setup():
     pseudo_random_generator = random.Random()
     channels = mediator_make_channel_pair()
-    from_transfer = factories.make_signed_transfer_for(channels[0])
+    from_transfer = factories.make_signed_transfer_for(channels.get_sub_channel(0))
 
     nodeaddresses_to_networkstates = factories.make_node_availability_map([UNIT_TRANSFER_TARGET])
     iteration = mediator.state_transition(
         mediator_state=None,
         state_change=mediator_make_init_action(channels, from_transfer),
-        channelidentifiers_to_channels=channels.channel_map,
+        channelidentifiers_to_channels=channels.sub_channel_map,
         nodeaddresses_to_networkstates=nodeaddresses_to_networkstates,
         pseudo_random_generator=pseudo_random_generator,
         block_number=1,
@@ -732,25 +732,25 @@ def test_secret_learned():
 
     iteration = mediator.secret_learned(
         state=iteration.new_state,
-        channelidentifiers_to_channels=channels.channel_map,
+        channelidentifiers_to_channels=channels.sub_channel_map,
         pseudo_random_generator=pseudo_random_generator,
         block_number=1,
         block_hash=factories.make_block_hash(),
         secret=UNIT_SECRET,
         secrethash=UNIT_SECRETHASH,
-        payee_address=channels[1].partner_state.address,
+        payee_address=channels.get_sub_channel(1).partner_state.address,
     )
     transfer_pair = iteration.new_state.transfers_pair[0]
 
     assert from_transfer.lock.expiration == transfer_pair.payee_transfer.lock.expiration
     assert mediator.is_send_transfer_almost_equal(
-        get_payee_channel(channels.channel_map, transfer_pair),
+        get_payee_channel(channels.sub_channel_map, transfer_pair),
         transfer_pair.payee_transfer,
         from_transfer,
     )
-    assert transfer_pair.payee_address == channels.get_route(1).node_address
+    assert transfer_pair.payee_address == channels.get_route_by_index(1).node_address
 
-    assert transfer_pair.payer_transfer.balance_proof.sender == channels.get_route(0).node_address
+    assert transfer_pair.payer_transfer.balance_proof.sender == channels.get_route_by_index(0).node_address
     assert transfer_pair.payer_transfer == from_transfer
 
     assert iteration.new_state.secret == UNIT_SECRET
@@ -771,8 +771,8 @@ def test_secret_learned_with_refund():
     channel_map, transfers_pair = setup.channel_map, setup.transfers_pair
 
     # Make sure that our state is updated once transfers are sent.
-    assert channel.is_lock_locked(setup.channels[1].our_state, UNIT_SECRETHASH)
-    assert channel.is_lock_locked(setup.channels[2].our_state, UNIT_SECRETHASH)
+    assert channel.is_lock_locked(setup.channels.get_sub_channel(1).our_state, UNIT_SECRETHASH)
+    assert channel.is_lock_locked(setup.channels.get_sub_channel(2).our_state, UNIT_SECRETHASH)
 
     mediator_state = MediatorTransferState(secrethash=UNIT_SECRETHASH, routes=[])
     mediator_state.transfers_pair = transfers_pair
@@ -796,26 +796,26 @@ def test_secret_learned_with_refund():
     assert not transition_result.events
     assert mediator_state.secret == UNIT_SECRET
 
-    assert channel.is_secret_known(setup.channels[0].partner_state, UNIT_SECRETHASH)
-    assert channel.is_secret_known(setup.channels[1].partner_state, UNIT_SECRETHASH)
-    assert channel.is_secret_known(setup.channels[1].our_state, UNIT_SECRETHASH)
-    assert channel.is_secret_known(setup.channels[2].our_state, UNIT_SECRETHASH)
+    assert channel.is_secret_known(setup.channels.get_sub_channel(0).partner_state, UNIT_SECRETHASH)
+    assert channel.is_secret_known(setup.channels.get_sub_channel(1).partner_state, UNIT_SECRETHASH)
+    assert channel.is_secret_known(setup.channels.get_sub_channel(1).our_state, UNIT_SECRETHASH)
+    assert channel.is_secret_known(setup.channels.get_sub_channel(2).our_state, UNIT_SECRETHASH)
 
 
 def test_secret_learned_for_closed_channel():
     pseudo_random_generator, channels, _, iteration = secret_learned_setup()
     close_transaction = factories.create(factories.TransactionExecutionStatusProperties())
-    channels[0].close_transaction = close_transaction
+    channels.get_sub_channel(0).close_transaction = close_transaction
 
     iteration = mediator.secret_learned(
         state=iteration.new_state,
-        channelidentifiers_to_channels=channels.channel_map,
+        channelidentifiers_to_channels=channels.sub_channel_map,
         pseudo_random_generator=pseudo_random_generator,
         block_number=1,
         block_hash=factories.make_block_hash(),
         secret=UNIT_SECRET,
         secrethash=UNIT_SECRETHASH,
-        payee_address=channels[1].partner_state.address,
+        payee_address=channels.get_sub_channel(1).partner_state.address,
     )
     assert search_for_item(iteration.events, ContractSendSecretReveal, {"secret": UNIT_SECRET})
 
@@ -826,7 +826,7 @@ def test_mediate_transfer():
 
     channels = mediator_make_channel_pair()
     payer_transfer = factories.make_signed_transfer_for(
-        channels[0], LockedTransferSignedStateProperties(expiration=30)
+        channels.get_sub_channel(0), LockedTransferSignedStateProperties(expiration=30)
     )
 
     mediator_state = MediatorTransferState(
@@ -834,9 +834,9 @@ def test_mediate_transfer():
     )
     iteration = mediator.mediate_transfer(
         mediator_state,
-        channels.get_routes(1),
-        channels[0],
-        channels.channel_map,
+        channels.get_routes_by_index(1),
+        channels.get_sub_channel(0),
+        channels.sub_channel_map,
         channels.nodeaddresses_to_networkstates,
         pseudo_random_generator,
         payer_transfer,
@@ -847,7 +847,7 @@ def test_mediate_transfer():
         iteration.events,
         SendLockedTransfer,
         {
-            "recipient": channels[1].partner_state.address,
+            "recipient": channels.get_sub_channel(1).partner_state.address,
             "transfer": {
                 "payment_identifier": payer_transfer.payment_identifier,
                 "token": payer_transfer.token,
@@ -1511,15 +1511,13 @@ def setup():
     channels = mediator_make_channel_pair()
     expiration = 30
     transfer_properties = LockedTransferSignedStateProperties(expiration=expiration)
-    first_channel = channels.channels[factories.UNIT_TRANSFER_DESCRIPTION.initiator][
-        next(iter(channels.channels[factories.UNIT_TRANSFER_DESCRIPTION.initiator]))]
-    transfer = factories.make_signed_transfer_for(first_channel, transfer_properties)
+    transfer = factories.make_signed_transfer_for(channels.get_sub_channel(0), transfer_properties)
 
     balance_proof = create(
         BalanceProofSignedStateProperties(
             nonce=2,
             transferred_amount=transfer.balance_proof.transferred_amount,
-            canonical_identifier=first_channel.canonical_identifier,
+            canonical_identifier=channels.get_sub_channel(0).canonical_identifier,
             message_hash=transfer.lock.secrethash,
         )
     )
