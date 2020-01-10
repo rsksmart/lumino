@@ -114,11 +114,10 @@ DB_CREATE_LIGHT_CLIENT_PROTOCOL_MESSAGE = """
 CREATE TABLE IF NOT EXISTS light_client_protocol_message (
     internal_msg_identifier INTEGER PRIMARY KEY AUTOINCREMENT,
     identifier TEXT,
-    light_client_payment_id TEXT,
+    light_client_payment_id TEXT NULLABLE REFERENCES light_client_payment(payment_id),
     message_order INTEGER, 
     unsigned_message JSON,
-    signed_message JSON,
-    FOREIGN KEY(light_client_payment_id) REFERENCES light_client_payment(payment_id)
+    signed_message JSON
     );
 """
 
@@ -133,7 +132,7 @@ CREATE TABLE IF NOT EXISTS light_client_balance_proof (
     token_network_address TEXT,
     balance_proof JSON,
     lc_balance_proof_signature TEXT,
-    FOREIGN KEY(light_client_payment_id) REFERENCES light_client_payment(payment_id)
+    FOREIGN KEY(light_client_payment_id)  REFERENCES light_client_payment(payment_id)
     );
 """
 

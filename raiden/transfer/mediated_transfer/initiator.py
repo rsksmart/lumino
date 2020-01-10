@@ -111,6 +111,8 @@ def handle_block(
     """ Checks if the lock has expired, and if it has sends a remove expired
     lock and emits the failing events.
     """
+
+
     secrethash = initiator_state.transfer.lock.secrethash
     locked_lock = channel_state.our_state.secrethashes_to_lockedlocks.get(secrethash)
 
@@ -131,7 +133,6 @@ def handle_block(
         block_number=state_change.block_number,
         lock_expiration_threshold=lock_expiration_threshold,
     )
-
     events: List[Event] = list()
 
     if lock_has_expired and initiator_state.transfer_state != "transfer_expired":
@@ -141,6 +142,7 @@ def handle_block(
                 channel_state=channel_state,
                 locked_lock=locked_lock,
                 pseudo_random_generator=pseudo_random_generator,
+                payment_identifier= initiator_state.transfer.payment_identifier
             )
             events.extend(expired_lock_events)
 

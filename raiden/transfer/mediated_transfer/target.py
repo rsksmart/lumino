@@ -325,8 +325,8 @@ def handle_send_secret_request_light(
                                                        True)
         events.append(secret_request_light)
         events.append(store_secret_request_event)
-        iteration = TransitionResult(target_state, events)
 
+    iteration = TransitionResult(target_state, events)
     return iteration
 
 
