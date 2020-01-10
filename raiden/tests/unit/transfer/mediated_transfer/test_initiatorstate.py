@@ -419,9 +419,6 @@ def test_refund_transfer_next_route():
     current_state = make_initiator_manager_state(
         channels=channels, pseudo_random_generator=prng, block_number=block_number
     )
-    # current_state.initiator_transfers.get(factories.UNIT_TRANSFER_DESCRIPTION.secrethash).transfer_description.initiator = first_channel.identifier
-    # current_state.initiator_transfers.get(
-    #     factories.UNIT_TRANSFER_DESCRIPTION.secrethash).transfer.initiator = first_channel.identifier
     initiator_state = get_transfer_at_index(current_state, 0)
     original_transfer = initiator_state.transfer
 

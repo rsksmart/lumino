@@ -158,7 +158,7 @@ def test_next_route_amount():
 
     # the first available route should be used
     chosen_channel = mediator.next_channel_from_routes(
-        channels.get_routes(), channels.sub_channel_map, amount, timeout_blocks
+        channels.get_routes_by_index(0), channels.sub_channel_map, amount, timeout_blocks
     )
     assert chosen_channel.identifier == channels.get_sub_channel(0).identifier
 
@@ -446,7 +446,7 @@ def test_events_for_secretreveal_all_states():
         assert search_for_item(
             events,
             SendSecretReveal,
-            {"secret": UNIT_SECRET, "recipient": setup.channels.partner_privatekeys[0]},
+            {"secret": UNIT_SECRET, "recipient": setup.channels.partner_address(0)},
         )
 
 
