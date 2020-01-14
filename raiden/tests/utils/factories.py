@@ -819,7 +819,7 @@ class ChannelSet:
         return {channel.partner_state.address: NODE_NETWORK_REACHABLE for channel in self.sub_channel_map.values()}
 
     def our_address(self, index: int) -> Address:
-        return self.channels[index].our_state.address
+        return self.get_sub_channel(index).our_state.address
 
     def partner_address(self, index: int) -> Address:
         return self.get_sub_channel(index).partner_state.address

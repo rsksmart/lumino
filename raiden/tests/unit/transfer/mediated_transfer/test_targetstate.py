@@ -88,7 +88,7 @@ def make_target_state(
     expiration = expiration or channel_set.get_sub_channel(0).reveal_timeout + block_number + 1
     from_transfer = make_target_transfer(channel_set.get_sub_channel(0), amount, expiration, initiator)
 
-    state_change = ActionInitTarget(route=channel_set.get_route(0), transfer=from_transfer)
+    state_change = ActionInitTarget(route=channel_set.get_route_by_index(0), transfer=from_transfer)
     iteration = target.handle_inittarget(
         state_change=state_change,
         channel_state=channel_set.get_sub_channel(0),
@@ -137,7 +137,7 @@ def test_events_for_onchain_secretreveal():
     safe_to_wait = expiration - channel_set.get_sub_channel(0).reveal_timeout - 1
     unsafe_to_wait = expiration - channel_set.get_sub_channel(0).reveal_timeout
 
-    state = TargetTransferState(channel_set.get_route(0), from_transfer)
+    state = TargetTransferState(channel_set.get_route_by_index(0), from_transfer)
     events = target.events_for_onchain_secretreveal(
         target_state=state,
         channel_state=channel_set.get_sub_channel(0),
@@ -181,7 +181,7 @@ def test_handle_inittarget():
     )
     from_transfer = create(transfer_properties)
 
-    state_change = ActionInitTarget(channel_set.get_route(0), from_transfer)
+    state_change = ActionInitTarget(channel_set.get_route_by_index(0), from_transfer)
 
     iteration = target.handle_inittarget(
         state_change, channel_set.get_sub_channel(0), pseudo_random_generator, block_number, None
@@ -211,7 +211,7 @@ def test_handle_inittarget_bad_expiration():
 
     channel.handle_receive_lockedtransfer(channel_set.get_sub_channel(0), from_transfer, None)
 
-    state_change = ActionInitTarget(channel_set.get_route(0), from_transfer)
+    state_change = ActionInitTarget(channel_set.get_route_by_index(0), from_transfer)
     iteration = target.handle_inittarget(
         state_change, channel_set.get_sub_channel(0), pseudo_random_generator, block_number, None
     )
@@ -446,7 +446,7 @@ def test_state_transition():
     channel_set = make_channel_set(properties=[channel_properties2], token_address=factories.UNIT_TRANSFER_DESCRIPTION.initiator)
     from_transfer = make_target_transfer(channel_set.get_sub_channel(0), amount=lock_amount, initiator=initiator)
 
-    init = ActionInitTarget(channel_set.get_route(0), from_transfer)
+    init = ActionInitTarget(channel_set.get_route_by_index(0), from_transfer)
 
     init_transition = target.state_transition(
         target_state=None,
@@ -457,7 +457,7 @@ def test_state_transition():
         storage=None
     )
     assert init_transition.new_state is not None
-    assert init_transition.new_state.route == channel_set.get_route(0)
+    assert init_transition.new_state.route == channel_set.get_route_by_index(0)
     assert init_transition.new_state.transfer == from_transfer
 
     first_new_block = Block(
@@ -503,7 +503,7 @@ def test_state_transition():
             locked_amount=0,
             canonical_identifier=factories.make_canonical_identifier(
                 token_network_address=channel_set.get_sub_channel(0).token_network_identifier,
-                channel_identifier=channel_set.get_route(0).channel_identifier,
+                channel_identifier=channel_set.get_route_by_index(0).channel_identifier,
             ),
             locksroot=EMPTY_MERKLE_ROOT,
             message_hash=b"\x00" * 32,  # invalid
@@ -546,7 +546,7 @@ def test_target_reject_keccak_empty_hash():
         allow_invalid=True,
     )
 
-    init = ActionInitTarget(route=channel_set.get_route(0), transfer=from_transfer)
+    init = ActionInitTarget(route=channel_set.get_route_by_index(0), transfer=from_transfer)
 
     init_transition = target.state_transition(
         target_state=None,
@@ -571,7 +571,7 @@ def test_target_receive_lock_expired():
         channel_set.get_sub_channel(0), amount=lock_amount, block_number=block_number
     )
 
-    init = ActionInitTarget(channel_set.get_route(0), from_transfer)
+    init = ActionInitTarget(channel_set.get_route_by_index(0), from_transfer)
 
     init_transition = target.state_transition(
         target_state=None,
@@ -582,7 +582,7 @@ def test_target_receive_lock_expired():
         storage=None
     )
     assert init_transition.new_state is not None
-    assert init_transition.new_state.route == channel_set.get_route(0)
+    assert init_transition.new_state.route == channel_set.get_route_by_index(0)
     assert init_transition.new_state.transfer == from_transfer
 
     balance_proof = create(
@@ -630,7 +630,7 @@ def test_target_lock_is_expired_if_secret_is_not_registered_onchain():
     channel_set = make_channel_set(properties=[channel_properties2], token_address=factories.UNIT_TRANSFER_DESCRIPTION.initiator)
     from_transfer = make_target_transfer(channel_set.get_sub_channel(0), amount=lock_amount, block_number=1)
 
-    init = ActionInitTarget(channel_set.get_route(0), from_transfer)
+    init = ActionInitTarget(channel_set.get_route_by_index(0), from_transfer)
 
     init_transition = target.state_transition(
         target_state=None,
