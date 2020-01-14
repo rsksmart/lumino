@@ -794,7 +794,6 @@ class ChannelSet:
 
     def __init__(
         self,
-        #channels: List[NettingChannelState],
         channels: Dict[AddressHex, Dict[ChannelID, NettingChannelState]],
         our_privatekeys: List[bytes],
         partner_privatekeys: List[bytes],
@@ -869,7 +868,13 @@ class ChannelSet:
         return None
 
     def __getitem__(self, item: int) -> NettingChannelState:
-        return self.channels[item]
+        counter = 0
+        for key in self.channels.keys():
+            if counter == item:
+                return self.channels[key]
+            else:
+                counter += 1
+        return None
 
 
 def make_channel_set(
@@ -881,7 +886,7 @@ def make_channel_set(
 ) -> ChannelSet:
     if number_of_channels is None:
         number_of_channels = len(properties)
-    channels = dict()
+    channel_set = dict()
     our_pkeys = [None] * number_of_channels
     partner_pkeys = [None] * number_of_channels
 
@@ -892,11 +897,11 @@ def make_channel_set(
 
     for i in range(number_of_channels):
         our_pkeys[i], partner_pkeys[i] = pkeys_from_channel_state(properties[i], defaults)
-        # channels.append(create(properties[i], defaults))
-        channel_set = create(properties[i], defaults)
-        channels[channel_set.identifier] = channel_set
+        new_channel = create(properties[i], defaults)
+        new_channel.our_state.address = token_address
+        channel_set[new_channel.identifier] = new_channel
     ret = dict()
-    ret[token_address] = channels
+    ret[token_address] = channel_set
     return ChannelSet(ret, our_pkeys, partner_pkeys)
 
 
@@ -970,7 +975,8 @@ def make_transfers_pair(
         )
         for i in range(number_of_channels)
     ]
-    channel_set = make_channel_set(properties=properties_list, defaults=defaults, token_address=UNIT_TRANSFER_DESCRIPTION.initiator)
+    channel_set = make_channel_set(
+        properties=properties_list, defaults=defaults, token_address=UNIT_TRANSFER_DESCRIPTION.initiator)
 
     lock_expiration = block_number + UNIT_REVEAL_TIMEOUT * 2
     pseudo_random_generator = random.Random()

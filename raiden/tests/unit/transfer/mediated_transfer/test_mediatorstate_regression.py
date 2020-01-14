@@ -63,7 +63,7 @@ def test_payer_enter_danger_zone_with_transfer_payed():
     initial_iteration = mediator.state_transition(
         mediator_state=None,
         state_change=factories.mediator_make_init_action(channel_set, payer_transfer),
-        channelidentifiers_to_channels=channel_set.channel_map,
+        channelidentifiers_to_channels=channel_set.sub_channel_map,
         nodeaddresses_to_networkstates=channel_set.nodeaddresses_to_networkstates,
         pseudo_random_generator=pseudo_random_generator,
         block_number=block_number,
@@ -92,7 +92,7 @@ def test_payer_enter_danger_zone_with_transfer_payed():
     paid_iteration = mediator.state_transition(
         mediator_state=new_state,
         state_change=receive_secret,
-        channelidentifiers_to_channels=channel_set.channel_map,
+        channelidentifiers_to_channels=channel_set.sub_channel_map,
         nodeaddresses_to_networkstates=channel_set.nodeaddresses_to_networkstates,
         pseudo_random_generator=pseudo_random_generator,
         block_number=block_number,
@@ -140,6 +140,8 @@ def test_regression_send_refund():
 
     last_pair = setup.transfers_pair[-1]
     canonical_identifier = last_pair.payee_transfer.balance_proof.canonical_identifier
+    last_pair.payee_transfer.balance_proof.nonce = 2
+    last_pair.payer_transfer.balance_proof.nonce = 2
     lock_expiration = last_pair.payee_transfer.lock.expiration
 
     received_transfer = factories.create(
@@ -161,7 +163,7 @@ def test_regression_send_refund():
     iteration = mediator.handle_refundtransfer(
         mediator_state=mediator_state,
         mediator_state_change=refund_state_change,
-        channelidentifiers_to_channels=setup.channel_map,
+        channelidentifiers_to_channels=setup.channel_set.sub_channel_map,
         nodeaddresses_to_networkstates=setup.channel_set.nodeaddresses_to_networkstates,
         pseudo_random_generator=pseudo_random_generator,
         block_number=setup.block_number,
@@ -169,7 +171,7 @@ def test_regression_send_refund():
 
     first_pair = setup.transfers_pair[0]
     first_payer_transfer = first_pair.payer_transfer
-    payer_channel = mediator.get_payer_channel(setup.channel_map, first_pair)
+    payer_channel = mediator.get_payer_channel(setup.channel_set.sub_channel_map, first_pair)
     lock = channel.get_lock(end_state=payer_channel.partner_state, secrethash=UNIT_SECRETHASH)
     token_network_identifier = first_payer_transfer.balance_proof.token_network_identifier
     assert search_for_item(
