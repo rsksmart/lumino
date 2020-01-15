@@ -696,6 +696,8 @@ def test_init_with_maximum_pending_transfers_exceeded():
         )
     )
     channel_map = {channel1.identifier: channel1}
+    address_channel = dict()
+    address_channel[factories.UNIT_TRANSFER_INITIATOR] = channel_map
     available_routes = [factories.make_route_from_channel(channel1)]
     pseudo_random_generator = random.Random()
 
@@ -706,7 +708,7 @@ def test_init_with_maximum_pending_transfers_exceeded():
         init_state_change = ActionInitInitiator(transfer_description, available_routes)
         transitions.append(
             initiator_manager.state_transition(
-                None, init_state_change, channel_map, pseudo_random_generator, block_number
+                None, init_state_change, address_channel, pseudo_random_generator, block_number
             )
         )
 
