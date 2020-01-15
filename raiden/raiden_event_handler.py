@@ -7,6 +7,7 @@ from eth_utils import to_checksum_address, to_hex
 from raiden.constants import EMPTY_BALANCE_HASH, EMPTY_HASH, EMPTY_MESSAGE_HASH, EMPTY_SIGNATURE
 from raiden.exceptions import ChannelOutdatedError, RaidenUnrecoverableError
 from raiden.lightclient.light_client_message_handler import LightClientMessageHandler
+from raiden.lightclient.lightclientmessages.light_client_protocol_message import LightClientProtocolMessageType
 from raiden.message_event_convertor import message_from_sendevent
 from raiden.messages import LockedTransfer
 from raiden.network.proxies.payment_channel import PaymentChannel
@@ -120,7 +121,7 @@ class RaidenEventHandler(EventHandler):
                 self.handle_send_lockexpired(raiden, event)
             else:
                 store_lock_expired = StoreMessageEvent(event.message_identifier, event.payment_identifier, -1,
-                                                       message_from_sendevent(event), False)
+                                                       message_from_sendevent(event), False, LightClientProtocolMessageType.PaymentExpired)
                 print("----- STORED LOCK EXPIRED -----")
                 self.handle_store_message(raiden, store_lock_expired)
         elif type(event) == SendLockedTransfer:
@@ -193,6 +194,7 @@ class RaidenEventHandler(EventHandler):
         existing_message = LightClientMessageHandler.is_light_client_protocol_message_already_stored(
             store_message_event.payment_id,
             store_message_event.message_order,
+            store_message_event.message_type,
             raiden.wal)
         if not existing_message:
             LightClientMessageHandler.store_light_client_protocol_message(store_message_event.message_id,
@@ -200,6 +202,7 @@ class RaidenEventHandler(EventHandler):
                                                                           store_message_event.is_signed,
                                                                           store_message_event.payment_id,
                                                                           store_message_event.message_order,
+                                                                          store_message_event.message_type,
                                                                           raiden.wal)
         else:
             stored_but_unsigned = existing_message.signed_message is None
@@ -208,6 +211,7 @@ class RaidenEventHandler(EventHandler):
                 LightClientMessageHandler.update_stored_msg_set_signed_data(store_message_event.message,
                                                                             store_message_event.payment_id,
                                                                             store_message_event.message_order,
+                                                                            store_message_event.message_type,
                                                                             raiden.wal)
             else:
                 log.info("Message for lc already received, ignoring db storage")

@@ -8,7 +8,7 @@ from eth_utils import to_checksum_address
 from raiden.constants import RAIDEN_DB_VERSION, SQLITE_MIN_REQUIRED_VERSION
 from raiden.exceptions import InvalidDBData, InvalidNumberInput
 from raiden.storage.serialize import SerializationBase
-from raiden.storage.utils import DB_SCRIPT_CREATE_TABLES, TimestampedEvent, DB_UPDATE_TABLES
+from raiden.storage.utils import DB_SCRIPT_CREATE_TABLES, TimestampedEvent
 from raiden.utils import get_system_spec
 from raiden.utils.typing import Any, Dict, Iterator, List, NamedTuple, Optional, Tuple, Union
 from dateutil.relativedelta import relativedelta
@@ -184,13 +184,15 @@ class SQLiteStorage:
                 "INSERT INTO light_client_protocol_message("
                 "identifier, "
                 "message_order, "
+                "message_type, "
                 "unsigned_message, "
                 "signed_message, "
                 "light_client_payment_id "
                 ")"
-                "VALUES(?, ?, ?, ?, ?)",
+                "VALUES(?, ?, ?, ?, ?, ?)",
                 (str(msg_dto.identifier),
                  msg_dto.message_order,
+                 str(msg_dto.message_type.value),
                  msg_dto.unsigned_message,
                  msg_dto.signed_message,
                  str(msg_dto.light_client_payment_id) if msg_dto.light_client_payment_id else None
@@ -199,30 +201,15 @@ class SQLiteStorage:
             last_id = cursor.lastrowid
         return last_id
 
-    def write_light_client_protocol_messages(self, msg_dtos):
-        with self.write_lock, self.conn:
-            cursor = self.conn.executemany(
-                "INSERT INTO light_client_protocol_message("
-                "identifier, "
-                "message_order, "
-                "unsigned_message, "
-                "signed_message, "
-                "light_client_payment_id "
-                ")"
-                "VALUES(?, ?, ?, ?, ?)",
-                msg_dtos,
-            )
-            last_id = cursor.lastrowid
-        return last_id
-
-    def is_light_client_protocol_message_already_stored(self, payment_id: int, order: int):
+    def is_light_client_protocol_message_already_stored(self, payment_id: int, order: int,
+                                                        message_type: str):
         cursor = self.conn.cursor()
         cursor.execute(
             """
             SELECT *
-                FROM light_client_protocol_message WHERE light_client_payment_id = ? and message_order = ?;
+                FROM light_client_protocol_message WHERE light_client_payment_id = ? and message_order = ? and message_type = ?;
             """,
-            (str(payment_id), order)
+            (str(payment_id), order, message_type)
         )
 
         return cursor.fetchone()
@@ -1305,7 +1292,7 @@ class SQLiteStorage:
     def get_light_client_messages(self, from_message, light_client):
         cursor = self.conn.cursor()
         cursor.execute(
-            "SELECT identifier, message_order, unsigned_message, signed_message, light_client_payment_id, internal_msg_identifier" +
+            "SELECT identifier, message_order, unsigned_message, signed_message, light_client_payment_id, internal_msg_identifier, message_type" +
             " FROM light_client_protocol_message A INNER JOIN light_client_payment B" +
             " ON A.light_client_payment_id = B.payment_id" +
             " WHERE A.internal_msg_identifier >= ?" +
@@ -1320,7 +1307,7 @@ class SQLiteStorage:
         cursor = self.conn.cursor()
         cursor.execute(
             """
-            SELECT identifier, message_order, unsigned_message, signed_message, light_client_payment_id
+            SELECT identifier, message_order, unsigned_message, signed_message, light_client_payment_id, message_type
             FROM light_client_protocol_message
             WHERE identifier  = ?
             ORDER BY message_order ASC
@@ -1343,15 +1330,16 @@ class SQLiteStorage:
         )
         return cursor.fetchone()
 
-    def get_light_client_payment_locked_transfer(self, payment_identifier):
+    def get_light_client_payment_locked_transfer(self, payment_identifier, message_type):
         cursor = self.conn.cursor()
         cursor.execute(
-            "SELECT identifier, message_order, unsigned_message, signed_message, light_client_payment_id" +
+            "SELECT identifier, message_order,message_type, unsigned_message, signed_message, light_client_payment_id" +
             " FROM light_client_protocol_message A INNER JOIN light_client_payment B" +
             " ON A.light_client_payment_id = B.payment_id" +
             " WHERE A.message_order = 1" +
+            " AND A.message_type = ?" +
             " AND B.payment_id = ?",
-            (str(payment_identifier),),
+            (message_type, str(payment_identifier)),
         )
         return cursor.fetchone()
 
@@ -1383,17 +1371,17 @@ class SerializedSQLiteStorage(SQLiteStorage):
                     serialized_unsigned_msg = None
                 result.append(
                     (signed, message[1], message[4], serialized_unsigned_msg,
-                     serialized_signed_msg, message[0], message[5]))
+                     serialized_signed_msg, message[0], message[5], message[6]))
         return result
 
-    def update_light_client_protocol_message_set_signed_data(self, payment_id, msg_order, signed_message):
+    def update_light_client_protocol_message_set_signed_data(self, payment_id, msg_order, signed_message, message_type):
         with self.write_lock, self.conn:
             cursor = self.conn.cursor()
             cursor.execute(
                 """
-                UPDATE  light_client_protocol_message set signed_message = ? WHERE light_client_payment_id = ? and message_order = ?;
+                UPDATE  light_client_protocol_message set signed_message = ? WHERE light_client_payment_id = ? and message_order = ? and message_type = ?;
                 """,
-                (self.serializer.serialize(signed_message), str(payment_id), msg_order)
+                (self.serializer.serialize(signed_message), str(payment_id), msg_order, message_type)
             )
 
             last_id = cursor.lastrowid
@@ -1405,14 +1393,6 @@ class SerializedSQLiteStorage(SQLiteStorage):
     def update_invoice(self, payment_hash_invoice):
         return super().update_invoice(payment_hash_invoice)
 
-    def write_light_client_protocol_messages(self, msg_dtos):
-        data = [
-            (msg_dto.identifier, msg_dto.message_order, self.serializer.serialize(msg_dto.unsigned_message),
-             self.serializer.serialize(msg_dto.signed_message),
-             msg_dto.state_change_id, msg_dto.light_client_payment_id)
-            for msg_dto in msg_dtos
-        ]
-        return super().write_light_client_protocol_messages(data)
 
     def write_light_client_protocol_message(self, new_message, msg_dto):
         serialized_data = self.serializer.serialize(new_message)

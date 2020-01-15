@@ -49,6 +49,7 @@ from raiden.lightclient.light_client_service import LightClientService
 from raiden.lightclient.light_client_utils import LightClientUtils
 from raiden.lightclient.lightclientmessages.hub_message import HubMessage
 from raiden.lightclient.lightclientmessages.light_client_payment import LightClientPayment, LightClientPaymentStatus
+from raiden.lightclient.lightclientmessages.light_client_protocol_message import LightClientProtocolMessageType
 
 from raiden.messages import RequestMonitoring, LockedTransfer, RevealSecret, Unlock, Delivered, SecretRequest, Processed
 from raiden.settings import DEFAULT_RETRY_TIMEOUT, DEVELOPMENT_CONTRACT_VERSION
@@ -1144,8 +1145,8 @@ class RaidenAPI:
         self.raiden.initiate_send_balance_proof(sender_address, receiver_address, unlock)
 
     def initiate_send_delivered_light(self, sender_address: typing.Address, receiver_address: typing.Address,
-                                      delivered: Delivered, msg_order: int, payment_id: int):
-        self.raiden.initiate_send_delivered_light(sender_address, receiver_address, delivered, msg_order, payment_id)
+                                      delivered: Delivered, msg_order: int, payment_id: int, message_type: LightClientProtocolMessageType):
+        self.raiden.initiate_send_delivered_light(sender_address, receiver_address, delivered, msg_order, payment_id, message_type)
 
     def initiate_send_processed_light(self, sender_address: typing.Address, receiver_address: typing.Address,
                                       processed: Processed, msg_order: int, payment_id: int):
@@ -1724,6 +1725,7 @@ class RaidenAPI:
                 False,
                 payment.payment_id,
                 order,
+                LightClientProtocolMessageType.PaymentSuccessful,
                 self.raiden.wal
             )
 

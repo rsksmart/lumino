@@ -1,8 +1,7 @@
 from eth_utils import to_canonical_address, encode_hex, decode_hex
 
-from raiden.messages import SignedBlindedBalanceProof, Unlock
+from raiden.messages import Unlock
 from raiden.utils import typing
-from raiden.utils.serialization import serialize_bytes, deserialize_bytes
 from raiden.utils.typing import Signature
 
 

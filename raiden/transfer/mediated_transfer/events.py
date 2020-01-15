@@ -1,5 +1,7 @@
 # pylint: disable=too-many-arguments,too-few-public-methods
 from eth_utils import to_canonical_address, to_checksum_address
+
+from raiden.lightclient.lightclientmessages.light_client_protocol_message import LightClientProtocolMessageType
 from raiden.messages import RevealSecret, Unlock, Message, SecretRequest
 
 from raiden.transfer.architecture import Event, SendMessageEvent
@@ -46,13 +48,14 @@ class StoreMessageEvent(Event):
     """
 
     def __init__(
-        self, message_id: int, payment_id: Optional[int], message_order: int, message: Message, is_signed: bool
+        self, message_id: int, payment_id: Optional[int], message_order: int, message: Message, is_signed: bool, message_type: LightClientProtocolMessageType
     ) -> None:
         self.message_id = message_id
         self.payment_id = payment_id
         self.message_order = message_order
         self.message = message
         self.is_signed = is_signed
+        self.message_type = message_type
 
     def __eq__(self, other: Any) -> bool:
         return (
@@ -61,6 +64,7 @@ class StoreMessageEvent(Event):
             and self.message_order == other.message_order
             and self.message == other.message
             and self.is_signed == other.is_signed
+            and self.message_type == other.message_type
         )
 
     def __ne__(self, other: Any) -> bool:
@@ -111,6 +115,7 @@ class SendLockExpired(SendMessageEvent):
             and self.balance_proof == other.balance_proof
             and self.secrethash == other.secrethash
             and self.recipient == other.recipient
+            and self.payment_identifier == other.payment_identifier
         )
 
     def __ne__(self, other: Any) -> bool:
@@ -122,6 +127,8 @@ class SendLockExpired(SendMessageEvent):
             "balance_proof": self.balance_proof,
             "secrethash": serialize_bytes(self.secrethash),
             "recipient": to_checksum_address(self.recipient),
+            "payment_identifier": str(self.payment_identifier),
+
         }
 
         return result
@@ -133,6 +140,7 @@ class SendLockExpired(SendMessageEvent):
             message_identifier=MessageID(int(data["message_identifier"])),
             balance_proof=data["balance_proof"],
             secrethash=deserialize_secret_hash(data["secrethash"]),
+            payment_identifier=int(data["payment_identifier"])
         )
 
         return restored

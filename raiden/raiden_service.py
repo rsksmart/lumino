@@ -32,6 +32,7 @@ from raiden.exceptions import (
     RaidenUnrecoverableError,
     InvalidPaymentIdentifier)
 from raiden.lightclient.light_client_message_handler import LightClientMessageHandler
+from raiden.lightclient.lightclientmessages.light_client_protocol_message import LightClientProtocolMessageType
 from raiden.message_event_convertor import message_from_sendevent
 from raiden.messages import (
     LockedTransfer,
@@ -1320,7 +1321,7 @@ class RaidenService(Runnable):
         return payment_status
 
     def initiate_send_delivered_light(self, sender_address: Address, receiver_address: Address,
-                                      delivered: Delivered, msg_order: int, payment_id: int):
+                                      delivered: Delivered, msg_order: int, payment_id: int, message_type: LightClientProtocolMessageType):
         lc_transport = self.get_light_client_transport(to_checksum_address(sender_address))
         if lc_transport:
             LightClientMessageHandler.store_light_client_protocol_message(
@@ -1329,12 +1330,13 @@ class RaidenService(Runnable):
                 True,
                 payment_id,
                 msg_order,
+                message_type,
                 self.wal
             )
             lc_transport.send_for_light_client_with_retry(receiver_address, delivered)
 
     def initiate_send_processed_light(self, sender_address: Address, receiver_address: Address,
-                                      processed: Processed, msg_order: int, payment_id: int):
+                                      processed: Processed, msg_order: int, payment_id: int, message_type: LightClientProtocolMessageType):
         lc_transport = self.get_light_client_transport(to_checksum_address(sender_address))
         if lc_transport:
             LightClientMessageHandler.store_light_client_protocol_message(
@@ -1343,6 +1345,7 @@ class RaidenService(Runnable):
                 True,
                 payment_id,
                 msg_order,
+                message_type,
                 self.wal
             )
             lc_transport.send_for_light_client_with_retry(receiver_address, processed)

@@ -24,6 +24,7 @@ from raiden.api.validations.channel_validator import ChannelValidator
 from raiden.lightclient.light_client_service import LightClientService
 from raiden.lightclient.lightclientmessages.light_client_non_closing_balance_proof import \
     LightClientNonClosingBalanceProof
+from raiden.lightclient.lightclientmessages.light_client_protocol_message import LightClientProtocolMessageType
 from raiden.messages import LockedTransfer, Delivered, RevealSecret, Unlock, SecretRequest, Processed, \
     SignedBlindedBalanceProof, LockExpired
 from raiden.rns_constants import RNS_ADDRESS_ZERO
@@ -249,6 +250,7 @@ URLS_COMMON_V1 = [
     ("/tokens/network/<hexaddress:token_network>", GetTokenResource),
     ("/address", AddressResource),
 ]
+
 
 def api_response(result, status_code=HTTPStatus.OK):
     if status_code == HTTPStatus.NO_CONTENT:
@@ -1514,14 +1516,16 @@ class RestAPI:
         return api_response(result=result.data)
 
     def initiate_send_delivered_light(self, sender_address: typing.Address, receiver_address: typing.Address,
-                                      delivered: Delivered, msg_order: int, payment_id: int):
+                                      delivered: Delivered, msg_order: int, payment_id: int,
+                                      message_type: LightClientProtocolMessageType):
         self.raiden_api.initiate_send_delivered_light(sender_address, receiver_address, delivered, msg_order,
-                                                      payment_id)
+                                                      payment_id, message_type)
 
     def initiate_send_processed_light(self, sender_address: typing.Address, receiver_address: typing.Address,
-                                      processed: Processed, msg_order: int, payment_id: int):
+                                      processed: Processed, msg_order: int, payment_id: int,
+                                      message_type: LightClientProtocolMessageType):
         self.raiden_api.initiate_send_processed_light(sender_address, receiver_address, processed, msg_order,
-                                                      payment_id)
+                                                      payment_id, message_type)
 
     def initiate_send_secret_reveal_light(self, sender_address: typing.Address, receiver_address: typing.Address,
                                           reveal_secret: RevealSecret):
@@ -2147,10 +2151,12 @@ class RestAPI:
                                         EMPTY_PAYMENT_HASH_INVOICE, lt)
         elif message["type"] == "Delivered":
             delivered = Delivered.from_dict(message)
-            self.initiate_send_delivered_light(sender, receiver, delivered, message_order, payment_request.payment_id)
+            self.initiate_send_delivered_light(sender, receiver, delivered, message_order, payment_request.payment_id,
+                                               LightClientProtocolMessageType.PaymentSuccessful)
         elif message["type"] == "Processed":
             processed = Processed.from_dict(message)
-            self.initiate_send_processed_light(sender, receiver, processed, message_order, payment_request.payment_id)
+            self.initiate_send_processed_light(sender, receiver, processed, message_order, payment_request.payment_id,
+                                               LightClientProtocolMessageType.PaymentSuccessful)
         elif message["type"] == "RevealSecret":
             reveal_secret = RevealSecret.from_dict(message)
             self.initiate_send_secret_reveal_light(sender, receiver, reveal_secret)

@@ -2,7 +2,7 @@ from eth_utils.typing import ChecksumAddress
 
 from raiden.lightclient.lightclientmessages.light_client_payment import LightClientPayment
 from raiden.lightclient.lightclientmessages.light_client_protocol_message import DbLightClientProtocolMessage, \
-    LightClientProtocolMessage
+    LightClientProtocolMessage, LightClientProtocolMessageType
 from raiden.storage.sqlite import SerializedSQLiteStorage
 from raiden.storage.wal import WriteAheadLog
 from .client_model import ClientModel, ClientType
@@ -47,8 +47,10 @@ class LightClientService:
             signed_msg = message[4]
             identifier = message[5]
             internal_identifier = message[6]
+            message_type = LightClientProtocolMessageType[message[7]]
             result.append(
-                LightClientProtocolMessage(signed, order, payment_id, identifier, unsigned_msg, signed_msg,
+                LightClientProtocolMessage(signed, order, payment_id, identifier, message_type, unsigned_msg,
+                                           signed_msg,
                                            internal_identifier))
         return result
 
@@ -64,19 +66,3 @@ class LightClientService:
                                          payment[6], payment[7], payment[0])
         return payment
 
-    @classmethod
-    def is_get_messages_request_valid(cls, message_request: dict):
-        payment_ids = list(message_request.keys())
-        msg_orders = list(message_request.values())
-        valid_payment_ids = len(payment_ids) > 0
-        valid_msg_orders = len(msg_orders) > 0
-        if not valid_msg_orders or not valid_payment_ids:
-            return False
-        else:
-            for payment_id in payment_ids:
-                if type(payment_id) is not str:
-                    return False
-            for message_order in msg_orders:
-                if type(message_order) is not int:
-                    return False
-        return True
