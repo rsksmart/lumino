@@ -154,7 +154,7 @@ def test_next_route():
 
     msg = "an initialized state must use the first valid route"
     initiator_state = get_transfer_at_index(state, 0)
-    assert initiator_state.channel_identifier == channel_set.get_sub_channel(0), msg
+    assert initiator_state.channel_identifier == channel_set.get_sub_channel(0).identifier, msg
     assert not state.cancelled_channels
 
     iteration = initiator_manager.maybe_try_new_route(
@@ -168,7 +168,7 @@ def test_next_route():
     )
 
     # HOP3 should be ignored because it doesn't have enough balance
-    assert iteration.new_state.cancelled_channels == [channel_set.get_sub_channel(0)]
+    assert iteration.new_state.cancelled_channels == [channel_set.get_sub_channel(0).identifier]
 
 
 def test_init_with_usable_routes():
@@ -442,7 +442,7 @@ def test_refund_transfer_next_route():
     )
 
     iteration = initiator_manager.state_transition(
-        current_state, state_change, channel_set.sub_channel_map, prng, block_number
+        current_state, state_change, channel_set.channel_map, prng, block_number
     )
     assert iteration.new_state is not None
 
@@ -491,7 +491,7 @@ def test_refund_transfer_no_more_routes():
     )
 
     iteration = initiator_manager.state_transition(
-        setup.current_state, state_change, setup.channel_map, setup.prng, setup.block_number
+        setup.current_state, state_change, setup.channel_set.sub_channel_map, setup.prng, setup.block_number
     )
     # As per the description of the issue here:
     # https://github.com/raiden-network/raiden/issues/3146#issuecomment-447378046
@@ -546,7 +546,7 @@ def test_refund_transfer_no_more_routes():
     iteration = initiator_manager.state_transition(
         current_state,
         invalid_lock_expired_state_change,
-        setup.channel_map,
+        setup.channel_set.sub_channel_map,
         setup.prng,
         before_expiry_block,
     )
@@ -560,7 +560,7 @@ def test_refund_transfer_no_more_routes():
     iteration = initiator_manager.state_transition(
         current_state,
         lock_expired_state_change,
-        setup.channel_map,
+        setup.channel_set.sub_channel_map,
         setup.prng,
         before_expiry_block,
     )
@@ -574,7 +574,7 @@ def test_refund_transfer_no_more_routes():
         block_number=expiry_block, gas_limit=1, block_hash=factories.make_transaction_hash()
     )
     iteration = initiator_manager.state_transition(
-        current_state, state_change, setup.channel_map, setup.prng, expiry_block
+        current_state, state_change, setup.channel_set.channel_map, setup.prng, expiry_block
     )
     assert search_for_item(iteration.events, SendLockExpired, {}) is not None
     # The lock expired, so the route failed
@@ -585,7 +585,7 @@ def test_refund_transfer_no_more_routes():
     # process the lock expired message after lock expiration
     current_state = iteration.new_state
     iteration = initiator_manager.state_transition(
-        current_state, lock_expired_state_change, setup.channel_map, setup.prng, expiry_block
+        current_state, lock_expired_state_change, setup.channel_set.sub_channel_map, setup.prng, expiry_block
     )
     # should be accepted
     assert search_for_item(iteration.events, SendProcessed, {}) is not None
@@ -597,7 +597,7 @@ def test_refund_transfer_no_more_routes():
         block_number=expiry_block + 1, gas_limit=1, block_hash=factories.make_transaction_hash()
     )
     iteration = initiator_manager.state_transition(
-        current_state, state_change, setup.channel_map, setup.prng, expiry_block + 1
+        current_state, state_change, setup.channel_set.channel_map, setup.prng, expiry_block + 1
     )
     assert iteration.new_state is None, "from this point on the payment task should go"
 
