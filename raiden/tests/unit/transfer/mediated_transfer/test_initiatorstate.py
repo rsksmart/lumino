@@ -1057,10 +1057,12 @@ def test_initiator_handle_contract_receive_after_channel_closed():
     )
 
     channel_map = {channel_state.identifier: channel_state}
+    address_channels = dict()
+    address_channels[channel_state.our_state.address] = channel_map
     iteration = initiator_manager.handle_onchain_secretreveal(
         payment_state=setup.current_state,
         state_change=state_change,
-        channelidentifiers_to_channels=channel_map,
+        channelidentifiers_to_channels=address_channels,
         pseudo_random_generator=setup.prng,
     )
     initiator_task = get_transfer_at_index(setup.current_state, 0)
