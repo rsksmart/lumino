@@ -158,7 +158,7 @@ def test_next_route_amount():
 
     # the first available route should be used
     chosen_channel = mediator.next_channel_from_routes(
-        channels.get_routes_by_index(0), channels.sub_channel_map, amount, timeout_blocks
+        channels.get_routes_by_index([0]), channels.sub_channel_map, amount, timeout_blocks
     )
     assert chosen_channel.identifier == channels.get_sub_channel(0).identifier
 
@@ -170,13 +170,13 @@ def test_next_route_amount():
 
     #As channels now are Dict, we cant check later for sub_channel 2, cause it always returns ordered, so it will be checking with sub_channel 0
     chosen_channel = mediator.next_channel_from_routes(
-        channels.get_routes_by_index(2), channels.sub_channel_map, amount, timeout_blocks
+        channels.get_routes_by_index([2]), channels.sub_channel_map, amount, timeout_blocks
     )
     assert chosen_channel.identifier == channels.get_sub_channel(2).identifier
 
     # a channel without capacity must be skipped
     chosen_channel = mediator.next_channel_from_routes(
-        channels.get_routes_by_index(1, 0), channels.sub_channel_map, amount, timeout_blocks
+        channels.get_routes_by_index([1, 0]), channels.sub_channel_map, amount, timeout_blocks
     )
     assert chosen_channel.identifier == channels.get_sub_channel(0).identifier
 
@@ -205,7 +205,7 @@ def test_next_route_reveal_timeout():
     )
 
     chosen_channel = mediator.next_channel_from_routes(
-        channels.get_routes_by_index(0, 1, 2, 3), channels.sub_channel_map, UNIT_TRANSFER_AMOUNT, timeout_blocks
+        channels.get_routes_by_index([0, 1, 2, 3]), channels.sub_channel_map, UNIT_TRANSFER_AMOUNT, timeout_blocks
     )
     assert chosen_channel.identifier == channels.get_sub_channel(2).identifier
 
@@ -232,7 +232,7 @@ def test_next_transfer_pair():
 
     pair, events = mediator.forward_transfer_pair(
         payer_transfer,
-        channels.get_routes_by_index(0),
+        channels.get_routes_by_index([0]),
         channels.sub_channel_map,
         pseudo_random_generator,
         block_number,
@@ -461,8 +461,8 @@ def test_events_for_balanceproof():
     last_pair.payee_state = "payee_secret_revealed"
 
     # the lock is not in the danger zone yet
-    payer_channel = mediator.get_payer_channel(setup.channel_set[factories.UNIT_TRANSFER_DESCRIPTION.initiator], last_pair)
-    payee_channel = mediator.get_payee_channel(setup.channel_set[factories.UNIT_TRANSFER_DESCRIPTION.initiator], last_pair)
+    payer_channel = mediator.get_payer_channel(setup.channel_set.channel_map[factories.UNIT_TRANSFER_DESCRIPTION.initiator], last_pair)
+    payee_channel = mediator.get_payee_channel(setup.channel_set.channel_map[factories.UNIT_TRANSFER_DESCRIPTION.initiator], last_pair)
     safe_block = last_pair.payee_transfer.lock.expiration - payer_channel.reveal_timeout - 1
 
     prng_copy = deepcopy(pseudo_random_generator)
@@ -834,7 +834,7 @@ def test_mediate_transfer():
     )
     iteration = mediator.mediate_transfer(
         mediator_state,
-        channels.get_routes_by_index(1),
+        channels.get_routes_by_index([1]),
         channels.get_sub_channel(0),
         channels.sub_channel_map,
         channels.nodeaddresses_to_networkstates,
@@ -1263,7 +1263,7 @@ def test_payee_timeout_must_be_equal_to_payer_timeout():
     mediator_state = MediatorTransferState(UNIT_SECRETHASH, channel_set.get_routes())
     iteration = mediator.mediate_transfer(
         mediator_state,
-        channel_set.get_routes_by_index(1),
+        channel_set.get_routes_by_index([1]),
         channel_set.get_sub_channel(0),
         channel_set.sub_channel_map,
         channel_set.nodeaddresses_to_networkstates,
@@ -1406,7 +1406,7 @@ def test_mediator_lock_expired_with_new_block():
     mediator_state = MediatorTransferState(UNIT_SECRETHASH, channel_set.get_routes())
     iteration = mediator.mediate_transfer(
         state=mediator_state,
-        possible_routes=channel_set.get_routes_by_index(1),
+        possible_routes=channel_set.get_routes_by_index([1]),
         payer_channel=channel_set.get_sub_channel(0),
         channelidentifiers_to_channels=channel_set.sub_channel_map,
         nodeaddresses_to_networkstates=channel_set.nodeaddresses_to_networkstates,
@@ -1462,7 +1462,7 @@ def test_mediator_must_not_send_lock_expired_when_channel_is_closed():
     mediator_state = MediatorTransferState(UNIT_SECRETHASH, channel_set.get_routes())
     iteration = mediator.mediate_transfer(
         state=mediator_state,
-        possible_routes=channel_set.get_routes_by_index(1),
+        possible_routes=channel_set.get_routes_by_index([1]),
         payer_channel=channel_set.get_sub_channel(0),
         channelidentifiers_to_channels=channel_set.sub_channel_map,
         nodeaddresses_to_networkstates=channel_set.nodeaddresses_to_networkstates,
@@ -1888,7 +1888,7 @@ def test_next_transfer_pair_with_fees_deducted():
 
     pair, events = mediator.forward_transfer_pair(
         payer_transfer=payer_transfer,
-        available_routes=channel_set.get_routes_by_index(0),
+        available_routes=channel_set.get_routes_by_index([0]),
         channelidentifiers_to_channels=channel_set.sub_channel_map,
         pseudo_random_generator=random.Random(),
         block_number=2,
