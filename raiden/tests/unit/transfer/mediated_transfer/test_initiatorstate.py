@@ -67,17 +67,20 @@ def get_transfer_at_index(
 
 
 def make_initiator_manager_state(
-    channels: factories.ChannelSet,
+    channel_set: factories.ChannelSet,
     transfer_description: factories.TransferDescriptionWithSecretState = None,
     pseudo_random_generator: random.Random = None,
     block_number: typing.BlockNumber = 1,
+
 ):
+    transfer_desc = transfer_description or factories.UNIT_TRANSFER_DESCRIPTION
     init = ActionInitInitiator(
-        transfer_description or factories.UNIT_TRANSFER_DESCRIPTION, channels.get_routes()
+        transfer_desc, channel_set.get_routes()
     )
+    #init.transfer.initiator
     initial_state = None
     iteration = initiator_manager.state_transition(
-        initial_state, init, channels.channel_map, pseudo_random_generator, block_number
+        initial_state, init, channel_set.channels, pseudo_random_generator, block_number
     )
     return iteration.new_state
 
@@ -397,7 +400,7 @@ def channels_setup(amount, our_address, refund_address):
         factories.NettingChannelStateProperties(our_state=funded),
     ]
 
-    return factories.make_channel_set(properties)
+    return factories.make_channel_set(properties=properties, token_address=factories.UNIT_TRANSFER_DESCRIPTION.initiator)
 
 
 def test_refund_transfer_next_route():
@@ -1100,11 +1103,11 @@ def test_secret_reveal_cancel_other_transfers():
     refund_pkey, refund_address = factories.make_privkey_address()
     prng = random.Random()
 
-    channels = channels_setup(amount, our_address, refund_address)
+    channel_set = channels_setup(amount, our_address, refund_address)
 
     block_number = 10
     current_state = make_initiator_manager_state(
-        channels=channels, pseudo_random_generator=prng, block_number=block_number
+        channel_set=channel_set, pseudo_random_generator=prng, block_number=block_number
     )
 
     initiator_state = get_transfer_at_index(current_state, 0)
@@ -1117,21 +1120,21 @@ def test_secret_reveal_cancel_other_transfers():
             target=original_transfer.target,
             expiration=original_transfer.lock.expiration,
             payment_identifier=original_transfer.payment_identifier,
-            canonical_identifier=channels[0].canonical_identifier,
+            canonical_identifier=channel_set.get_sub_channel(0).canonical_identifier,
             sender=refund_address,
             pkey=refund_pkey,
         )
     )
-    assert channels[0].partner_state.address == refund_address
+    assert channel_set.get_sub_channel(0).partner_state.address == refund_address
 
     state_change = ReceiveTransferRefundCancelRoute(
-        routes=channels.get_routes(), transfer=refund_transfer, secret=random_secret()
+        routes=channel_set.get_routes(), transfer=refund_transfer, secret=random_secret()
     )
 
     iteration = initiator_manager.state_transition(
         payment_state=current_state,
         state_change=state_change,
-        channelidentifiers_to_channels=channels.channel_map,
+        channelidentifiers_to_channels=channel_set.channel_map,
         pseudo_random_generator=prng,
         block_number=block_number,
     )
@@ -1147,13 +1150,13 @@ def test_secret_reveal_cancel_other_transfers():
 
     # A secretreveal for a pending transfer should succeed
     secret_reveal = ReceiveSecretReveal(
-        secret=UNIT_SECRET, sender=channels[0].partner_state.address
+        secret=UNIT_SECRET, sender=channel_set.get_sub_channel(0).partner_state.address
     )
 
     iteration = initiator_manager.state_transition(
         payment_state=iteration.new_state,
         state_change=secret_reveal,
-        channelidentifiers_to_channels=channels.channel_map,
+        channelidentifiers_to_channels=channel_set.channel_map,
         pseudo_random_generator=prng,
         block_number=block_number,
     )
@@ -1168,7 +1171,7 @@ def test_secret_reveal_cancel_other_transfers():
 
     secret_reveal = ReceiveSecretReveal(
         secret=rerouted_transfer.transfer_description.secret,
-        sender=channels[0].partner_state.address,
+        sender=channel_set.get_sub_channel(0).partner_state.address,
     )
 
     # An existing transfer was already unlocked,
@@ -1177,7 +1180,7 @@ def test_secret_reveal_cancel_other_transfers():
         iteration = initiator_manager.state_transition(
             payment_state=iteration.new_state,
             state_change=secret_reveal,
-            channelidentifiers_to_channels=channels.channel_map,
+            channelidentifiers_to_channels=channel_set.channel_map,
             pseudo_random_generator=prng,
             block_number=block_number,
         )
