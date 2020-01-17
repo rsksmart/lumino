@@ -9,11 +9,9 @@ import os
 import dateutil.parser
 from datetime import datetime, date
 from dateutil.relativedelta import relativedelta
-from eth_utils import is_binary_address, to_checksum_address, to_canonical_address, to_normalized_address, decode_hex, \
-    encode_hex
+from eth_utils import is_binary_address, to_checksum_address, to_canonical_address, to_normalized_address, encode_hex
 
-from ecies import encrypt, decrypt
-from ecies.utils import generate_eth_key, generate_key
+from ecies import encrypt
 
 import raiden.blockchain.events as blockchain_events
 from raiden import waiting
@@ -36,21 +34,19 @@ from raiden.exceptions import (
     InvalidAmount,
     InvalidSecret,
     InvalidSecretHash,
-    InvalidSettleTimeout,
     TokenAppNotFound,
     TokenAppExpired,
     RaidenRecoverableError,
-    TokenNotRegistered,
     UnknownTokenAddress,
     InvoiceCoding,
     UnhandledLightClient)
-from raiden.lightclient.light_client_message_handler import LightClientMessageHandler
-from raiden.lightclient.light_client_service import LightClientService
-from raiden.lightclient.light_client_utils import LightClientUtils
-from raiden.lightclient.lightclientmessages.hub_message import HubMessage
+from raiden.lightclient.handlers.light_client_message_handler import LightClientMessageHandler
+from raiden.lightclient.handlers.light_client_service import LightClientService
+from raiden.lightclient.handlers.light_client_utils import LightClientUtils
+from raiden.lightclient.lightclientmessages.hub_response_message import HubResponseMessage
 from raiden.lightclient.lightclientmessages.payment_hub_message import PaymentHubMessage
-from raiden.lightclient.lightclientmessages.light_client_payment import LightClientPayment, LightClientPaymentStatus
-from raiden.lightclient.lightclientmessages.light_client_protocol_message import LightClientProtocolMessageType
+from raiden.lightclient.models.light_client_payment import LightClientPayment, LightClientPaymentStatus
+from raiden.lightclient.models.light_client_protocol_message import LightClientProtocolMessageType
 
 from raiden.messages import RequestMonitoring, LockedTransfer, RevealSecret, Unlock, Delivered, SecretRequest, Processed
 from raiden.settings import DEFAULT_RETRY_TIMEOUT, DEVELOPMENT_CONTRACT_VERSION
@@ -75,7 +71,6 @@ from raiden.utils import pex, typing
 from raiden.utils.gas_reserve import has_enough_gas_reserve
 from raiden.utils.typing import (
     Address,
-    AddressHex,
     Any,
     BlockSpecification,
     BlockTimeout,
@@ -96,7 +91,7 @@ from raiden.utils.typing import (
     TokenNetworkAddress,
     TokenNetworkID,
     Tuple,
-    SignedTransaction, InitiatorAddress, TargetAddress, PaymentWithFeeAmount, BlockExpiration)
+    SignedTransaction, InitiatorAddress, TargetAddress, PaymentWithFeeAmount)
 
 from raiden.rns_constants import RNS_ADDRESS_ZERO
 from raiden.utils.rns import is_rns_address
@@ -1683,7 +1678,7 @@ class RaidenAPI:
         token_address: typing.TokenAddress,
         amount: typing.TokenAmount,
         secrethash: typing.SecretHash
-    ) -> HubMessage:
+    ) -> HubResponseMessage:
         channel_state = views.get_channelstate_for(
             views.state_from_raiden(self.raiden),
             registry_address,
@@ -1732,6 +1727,6 @@ class RaidenAPI:
             payment_hub_message = PaymentHubMessage(payment_id=payment.payment_id,
                                                     message_order=order,
                                                     message=locked_transfer)
-            return HubMessage(lcpm_id, LightClientProtocolMessageType.PaymentSuccessful, payment_hub_message)
+            return HubResponseMessage(lcpm_id, LightClientProtocolMessageType.PaymentSuccessful, payment_hub_message)
         else:
             raise ChannelNotFound("Channel with given partner address doesnt exists")

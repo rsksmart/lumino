@@ -1,11 +1,10 @@
 import structlog
-import json
 
-from eth_utils import to_checksum_address, encode_hex
+from eth_utils import to_checksum_address
 
-from raiden.constants import EMPTY_SECRET, TEST_PAYMENT_ID
-from raiden.lightclient.light_client_message_handler import LightClientMessageHandler
-from raiden.lightclient.light_client_service import LightClientService
+from raiden.constants import EMPTY_SECRET
+from raiden.lightclient.handlers.light_client_message_handler import LightClientMessageHandler
+from raiden.lightclient.handlers.light_client_service import LightClientService
 from raiden.messages import (
     Delivered,
     LockedTransfer,
@@ -19,7 +18,6 @@ from raiden.messages import (
 )
 from raiden.raiden_service import RaidenService
 from raiden.routing import get_best_routes
-from raiden.storage.wal import WriteAheadLog
 from raiden.transfer import views
 from raiden.transfer.architecture import StateChange
 from raiden.transfer.mediated_transfer.state import lockedtransfersigned_from_message
@@ -33,7 +31,7 @@ from raiden.transfer.mediated_transfer.state_change import (
 from raiden.transfer.state import balanceproof_from_envelope
 from raiden.transfer.state_change import ReceiveDelivered, ReceiveProcessed, ReceiveUnlock, ReceiveUnlockLight
 from raiden.utils import pex, random_secret
-from raiden.utils.typing import MYPY_ANNOTATION, InitiatorAddress, PaymentAmount, TokenNetworkID, Union
+from raiden.utils.typing import MYPY_ANNOTATION, InitiatorAddress, PaymentAmount, TokenNetworkID
 
 log = structlog.get_logger(__name__)  # pylint: disable=invalid-name
 

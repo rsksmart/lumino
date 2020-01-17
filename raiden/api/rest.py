@@ -15,18 +15,18 @@ from flask import Flask, make_response, send_from_directory, url_for, request
 from flask_restful import Api, abort
 from gevent.pywsgi import WSGIServer
 from hexbytes import HexBytes
-from raiden.lightclient.light_client_message_handler import LightClientMessageHandler
+from raiden.lightclient.handlers.light_client_message_handler import LightClientMessageHandler
 from raiden_webui import RAIDEN_WEBUI_PATH
 
 from raiden.api.validations.api_error_builder import ApiErrorBuilder
 from raiden.api.validations.api_status_codes import ERROR_STATUS_CODES
 from raiden.api.validations.channel_validator import ChannelValidator
-from raiden.lightclient.light_client_service import LightClientService
+from raiden.lightclient.handlers.light_client_service import LightClientService
 from raiden.lightclient.lightclientmessages.light_client_non_closing_balance_proof import \
     LightClientNonClosingBalanceProof
-from raiden.lightclient.lightclientmessages.light_client_protocol_message import LightClientProtocolMessageType
+from raiden.lightclient.models.light_client_protocol_message import LightClientProtocolMessageType
 from raiden.messages import LockedTransfer, Delivered, RevealSecret, Unlock, SecretRequest, Processed, \
-    SignedBlindedBalanceProof, LockExpired
+    LockExpired
 from raiden.rns_constants import RNS_ADDRESS_ZERO
 from raiden.utils.rns import is_rns_address
 from webargs.flaskparser import parser
@@ -86,7 +86,7 @@ from raiden.api.v1.resources import (
     LightClientMatrixCredentialsBuildResource,
     LightClientResource,
     PaymentLightResource,
-    CreatePaymentLightResource, WatchtowerResource)
+    CreatePaymentLightResource, WatchtowerResource, LightClientMessageResource)
 
 from raiden.constants import GENESIS_BLOCK_NUMBER, UINT256_MAX, Environment, EMPTY_PAYMENT_HASH_INVOICE
 
@@ -120,20 +120,17 @@ from raiden.transfer.events import (
     EventPaymentSentFailed,
     EventPaymentSentSuccess,
 )
-from raiden.transfer.state import CHANNEL_STATE_CLOSED, CHANNEL_STATE_OPENED, NettingChannelState, \
-    BalanceProofSignedState
+from raiden.transfer.state import CHANNEL_STATE_CLOSED, CHANNEL_STATE_OPENED, NettingChannelState
 from raiden.utils import (
     create_default_identifier,
     optional_address_to_string,
     pex,
     sha3,
-    typing,
-    random_secret, Secret)
+    typing)
 from raiden.utils.runnable import Runnable
 
 from eth_utils import (
-    to_canonical_address,
-    to_normalized_address
+    to_canonical_address
 )
 
 from raiden.billing.invoices.constants.invoice_type import InvoiceType
@@ -143,7 +140,6 @@ from raiden.billing.invoices.decoder.invoice_decoder import get_tags_dict, get_u
 from dateutil.relativedelta import relativedelta
 from raiden.billing.invoices.util.time_util import is_invoice_expired, UTC_FORMAT
 from raiden.billing.invoices.constants.errors import AUTO_PAY_INVOICE, INVOICE_EXPIRED, INVOICE_PAID
-from raiden.utils.typing import PaymentID
 
 from raiden.utils.signer import recover
 from raiden.ui.app import get_matrix_light_client_instance
@@ -231,7 +227,7 @@ URLS_HUB_V1 = [
         LightChannelsResourceByTokenAndPartnerAddress
     ),
     ("/payments_light", PaymentLightResource),
-    ("/payments_light/get_messages", PaymentLightResource, "Message poling"),
+    ("/light_client_messages", LightClientMessageResource, "Message polling"),
     ("/payments_light/create", CreatePaymentLightResource, "create_payment"),
     ("/watchtower", WatchtowerResource),
     (

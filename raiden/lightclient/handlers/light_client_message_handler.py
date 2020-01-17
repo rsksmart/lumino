@@ -6,14 +6,13 @@ from eth_utils import to_checksum_address
 
 from raiden.lightclient.lightclientmessages.light_client_non_closing_balance_proof import \
     LightClientNonClosingBalanceProof
-from raiden.lightclient.lightclientmessages.light_client_payment import LightClientPayment
-from raiden.lightclient.lightclientmessages.light_client_protocol_message import LightClientProtocolMessage, \
-    DbLightClientProtocolMessage, LightClientProtocolMessageType
+from raiden.lightclient.models.light_client_payment import LightClientPayment
+from raiden.lightclient.models.light_client_protocol_message import LightClientProtocolMessage, \
+    LightClientProtocolMessageType
 from raiden.messages import Message, LockedTransfer, SecretRequest, RevealSecret, Secret, Processed, Delivered, Unlock, \
     LockExpired
 from raiden.storage.sqlite import SerializedSQLiteStorage
 from raiden.storage.wal import WriteAheadLog
-from typing import List
 
 
 def build_light_client_protocol_message(identifier: int, message: Message, signed: bool, payment_id: int,

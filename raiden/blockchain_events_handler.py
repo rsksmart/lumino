@@ -1,15 +1,14 @@
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING
 
 import gevent
 import structlog
-from eth_utils import to_canonical_address, to_checksum_address, encode_hex, decode_hex
+from eth_utils import to_checksum_address, encode_hex
 
 from raiden.blockchain.events import Event
 from raiden.blockchain.state import get_channel_state
 from raiden.connection_manager import ConnectionManager
-from raiden.lightclient.client_model import ClientModel
-from raiden.lightclient.light_client_message_handler import LightClientMessageHandler
-from raiden.lightclient.light_client_service import LightClientService
+from raiden.lightclient.handlers.light_client_message_handler import LightClientMessageHandler
+from raiden.lightclient.handlers.light_client_service import LightClientService
 from raiden.network.proxies.utils import get_onchain_locksroots
 from raiden.transfer import views
 from raiden.transfer.architecture import StateChange
@@ -37,8 +36,6 @@ from raiden_contracts.constants import (
     EVENT_TOKEN_NETWORK_CREATED,
     ChannelEvent,
 )
-
-from raiden.utils.typing import AddressHex
 
 if TYPE_CHECKING:
     # pylint: disable=unused-import

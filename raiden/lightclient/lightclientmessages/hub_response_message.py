@@ -1,10 +1,10 @@
 from typing import Dict, Any
 
 from raiden.lightclient.lightclientmessages.abstract_message_content import AbstractMessageContent
-from raiden.lightclient.lightclientmessages.light_client_protocol_message import LightClientProtocolMessageType
+from raiden.lightclient.models.light_client_protocol_message import LightClientProtocolMessageType
 
 
-class HubMessage:
+class HubResponseMessage:
     """ Representation of response to a LC request """
 
     def __init__(

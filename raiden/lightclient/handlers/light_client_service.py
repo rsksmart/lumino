@@ -1,13 +1,12 @@
 from eth_utils.typing import ChecksumAddress
 
-from raiden.lightclient.lightclientmessages.hub_message import HubMessage
-from raiden.lightclient.lightclientmessages.light_client_payment import LightClientPayment
-from raiden.lightclient.lightclientmessages.light_client_protocol_message import DbLightClientProtocolMessage, \
-    LightClientProtocolMessage, LightClientProtocolMessageType
+from raiden.lightclient.models.client_model import ClientModel, ClientType
+from raiden.lightclient.lightclientmessages.hub_response_message import HubResponseMessage
+from raiden.lightclient.models.light_client_payment import LightClientPayment
+from raiden.lightclient.models.light_client_protocol_message import LightClientProtocolMessage, LightClientProtocolMessageType
 from raiden.lightclient.lightclientmessages.payment_hub_message import PaymentHubMessage
 from raiden.storage.sqlite import SerializedSQLiteStorage
 from raiden.storage.wal import WriteAheadLog
-from .client_model import ClientModel, ClientType
 from raiden.utils.typing import List, Optional
 
 
@@ -40,7 +39,7 @@ class LightClientService:
     @classmethod
     def get_light_client_messages(cls, from_message: int, light_client: ChecksumAddress, wal: WriteAheadLog):
         messages = wal.storage.get_light_client_messages(from_message, light_client)
-        result: List[HubMessage] = []
+        result: List[HubResponseMessage] = []
         for message in messages:
             order = message[1]
             payment_id = message[2]
@@ -52,7 +51,7 @@ class LightClientService:
             payment_hub_message = PaymentHubMessage(payment_id=payment_id,
                                                     message_order=order,
                                                     message=message)
-            hub_message = HubMessage(internal_identifier, message_type, payment_hub_message)
+            hub_message = HubResponseMessage(internal_identifier, message_type, payment_hub_message)
             result.append(hub_message)
         return result
 

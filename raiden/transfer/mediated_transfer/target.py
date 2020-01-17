@@ -2,16 +2,14 @@ import random
 
 from datetime import date
 
-from raiden.lightclient.light_client_message_handler import LightClientMessageHandler
-from raiden.lightclient.light_client_service import LightClientService
-from raiden.lightclient.lightclientmessages.light_client_payment import LightClientPayment, LightClientPaymentStatus
-from raiden.lightclient.lightclientmessages.light_client_protocol_message import LightClientProtocolMessage, \
-    LightClientProtocolMessageType
+from raiden.lightclient.handlers.light_client_message_handler import LightClientMessageHandler
+from raiden.lightclient.handlers.light_client_service import LightClientService
+from raiden.lightclient.models.light_client_payment import LightClientPayment, LightClientPaymentStatus
+from raiden.lightclient.models.light_client_protocol_message import LightClientProtocolMessageType
 from raiden.message_event_convertor import message_from_sendevent
-from raiden.messages import SecretRequest, LockedTransfer
+from raiden.messages import SecretRequest
 from raiden.transfer import channel, secret_registry
 from raiden.transfer.architecture import Event, StateChange, TransitionResult
-from raiden.transfer.channel import is_valid_lockedtransfer
 from raiden.transfer.events import EventPaymentReceivedSuccess, SendProcessed
 from raiden.transfer.mediated_transfer.events import (
     CHANNEL_IDENTIFIER_GLOBAL_QUEUE,

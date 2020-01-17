@@ -6,10 +6,9 @@ from eth_utils import to_checksum_address, to_hex
 
 from raiden.constants import EMPTY_BALANCE_HASH, EMPTY_HASH, EMPTY_MESSAGE_HASH, EMPTY_SIGNATURE
 from raiden.exceptions import ChannelOutdatedError, RaidenUnrecoverableError
-from raiden.lightclient.light_client_message_handler import LightClientMessageHandler
-from raiden.lightclient.lightclientmessages.light_client_protocol_message import LightClientProtocolMessageType
+from raiden.lightclient.handlers.light_client_message_handler import LightClientMessageHandler
+from raiden.lightclient.models.light_client_protocol_message import LightClientProtocolMessageType
 from raiden.message_event_convertor import message_from_sendevent
-from raiden.messages import LockedTransfer
 from raiden.network.proxies.payment_channel import PaymentChannel
 from raiden.network.proxies.token_network import TokenNetwork
 from raiden.network.resolver.client import reveal_secret_with_resolver
@@ -28,7 +27,6 @@ from raiden.transfer.events import (
     EventInvalidReceivedLockExpired,
     EventInvalidReceivedTransferRefund,
     EventInvalidReceivedUnlock,
-    EventPaymentReceivedSuccess,
     EventPaymentSentFailed,
     EventPaymentSentSuccess,
     SendProcessed,
@@ -55,7 +53,7 @@ from raiden.transfer.utils import (
 )
 from raiden.transfer.views import get_channelstate_by_token_network_and_partner
 from raiden.utils import pex
-from raiden.utils.typing import MYPY_ANNOTATION, Address, Nonce, TokenNetworkID, Secret, ChannelID, AddressHex
+from raiden.utils.typing import MYPY_ANNOTATION, Address, Nonce, TokenNetworkID, AddressHex
 
 from raiden.billing.invoices.handlers.invoice_handler import handle_receive_events_with_payments
 

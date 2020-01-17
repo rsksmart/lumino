@@ -1,5 +1,4 @@
-from raiden.lightclient.lightclientmessages.light_client_protocol_message import LightClientProtocolMessageType
-from raiden.messages import RevealSecret, Unlock
+from raiden.lightclient.models.light_client_protocol_message import LightClientProtocolMessageType
 from raiden.transfer import channel, token_network, views
 from raiden.transfer.architecture import (
     ContractReceiveStateChange,
@@ -9,7 +8,6 @@ from raiden.transfer.architecture import (
     StateChange,
     TransitionResult,
 )
-from raiden.transfer.channel import compute_merkletree_with, create_sendlockedtransfer
 from raiden.transfer.events import (
     ContractSendChannelBatchUnlock,
     ContractSendChannelClose,
@@ -19,8 +17,7 @@ from raiden.transfer.events import (
 )
 from raiden.transfer.identifiers import CanonicalIdentifier, QueueIdentifier
 from raiden.transfer.mediated_transfer import initiator_manager, mediator, target
-from raiden.transfer.mediated_transfer.events import CHANNEL_IDENTIFIER_GLOBAL_QUEUE, SendBalanceProof, \
-    StoreMessageEvent
+from raiden.transfer.mediated_transfer.events import CHANNEL_IDENTIFIER_GLOBAL_QUEUE, StoreMessageEvent
 from raiden.transfer.mediated_transfer.state import (
     InitiatorPaymentState,
     MediatorTransferState,
@@ -44,7 +41,6 @@ from raiden.transfer.state import (
     PaymentNetworkState,
     TargetTask,
     TokenNetworkState,
-    NettingChannelState,
     LightClientTransportState,
     NodeTransportState)
 from raiden.transfer.state_change import (
@@ -71,7 +67,6 @@ from raiden.transfer.state_change import (
     ReceiveProcessed,
     ReceiveUnlock,
     ReceiveUnlockLight, ContractReceiveChannelClosedLight)
-from raiden.utils import sha3
 from raiden.utils.typing import (
     MYPY_ANNOTATION,
     BlockHash,
@@ -88,7 +83,7 @@ from raiden.utils.typing import (
     Union,
     Address, AddressHex)
 
-from eth_utils import to_canonical_address, keccak, decode_hex
+from eth_utils import to_canonical_address
 
 # All State changes that are subdispatched as token network actions
 TokenNetworkStateChange = Union[

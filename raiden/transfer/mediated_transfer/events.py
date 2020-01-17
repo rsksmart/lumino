@@ -1,7 +1,7 @@
 # pylint: disable=too-many-arguments,too-few-public-methods
 from eth_utils import to_canonical_address, to_checksum_address
 
-from raiden.lightclient.lightclientmessages.light_client_protocol_message import LightClientProtocolMessageType
+from raiden.lightclient.models.light_client_protocol_message import LightClientProtocolMessageType
 from raiden.messages import RevealSecret, Unlock, Message, SecretRequest
 
 from raiden.transfer.architecture import Event, SendMessageEvent

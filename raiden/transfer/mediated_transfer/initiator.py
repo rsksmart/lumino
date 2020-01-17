@@ -3,7 +3,7 @@ import random
 from eth_utils import to_canonical_address
 
 from raiden.constants import MAXIMUM_PENDING_TRANSFERS
-from raiden.lightclient.lightclientmessages.light_client_protocol_message import LightClientProtocolMessageType
+from raiden.lightclient.models.light_client_protocol_message import LightClientProtocolMessageType
 from raiden.messages import LockedTransfer, Unlock
 from raiden.settings import DEFAULT_WAIT_BEFORE_LOCK_REMOVAL
 from raiden.transfer import channel
@@ -17,22 +17,21 @@ from raiden.transfer.mediated_transfer.events import (
     EventUnlockSuccess,
     SendLockedTransfer,
     SendSecretReveal,
-    SendLockedTransferLight, StoreMessageEvent, SendSecretRevealLight, SendBalanceProofLight)
+    SendLockedTransferLight, StoreMessageEvent, SendSecretRevealLight)
 from raiden.transfer.mediated_transfer.state import (
     InitiatorTransferState,
     TransferDescriptionWithSecretState,
-    LockedTransferUnsignedState, TransferDescriptionWithoutSecretState)
+    TransferDescriptionWithoutSecretState)
 from raiden.transfer.mediated_transfer.state_change import (
     ReceiveSecretRequest,
     ReceiveSecretReveal,
-    ReceiveSecretRequestLight, ActionSendSecretRevealLight, ReceiveSecretRevealLight, ActionSendUnlockLight)
+    ReceiveSecretRequestLight, ActionSendSecretRevealLight, ReceiveSecretRevealLight)
 from raiden.transfer.merkle_tree import merkleroot
 from raiden.transfer.state import (
     CHANNEL_STATE_OPENED,
     NettingChannelState,
     RouteState,
-    message_identifier_from_prng,
-    BalanceProofUnsignedState, HashTimeLockState)
+    message_identifier_from_prng)
 from raiden.transfer.state_change import Block, ContractReceiveSecretReveal, StateChange
 from raiden.transfer.utils import is_valid_secret_reveal
 from raiden.utils.typing import (

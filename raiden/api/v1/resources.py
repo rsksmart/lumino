@@ -28,9 +28,8 @@ from raiden.api.v1.encoding import (
     LightClientMatrixCredentialsBuildSchema,
     PaymentLightPutSchema,
     CreatePaymentLightPostSchema,
-    PaymentLightGetSchema,
-    WatchtowerPutResource)
-from raiden.messages import SignedBlindedBalanceProof, Unlock
+    WatchtowerPutResource, LightClientMessageGetSchema)
+from raiden.messages import  Unlock
 
 from raiden.utils import typing
 
@@ -305,9 +304,16 @@ class CreatePaymentLightResource(BaseResource):
         )
 
 
+class LightClientMessageResource(BaseResource):
+    get_schema = LightClientMessageGetSchema
+
+    @use_kwargs(get_schema, locations=("query",))
+    def get(self, from_message):
+        return self.rest_api.get_light_client_protocol_message(from_message)
+
+
 class PaymentLightResource(BaseResource):
     put_schema = PaymentLightPutSchema
-    get_schema = PaymentLightGetSchema
 
     @use_kwargs(put_schema, locations=("json",))
     def put(self,
@@ -320,10 +326,6 @@ class PaymentLightResource(BaseResource):
         put a signed message associated with a payment of a light client
         """
         return self.rest_api.receive_light_client_protocol_message(message_id, message_order, sender, receiver, message)
-
-    @use_kwargs(get_schema, locations=("query",))
-    def get(self, from_message):
-        return self.rest_api.get_light_client_protocol_message(from_message)
 
 
 class PaymentResource(BaseResource):

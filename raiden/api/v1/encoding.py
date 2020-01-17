@@ -382,7 +382,7 @@ class CreatePaymentLightPostSchema(BaseSchema):
         decoding_class = dict
 
 
-class PaymentLightGetSchema(BaseSchema):
+class LightClientMessageGetSchema(BaseSchema):
     from_message = fields.Int(required=True)
 
     class Meta:
