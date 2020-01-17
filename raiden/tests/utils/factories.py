@@ -133,7 +133,7 @@ def make_uint256() -> int:
 
 
 def make_channel_identifier() -> ChannelID:
-    return ChannelID(make_uint64())
+    return ChannelID(make_uint256())
 
 
 def make_uint64() -> int:
