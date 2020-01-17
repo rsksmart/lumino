@@ -210,6 +210,8 @@ def test_channel_data_removed_after_unlock(
         block_hash=closed_block_hash,
     )
     channel_state_after_closed = channel_closed_iteration.new_state.channelidentifiers_to_channels[
+        channel_state.our_state.address
+    ][
         channel_state.identifier
     ]
 
@@ -221,6 +223,7 @@ def test_channel_data_removed_after_unlock(
         block_hash=factories.make_block_hash(),
         our_onchain_locksroot=merkleroot(channel_state_after_closed.our_state.merkletree),
         partner_onchain_locksroot=merkleroot(channel_state_after_closed.partner_state.merkletree),
+        participant1=our_address,
     )
 
     channel_settled_iteration = token_network.state_transition(
@@ -233,7 +236,7 @@ def test_channel_data_removed_after_unlock(
     token_network_state_after_settle = channel_settled_iteration.new_state
     ids_to_channels = token_network_state_after_settle.channelidentifiers_to_channels
     assert len(ids_to_channels) == 1
-    assert channel_state.identifier in ids_to_channels
+    assert channel_state.identifier in ids_to_channels[channel_state.our_state.address]
 
     unlock_blocknumber = settle_block_number + 5
     channel_batch_unlock_state_change = ContractReceiveChannelBatchUnlock(
@@ -255,7 +258,7 @@ def test_channel_data_removed_after_unlock(
     )
 
     token_network_state_after_unlock = channel_unlock_iteration.new_state
-    ids_to_channels = token_network_state_after_unlock.channelidentifiers_to_channels
+    ids_to_channels = token_network_state_after_unlock.channelidentifiers_to_channels[chain_state.our_address]
     assert len(ids_to_channels) == 0
 
 

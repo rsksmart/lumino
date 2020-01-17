@@ -207,7 +207,7 @@ def handle_batch_unlock(
     block_hash: BlockHash,
 ) -> TransitionResult:
     events = list()
-    channel_state = token_network_state.channelidentifiers_to_channels.get(
+    channel_state = token_network_state.channelidentifiers_to_channels[state_change.participant].get(
         state_change.canonical_identifier.channel_identifier
     )
     if channel_state is not None:
@@ -224,7 +224,7 @@ def handle_batch_unlock(
                 channel_state.partner_state.address
             ].remove(channel_state.identifier)
 
-            del token_network_state.channelidentifiers_to_channels[channel_state.identifier]
+            del token_network_state.channelidentifiers_to_channels[state_change.participant][channel_state.identifier]
 
     return TransitionResult(token_network_state, events)
 
