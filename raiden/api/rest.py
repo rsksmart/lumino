@@ -2190,10 +2190,10 @@ class RestAPI:
                 errors="There is no light client associated with the api key provided",
                 status_code=HTTPStatus.FORBIDDEN, log=log)
         try:
-            locked_transfer_wrapper = self.raiden_api.create_light_client_payment(registry_address, creator_address,
+            hub_message = self.raiden_api.create_light_client_payment(registry_address, creator_address,
                                                                                   partner_address, token_address,
                                                                                   amount, secrethash)
-            return api_response(locked_transfer_wrapper.to_dict())
+            return api_response(hub_message.to_dict())
         except ChannelNotFound as e:
             return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.NOT_FOUND, log=log)
         except UnhandledLightClient as e:

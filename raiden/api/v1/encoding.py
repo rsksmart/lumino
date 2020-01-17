@@ -10,7 +10,6 @@ from eth_utils import (
 )
 from marshmallow import Schema, SchemaOpts, fields, post_dump, post_load, pre_load
 
-from raiden.lightclient.lightclientmessages.hub_message import HubMessage
 from raiden.utils.rns import is_rns_address
 from webargs import validate
 from werkzeug.exceptions import NotFound

@@ -48,6 +48,7 @@ from raiden.lightclient.light_client_message_handler import LightClientMessageHa
 from raiden.lightclient.light_client_service import LightClientService
 from raiden.lightclient.light_client_utils import LightClientUtils
 from raiden.lightclient.lightclientmessages.hub_message import HubMessage
+from raiden.lightclient.lightclientmessages.payment_hub_message import PaymentHubMessage
 from raiden.lightclient.lightclientmessages.light_client_payment import LightClientPayment, LightClientPaymentStatus
 from raiden.lightclient.lightclientmessages.light_client_protocol_message import LightClientProtocolMessageType
 
@@ -1719,7 +1720,7 @@ class RaidenAPI:
             # Persist the light_client_protocol_message associated
             order = 1
             LightClientMessageHandler.store_light_client_payment(payment, self.raiden.wal.storage)
-            LightClientMessageHandler.store_light_client_protocol_message(
+            lcpm_id = LightClientMessageHandler.store_light_client_protocol_message(
                 locked_transfer.message_identifier,
                 locked_transfer,
                 False,
@@ -1728,7 +1729,9 @@ class RaidenAPI:
                 LightClientProtocolMessageType.PaymentSuccessful,
                 self.raiden.wal
             )
-
-            return HubMessage(payment.payment_id, order, locked_transfer)
+            payment_hub_message = PaymentHubMessage(payment_id=payment.payment_id,
+                                                    message_order=order,
+                                                    message=locked_transfer)
+            return HubMessage(lcpm_id, LightClientProtocolMessageType.PaymentSuccessful, payment_hub_message)
         else:
             raise ChannelNotFound("Channel with given partner address doesnt exists")
