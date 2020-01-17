@@ -936,7 +936,7 @@ def mediator_make_channel_pair(
 def mediator_make_init_action(
     channels: ChannelSet, transfer: LockedTransferSignedState
 ) -> ActionInitMediator:
-    return ActionInitMediator(channels.get_routes_by_index(1), channels.get_route_by_index(0), transfer)
+    return ActionInitMediator(channels.get_routes_by_index([1]), channels.get_route_by_index(0), transfer)
 
 
 class MediatorTransfersPair(NamedTuple):
@@ -990,6 +990,8 @@ def make_transfers_pair(
                 expiration=lock_expiration,
                 payment_identifier=UNIT_TRANSFER_IDENTIFIER,
                 canonical_identifier=receiver_channel.canonical_identifier,
+                #TODO
+                #No deberia ser our_address?
                 sender=receiver_channel.partner_state.address,
                 pkey=channel_set.partner_privatekeys[payer_index],
             )

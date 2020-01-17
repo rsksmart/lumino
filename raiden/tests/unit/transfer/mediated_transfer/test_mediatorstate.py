@@ -869,7 +869,7 @@ def test_init_mediator():
     iteration = mediator.state_transition(
         mediator_state=None,
         state_change=mediator_make_init_action(channel_set, from_transfer),
-        channelidentifiers_to_channels=channel_set.channel_map,
+        channelidentifiers_to_channels=channel_set.sub_channel_map,
         nodeaddresses_to_networkstates=channel_set.nodeaddresses_to_networkstates,
         pseudo_random_generator=random.Random(),
         block_number=1,
@@ -927,7 +927,7 @@ def test_mediator_secret_reveal_empty_hash():
     iteration = mediator.state_transition(
         mediator_state=None,
         state_change=mediator_make_init_action(channel_set, from_transfer),
-        channelidentifiers_to_channels=channel_set.channel_map,
+        channelidentifiers_to_channels=channel_set.sub_channel_map,
         nodeaddresses_to_networkstates=channel_set.nodeaddresses_to_networkstates,
         pseudo_random_generator=pseudo_random_generator,
         block_number=1,
@@ -999,7 +999,7 @@ def test_no_valid_routes():
     iteration = mediator.state_transition(
         mediator_state=None,
         state_change=mediator_make_init_action(channel_set, from_transfer),
-        channelidentifiers_to_channels=channel_set.channel_map,
+        channelidentifiers_to_channels=channel_set.sub_channel_map,
         nodeaddresses_to_networkstates=channel_set.nodeaddresses_to_networkstates,
         pseudo_random_generator=random.Random(),
         block_number=1,
@@ -1981,7 +1981,7 @@ def test_sanity_check_for_refund_transfer_with_fees():
     iteration = mediator.state_transition(
         mediator_state=None,
         state_change=mediator_make_init_action(channel_set, from_transfer),
-        channelidentifiers_to_channels=channel_set.channel_map,
+        channelidentifiers_to_channels=channel_set.sub_channel_map,
         nodeaddresses_to_networkstates=channel_set.nodeaddresses_to_networkstates,
         pseudo_random_generator=random.Random(),
         block_number=1,
@@ -2037,7 +2037,7 @@ def test_receive_unlock():
     assert_dropped(iteration, state_change, "channel identifier unknown")
 
     iteration = mediator.state_transition(
-        state, state_change, channel_set.channel_map, dict(), prng, 1, block_hash
+        state, state_change, channel_set.sub_channel_map, dict(), prng, 1, block_hash
     )
     msg = "Expected rejection due to no corresponding lock"
     assert search_for_item(iteration.events, EventInvalidReceivedUnlock, {}), msg
@@ -2051,7 +2051,7 @@ def test_receive_unlock():
     )
     state.secret = UNIT_SECRET
     iteration = mediator.state_transition(
-        state, state_change, channel_set.channel_map, dict(), prng, 1, block_hash
+        state, state_change, channel_set.sub_channel_map, dict(), prng, 1, block_hash
     )
     assert search_for_item(iteration.events, EventUnlockClaimSuccess, {})
     assert iteration.new_state is None, "Only transfer has been cleared."
