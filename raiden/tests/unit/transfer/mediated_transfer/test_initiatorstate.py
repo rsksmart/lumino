@@ -491,7 +491,7 @@ def test_refund_transfer_no_more_routes():
     )
 
     iteration = initiator_manager.state_transition(
-        setup.current_state, state_change, setup.channel_set.sub_channel_map, setup.prng, setup.block_number
+        setup.current_state, state_change, setup.channel_set.channel_map, setup.prng, setup.block_number
     )
     # As per the description of the issue here:
     # https://github.com/raiden-network/raiden/issues/3146#issuecomment-447378046
@@ -907,9 +907,11 @@ def test_initiator_lock_expired_must_not_be_sent_if_channel_is_closed():
     block = Block(
         block_number=expiration_block_number, gas_limit=1, block_hash=factories.make_block_hash()
     )
+    address_channels = dict()
     channel_map = {channel_state.identifier: channel_state}
+    address_channels[channel_state.our_state.address] = channel_map
     iteration = initiator_manager.state_transition(
-        setup.current_state, block, channel_map, setup.prng, expiration_block_number
+        setup.current_state, block, address_channels, setup.prng, expiration_block_number
     )
     assert search_for_item(iteration.events, SendLockExpired, {}) is None
     # The lock expired, so the route failed

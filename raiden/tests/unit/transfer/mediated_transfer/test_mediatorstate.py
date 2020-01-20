@@ -768,7 +768,7 @@ def test_secret_learned_with_refund():
     # Emulate HOP2(Initiator) -> HOP1 (This node)
     #                                             \-> hop4 -> hop5
     setup = factories.make_transfers_pair(3, block_number=1)
-    channel_map, transfers_pair = setup.channel_map, setup.transfers_pair
+    channel_map, transfers_pair = setup.channel_set.sub_channel_map, setup.transfers_pair
 
     # Make sure that our state is updated once transfers are sent.
     assert channel.is_lock_locked(setup.channel_set.get_sub_channel(1).our_state, UNIT_SECRETHASH)
