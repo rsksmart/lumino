@@ -391,7 +391,7 @@ class LightClientMessageGetSchema(BaseSchema):
 
 
 class PaymentLightPutSchema(BaseSchema):
-    message_id = fields.Integer(required=True)
+    payment_id = fields.Integer(required=True)
     message_order = fields.Integer(required=True)
     message = fields.Dict(required=True)
     sender = AddressField(required=True)

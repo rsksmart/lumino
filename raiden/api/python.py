@@ -1726,7 +1726,7 @@ class RaidenAPI:
             )
             payment_hub_message = PaymentHubMessage(payment_id=payment.payment_id,
                                                     message_order=order,
-                                                    message=locked_transfer)
+                                                    message=locked_transfer, is_signed=False)
             return HubResponseMessage(lcpm_id, LightClientProtocolMessageType.PaymentSuccessful, payment_hub_message)
         else:
             raise ChannelNotFound("Channel with given partner address doesnt exists")

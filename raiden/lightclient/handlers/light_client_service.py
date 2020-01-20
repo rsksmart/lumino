@@ -41,6 +41,7 @@ class LightClientService:
         messages = wal.storage.get_light_client_messages(from_message, light_client)
         result: List[HubResponseMessage] = []
         for message in messages:
+            signed = message[0]
             order = message[1]
             payment_id = message[2]
             unsigned_msg = message[3]
@@ -50,7 +51,7 @@ class LightClientService:
             message = signed_msg if signed_msg is not None else unsigned_msg
             payment_hub_message = PaymentHubMessage(payment_id=payment_id,
                                                     message_order=order,
-                                                    message=message)
+                                                    message=message, is_signed=signed)
             hub_message = HubResponseMessage(internal_identifier, message_type, payment_hub_message)
             result.append(hub_message)
         return result

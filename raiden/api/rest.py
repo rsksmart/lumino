@@ -2114,7 +2114,7 @@ class RestAPI:
         return api_response(str(stored))
 
     def receive_light_client_protocol_message(self,
-                                              message_id: int,
+                                              payment_id: int,
                                               message_order: int,
                                               sender: typing.AddressHex,
                                               receiver: typing.AddressHex,
@@ -2134,7 +2134,7 @@ class RestAPI:
                                                        status_code=HTTPStatus.BAD_REQUEST, log=log)
 
         message = parse_message_number(message)
-        payment_request = LightClientService.get_light_client_payment(message_id, self.raiden_api.raiden.wal.storage)
+        payment_request = LightClientService.get_light_client_payment(payment_id, self.raiden_api.raiden.wal.storage)
         if not payment_request:
             return ApiErrorBuilder.build_and_log_error(errors="No payment associated",
                                                        status_code=HTTPStatus.BAD_REQUEST, log=log)

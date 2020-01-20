@@ -317,7 +317,7 @@ class PaymentLightResource(BaseResource):
 
     @use_kwargs(put_schema, locations=("json",))
     def put(self,
-            message_id: int,
+            payment_id: int,
             message_order: int,
             sender: typing.AddressHex,
             receiver: typing.AddressHex,
@@ -325,7 +325,7 @@ class PaymentLightResource(BaseResource):
         """
         put a signed message associated with a payment of a light client
         """
-        return self.rest_api.receive_light_client_protocol_message(message_id, message_order, sender, receiver, message)
+        return self.rest_api.receive_light_client_protocol_message(payment_id, message_order, sender, receiver, message)
 
 
 class PaymentResource(BaseResource):
