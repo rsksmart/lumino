@@ -33,7 +33,7 @@ from raiden.tests.utils.factories import (
     make_channel_set,
     mediator_make_channel_pair,
     mediator_make_init_action,
-)
+    ChannelSet)
 from raiden.tests.utils.transfer import assert_dropped
 from raiden.transfer import channel
 from raiden.transfer.events import (
@@ -461,8 +461,8 @@ def test_events_for_balanceproof():
     last_pair.payee_state = "payee_secret_revealed"
 
     # the lock is not in the danger zone yet
-    payer_channel = mediator.get_payer_channel(setup.channel_set.channel_map[factories.UNIT_TRANSFER_DESCRIPTION.initiator], last_pair)
-    payee_channel = mediator.get_payee_channel(setup.channel_set.channel_map[factories.UNIT_TRANSFER_DESCRIPTION.initiator], last_pair)
+    payer_channel = mediator.get_payer_channel(setup.channel_set.channel_map[ChannelSet.ADDRESSES[0]], last_pair)
+    payee_channel = mediator.get_payee_channel(setup.channel_set.channel_map[ChannelSet.ADDRESSES[0]], last_pair)
     safe_block = last_pair.payee_transfer.lock.expiration - payer_channel.reveal_timeout - 1
 
     prng_copy = deepcopy(pseudo_random_generator)

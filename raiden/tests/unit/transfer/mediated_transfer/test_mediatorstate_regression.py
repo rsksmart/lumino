@@ -520,7 +520,7 @@ def test_regression_onchain_secret_reveal_must_update_channel_state():
             block_number=setup.block_number,
             block_hash=setup.block_hash,
         ),
-        channelidentifiers_to_channels=setup.channel_map,
+        channelidentifiers_to_channels=setup.channel_set.sub_channel_map,
         nodeaddresses_to_networkstates=setup.channel_set.nodeaddresses_to_networkstates,
         pseudo_random_generator=pseudo_random_generator,
         block_number=setup.block_number,
