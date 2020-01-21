@@ -1,7 +1,7 @@
 # pylint: disable=too-few-public-methods,too-many-arguments,too-many-instance-attributes
 
 from eth_utils import to_canonical_address, to_checksum_address
-from raiden.messages import RevealSecret, Unlock, LockedTransfer, SecretRequest
+from raiden.messages import RevealSecret, Unlock, LockedTransfer, SecretRequest, LockExpired
 
 from raiden.transfer.architecture import (
     AuthenticatedSenderStateChange,
@@ -699,6 +699,45 @@ class ActionSendSecretRequestLight(AuthenticatedSenderStateChange):
         )
         return instance
 
+
+class ActionSendLockExpiredLight(AuthenticatedSenderStateChange):
+    """ A LockExpired message must be sent from a  light client. """
+
+    def __init__(self, lock_expired: LockExpired, sender: Address, receiver: Address) -> None:
+        super().__init__(sender)
+        self.receiver = receiver
+        self.lock_expired = lock_expired
+
+    def __repr__(self) -> str:
+        return "<ActionSendLockExpiredLight lock_expired:{} sender:{}>".format(
+            pex(self.lock_expired.__repr__()), pex(self.sender)
+        )
+
+    def __eq__(self, other: Any) -> bool:
+        return (
+            isinstance(other, ActionSendLockExpiredLight)
+            and self.lock_expired.__eq__(other.lock_expired)
+            and super().__eq__(other)
+        )
+
+    def __ne__(self, other: Any) -> bool:
+        return not self.__eq__(other)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "secret_request": self.lock_expired.to_dict(),
+            "sender": to_checksum_address(self.sender),
+            "receiver": to_checksum_address(self.receiver)
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "ActionSendLockExpiredLight":
+        instance = cls(
+            lock_expired=LockExpired.from_dict(data["lock_expired"]),
+            sender=to_canonical_address(data["sender"]),
+            receiver=to_canonical_address(data["receiver"])
+        )
+        return instance
 
 class ActionSendUnlockLight(AuthenticatedSenderStateChange):
     """ An Unlock message must be sent to a light client. """

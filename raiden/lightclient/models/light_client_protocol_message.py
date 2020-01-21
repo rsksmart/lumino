@@ -49,7 +49,7 @@ class LightClientProtocolMessage:
             "unsigned_message": unsigned_msg_dict,
             "signed_message": signed_msg_dict,
             "light_client_payment_id": self.light_client_payment_id,
-            "internal_msg_identifer": self.internal_msg_identifier
+            "internal_msg_identifier": self.internal_msg_identifier
         }
         return result
 
