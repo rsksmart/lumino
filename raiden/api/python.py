@@ -1145,8 +1145,8 @@ class RaidenAPI:
         self.raiden.initiate_send_delivered_light(sender_address, receiver_address, delivered, msg_order, payment_id, message_type)
 
     def initiate_send_processed_light(self, sender_address: typing.Address, receiver_address: typing.Address,
-                                      processed: Processed, msg_order: int, payment_id: int):
-        self.raiden.initiate_send_processed_light(sender_address, receiver_address, processed, msg_order, payment_id)
+                                      processed: Processed, msg_order: int, payment_id: int, message_type: LightClientProtocolMessageType):
+        self.raiden.initiate_send_processed_light(sender_address, receiver_address, processed, msg_order, payment_id, message_type)
 
     def initiate_send_secret_request_light(self, sender_address: typing.Address, receiver_address: typing.Address,
                                            secret_request: SecretRequest, msg_order: int, payment_id: int):

@@ -1538,6 +1538,10 @@ class RestAPI:
         self.raiden_api.initiate_send_secret_request_light(sender_address, receiver_address, secret_request, 5,
                                                            secret_request.payment_identifier)
 
+    def initiate_send_lock_expired_light(self, sender_address: typing.Address, receiver_address: typing.Address,
+                                         lock_expired: LockExpired):
+        self.raiden_api.initiate_send_lock_expired_light(sender_address, receiver_address, lock_expired)
+
     def initiate_payment_light(
         self,
         registry_address: typing.PaymentNetworkID,
@@ -2123,10 +2127,6 @@ class RestAPI:
         # TODO call from dict will work but we need to validate each parameter in order to know if there are no extra or missing params.
         # TODO we also need to check if message id an order received make sense
 
-        if message["type"] == "LockExpired":
-            le = LockExpired.from_dict(message)
-            self.raiden_api.raiden.transport.light_client_transports[0].send_for_light_client_with_retry(receiver, le)
-
         headers = request.headers
         api_key = headers.get("x-api-key")
         if not api_key:
@@ -2162,6 +2162,9 @@ class RestAPI:
         elif message["type"] == "SecretRequest":
             secret_request = SecretRequest.from_dict(message)
             self.initiate_send_secret_request_light(sender, receiver, secret_request)
+        elif message["type"] == "LockExpired":
+            le = LockExpired.from_dict(message)
+            self.raiden_api.raiden.transport.light_client_transports[0].send_for_light_client_with_retry(receiver, le)
 
         return api_response("Received, message should be sent to partner")
 
@@ -2187,8 +2190,8 @@ class RestAPI:
                 status_code=HTTPStatus.FORBIDDEN, log=log)
         try:
             hub_message = self.raiden_api.create_light_client_payment(registry_address, creator_address,
-                                                                                  partner_address, token_address,
-                                                                                  amount, secrethash)
+                                                                      partner_address, token_address,
+                                                                      amount, secrethash)
             return api_response(hub_message.to_dict())
         except ChannelNotFound as e:
             return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.NOT_FOUND, log=log)

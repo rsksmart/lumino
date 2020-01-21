@@ -37,7 +37,7 @@ from raiden.messages import (
     LockedTransfer,
     Message,
     SignedMessage,
-    RevealSecret, Unlock, Delivered, SecretRequest, Processed)
+    RevealSecret, Unlock, Delivered, SecretRequest, Processed, LockExpired)
 from raiden.network.blockchain_service import BlockChainService
 from raiden.network.proxies.secret_registry import SecretRegistry
 from raiden.network.proxies.service_registry import ServiceRegistry
@@ -58,7 +58,8 @@ from raiden.transfer.mediated_transfer.state_change import (
     ActionInitMediator,
     ActionInitTarget,
     ActionInitTargetLight,
-    ActionInitInitiatorLight, ActionSendSecretRevealLight, ActionSendUnlockLight, ActionSendSecretRequestLight)
+    ActionInitInitiatorLight, ActionSendSecretRevealLight, ActionSendUnlockLight, ActionSendSecretRequestLight,
+    ActionSendLockExpiredLight)
 from raiden.transfer.state import (
     BalanceProofSignedState,
     BalanceProofUnsignedState,
@@ -1316,7 +1317,8 @@ class RaidenService(Runnable):
         return payment_status
 
     def initiate_send_delivered_light(self, sender_address: Address, receiver_address: Address,
-                                      delivered: Delivered, msg_order: int, payment_id: int, message_type: LightClientProtocolMessageType):
+                                      delivered: Delivered, msg_order: int, payment_id: int,
+                                      message_type: LightClientProtocolMessageType):
         lc_transport = self.get_light_client_transport(to_checksum_address(sender_address))
         if lc_transport:
             LightClientMessageHandler.store_light_client_protocol_message(
@@ -1331,7 +1333,8 @@ class RaidenService(Runnable):
             lc_transport.send_for_light_client_with_retry(receiver_address, delivered)
 
     def initiate_send_processed_light(self, sender_address: Address, receiver_address: Address,
-                                      processed: Processed, msg_order: int, payment_id: int, message_type: LightClientProtocolMessageType):
+                                      processed: Processed, msg_order: int, payment_id: int,
+                                      message_type: LightClientProtocolMessageType):
         lc_transport = self.get_light_client_transport(to_checksum_address(sender_address))
         if lc_transport:
             LightClientMessageHandler.store_light_client_protocol_message(
@@ -1361,6 +1364,15 @@ class RaidenService(Runnable):
         secret_request: SecretRequest
     ):
         init_state = ActionSendSecretRequestLight(secret_request, sender, receiver)
+        self.handle_and_track_state_change(init_state)
+
+    def initiate_send_lock_expired_light(
+        self,
+        sender: Address,
+        receiver: Address,
+        lock_expired: LockExpired
+    ):
+        init_state = ActionSendLockExpiredLight(lock_expired, sender, receiver)
         self.handle_and_track_state_change(init_state)
 
     def initiate_send_balance_proof(
