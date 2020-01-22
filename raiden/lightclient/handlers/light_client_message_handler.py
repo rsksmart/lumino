@@ -100,9 +100,14 @@ class LightClientMessageHandler:
     def get_light_client_payment_locked_transfer(cls, payment_identifier: int, wal: WriteAheadLog):
         message = wal.storage.get_light_client_payment_locked_transfer(payment_identifier,
                                                                        str(LightClientProtocolMessageType.PaymentSuccessful.value))
-        return LightClientProtocolMessage(message[3] is not None, message[1], message[4], message[0],
-                                          LightClientProtocolMessageType.PaymentSuccessful, message[2],
-                                          message[3])
+        identifier = message[0]
+        message_order = message[1]
+        unsigned_message = message[3]
+        signed_message = message[4]
+        payment_id = message[5]
+        return LightClientProtocolMessage(signed_message is not None, message_order, payment_id, identifier,
+                                          LightClientProtocolMessageType.PaymentSuccessful, unsigned_message,
+                                          signed_message)
 
 
     @staticmethod
@@ -189,6 +194,14 @@ class LightClientMessageHandler:
             # get lt to get the payment identifier
             locked_transfer = LightClientMessageHandler.get_light_client_payment_locked_transfer(
                 protocol_message.light_client_payment_id, wal)
+            print("protocol_message.light_client_payment_id")
+
+            print(protocol_message.light_client_payment_id)
+            print("Is none ")
+            print(locked_transfer)
+            print(locked_transfer.signed_message)
+
+
             signed_locked_transfer_message = json.loads(locked_transfer.signed_message)
             payment_initiator = signed_locked_transfer_message["initiator"]
             if to_checksum_address(delivered_sender) != to_checksum_address(payment_initiator):
