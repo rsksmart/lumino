@@ -39,7 +39,7 @@ from raiden.network.transport.matrix.client import GMatrixClient, Room, User
 from raiden.network.utils import get_http_rtt
 from raiden.utils import pex
 from raiden.utils.signer import Signer, recover
-from raiden.utils.typing import Address, ChainID
+from raiden.utils.typing import Address, ChainID, Signature
 from raiden_contracts.constants import ID_TO_NETWORKNAME
 from ecies import decrypt
 
@@ -48,6 +48,7 @@ log = structlog.get_logger(__name__)
 
 JOIN_RETRIES = 10
 USERID_RE = re.compile(r"^@(0x[0-9a-f]{40})(?:\.[0-9a-f]{8})?(?::.+)?$")
+DISPLAY_NAME_HEX_RE = re.compile(r"^0x[0-9a-fA-F]{130}$")
 ROOM_NAME_SEPARATOR = "_"
 ROOM_NAME_PREFIX = "raiden"
 
@@ -491,9 +492,10 @@ def login_or_register(
 
         _try_login_or_register(client, base_username, password, server_name, server_url, seed)
 
-        name = encode_hex(signer.sign(client.user_id.encode()))
+        signature_bytes = signer.sign(client.user_id.encode())
+        signature_hex = encode_hex(signature_bytes)
         user = client.get_user(client.user_id)
-        user.set_display_name(name)
+        user.set_display_name(signature_hex)
 
     log.info("Login or register for Hub Node is successfully run")
     return user
@@ -512,7 +514,11 @@ def validate_userid_signature(user: User) -> Optional[Address]:
 
     try:
         displayname = user.get_display_name()
-        recovered = recover(data=user.user_id.encode(), signature=decode_hex(displayname))
+        if DISPLAY_NAME_HEX_RE.match(displayname):
+            signature_bytes = decode_hex(displayname)
+        else:
+            return None
+        recovered = recover(data=user.user_id.encode(), signature=Signature(signature_bytes))
         if not (address and recovered and recovered == address):
             return None
     except (
