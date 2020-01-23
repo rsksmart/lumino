@@ -26,9 +26,9 @@ The following are the addresses of the set of contracts for Lumino Network per r
 
 | Contract                                | TestNet                                    | MainNet        |
 |-----------------------------------------|--------------------------------------------|----------------|
-| `$TOKENNETWORK_REGISTRY_CONTRACT_ADDRESS` | 0x7385f5c9Fb5D5cd11b689264756A847359d2FDc7 | 0x5bE08F3AAD3AB1214be82f3E4FFD0B214Fd4653B  |
-| `$SECRET_REGISTRY_CONTRACT_ADDRESS`       | 0x59e1344572EC42BB0BB95046E07d6509Bc737b57 | 0x30aabDd1f2A31c5faEDD8B9328F3294a7D7D7DF7  |
-| `$ENDPOINT_REGISTRY_CONTRACT_ADDRESS`     | 0x6BEb99b6eCac8E4E2EdeC141042135D0dD8F15c1 | 0xDd9Df254972a61898E125FDd3Cbe235Bec565f8e |
+| `$TOKENNETWORK_REGISTRY_CONTRACT_ADDRESS` | 0x7385f5c9Fb5D5cd11b689264756A847359d2FDc7 | 0x060B81E90894E1F38A625C186CB1F4f9dD86A2B5  |
+| `$SECRET_REGISTRY_CONTRACT_ADDRESS`       | 0x59e1344572EC42BB0BB95046E07d6509Bc737b57 | 0xfddac0Ca372877d8E5376A4624F95ADF77B83FE1  |
+| `$ENDPOINT_REGISTRY_CONTRACT_ADDRESS`     | 0x6BEb99b6eCac8E4E2EdeC141042135D0dD8F15c1 | 0x150840901Cca6d432B1aaEfD65d6D53b964C7EE5 |
 
 
 If you want to create your own RIF Lumino network for development or custom use on private networks, please refer to [Lumino Contracts](https://github.com/rsksmart/lumino-contracts)
