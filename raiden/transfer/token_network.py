@@ -121,7 +121,7 @@ def handle_channelnew(
         addresses_to_ids[our_address].append(channel_identifier)
         addresses_to_ids[partner_address].append(channel_identifier)
 
-        return TransitionResult(token_network_state, events)
+    return TransitionResult(token_network_state, events)
 
 
 def handle_balance(
