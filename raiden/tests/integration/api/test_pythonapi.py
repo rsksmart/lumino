@@ -103,6 +103,7 @@ def run_test_raidenapi_channel_lifecycle(raiden_network, token_addresses, deposi
         api1.set_total_channel_deposit(
             registry_address=registry_address,
             token_address=token_address,
+            creator_address=api1.address,
             partner_address=api2.address,
             total_deposit=0,
         )
@@ -110,13 +111,14 @@ def run_test_raidenapi_channel_lifecycle(raiden_network, token_addresses, deposi
     api1.set_total_channel_deposit(
         registry_address=registry_address,
         token_address=token_address,
+        creator_address=api1.address,
         partner_address=api2.address,
         total_deposit=deposit,
     )
 
     # let's make sure it's idempotent. Same deposit should raise deposit mismatch limit
     with pytest.raises(DepositMismatch):
-        api1.set_total_channel_deposit(registry_address, token_address, api2.address, deposit)
+        api1.set_total_channel_deposit(registry_address, token_address, api1.address, api2.address, deposit)
 
     channel12 = get_channelstate(node1, node2, token_network_identifier)
 
