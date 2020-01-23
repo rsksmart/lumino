@@ -69,7 +69,7 @@ def run_test_raidenapi_channel_lifecycle(raiden_network, token_addresses, deposi
     # Make sure invalid arguments to get_channel_list are caught
     with pytest.raises(UnknownTokenAddress):
         api1.get_channel_list(
-            registry_address=registry_address, token_address=None, partner_address=api2.address
+            registry_address=registry_address, token_address=None, partner_address=api2.address, creator_address=api1.address
         )
 
     # open is a synchronous api

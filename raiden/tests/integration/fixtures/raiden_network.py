@@ -172,6 +172,7 @@ def raiden_network(
     tmpdir,
     request,
 ):
+
     service_registry_address = None
     if blockchain_services.service_registry:
         service_registry_address = blockchain_services.service_registry.address

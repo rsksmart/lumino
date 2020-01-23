@@ -18,6 +18,7 @@ from raiden.tests.utils.factories import UNIT_CHAIN_ID
 from raiden.tests.utils.protocol import HoldRaidenEventHandler, WaitForMessage
 from raiden.transfer.identifiers import CanonicalIdentifier
 from raiden.transfer.views import state_from_raiden
+from raiden.ui.app import _setup_matrix
 from raiden.utils import BlockNumber, merge_dict, pex
 from raiden.utils.typing import Address, Optional
 from raiden.waiting import wait_for_payment_network
@@ -342,6 +343,10 @@ def create_apps(
                             "private_rooms": private_rooms,
                         }
                     },
+                    "services": {
+                        "pathfinding_service_address": None,
+                        "monitoring_enabled": False
+                    }
                 },
             )
 
@@ -360,7 +365,7 @@ def create_apps(
             user_deposit = blockchain.user_deposit(user_deposit_address)
 
         if use_matrix:
-            transport = MatrixTransport(config["transport"]["matrix"])
+            transport = _setup_matrix(config)
         else:
             throttle_policy = TokenBucket(
                 config["transport"]["udp"]["throttle_capacity"],
@@ -470,7 +475,7 @@ def wait_for_usable_channel(
     is reachable.
     """
     waiting.wait_for_newchannel(
-        app0.raiden, registry_address, token_address, app1.raiden.address, retry_timeout
+        app0.raiden, registry_address, token_address, app1.raiden.address, app0.raiden.address, retry_timeout
     )
 
     waiting.wait_for_participant_newbalance(
@@ -487,7 +492,7 @@ def wait_for_usable_channel(
         app0.raiden,
         registry_address,
         token_address,
-        app1.raiden.address,
+        app0.raiden.address,
         app1.raiden.address,
         partner_deposit,
         retry_timeout,
