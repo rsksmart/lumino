@@ -841,9 +841,7 @@ class ChannelSet:
             for channel_key in self.channels[key].keys():
                 if counter in indexes:
                     ret_routes.append(self.get_route(key, channel_key))
-                    counter += 1
-                else:
-                    counter += 1
+                counter += 1
         return ret_routes
 
     def get_route_by_index(self, index: int) -> RouteState:
