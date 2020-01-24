@@ -127,10 +127,10 @@ def get_netting_channel_settled_events(
 
 def wait_both_channel_open(app0, app1, registry_address, token_address, retry_timeout):
     waiting.wait_for_newchannel(
-        app1.raiden, registry_address, token_address, app0.raiden.address, retry_timeout
+        app1.raiden, registry_address, token_address, app1.raiden.address, app0.raiden.address, retry_timeout
     )
     waiting.wait_for_newchannel(
-        app0.raiden, registry_address, token_address, app1.raiden.address, retry_timeout
+        app0.raiden, registry_address, token_address, app0.raiden.address, app1.raiden.address, retry_timeout
     )
 
 
@@ -151,7 +151,7 @@ def wait_both_channel_deposit(
         app_partner.raiden,
         registry_address,
         token_address,
-        app_deposit.raiden.address,
+        app_partner.raiden.address,
         app_deposit.raiden.address,
         total_deposit,
         retry_timeout,
@@ -225,7 +225,7 @@ def run_test_channel_deposit(raiden_chain, deposit, retry_timeout, token_address
     assert_synced_channel_state(token_network_identifier, app0, 0, [], app1, 0, [])
 
     RaidenAPI(app0.raiden).set_total_channel_deposit(
-        registry_address, token_address, app1.raiden.address, deposit
+        registry_address, token_address, app0.raiden.address, app1.raiden.address, deposit
     )
 
     wait_both_channel_deposit(app0, app1, registry_address, token_address, deposit, retry_timeout)
@@ -233,7 +233,7 @@ def run_test_channel_deposit(raiden_chain, deposit, retry_timeout, token_address
     assert_synced_channel_state(token_network_identifier, app0, deposit, [], app1, 0, [])
 
     RaidenAPI(app1.raiden).set_total_channel_deposit(
-        registry_address, token_address, app0.raiden.address, deposit
+        registry_address, token_address, app1.raiden.address, app0.raiden.address, deposit
     )
 
     wait_both_channel_deposit(app1, app0, registry_address, token_address, deposit, retry_timeout)
@@ -365,7 +365,7 @@ def run_test_query_events(
     assert_synced_channel_state(token_network_identifier, app0, 0, [], app1, 0, [])
 
     RaidenAPI(app0.raiden).set_total_channel_deposit(
-        registry_address, token_address, app1.raiden.address, deposit
+        registry_address, token_address, app0.raiden.address, app1.raiden.address, deposit
     )
 
     all_netting_channel_events = get_all_netting_channel_events(
@@ -581,8 +581,8 @@ def run_test_clear_closed_queue(raiden_network, token_addresses, network_wait):
         secret=secret,
     )
 
-    app1.raiden.transport.stop()
-    app1.raiden.transport.get()
+    app1.raiden.transport.hub_transport.stop()
+    app1.raiden.transport.hub_transport.get()
 
     # make sure to wait until the queue is created
     def has_initiator_events():
@@ -613,6 +613,7 @@ def run_test_clear_closed_queue(raiden_network, token_addresses, network_wait):
             token_address,
             [channel_identifier],
             app0.raiden.alarm.sleep_time,
+            app0.raiden.address
         )
 
     # assert all queues with this partner are gone or empty
