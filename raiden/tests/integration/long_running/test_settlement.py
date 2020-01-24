@@ -76,7 +76,7 @@ def run_test_settle_is_automatically_called(raiden_network, token_addresses):
 
     # A ChannelClose event will be generated, this will be polled by both apps
     # and each must start a task for calling settle
-    RaidenAPI(app1.raiden).channel_close(registry_address, token_address, app0.raiden.address)
+    RaidenAPI(app1.raiden).channel_close(registry_address, token_address, app0.raiden.address, app0.raiden.alarm.sleep_time)
 
     waiting.wait_for_close(
         app0.raiden,
@@ -84,10 +84,11 @@ def run_test_settle_is_automatically_called(raiden_network, token_addresses):
         token_address,
         [channel_identifier],
         app0.raiden.alarm.sleep_time,
+        app0.raiden.address
     )
 
     channel_state = views.get_channelstate_for(
-        views.state_from_raiden(app0.raiden), registry_address, token_address, app1.raiden.address
+        views.state_from_raiden(app0.raiden), registry_address, token_address, app0.raiden.address, app1.raiden.address
     )
 
     assert channel_state.close_transaction.finished_block_number
@@ -556,7 +557,7 @@ def run_test_automatic_secret_registration(raiden_chain, token_addresses):
 
     # Stop app0 to avoid sending the unlock, this must be done after the locked
     # transfer is sent.
-    app0.raiden.transport.stop()
+    app0.raiden.transport.hub_transport.stop()
 
     reveal_secret = RevealSecret(message_identifier=random.randint(0, UINT64_MAX), secret=secret)
     app0.raiden.sign(reveal_secret)
@@ -891,6 +892,7 @@ def run_test_batch_unlock_after_restart(raiden_network, token_addresses, deposit
             token_address=token_address,
             channel_ids=[alice_bob_channel_state.identifier],
             retry_timeout=alice_app.raiden.alarm.sleep_time,
+            partner_addresses=bob_app.raiden.address
         )
 
     channel_closed = raiden_state_changes_search_for_item(
