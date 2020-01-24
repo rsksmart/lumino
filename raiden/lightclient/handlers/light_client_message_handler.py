@@ -185,7 +185,7 @@ class LightClientMessageHandler:
             json_message = protocol_message.signed_message
 
         json_message = json.loads(json_message)
-
+        # FIXME must be modified since msg order 1 is for le too
         first_message_is_lt = protocol_message.message_order == 1
         is_delivered_from_initiator = True
         delivered_sender = message.sender
@@ -194,14 +194,6 @@ class LightClientMessageHandler:
             # get lt to get the payment identifier
             locked_transfer = LightClientMessageHandler.get_light_client_payment_locked_transfer(
                 protocol_message.light_client_payment_id, wal)
-            print("protocol_message.light_client_payment_id")
-
-            print(protocol_message.light_client_payment_id)
-            print("Is none ")
-            print(locked_transfer)
-            print(locked_transfer.signed_message)
-
-
             signed_locked_transfer_message = json.loads(locked_transfer.signed_message)
             payment_initiator = signed_locked_transfer_message["initiator"]
             if to_checksum_address(delivered_sender) != to_checksum_address(payment_initiator):

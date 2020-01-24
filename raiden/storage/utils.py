@@ -118,7 +118,7 @@ CREATE TABLE IF NOT EXISTS light_client_protocol_message (
     message_order INTEGER, 
     unsigned_message JSON,
     signed_message JSON,
-    message_type TEXT CHECK (message_type in ('PaymentSuccessful', 'PaymentFailure', 'PaymentExpiration', 'SettlementRequired')) NOT NULL
+    message_type TEXT CHECK (message_type in ('PaymentSuccessful', 'PaymentFailure', 'PaymentExpired', 'SettlementRequired')) NOT NULL
     
     );
 """

@@ -91,8 +91,8 @@ def handle_channel_new(raiden: "RaidenService", event: Event):
                                                                   raiden.wal)
     is_participant2_handled_lc = LightClientService.is_handled_lc(to_checksum_address(encode_hex(participant2)),
                                                                   raiden.wal)
-
-    if is_participant or is_participant1_handled_lc or is_participant2_handled_lc:
+    is_light_channel = is_participant1_handled_lc or is_participant2_handled_lc
+    if is_participant or is_light_channel:
         channel_proxy = raiden.chain.payment_channel(
             canonical_identifier=CanonicalIdentifier(
                 chain_identifier=views.state_from_raiden(raiden).chain_id,
@@ -108,6 +108,7 @@ def handle_channel_new(raiden: "RaidenService", event: Event):
             reveal_timeout=raiden.config["reveal_timeout"],
             payment_channel_proxy=channel_proxy,
             opened_block_number=block_number,
+            is_light_channel=is_light_channel
         )
 
         # Swap our_state and partner_state in order to have the LC from our_side of the channel

@@ -48,7 +48,8 @@ from raiden.lightclient.lightclientmessages.payment_hub_message import PaymentHu
 from raiden.lightclient.models.light_client_payment import LightClientPayment, LightClientPaymentStatus
 from raiden.lightclient.models.light_client_protocol_message import LightClientProtocolMessageType
 
-from raiden.messages import RequestMonitoring, LockedTransfer, RevealSecret, Unlock, Delivered, SecretRequest, Processed
+from raiden.messages import RequestMonitoring, LockedTransfer, RevealSecret, Unlock, Delivered, SecretRequest, \
+    Processed, LockExpired
 from raiden.settings import DEFAULT_RETRY_TIMEOUT, DEVELOPMENT_CONTRACT_VERSION
 from raiden.transfer import architecture, views, channel
 from raiden.transfer.events import (
@@ -1151,6 +1152,10 @@ class RaidenAPI:
     def initiate_send_secret_request_light(self, sender_address: typing.Address, receiver_address: typing.Address,
                                            secret_request: SecretRequest, msg_order: int, payment_id: int):
         self.raiden.initiate_send_secret_request_light(sender_address, receiver_address, secret_request)
+
+    def initiate_send_lock_expired_light(self, sender_address: typing.Address, receiver_address: typing.Address,
+                                         lock_expired: LockExpired, payment_id: int):
+        self.raiden.initiate_send_lock_expired_light(sender_address, receiver_address, lock_expired, payment_id)
 
     def get_raiden_events_payment_history_with_timestamps_v2(
         self,

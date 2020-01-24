@@ -1370,10 +1370,13 @@ class RaidenService(Runnable):
         self,
         sender: Address,
         receiver: Address,
-        lock_expired: LockExpired
+        lock_expired: LockExpired,
+        payment_id: int
     ):
-        init_state = ActionSendLockExpiredLight(lock_expired, sender, receiver)
+        init_state = ActionSendLockExpiredLight(lock_expired, sender, receiver, payment_id)
         self.handle_and_track_state_change(init_state)
+
+
 
     def initiate_send_balance_proof(
         self,

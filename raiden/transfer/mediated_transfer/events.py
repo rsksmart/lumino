@@ -2,11 +2,11 @@
 from eth_utils import to_canonical_address, to_checksum_address
 
 from raiden.lightclient.models.light_client_protocol_message import LightClientProtocolMessageType
-from raiden.messages import RevealSecret, Unlock, Message, SecretRequest
+from raiden.messages import RevealSecret, Unlock, Message, SecretRequest, LockExpired
 
 from raiden.transfer.architecture import Event, SendMessageEvent
 from raiden.transfer.mediated_transfer.state import LockedTransferUnsignedState
-from raiden.transfer.state import BalanceProofUnsignedState
+from raiden.transfer.state import BalanceProofUnsignedState, BalanceProofSignedState
 from raiden.utils import pex, sha3
 from raiden.utils.serialization import deserialize_secret, deserialize_secret_hash, serialize_bytes
 from raiden.utils.typing import (
@@ -141,6 +141,127 @@ class SendLockExpired(SendMessageEvent):
             balance_proof=data["balance_proof"],
             secrethash=deserialize_secret_hash(data["secrethash"]),
             payment_identifier=int(data["payment_identifier"])
+        )
+
+        return restored
+
+
+class SendLockExpiredLight(SendMessageEvent):
+    def __init__(
+        self,
+        recipient: Address,
+        message_identifier: MessageID,
+        signed_lock_expired: LockExpired,
+        secrethash: SecretHash,
+        payment_identifier: int
+    ) -> None:
+        super().__init__(recipient, signed_lock_expired.channel_identifier, message_identifier)
+
+        self.signed_lock_expired = signed_lock_expired
+        self.secrethash = secrethash
+        self.payment_identifier = payment_identifier
+
+    def __repr__(self) -> str:
+        return "<SendLockExpiredLight msgid:{} balance_proof:{} secrethash:{} recipient:{}>".format(
+            self.message_identifier, self.balance_proof, pex(self.secrethash), pex(self.recipient)
+        )
+
+    def __eq__(self, other: Any) -> bool:
+        return (
+            isinstance(other, SendLockExpired)
+            and self.message_identifier == other.message_identifier
+            and self.signed_lock_expired == other.signed_lock_expired
+            and self.secrethash == other.secrethash
+            and self.recipient == other.recipient
+            and self.payment_identifier == other.payment_identifier
+        )
+
+    def __ne__(self, other: Any) -> bool:
+        return not self.__eq__(other)
+
+    def to_dict(self) -> Dict[str, Any]:
+        result = {
+            "message_identifier": str(self.message_identifier),
+            "signed_lock_expired": self.signed_lock_expired.to_dict(),
+            "secrethash": serialize_bytes(self.secrethash),
+            "recipient": to_checksum_address(self.recipient),
+            "payment_identifier": str(self.payment_identifier),
+
+        }
+
+        return result
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "SendLockExpiredLight":
+        restored = cls(
+            recipient=to_canonical_address(data["recipient"]),
+            message_identifier=MessageID(int(data["message_identifier"])),
+            signed_lock_expired=LockExpired.from_dict(data["signed_lock_expired"]),
+            secrethash=deserialize_secret_hash(data["secrethash"]),
+            payment_identifier=int(data["payment_identifier"])
+        )
+
+        return restored
+
+
+class ProcessLockExpiredLight(SendMessageEvent):
+    def __init__(
+        self,
+        sender: Address,
+        recipient: Address,
+        message_identifier: MessageID,
+        balance_proof: BalanceProofUnsignedState,
+        secrethash: SecretHash,
+        payment_identifier: int
+    ) -> None:
+        super().__init__(recipient, balance_proof.channel_identifier, message_identifier)
+
+        self.balance_proof = balance_proof
+        self.secrethash = secrethash
+        self.payment_identifier = payment_identifier
+        self.sender = sender
+
+    def __repr__(self) -> str:
+        return "<ProcessLockExpiredLight msgid:{} balance_proof:{} secrethash:{} recipient:{} sender:{}>".format(
+            self.message_identifier, self.balance_proof, pex(self.secrethash), pex(self.recipient), pex(self.sender)
+        )
+
+    def __eq__(self, other: Any) -> bool:
+        return (
+            isinstance(other, ProcessLockExpiredLight)
+            and self.message_identifier == other.message_identifier
+            and self.balance_proof == other.balance_proof
+            and self.secrethash == other.secrethash
+            and self.recipient == other.recipient
+            and self.payment_identifier == other.payment_identifier
+            and self.sender == other.sender
+        )
+
+    def __ne__(self, other: Any) -> bool:
+        return not self.__eq__(other)
+
+    def to_dict(self) -> Dict[str, Any]:
+        result = {
+            "message_identifier": str(self.message_identifier),
+            "balance_proof": self.balance_proof,
+            "secrethash": serialize_bytes(self.secrethash),
+            "recipient": to_checksum_address(self.recipient),
+            "payment_identifier": str(self.payment_identifier),
+            "sender": to_checksum_address(self.sender),
+
+        }
+
+        return result
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "ProcessLockExpiredLight":
+        restored = cls(
+            recipient=to_canonical_address(data["recipient"]),
+            message_identifier=MessageID(int(data["message_identifier"])),
+            balance_proof=data["balance_proof"],
+            secrethash=deserialize_secret_hash(data["secrethash"]),
+            payment_identifier=int(data["payment_identifier"]),
+            sender=to_canonical_address(data["sender"]),
         )
 
         return restored

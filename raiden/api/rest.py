@@ -1539,8 +1539,8 @@ class RestAPI:
                                                            secret_request.payment_identifier)
 
     def initiate_send_lock_expired_light(self, sender_address: typing.Address, receiver_address: typing.Address,
-                                         lock_expired: LockExpired):
-        self.raiden_api.initiate_send_lock_expired_light(sender_address, receiver_address, lock_expired)
+                                         lock_expired: LockExpired, payment_id:int):
+        self.raiden_api.initiate_send_lock_expired_light(sender_address, receiver_address, lock_expired, payment_id)
 
     def initiate_payment_light(
         self,
@@ -2163,8 +2163,8 @@ class RestAPI:
             secret_request = SecretRequest.from_dict(message)
             self.initiate_send_secret_request_light(sender, receiver, secret_request)
         elif message["type"] == "LockExpired":
-            le = LockExpired.from_dict(message)
-            self.raiden_api.raiden.transport.light_client_transports[0].send_for_light_client_with_retry(receiver, le)
+            lock_expired = LockExpired.from_dict(message)
+            self.initiate_send_lock_expired_light(sender, receiver, lock_expired,  payment_request.payment_id)
 
         return api_response("Received, message should be sent to partner")
 

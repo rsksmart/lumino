@@ -22,6 +22,7 @@ def get_channel_state(
     reveal_timeout: BlockTimeout,
     payment_channel_proxy,
     opened_block_number: BlockNumber,
+    is_light_channel: bool
 ):
     # Here we have to query the latest state because if we query with an older block
     # state (e.g. opened_block_number) the state may have been pruned which will
@@ -76,6 +77,7 @@ def get_channel_state(
         open_transaction=open_transaction,
         close_transaction=close_transaction,
         settle_transaction=settle_transaction,
+        is_light_channel=is_light_channel
     )
 
     return channel

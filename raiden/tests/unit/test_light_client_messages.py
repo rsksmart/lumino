@@ -145,9 +145,9 @@ def test_locked_transfer_1():
 
 def test_lock_expired():
     dict_data = {"type": "LockExpired", "chain_id": 33, "nonce": 2,
-                 "token_network_address": "0xb3df4fbd04d29a04d9d0666c009713076e364109",
-                 "message_identifier": 100261347073025339, "channel_identifier": 4,
-                 "secrethash": "0xbec0cbd74af7dcc4e2a0d382f7c02562a812c041950746d8c81f42b347075341",
+                 "token_network_address": "0x877ec5961d18d3413fabbd67696b758fe95408d6",
+                 "message_identifier": 10893010622325126424, "channel_identifier": 1,
+                 "secrethash": "0x2f3a1f9425850b04e2ea7f572594fd2c6a80e3632bdd04144c825a7e49cf21e2",
                  "transferred_amount": 0, "locked_amount": 0, "recipient": "0x29021129f5d038897f01bd4bc050525ca01a4758",
                  "locksroot": "0x0000000000000000000000000000000000000000000000000000000000000000"}
 

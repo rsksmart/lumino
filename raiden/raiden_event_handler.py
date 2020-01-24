@@ -43,7 +43,8 @@ from raiden.transfer.mediated_transfer.events import (
     SendRefundTransfer,
     SendSecretRequest,
     SendSecretReveal,
-    SendLockedTransferLight, StoreMessageEvent, SendSecretRevealLight, SendBalanceProofLight, SendSecretRequestLight)
+    SendLockedTransferLight, StoreMessageEvent, SendSecretRevealLight, SendBalanceProofLight, SendSecretRequestLight,
+    SendLockExpiredLight)
 from raiden.transfer.state import ChainState, NettingChannelEndState
 from raiden.transfer.utils import (
     get_event_with_balance_proof_by_balance_hash,
@@ -104,24 +105,13 @@ class RaidenEventHandler(EventHandler):
                                                                           partner_address)
 
     def on_raiden_event(self, raiden: "RaidenService", chain_state: ChainState, event: Event):
-        print("On raiden event " + str(type(event)))
         # pylint: disable=too-many-branches
         if type(event) == SendLockExpired:
             assert isinstance(event, SendLockExpired), MYPY_ANNOTATION
-            # If it is from a light client, store the message on light_client_protocol_message to be retrieved
-            canonical_identifier = CanonicalIdentifier(
-                chain_identifier=chain_state.chain_id,
-                token_network_address=event.balance_proof.token_network_identifier,
-                channel_identifier=event.balance_proof.channel_identifier,
-            )
-            channel_state = self.event_from_light_client(chain_state, event.recipient, canonical_identifier)
-            if channel_state.our_state.address == raiden.address:
-                self.handle_send_lockexpired(raiden, event)
-            else:
-                store_lock_expired = StoreMessageEvent(event.message_identifier, event.payment_identifier, -1,
-                                                       message_from_sendevent(event), False, LightClientProtocolMessageType.PaymentExpired)
-                print("----- STORED LOCK EXPIRED -----")
-                self.handle_store_message(raiden, store_lock_expired)
+            self.handle_send_lockexpired(raiden, event)
+        elif type(event) == SendLockExpiredLight:
+            assert isinstance(event, SendLockExpiredLight), MYPY_ANNOTATION
+            self.handle_send_lockexpired_light(raiden, event)
         elif type(event) == SendLockedTransfer:
             assert isinstance(event, SendLockedTransfer), MYPY_ANNOTATION
             self.handle_send_lockedtransfer(raiden, event)
@@ -219,6 +209,15 @@ class RaidenEventHandler(EventHandler):
         lock_expired_message = message_from_sendevent(send_lock_expired)
         raiden.sign(lock_expired_message)
         raiden.transport.hub_transport.send_async(send_lock_expired.queue_identifier, lock_expired_message)
+
+    @staticmethod
+    def handle_send_lockexpired_light(raiden: "RaidenService", send_lock_expired: SendLockExpiredLight):
+        signed_lock_expired = send_lock_expired.signed_lock_expired
+        lc_transport = raiden.get_light_client_transport(to_checksum_address(signed_lock_expired.sender))
+        if lc_transport:
+            lc_transport.send_async(
+                send_lock_expired.queue_identifier, signed_lock_expired
+            )
 
     @staticmethod
     def handle_send_lockedtransfer(

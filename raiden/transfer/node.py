@@ -17,7 +17,8 @@ from raiden.transfer.events import (
 )
 from raiden.transfer.identifiers import CanonicalIdentifier, QueueIdentifier
 from raiden.transfer.mediated_transfer import initiator_manager, mediator, target
-from raiden.transfer.mediated_transfer.events import CHANNEL_IDENTIFIER_GLOBAL_QUEUE, StoreMessageEvent
+from raiden.transfer.mediated_transfer.events import CHANNEL_IDENTIFIER_GLOBAL_QUEUE, StoreMessageEvent, \
+    SendLockExpiredLight
 from raiden.transfer.mediated_transfer.state import (
     InitiatorPaymentState,
     MediatorTransferState,
@@ -33,7 +34,7 @@ from raiden.transfer.mediated_transfer.state_change import (
     ReceiveTransferRefund,
     ReceiveTransferRefundCancelRoute,
     ActionInitInitiatorLight, ReceiveSecretRequestLight, ActionSendSecretRevealLight, ReceiveSecretRevealLight,
-    ActionSendUnlockLight, ActionInitTargetLight, ActionSendSecretRequestLight)
+    ActionSendUnlockLight, ActionInitTargetLight, ActionSendSecretRequestLight, ActionSendLockExpiredLight)
 from raiden.transfer.state import (
     ChainState,
     InitiatorTask,
@@ -310,6 +311,21 @@ def handle_init_unlock_light(
     return TransitionResult(chain_state, events)
 
 
+def handle_init_send_lock_expired_light(
+    chain_state: ChainState, state_change: ActionSendLockExpiredLight
+) -> TransitionResult[ChainState]:
+    signed_lock_expired = state_change.signed_lock_expired
+    send_lock_expired_light = SendLockExpiredLight(state_change.receiver, signed_lock_expired.message_identifier,
+                                                   signed_lock_expired, state_change.signed_lock_expired.secrethash,
+                                                   state_change.payment_id)
+    store_lock_expired_light = StoreMessageEvent(signed_lock_expired.message_identifier, state_change.payment_id,
+                                                 1, signed_lock_expired, True,
+                                                 LightClientProtocolMessageType.PaymentExpired)
+
+    events = [send_lock_expired_light, store_lock_expired_light]
+    return TransitionResult(chain_state, events)
+
+
 def subdispatch_initiatortask(
     chain_state: ChainState,
     state_change: StateChange,
@@ -384,7 +400,8 @@ def subdispatch_mediatortask(
             iteration = mediator.state_transition(
                 mediator_state=mediator_state,
                 state_change=state_change,
-                channelidentifiers_to_channels=token_network_state.channelidentifiers_to_channels.get(chain_state.our_address),
+                channelidentifiers_to_channels=token_network_state.channelidentifiers_to_channels.get(
+                    chain_state.our_address),
                 nodeaddresses_to_networkstates=chain_state.nodeaddresses_to_networkstates,
                 pseudo_random_generator=pseudo_random_generator,
                 block_number=block_number,
@@ -829,6 +846,7 @@ def handle_receive_unlock(
     secrethash = state_change.secrethash
     return subdispatch_to_paymenttask(chain_state, state_change, secrethash)
 
+
 def handle_receive_unlock_light(
     chain_state: ChainState, state_change: ReceiveUnlockLight
 ) -> TransitionResult[ChainState]:
@@ -989,6 +1007,9 @@ def handle_state_change(
     elif type(state_change) == ActionSendUnlockLight:
         assert isinstance(state_change, ActionSendUnlockLight), MYPY_ANNOTATION
         iteration = handle_init_unlock_light(chain_state, state_change)
+    elif type(state_change) == ActionSendLockExpiredLight:
+        assert isinstance(state_change, ActionSendLockExpiredLight), MYPY_ANNOTATION
+        iteration = handle_init_send_lock_expired_light(chain_state, state_change)
     assert chain_state is not None, "chain_state must be set"
     return iteration
 
