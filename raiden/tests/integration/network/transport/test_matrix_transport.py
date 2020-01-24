@@ -18,10 +18,6 @@ from raiden.messages import Delivered, Processed, SecretRequest, ToDevice
 from raiden.network.transport.matrix import AddressReachability, MatrixTransport, _RetryQueue
 from raiden.network.transport.matrix.client import Room
 from raiden.network.transport.matrix.utils import make_room_alias
-from raiden.raiden_service import (
-    update_monitoring_service_from_balance_proof,
-    update_path_finding_service_from_balance_proof,
-)
 from raiden.tests.utils import factories
 from raiden.tests.utils.client import burn_eth
 from raiden.tests.utils.mocks import MockRaidenService
@@ -358,7 +354,7 @@ def test_matrix_message_sync(matrix_transports):
         assert any(getattr(m, "message_identifier", -1) == i for m in received_messages)
 
 
-@pytest.mark.skipif(getattr(pytest, "config").getvalue("usepdb"), reason="test fails with pdb")
+# @pytest.mark.skipif(getattr(pytest, "config").getvalue("usepdb"), reason="test fails with pdb")
 @pytest.mark.parametrize("number_of_nodes", [2])
 @pytest.mark.parametrize("channels_per_node", [1])
 @pytest.mark.parametrize("number_of_tokens", [1])
@@ -475,7 +471,6 @@ def test_join_invalid_discovery(
     local_matrix_servers, private_rooms, retry_interval, retries_before_backoff, global_rooms
 ):
     """join_global_room tries to join on all servers on available_servers config
-
     If any of the servers isn't reachable by synapse, it'll return a 500 response, which needs
     to be handled, and if no discovery room is found on any of the available_servers, one in
     our current server should be created
@@ -657,9 +652,6 @@ def test_monitoring_global_messages(
     monkeypatch.setattr(raiden.transfer.channel, "get_balance", lambda *a, **kw: 123)
     raiden_service.user_deposit.effective_balance.return_value = 100
 
-    update_monitoring_service_from_balance_proof(
-        raiden=raiden_service, chain_state=None, new_balance_proof=balance_proof
-    )
     gevent.idle()
 
     with gevent.Timeout(2):
@@ -715,9 +707,6 @@ def test_pfs_global_messages(
         raiden.transfer.views,
         "get_channelstate_by_canonical_identifier",
         lambda *a, **kw: channel_state,
-    )
-    update_path_finding_service_from_balance_proof(
-        raiden=raiden_service, chain_state=None, new_balance_proof=balance_proof
     )
     gevent.idle()
 
