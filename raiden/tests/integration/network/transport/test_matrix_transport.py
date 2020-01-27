@@ -311,7 +311,9 @@ def test_matrix_message_sync(matrix_transports):
     gevent.sleep(1)
 
     latest_auth_data = f"{transport1._user_id}/{transport1._client.api.token}"
-    update_transport_auth_data = ActionUpdateTransportAuthData(latest_auth_data)
+    update_transport_auth_data = ActionUpdateTransportAuthData(
+        auth_data=latest_auth_data,
+        address=raiden_service1.address)
     raiden_service1.handle_and_track_state_change.assert_called_with(update_transport_auth_data)
 
     transport0.start_health_check(transport1._raiden_service.address)
@@ -370,14 +372,20 @@ def test_matrix_tx_error_handling(  # pylint: disable=unused-argument
         payment_network_id=app0.raiden.default_registry.address,
         token_address=token_address,
         partner_address=app1.raiden.address,
+        creator_address=app0.raiden.address,
     )
     burn_eth(app0.raiden)
 
     def make_tx(*args, **kwargs):  # pylint: disable=unused-argument
-        close_channel = ActionChannelClose(canonical_identifier=channel_state.canonical_identifier)
+        close_channel = ActionChannelClose(
+            canonical_identifier=channel_state.canonical_identifier,
+            signed_close_tx=None,
+            participant2=app1.raiden.address,
+            participant1=app0.raiden.address
+        )
         app0.raiden.handle_and_track_state_change(close_channel)
 
-    app0.raiden.transport._client.add_presence_listener(make_tx)
+    app0.raiden.transport.hub_transport._client.add_presence_listener(make_tx)
 
     exception = ValueError("exception was not raised from the transport")
     with pytest.raises(InsufficientFunds), gevent.Timeout(200, exception=exception):
