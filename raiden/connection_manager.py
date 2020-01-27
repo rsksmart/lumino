@@ -309,6 +309,7 @@ class ConnectionManager:
                 token_address=self.token_address,
                 partner_address=partner,
                 total_deposit=total_deposit,
+                creator_address=self.raiden.address
             )
         except InvalidDBData:
             raise
