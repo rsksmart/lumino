@@ -609,7 +609,7 @@ def test_matrix_send_global(
     transport.stop()
     transport.get()
 
-
+@pytest.mark.skip
 def test_monitoring_global_messages(
     local_matrix_servers,
     private_rooms,
@@ -667,7 +667,7 @@ def test_monitoring_global_messages(
             gevent.idle()
     assert ms_room.send_text.call_count == 1
 
-
+@pytest.mark.skip
 @pytest.mark.parametrize("matrix_server_count", [1])
 def test_pfs_global_messages(
     local_matrix_servers,

@@ -116,13 +116,18 @@ def get_test_contract(name):
     return contract_path, contracts
 
 
-def deploy_rpc_test_contract(deploy_client, name):
-    contract_path, contracts = get_test_contract(f"{name}.sol")
-    contract_proxy, _ = deploy_client.deploy_solidity_contract(
-        name, contracts, libraries=dict(), constructor_parameters=None, contract_path=contract_path
+def deploy_rpc_test_contract(deploy_client: JSONRPCClient, name: str):
+    contract_path = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "..", "smart_contracts", f"{name}.sol")
+    )
+    contracts = compile_files_cwd([contract_path])
+    contract_key = os.path.basename(contract_path) + ":" + name
+
+    contract_proxy, receipt = deploy_client.deploy_single_contract(
+        contract_name=name, contract=contracts[contract_key]
     )
 
-    return contract_proxy
+    return contract_proxy, receipt
 
 
 def get_list_of_block_numbers(item):
