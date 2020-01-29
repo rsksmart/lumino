@@ -618,7 +618,6 @@ def parse_message_number(message):
         message["message_identifier"] = int(message["message_identifier"])
         message["locked_amount"] = int(message["locked_amount"])
         message["transferred_amount"] = int(message["transferred_amount"])
-        message["lock"]["amount"] = int(message["lock"]["amount"])
 
     return message
 
