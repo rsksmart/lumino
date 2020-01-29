@@ -3,7 +3,7 @@ import random
 import gevent
 import pytest
 
-from raiden.constants import EMPTY_MERKLE_ROOT, UINT64_MAX
+from raiden.constants import EMPTY_MERKLE_ROOT, UINT64_MAX, EMPTY_PAYMENT_HASH_INVOICE
 from raiden.messages import Lock, LockedTransfer, RevealSecret, Unlock
 from raiden.tests.fixtures.variables import TransportProtocol
 from raiden.tests.integration.fixtures.raiden_network import CHAIN, wait_for_channels
@@ -102,7 +102,11 @@ def run_test_regression_revealsecret_after_secret(
         views.state_from_app(app0), payment_network_identifier, token
     )
     payment_status = app0.raiden.mediated_transfer_async(
-        token_network_identifier, amount=1, target=app2.raiden.address, identifier=identifier
+        token_network_identifier=token_network_identifier,
+        amount=1,
+        target=app2.raiden.address,
+        identifier=identifier,
+        payment_hash_invoice=EMPTY_PAYMENT_HASH_INVOICE,
     )
     assert payment_status.payment_done.wait()
 
@@ -118,7 +122,7 @@ def run_test_regression_revealsecret_after_secret(
         host_port = None
         app1.raiden.transport.receive(reveal_data, host_port)
     elif transport_protocol is TransportProtocol.MATRIX:
-        app1.raiden.transport._receive_message(reveal_secret)  # pylint: disable=protected-access
+        app1.raiden.transport.hub_transport._receive_message(reveal_secret)  # pylint: disable=protected-access
     else:
         raise TypeError("Unknown TransportProtocol")
 
@@ -184,15 +188,17 @@ def run_test_regression_multiple_revealsecret(raiden_network, token_addresses, t
         lock=lock,
         target=app1.raiden.address,
         initiator=app0.raiden.address,
+        payment_hash_invoice=EMPTY_PAYMENT_HASH_INVOICE
     )
     app0.raiden.sign(mediated_transfer)
+    app1.raiden.on_messages([mediated_transfer])
 
     if transport_protocol is TransportProtocol.UDP:
         message_data = mediated_transfer.encode()
         host_port = None
-        app1.raiden.transport.receive(message_data, host_port)
+        app1.raiden.transport.hub_transport.receive(message_data, host_port)
     elif transport_protocol is TransportProtocol.MATRIX:
-        app1.raiden.transport._receive_message(mediated_transfer)
+        app1.raiden.transport.hub_transport._receive_message(mediated_transfer)
     else:
         raise TypeError("Unknown TransportProtocol")
 
@@ -217,11 +223,11 @@ def run_test_regression_multiple_revealsecret(raiden_network, token_addresses, t
     if transport_protocol is TransportProtocol.UDP:
         messages = [unlock.encode(), reveal_secret.encode()]
         host_port = None
-        receive_method = app1.raiden.transport.receive
+        receive_method = app1.raiden.transport.hub_transport.receive
         wait = set(gevent.spawn_later(0.1, receive_method, data, host_port) for data in messages)
     elif transport_protocol is TransportProtocol.MATRIX:
         messages = [unlock, reveal_secret]
-        receive_method = app1.raiden.transport._receive_message
+        receive_method = app1.raiden.transport.hub_transport._receive_message
         wait = set(gevent.spawn_later(0.1, receive_method, data) for data in messages)
     else:
         raise TypeError("Unknown TransportProtocol")

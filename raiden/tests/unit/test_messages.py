@@ -1,7 +1,7 @@
 import pytest
 
 from raiden.constants import UINT64_MAX, UINT256_MAX
-from raiden.messages import Ping, RequestMonitoring, SignedBlindedBalanceProof, UpdatePFS
+from raiden.messages import Ping, RequestMonitoring, SignedBlindedBalanceProof
 from raiden.tests.utils import factories
 from raiden.tests.utils.tests import fixture_all_combinations
 from raiden.transfer.balance_proof import (

@@ -194,6 +194,7 @@ def run_test_participant_selection(raiden_network, token_addresses):
     receiver_channel = RaidenAPI(receiver).get_channel_list(
         registry_address=registry_address,
         token_address=token_address,
+        creator_address=receiver.address,
         partner_address=sender.address,
     )
     assert len(receiver_channel) == 1

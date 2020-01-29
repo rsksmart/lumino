@@ -10,7 +10,7 @@ from raiden.constants import (
     RED_EYES_PER_TOKEN_NETWORK_LIMIT,
     UINT256_MAX,
     Environment,
-)
+    EMPTY_PAYMENT_HASH_INVOICE)
 from raiden.exceptions import (
     AlreadyRegisteredTokenAddress,
     DepositOverLimit,
@@ -239,7 +239,13 @@ def run_test_deposit_updates_balance_immediately(raiden_chain, token_addresses):
     api0 = RaidenAPI(app0.raiden)
 
     old_state = get_channelstate(app0, app1, token_network_identifier)
-    api0.set_total_channel_deposit(registry_address, token_address, app1.raiden.address, 210)
+    api0.set_total_channel_deposit(
+        registry_address=registry_address,
+        token_address=token_address,
+        creator_address=app0.raiden.address,
+        partner_address=app1.raiden.address,
+        total_deposit=210
+    )
     new_state = get_channelstate(app0, app1, token_network_identifier)
 
     assert new_state.our_state.contract_balance == old_state.our_state.contract_balance + 10
@@ -380,10 +386,11 @@ def run_test_insufficient_funds(raiden_network, token_addresses, deposit):
     token_address = token_addresses[0]
 
     result = RaidenAPI(app0.raiden).transfer(
-        app0.raiden.default_registry.address,
-        token_address,
-        deposit + 1,
+        registry_address=app0.raiden.default_registry.address,
+        token_address=token_address,
+        amount=deposit + 1,
         target=app1.raiden.address,
+        payment_hash_invoice=EMPTY_PAYMENT_HASH_INVOICE,
     )
     assert not result.payment_done.get()
 
@@ -460,7 +467,7 @@ def run_test_payment_timing_out_if_partner_does_not_respond(  # pylint: disable=
     def fake_receive(room, event):  # pylint: disable=unused-argument
         return True
 
-    with patch.object(app1.raiden.transport, "_handle_message", side_effect=fake_receive):
+    with patch.object(app1.raiden.transport.hub_transport, "_handle_message", side_effect=fake_receive):
         greenlet = gevent.spawn(
             RaidenAPI(app0.raiden).transfer,
             app0.raiden.default_registry.address,
@@ -538,6 +545,7 @@ def run_test_set_deposit_limit_crash(
         api1.set_total_channel_deposit(
             registry_address=app1.raiden.default_registry.address,
             token_address=token_address,
+            creator_address=app1.raiden.address,
             partner_address=partner_address,
             total_deposit=10000000000000000000000,
         )
@@ -574,7 +582,10 @@ def run_test_create_monitoring_request(raiden_network, token_addresses):
     )
     chain_state = views.state_from_raiden(app0.raiden)
     channel_state = views.get_channelstate_by_token_network_and_partner(
-        chain_state, token_network_identifier, app1.raiden.address
+        chain_state=chain_state,
+        token_network_id=token_network_identifier,
+        creator_address=app0.raiden.address,
+        partner_address=app1.raiden.address,
     )
     balance_proof = channel_state.partner_state.balance_proof
     api = RaidenAPI(app0.raiden)

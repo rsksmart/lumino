@@ -43,7 +43,8 @@ def test_call_with_a_block_number_before_smart_contract_deployed(deploy_client):
     """ A JSON RPC call using a block number where the smart contract was not
     yet deployed should raise.
     """
-    contract_path, contracts = get_test_contract("RpcTest.sol")
+    # contract_path, contracts = get_test_contract("RpcTest.sol")
+    contract_path, contracts = deploy_rpc_test_contract(deploy_client, "RpcTest")
     contract_proxy, receipt = deploy_client.deploy_solidity_contract(
         "RpcTest",
         contracts,
