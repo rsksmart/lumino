@@ -162,8 +162,8 @@ class SendLockExpiredLight(SendMessageEvent):
         self.payment_identifier = payment_identifier
 
     def __repr__(self) -> str:
-        return "<SendLockExpiredLight msgid:{} balance_proof:{} secrethash:{} recipient:{}>".format(
-            self.message_identifier, self.balance_proof, pex(self.secrethash), pex(self.recipient)
+        return "<SendLockExpiredLight msgid:{} secrethash:{} recipient:{}>".format(
+            self.message_identifier,  pex(self.secrethash), pex(self.recipient)
         )
 
     def __eq__(self, other: Any) -> bool:
