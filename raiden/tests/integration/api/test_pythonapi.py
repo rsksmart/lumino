@@ -239,7 +239,12 @@ def run_test_deposit_updates_balance_immediately(raiden_chain, token_addresses):
     api0 = RaidenAPI(app0.raiden)
 
     old_state = get_channelstate(app0, app1, token_network_identifier)
-    api0.set_total_channel_deposit(registry_address, token_address, app1.raiden.address, 210)
+    api0.set_total_channel_deposit(
+        registry_address=registry_address,
+        token_address=token_address,
+        creator_address=app0.raiden.address,
+        partner_address=app1.raiden.address,
+        total_deposit=210)
     new_state = get_channelstate(app0, app1, token_network_identifier)
 
     assert new_state.our_state.contract_balance == old_state.our_state.contract_balance + 10
@@ -460,7 +465,7 @@ def run_test_payment_timing_out_if_partner_does_not_respond(  # pylint: disable=
     def fake_receive(room, event):  # pylint: disable=unused-argument
         return True
 
-    with patch.object(app1.raiden.transport, "_handle_message", side_effect=fake_receive):
+    with patch.object(app1.raiden.transport.hub_transport, "_handle_message", side_effect=fake_receive):
         greenlet = gevent.spawn(
             RaidenAPI(app0.raiden).transfer,
             app0.raiden.default_registry.address,
