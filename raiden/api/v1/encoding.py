@@ -396,6 +396,7 @@ class PaymentLightPutSchema(BaseSchema):
     message = fields.Dict(required=True)
     sender = AddressField(required=True)
     receiver = AddressField(required=True)
+    message_type_value = fields.String(required=True)
 
     class Meta:
         strict = True

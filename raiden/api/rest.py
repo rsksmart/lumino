@@ -2126,7 +2126,9 @@ class RestAPI:
                                               message_order: int,
                                               sender: typing.AddressHex,
                                               receiver: typing.AddressHex,
-                                              message: Dict):
+                                              message: Dict,
+                                              message_type_value: str
+                                              ):
         # TODO mmartinez7 pending msg validations
         # TODO call from dict will work but we need to validate each parameter in order to know if there are no extra or missing params.
         # TODO we also need to check if message id an order received make sense
@@ -2143,6 +2145,8 @@ class RestAPI:
             return ApiErrorBuilder.build_and_log_error(errors="No payment associated",
                                                        status_code=HTTPStatus.BAD_REQUEST, log=log)
 
+        message_type = LightClientProtocolMessageType[message_type_value]
+
         if message["type"] == "LockedTransfer":
             lt = LockedTransfer.from_dict(message)
             self.initiate_payment_light(self.raiden_api.raiden.default_registry.address, lt.token, lt.initiator,
@@ -2152,11 +2156,11 @@ class RestAPI:
         elif message["type"] == "Delivered":
             delivered = Delivered.from_dict(message)
             self.initiate_send_delivered_light(sender, receiver, delivered, message_order, payment_request.payment_id,
-                                               LightClientProtocolMessageType.PaymentSuccessful)
+                                               message_type)
         elif message["type"] == "Processed":
             processed = Processed.from_dict(message)
             self.initiate_send_processed_light(sender, receiver, processed, message_order, payment_request.payment_id,
-                                               LightClientProtocolMessageType.PaymentSuccessful)
+                                               message_type)
         elif message["type"] == "RevealSecret":
             reveal_secret = RevealSecret.from_dict(message)
             self.initiate_send_secret_reveal_light(sender, receiver, reveal_secret)
@@ -2168,7 +2172,7 @@ class RestAPI:
             self.initiate_send_secret_request_light(sender, receiver, secret_request)
         elif message["type"] == "LockExpired":
             lock_expired = LockExpired.from_dict(message)
-            self.initiate_send_lock_expired_light(sender, receiver, lock_expired,  payment_request.payment_id)
+            self.initiate_send_lock_expired_light(sender, receiver, lock_expired, payment_request.payment_id)
 
         return api_response("Received, message should be sent to partner")
 

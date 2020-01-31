@@ -321,11 +321,12 @@ class PaymentLightResource(BaseResource):
             message_order: int,
             sender: typing.AddressHex,
             receiver: typing.AddressHex,
-            message: Dict):
+            message: Dict,
+            message_type_value: str):
         """
         put a signed message associated with a payment of a light client
         """
-        return self.rest_api.receive_light_client_protocol_message(payment_id, message_order, sender, receiver, message)
+        return self.rest_api.receive_light_client_protocol_message(payment_id, message_order, sender, receiver, message, message_type_value)
 
 
 class PaymentResource(BaseResource):
