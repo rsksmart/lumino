@@ -50,7 +50,8 @@ from raiden.lightclient.models.light_client_protocol_message import LightClientP
 
 from raiden.messages import RequestMonitoring, LockedTransfer, RevealSecret, Unlock, Delivered, SecretRequest, \
     Processed, LockExpired
-from raiden.settings import DEFAULT_RETRY_TIMEOUT, DEVELOPMENT_CONTRACT_VERSION
+from raiden.settings import DEFAULT_RETRY_TIMEOUT, DEVELOPMENT_CONTRACT_VERSION, HUB_MAX_LIGHT_CLIENTS
+
 from raiden.transfer import architecture, views, channel
 from raiden.transfer.events import (
     EventPaymentReceivedSuccess,
@@ -1150,7 +1151,7 @@ class RaidenAPI:
         self.raiden.initiate_send_processed_light(sender_address, receiver_address, processed, msg_order, payment_id, message_type)
 
     def initiate_send_secret_request_light(self, sender_address: typing.Address, receiver_address: typing.Address,
-                                           secret_request: SecretRequest, msg_order: int, payment_id: int):
+                                           secret_request: SecretRequest):
         self.raiden.initiate_send_secret_request_light(sender_address, receiver_address, secret_request)
 
     def initiate_send_lock_expired_light(self, sender_address: typing.Address, receiver_address: typing.Address,
@@ -1645,25 +1646,29 @@ class RaidenAPI:
 
             api_key = hexlify(os.urandom(20))
             api_key = api_key.decode("utf-8")
+            #Check for limit light client
+            if HUB_MAX_LIGHT_CLIENTS > len(self.get_all_light_clients()):
+                result = self.raiden.wal.storage.save_light_client(
+                    api_key=api_key,
+                    address=address,
+                    encrypt_signed_password=encrypt_signed_password.hex(),
+                    encrypt_signed_display_name=encrypt_signed_display_name.hex(),
+                    encrypt_signed_seed_retry=encrypt_signed_seed_retry.hex())
 
-            result = self.raiden.wal.storage.save_light_client(
-                api_key=api_key,
-                address=address,
-                encrypt_signed_password=encrypt_signed_password.hex(),
-                encrypt_signed_display_name=encrypt_signed_display_name.hex(),
-                encrypt_signed_seed_retry=encrypt_signed_seed_retry.hex())
-
-            if result > 0:
-                result = {"address": address,
-                          "encrypt_signed_password": encrypt_signed_password.hex(),
-                          "encrypt_signed_display_name": encrypt_signed_display_name.hex(),
-                          "api_key": api_key,
-                          "encrypt_signed_seed_retry": encrypt_signed_seed_retry.hex(),
-                          "message": "successfully registered",
-                          "result_code": 0}
+                if result > 0:
+                    result = {"address": address,
+                              "encrypt_signed_password": encrypt_signed_password.hex(),
+                              "encrypt_signed_display_name": encrypt_signed_display_name.hex(),
+                              "api_key": api_key,
+                              "encrypt_signed_seed_retry": encrypt_signed_seed_retry.hex(),
+                              "message": "successfully registered",
+                              "result_code": 200}
+                else:
+                    result = {"message": "An unexpected error has occurred.",
+                              "result_code": 500}
             else:
-                result = {"message": "An unexpected error has occurred.",
-                          "result_code": 1}
+                result = {"message": "Limit of registered light clients reached.",
+                          "result_code": 403}
         else:
             result = {"address": address,
                       "encrypt_signed_password": encrypt_signed_password.hex(),
@@ -1671,7 +1676,7 @@ class RaidenAPI:
                       "api_key": light_client['api_key'],
                       "encrypt_signed_seed_retry": encrypt_signed_seed_retry.hex(),
                       "message": "Already registered",
-                      "result_code": 2}
+                      "result_code": 409}
 
         return result
 

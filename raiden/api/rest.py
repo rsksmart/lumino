@@ -1539,8 +1539,7 @@ class RestAPI:
     def initiate_send_secret_request_light(self, sender_address: typing.Address, receiver_address: typing.Address,
                                            secret_request: SecretRequest
                                            ):
-        self.raiden_api.initiate_send_secret_request_light(sender_address, receiver_address, secret_request, 5,
-                                                           secret_request.payment_identifier)
+        self.raiden_api.initiate_send_secret_request_light(sender_address, receiver_address, secret_request)
 
     def initiate_send_lock_expired_light(self, sender_address: typing.Address, receiver_address: typing.Address,
                                          lock_expired: LockExpired, payment_id:int):

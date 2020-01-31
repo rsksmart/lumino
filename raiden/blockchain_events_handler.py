@@ -25,7 +25,7 @@ from raiden.transfer.state_change import (
     ContractReceiveRouteNew,
     ContractReceiveSecretReveal,
     ContractReceiveUpdateTransfer,
-    ContractReceiveChannelClosedLight)
+    ContractReceiveChannelClosedLight, ContractReceiveChannelSettledLight)
 from raiden.transfer.utils import (
     get_event_with_balance_proof_by_locksroot,
     get_state_change_with_balance_proof_by_locksroot,
@@ -318,6 +318,7 @@ def handle_channel_settled(raiden: "RaidenService", event: Event):
     transaction_hash = data["transaction_hash"]
 
     chain_state = views.state_from_raiden(raiden)
+    # TODO fixme mmartinez7 what about when is a light client?
     channel_state = views.get_channelstate_by_canonical_identifier_and_address(
         chain_state=chain_state,
         canonical_identifier=CanonicalIdentifier(
@@ -372,16 +373,30 @@ def handle_channel_settled(raiden: "RaidenService", event: Event):
             block_identifier="latest",
         )
 
-    channel_settled = ContractReceiveChannelSettled(
-        transaction_hash=transaction_hash,
-        canonical_identifier=channel_state.canonical_identifier,
-        our_onchain_locksroot=our_locksroot,
-        partner_onchain_locksroot=partner_locksroot,
-        block_number=block_number,
-        block_hash=block_hash,
-        participant1=channel_state.our_state.address
-    )
-    raiden.handle_and_track_state_change(channel_settled)
+    if raiden.address == channel_state.our_state.address:
+        channel_settled = ContractReceiveChannelSettled(
+            transaction_hash=transaction_hash,
+            canonical_identifier=channel_state.canonical_identifier,
+            our_onchain_locksroot=our_locksroot,
+            partner_onchain_locksroot=partner_locksroot,
+            block_number=block_number,
+            block_hash=block_hash,
+            participant1=channel_state.our_state.address
+        )
+        raiden.handle_and_track_state_change(channel_settled)
+    else:
+        channel_settled = ContractReceiveChannelSettledLight(
+            transaction_hash=transaction_hash,
+            canonical_identifier=channel_state.canonical_identifier,
+            our_onchain_locksroot=our_locksroot,
+            partner_onchain_locksroot=partner_locksroot,
+            block_number=block_number,
+            block_hash=block_hash,
+            participant1=channel_state.our_state.address,
+            participant2=channel_state.partner_state.address
+        )
+        raiden.handle_and_track_state_change(channel_settled)
+
 
 
 def handle_channel_batch_unlock(raiden: "RaidenService", event: Event):

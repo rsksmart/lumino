@@ -77,7 +77,7 @@ from raiden.transfer.state_change import (
     ContractReceiveChannelSettled,
     ContractReceiveUpdateTransfer,
     ReceiveUnlock,
-    ContractReceiveChannelClosedLight)
+    ContractReceiveChannelClosedLight, ContractReceiveChannelSettledLight)
 from raiden.transfer.utils import hash_balance_data
 from raiden.utils import pex
 from raiden.utils.signer import recover
@@ -1936,6 +1936,31 @@ def handle_channel_settled(
     return TransitionResult(channel_state, events)
 
 
+def handle_channel_settled_light(
+    channel_state: NettingChannelState, state_change: ContractReceiveChannelSettledLight
+) -> TransitionResult[NettingChannelState]:
+    events: List[Event] = list()
+
+    if state_change.channel_identifier == channel_state.identifier:
+        set_settled(channel_state, state_change.block_number)
+
+        our_locksroot = state_change.our_onchain_locksroot
+        partner_locksroot = state_change.partner_onchain_locksroot
+
+        should_clear_channel = (
+            our_locksroot == EMPTY_MERKLE_ROOT and partner_locksroot == EMPTY_MERKLE_ROOT
+        )
+
+        if should_clear_channel:
+            return TransitionResult(None, events)
+
+        channel_state.our_state.onchain_locksroot = our_locksroot
+        channel_state.partner_state.onchain_locksroot = partner_locksroot
+
+        #TODO mmartinez7 unlock for light clients
+
+    return TransitionResult(channel_state, events)
+
 def handle_channel_newbalance(
     channel_state: NettingChannelState,
     state_change: ContractReceiveChannelNewBalance,
@@ -2032,6 +2057,9 @@ def state_transition(
     elif type(state_change) == ContractReceiveChannelSettled:
         assert isinstance(state_change, ContractReceiveChannelSettled), MYPY_ANNOTATION
         iteration = handle_channel_settled(channel_state, state_change)
+    elif type(state_change) == ContractReceiveChannelSettledLight:
+        assert isinstance(state_change, ContractReceiveChannelSettledLight), MYPY_ANNOTATION
+        iteration = handle_channel_settled_light(channel_state, state_change)
     elif type(state_change) == ContractReceiveChannelNewBalance:
         assert isinstance(state_change, ContractReceiveChannelNewBalance), MYPY_ANNOTATION
         iteration = handle_channel_newbalance(channel_state, state_change, block_number)
