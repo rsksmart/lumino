@@ -4,6 +4,7 @@ from unittest.mock import MagicMock
 
 import gevent
 import pytest
+from eth_utils import to_checksum_address
 from gevent import Timeout
 from matrix_client.errors import MatrixRequestError
 
@@ -12,7 +13,7 @@ from raiden.constants import (
     MONITORING_BROADCASTING_ROOM,
     PATH_FINDING_BROADCASTING_ROOM,
     UINT64_MAX,
-)
+    EMPTY_SIGNATURE, DISCOVERY_DEFAULT_ROOM)
 from raiden.exceptions import InsufficientFunds
 from raiden.messages import Delivered, Processed, SecretRequest, ToDevice
 from raiden.network.transport.matrix import AddressReachability, MatrixTransport, _RetryQueue
@@ -21,6 +22,7 @@ from raiden.network.transport.matrix.utils import make_room_alias
 from raiden.tests.utils import factories
 from raiden.tests.utils.client import burn_eth
 from raiden.tests.utils.mocks import MockRaidenService
+from raiden.tests.utils.transfer import wait_assert
 from raiden.transfer import views
 from raiden.transfer.identifiers import QueueIdentifier
 from raiden.transfer.mediated_transfer.events import CHANNEL_IDENTIFIER_GLOBAL_QUEUE
@@ -393,7 +395,7 @@ def test_matrix_tx_error_handling(  # pylint: disable=unused-argument
 
 
 def test_matrix_message_retry(
-    local_matrix_servers, private_rooms, retry_interval, retries_before_backoff, global_rooms
+    local_matrix_servers, retry_interval, retries_before_backoff, global_rooms
 ):
     """ Test the retry mechanism implemented into the matrix client.
     The test creates a transport and sends a message. Given that the
@@ -406,15 +408,15 @@ def test_matrix_message_retry(
     partner_address = factories.make_address()
 
     transport = MatrixTransport(
-        {
+        config={
             "global_rooms": global_rooms,
             "retries_before_backoff": retries_before_backoff,
             "retry_interval": retry_interval,
             "server": local_matrix_servers[0],
-            "server_name": local_matrix_servers[0].netloc,
             "available_servers": [local_matrix_servers[0]],
-            "private_rooms": private_rooms,
-        }
+            "sync_timeout": 20_000,
+            "sync_latency": 15_000,
+        },
     )
     transport._send_raw = MagicMock()
     raiden_service = MockRaidenService(None)
@@ -452,7 +454,8 @@ def test_matrix_message_retry(
 
     gevent.sleep(retry_interval)
 
-    transport.log.debug.assert_called_with(
+    #Checks in log.info that the message was logged correctly
+    transport.log.info.assert_called_with(
         "Partner not reachable. Skipping.",
         partner=pex(partner_address),
         status=AddressReachability.UNREACHABLE,
