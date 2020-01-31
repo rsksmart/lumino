@@ -1,7 +1,7 @@
 # pylint: disable=too-few-public-methods,too-many-arguments,too-many-instance-attributes
 
 from eth_utils import to_canonical_address, to_checksum_address
-from raiden.messages import RevealSecret, Unlock, LockedTransfer, SecretRequest
+from raiden.messages import RevealSecret, Unlock, LockedTransfer, SecretRequest, LockExpired
 
 from raiden.transfer.architecture import (
     AuthenticatedSenderStateChange,
@@ -696,6 +696,50 @@ class ActionSendSecretRequestLight(AuthenticatedSenderStateChange):
             secret_request=SecretRequest.from_dict(data["secret_request"]),
             sender=to_canonical_address(data["sender"]),
             receiver=to_canonical_address(data["receiver"])
+        )
+        return instance
+
+
+class ActionSendLockExpiredLight(AuthenticatedSenderStateChange):
+    """ A LockExpired message must be sent from a  light client. """
+
+    def __init__(self, signed_lock_expired: LockExpired, sender: Address, receiver: Address, payment_id: int) -> None:
+        super().__init__(sender)
+        self.receiver = receiver
+        self.signed_lock_expired = signed_lock_expired
+        self.payment_id = payment_id
+
+    def __repr__(self) -> str:
+        return "<ActionSendLockExpiredLight lock_expired:{} sender:{}>".format(
+            pex(self.signed_lock_expired.__repr__()), pex(self.sender)
+        )
+
+    def __eq__(self, other: Any) -> bool:
+        return (
+            isinstance(other, ActionSendLockExpiredLight)
+            and self.signed_lock_expired.__eq__(other.signed_lock_expired)
+            and self.payment_id == other.payment_id
+            and super().__eq__(other)
+        )
+
+    def __ne__(self, other: Any) -> bool:
+        return not self.__eq__(other)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "lock_expired": self.signed_lock_expired.to_dict(),
+            "sender": to_checksum_address(self.sender),
+            "receiver": to_checksum_address(self.receiver),
+            "payment_id": self.payment_id
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "ActionSendLockExpiredLight":
+        instance = cls(
+            signed_lock_expired=LockExpired.from_dict(data["lock_expired"]),
+            sender=to_canonical_address(data["sender"]),
+            receiver=to_canonical_address(data["receiver"]),
+            payment_id=data["payment_id"]
         )
         return instance
 

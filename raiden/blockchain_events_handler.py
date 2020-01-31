@@ -1,15 +1,14 @@
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING
 
 import gevent
 import structlog
-from eth_utils import to_canonical_address, to_checksum_address, encode_hex, decode_hex
+from eth_utils import to_checksum_address, encode_hex
 
 from raiden.blockchain.events import Event
 from raiden.blockchain.state import get_channel_state
 from raiden.connection_manager import ConnectionManager
-from raiden.lightclient.client_model import ClientModel
-from raiden.lightclient.light_client_message_handler import LightClientMessageHandler
-from raiden.lightclient.light_client_service import LightClientService
+from raiden.lightclient.handlers.light_client_message_handler import LightClientMessageHandler
+from raiden.lightclient.handlers.light_client_service import LightClientService
 from raiden.network.proxies.utils import get_onchain_locksroots
 from raiden.transfer import views
 from raiden.transfer.architecture import StateChange
@@ -37,8 +36,6 @@ from raiden_contracts.constants import (
     EVENT_TOKEN_NETWORK_CREATED,
     ChannelEvent,
 )
-
-from raiden.utils.typing import AddressHex
 
 if TYPE_CHECKING:
     # pylint: disable=unused-import
@@ -94,8 +91,8 @@ def handle_channel_new(raiden: "RaidenService", event: Event):
                                                                   raiden.wal)
     is_participant2_handled_lc = LightClientService.is_handled_lc(to_checksum_address(encode_hex(participant2)),
                                                                   raiden.wal)
-
-    if is_participant or is_participant1_handled_lc or is_participant2_handled_lc:
+    is_light_channel = is_participant1_handled_lc or is_participant2_handled_lc
+    if is_participant or is_light_channel:
         channel_proxy = raiden.chain.payment_channel(
             canonical_identifier=CanonicalIdentifier(
                 chain_identifier=views.state_from_raiden(raiden).chain_id,
@@ -111,6 +108,7 @@ def handle_channel_new(raiden: "RaidenService", event: Event):
             reveal_timeout=raiden.config["reveal_timeout"],
             payment_channel_proxy=channel_proxy,
             opened_block_number=block_number,
+            is_light_channel=is_light_channel
         )
 
         # Swap our_state and partner_state in order to have the LC from our_side of the channel
