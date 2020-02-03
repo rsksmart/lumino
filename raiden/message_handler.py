@@ -27,7 +27,7 @@ from raiden.transfer.mediated_transfer.state_change import (
     ReceiveSecretReveal,
     ReceiveTransferRefund,
     ReceiveTransferRefundCancelRoute,
-    ReceiveSecretRequestLight, ReceiveSecretRevealLight)
+    ReceiveSecretRequestLight, ReceiveSecretRevealLight, ReceiveLockExpiredLight)
 from raiden.transfer.state import balanceproof_from_envelope
 from raiden.transfer.state_change import ReceiveDelivered, ReceiveProcessed, ReceiveUnlock, ReceiveUnlockLight
 from raiden.utils import pex, random_secret
@@ -55,7 +55,7 @@ class MessageHandler:
 
         elif type(message) == LockExpired:
             assert isinstance(message, LockExpired), MYPY_ANNOTATION
-            self.handle_message_lockexpired(raiden, message)
+            self.handle_message_lockexpired(raiden, message, is_light_client)
 
         elif type(message) == RefundTransfer:
             assert isinstance(message, RefundTransfer), MYPY_ANNOTATION
@@ -128,14 +128,23 @@ class MessageHandler:
             raiden.handle_and_track_state_change(state_change)
 
     @staticmethod
-    def handle_message_lockexpired(raiden: RaidenService, message: LockExpired) -> None:
+    def handle_message_lockexpired(raiden: RaidenService, message: LockExpired, is_light_client=False) -> None:
         balance_proof = balanceproof_from_envelope(message)
-        state_change = ReceiveLockExpired(
-            balance_proof=balance_proof,
-            secrethash=message.secrethash,
-            message_identifier=message.message_identifier,
-        )
-        raiden.handle_and_track_state_change(state_change)
+        if is_light_client:
+            state_change = ReceiveLockExpiredLight(
+                balance_proof=balance_proof,
+                secrethash=message.secrethash,
+                message_identifier=message.message_identifier,
+                lock_expired=message
+            )
+            raiden.handle_and_track_state_change(state_change)
+        else:
+            state_change = ReceiveLockExpired(
+                balance_proof=balance_proof,
+                secrethash=message.secrethash,
+                message_identifier=message.message_identifier,
+            )
+            raiden.handle_and_track_state_change(state_change)
 
     @staticmethod
     def handle_message_refundtransfer(raiden: RaidenService, message: RefundTransfer) -> None:
