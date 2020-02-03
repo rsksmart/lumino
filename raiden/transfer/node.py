@@ -1,3 +1,6 @@
+from datetime import date
+
+from raiden.lightclient.models.light_client_payment import LightClientPayment
 from raiden.lightclient.models.light_client_protocol_message import LightClientProtocolMessageType
 from raiden.transfer import channel, token_network, views
 from raiden.transfer.architecture import (
@@ -34,7 +37,8 @@ from raiden.transfer.mediated_transfer.state_change import (
     ReceiveTransferRefund,
     ReceiveTransferRefundCancelRoute,
     ActionInitInitiatorLight, ReceiveSecretRequestLight, ActionSendSecretRevealLight, ReceiveSecretRevealLight,
-    ActionSendUnlockLight, ActionInitTargetLight, ActionSendSecretRequestLight, ActionSendLockExpiredLight)
+    ActionSendUnlockLight, ActionInitTargetLight, ActionSendSecretRequestLight, ActionSendLockExpiredLight,
+    ReceiveLockExpiredLight)
 from raiden.transfer.state import (
     ChainState,
     InitiatorTask,
@@ -204,7 +208,7 @@ def subdispatch_to_all_lockedtransfers(
 
 
 def subdispatch_to_paymenttask(
-    chain_state: ChainState, state_change: StateChange, secrethash: SecretHash
+    chain_state: ChainState, state_change: StateChange, secrethash: SecretHash, storage=None
 ) -> TransitionResult[ChainState]:
     block_number = chain_state.block_number
     block_hash = chain_state.block_hash
@@ -279,7 +283,7 @@ def subdispatch_to_paymenttask(
                     channel_state=channel_state,
                     pseudo_random_generator=pseudo_random_generator,
                     block_number=block_number,
-                    storage=None
+                    storage=storage
                 )
                 events = sub_iteration.events
 
@@ -800,6 +804,12 @@ def handle_receive_lock_expired(
     return subdispatch_to_paymenttask(chain_state, state_change, state_change.secrethash)
 
 
+def handle_receive_lock_expired_light(
+    chain_state: ChainState, state_change: ReceiveLockExpiredLight, storage
+) -> TransitionResult[ChainState]:
+    return subdispatch_to_paymenttask(chain_state, state_change, state_change.secrethash, storage)
+
+
 def handle_receive_transfer_refund(
     chain_state: ChainState, state_change: ReceiveTransferRefund
 ) -> TransitionResult[ChainState]:
@@ -999,6 +1009,9 @@ def handle_state_change(
     elif type(state_change) == ReceiveLockExpired:
         assert isinstance(state_change, ReceiveLockExpired), MYPY_ANNOTATION
         iteration = handle_receive_lock_expired(chain_state, state_change)
+    elif type(state_change) == ReceiveLockExpiredLight:
+        assert isinstance(state_change, ReceiveLockExpiredLight), MYPY_ANNOTATION
+        iteration = handle_receive_lock_expired_light(chain_state, state_change, storage)
     elif type(state_change) == ActionInitInitiatorLight:
         iteration = handle_init_initiator_light(chain_state, state_change)
     elif type(state_change) == ActionSendSecretRevealLight:

@@ -24,7 +24,8 @@ from raiden.transfer.mediated_transfer.state_change import (
     ActionInitTarget,
     ReceiveLockExpired,
     ReceiveSecretReveal,
-    ActionInitTargetLight, ActionSendSecretRequestLight, ReceiveSecretRevealLight, ActionSendSecretRevealLight)
+    ActionInitTargetLight, ActionSendSecretRequestLight, ReceiveSecretRevealLight, ActionSendSecretRevealLight,
+    ReceiveLockExpiredLight)
 from raiden.transfer.state import NettingChannelState, message_identifier_from_prng
 from raiden.transfer.state_change import Block, ContractReceiveSecretReveal, ReceiveUnlock, ReceiveUnlockLight
 from raiden.transfer.utils import is_valid_secret_reveal
@@ -279,7 +280,8 @@ def handle_send_secret_reveal_light(
         signed_secret_reveal=state_change.reveal_secret
     )
     store_reveal_secret_event = StoreMessageEvent(message_identifier, transfer.payment_identifier, 9,
-                                                  state_change.reveal_secret, True, LightClientProtocolMessageType.PaymentSuccessful)
+                                                  state_change.reveal_secret, True,
+                                                  LightClientProtocolMessageType.PaymentSuccessful)
     iteration = TransitionResult(target_state, [revealsecret, store_reveal_secret_event])
     return iteration
 
@@ -593,17 +595,31 @@ def handle_block(
     return TransitionResult(target_state, events)
 
 
-def handle_lock_expired(
+def handle_lock_expired_light(
     target_state: TargetTransferState,
-    state_change: ReceiveLockExpired,
+    state_change: ReceiveLockExpiredLight,
     channel_state: NettingChannelState,
     block_number: BlockNumber,
+    storage
 ) -> TransitionResult[TargetTransferState]:
-    """Remove expired locks from channel states."""
-    result = channel.handle_receive_lock_expired(
-        channel_state=channel_state, state_change=state_change, block_number=block_number
+    """Persist the failing payment."""
+    payment = LightClientPayment(
+        state_change.lock_expired.recipient, state_change.lock_expired.sender,
+        False,
+        channel_state.token_network_identifier,
+        state_change.lock_expired.transferred_amount,
+        str(date.today()),
+        LightClientPaymentStatus.Failed,
+        target_state.transfer.payment_identifier
     )
-    assert result.new_state, "handle_receive_lock_expired should not delete the task"
+
+    LightClientMessageHandler.store_light_client_payment(payment, storage)
+    """Remove expired locks from channel states."""
+    result = channel.handle_receive_lock_expired_light(
+        channel_state=channel_state, state_change=state_change, block_number=block_number,
+        payment_id=target_state.transfer.payment_identifier
+    )
+    assert result.new_state, "handle_receive_lock_expired_light should not delete the task"
 
     if not channel.get_lock(result.new_state.partner_state, target_state.transfer.lock.secrethash):
         transfer = target_state.transfer
@@ -709,6 +725,16 @@ def state_transition(
             state_change=state_change,
             channel_state=channel_state,
             block_number=block_number,
+        )
+    elif type(state_change) == ReceiveLockExpiredLight:
+        assert isinstance(state_change, ReceiveLockExpiredLight), MYPY_ANNOTATION
+        assert target_state, "ReceiveLockExpired should be accompanied by a valid target state"
+        iteration = handle_lock_expired_light(
+            target_state=target_state,
+            state_change=state_change,
+            channel_state=channel_state,
+            block_number=block_number,
+            storage=storage
         )
 
     sanity_check(

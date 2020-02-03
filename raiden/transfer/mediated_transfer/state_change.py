@@ -311,6 +311,56 @@ class ReceiveLockExpired(BalanceProofStateChange):
         )
 
 
+class ReceiveLockExpiredLight(BalanceProofStateChange):
+    """ A LockExpired message received. """
+
+    def __init__(
+        self,
+        balance_proof: BalanceProofSignedState,
+        secrethash: SecretHash,
+        message_identifier: MessageID,
+        lock_expired: LockExpired
+    ) -> None:
+        super().__init__(balance_proof)
+        self.secrethash = secrethash
+        self.message_identifier = message_identifier
+        self.lock_expired = lock_expired
+
+    def __repr__(self) -> str:
+        return "<ReceiveLockExpiredLight sender:{} balance_proof:{}>".format(
+            pex(self.sender), self.balance_proof
+        )
+
+    def __eq__(self, other: Any) -> bool:
+        return (
+            isinstance(other, ReceiveLockExpiredLight)
+            and self.secrethash == other.secrethash
+            and self.message_identifier == other.message_identifier
+            and self.lock_expired == other.lock_expired
+            and super().__eq__(other)
+        )
+
+    def __ne__(self, other: Any) -> bool:
+        return not self.__eq__(other)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "balance_proof": self.balance_proof,
+            "secrethash": serialize_bytes(self.secrethash),
+            "message_identifier": str(self.message_identifier),
+            "lock_expired": self.lock_expired.to_dict()
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "ReceiveLockExpiredLight":
+        return cls(
+            balance_proof=data["balance_proof"],
+            secrethash=SecretHash(deserialize_bytes(data["secrethash"])),
+            message_identifier=MessageID(int(data["message_identifier"])),
+            lock_expired=LockExpired.from_dict(data["lock_expired"])
+        )
+
+
 class ReceiveSecretRequest(AuthenticatedSenderStateChange):
     """ A SecretRequest message received. """
 

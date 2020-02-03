@@ -2,6 +2,7 @@
 import heapq
 import random
 
+from datetime import date
 from eth_utils import encode_hex, decode_hex
 
 from raiden.constants import (
@@ -11,6 +12,8 @@ from raiden.constants import (
     UINT256_MAX,
     EMPTY_PAYMENT_HASH_INVOICE
 )
+from raiden.lightclient.handlers.light_client_message_handler import LightClientMessageHandler
+from raiden.lightclient.models.light_client_payment import LightClientPayment, LightClientPaymentStatus
 from raiden.lightclient.models.light_client_protocol_message import LightClientProtocolMessageType
 from raiden.message_event_convertor import message_from_sendevent
 from raiden.messages import Unlock, LockExpired
@@ -44,7 +47,7 @@ from raiden.transfer.mediated_transfer.state import (
 from raiden.transfer.mediated_transfer.state_change import (
     ReceiveLockExpired,
     ReceiveTransferRefund,
-)
+    ReceiveLockExpiredLight)
 from raiden.transfer.merkle_tree import LEAVES, compute_layers, merkleroot
 from raiden.transfer.state import (
     CHANNEL_STATE_CLOSED,
@@ -436,7 +439,7 @@ def is_valid_lockedtransfer(
 
 
 def is_valid_lock_expired(
-    state_change: ReceiveLockExpired,
+    state_change: Union[ReceiveLockExpired, ReceiveLockExpiredLight],
     channel_state: NettingChannelState,
     sender_state: NettingChannelEndState,
     receiver_state: NettingChannelEndState,
@@ -1636,6 +1639,45 @@ def handle_receive_lock_expired(
             message_identifier=state_change.message_identifier,
         )
         events = [send_processed]
+    else:
+        assert msg, "is_valid_lock_expired should return error msg if not valid"
+        invalid_lock_expired = EventInvalidReceivedLockExpired(
+            secrethash=state_change.secrethash, reason=msg
+        )
+        events = [invalid_lock_expired]
+
+    return TransitionResult(channel_state, events)
+
+
+def handle_receive_lock_expired_light(
+    channel_state: NettingChannelState, state_change: ReceiveLockExpiredLight, block_number: BlockNumber, payment_id: PaymentID
+) -> TransitionResult[NettingChannelState]:
+    """Remove expired locks from channel states."""
+    is_valid, msg, merkletree = is_valid_lock_expired(
+        state_change=state_change,
+        channel_state=channel_state,
+        sender_state=channel_state.partner_state,
+        receiver_state=channel_state.our_state,
+        block_number=block_number,
+    )
+
+    events: List[Event] = list()
+    if is_valid:
+        assert merkletree, "is_valid_lock_expired should return merkletree if valid"
+        channel_state.partner_state.balance_proof = state_change.balance_proof
+        channel_state.partner_state.merkletree = merkletree
+
+        _del_unclaimed_lock(channel_state.partner_state, state_change.secrethash)
+
+        store_lock_expired = StoreMessageEvent(
+            state_change.lock_expired.message_identifier,
+            payment_id,
+            1,
+            state_change.lock_expired,
+            True,
+            LightClientProtocolMessageType.PaymentExpired
+        )
+        events = [store_lock_expired]
     else:
         assert msg, "is_valid_lock_expired should return error msg if not valid"
         invalid_lock_expired = EventInvalidReceivedLockExpired(
