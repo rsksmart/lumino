@@ -83,6 +83,7 @@ def test_channel_cleared_after_two_unlocks():
         partner_onchain_locksroot=merkleroot(channel_state.partner_state.merkletree),
         block_number=1,
         block_hash=make_block_hash(),
+        participant1=our_model.participant_address
     )
     iteration = channel.state_transition(channel_state, settle_channel, block_number, block_hash)
 
@@ -148,6 +149,7 @@ def test_channel_cleared_after_our_unlock():
         partner_onchain_locksroot=merkleroot(channel_state.partner_state.merkletree),
         block_number=1,
         block_hash=make_block_hash(),
+        participant1=our_model.participant_address
     )
 
     assert settle_channel.our_onchain_locksroot is not EMPTY_MERKLE_ROOT
@@ -164,7 +166,8 @@ def test_channel_cleared_after_our_unlock():
 
 
 def test_is_balance_proof_usable_onchain_answer_is_false():
-    channel_state = factories.make_channel_set(number_of_channels=1).channels[0]
+    channel_set = factories.make_channel_set(number_of_channels=1, token_address=factories.UNIT_TRANSFER_DESCRIPTION.initiator)
+    channel_state = channel_set.get_sub_channel(0)
     balance_proof_wrong_channel = factories.create(factories.BalanceProofSignedStateProperties())
     result, msg = is_balance_proof_usable_onchain(
         received_balance_proof=balance_proof_wrong_channel,

@@ -112,9 +112,9 @@ def test_signature():
     message.sign(signer)
     data_was_signed = message._data_to_sign()
     assert message.signature == decode_hex(
-        "0x65309af4b47e9bde1b567c790424dd8a0036712ec9d29e6651208a568cce50ad53fbc7672c85f98831810e77c6558469364086bdfd8f858e927af91986b710431b")
+        "3104e6b6fdc2c01806802be397af6030e6d411f9a998b894891abb6e1e8639c61de260f9ada792ada04cc9e8c8f30f5568401dd4759588227b6d97b8e227a3c71c")
     assert recover(data_was_signed, message.signature) == to_canonical_address(
-        "0x09fcbe7ceb49c944703b4820e29b0541edfe7e82")
+        "6d369723521b4080a19457d5fdd2194d633b0c3a")
 
 
 def test_signature_without_secret():
@@ -149,4 +149,4 @@ def test_signature_without_secret():
     data_was_signed = message._data_to_sign()
     print(message.signature.hex())
     assert recover(data_was_signed, message.signature) == to_canonical_address(
-        "0x09fcbe7ceb49c944703b4820e29b0541edfe7e82")
+        "6d369723521b4080a19457d5fdd2194d633b0c3a")

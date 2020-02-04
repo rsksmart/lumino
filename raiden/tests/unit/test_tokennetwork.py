@@ -83,7 +83,7 @@ def test_contract_receive_channelnew_must_be_idempotent(channel_properties):
 
     msg = "the channel must not have been overwritten"
     channelmap_by_id = iteration.new_state.channelidentifiers_to_channels
-    assert channelmap_by_id[channel_state1.identifier] == channel_state1, msg
+    assert channelmap_by_id[state_change2.channel_state.our_state.address][channel_state1.identifier] == channel_state1, msg
 
     channelmap_by_address = iteration.new_state.partneraddresses_to_channelidentifiers
     partner_channels_ids = channelmap_by_address[channel_state1.partner_state.address]
@@ -140,6 +140,7 @@ def test_channel_settle_must_properly_cleanup(channel_properties):
         block_hash=factories.make_block_hash(),
         our_onchain_locksroot=EMPTY_MERKLE_ROOT,
         partner_onchain_locksroot=EMPTY_MERKLE_ROOT,
+        participant1=channel_state.our_state.address
     )
 
     channel_settled_iteration = token_network.state_transition(
@@ -332,6 +333,7 @@ def test_mediator_clear_pairs_after_batch_unlock(
         block_hash=factories.make_block_hash(),
         our_onchain_locksroot=factories.make_32bytes(),
         partner_onchain_locksroot=EMPTY_MERKLE_ROOT,
+        participant1=channel_state.our_state.address
     )
 
     channel_settled_iteration = token_network.state_transition(
@@ -442,6 +444,7 @@ def test_multiple_channel_states(chain_state, token_network_state, channel_prope
         block_hash=factories.make_block_hash(),
         our_onchain_locksroot=factories.make_32bytes(),
         partner_onchain_locksroot=EMPTY_MERKLE_ROOT,
+        participant1=channel_state.our_state.address
     )
 
     channel_settled_iteration = token_network.state_transition(
@@ -454,7 +457,7 @@ def test_multiple_channel_states(chain_state, token_network_state, channel_prope
     token_network_state_after_settle = channel_settled_iteration.new_state
     ids_to_channels = token_network_state_after_settle.channelidentifiers_to_channels
     assert len(ids_to_channels) == 1
-    assert channel_state.identifier in ids_to_channels
+    assert channel_state.identifier in ids_to_channels[channel_state.our_state.address]
 
     # Create new channel while the previous one is pending unlock
     new_channel_properties = factories.create_properties(
@@ -482,8 +485,8 @@ def test_multiple_channel_states(chain_state, token_network_state, channel_prope
     token_network_state_after_new_open = channel_new_iteration.new_state
     ids_to_channels = token_network_state_after_new_open.channelidentifiers_to_channels
 
-    assert len(ids_to_channels) == 2
-    assert channel_state.identifier in ids_to_channels
+    assert len(ids_to_channels[channel_state.our_state.address]) == 2
+    assert channel_state.identifier in ids_to_channels[channel_state.our_state.address]
 
 
 def test_routing_updates(token_network_state, our_address, channel_properties):

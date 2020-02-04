@@ -6,7 +6,6 @@ from eth_utils import decode_hex
 from gevent.lock import Semaphore
 
 from raiden import waiting
-from raiden.api.python import RaidenAPI
 from raiden.constants import Environment
 from raiden.exceptions import (
     DepositMismatch,
@@ -69,6 +68,8 @@ class ConnectionManager:
     BOOTSTRAP_ADDR = decode_hex(BOOTSTRAP_ADDR_HEX)
 
     def __init__(self, raiden, token_network_identifier):
+
+        from raiden.api.python import RaidenAPI
         chain_state = views.state_from_raiden(raiden)
         token_network_state = views.get_token_network_by_identifier(
             chain_state, token_network_identifier
