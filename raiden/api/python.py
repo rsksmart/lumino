@@ -9,11 +9,9 @@ import os
 import dateutil.parser
 from datetime import datetime, date
 from dateutil.relativedelta import relativedelta
-from eth_utils import is_binary_address, to_checksum_address, to_canonical_address, to_normalized_address, decode_hex, \
-    encode_hex
+from eth_utils import is_binary_address, to_checksum_address, to_canonical_address, to_normalized_address, encode_hex
 
-from ecies import encrypt, decrypt
-from ecies.utils import generate_eth_key, generate_key
+from ecies import encrypt
 
 import raiden.blockchain.events as blockchain_events
 from raiden import waiting
@@ -36,22 +34,24 @@ from raiden.exceptions import (
     InvalidAmount,
     InvalidSecret,
     InvalidSecretHash,
-    InvalidSettleTimeout,
     TokenAppNotFound,
     TokenAppExpired,
     RaidenRecoverableError,
-    TokenNotRegistered,
     UnknownTokenAddress,
     InvoiceCoding,
     UnhandledLightClient)
-from raiden.lightclient.light_client_message_handler import LightClientMessageHandler
-from raiden.lightclient.light_client_service import LightClientService
-from raiden.lightclient.light_client_utils import LightClientUtils
-from raiden.lightclient.lightclientmessages.hub_message import HubMessage
-from raiden.lightclient.lightclientmessages.light_client_payment import LightClientPayment, LightClientPaymentStatus
+from raiden.lightclient.handlers.light_client_message_handler import LightClientMessageHandler
+from raiden.lightclient.handlers.light_client_service import LightClientService
+from raiden.lightclient.handlers.light_client_utils import LightClientUtils
+from raiden.lightclient.lightclientmessages.hub_response_message import HubResponseMessage
+from raiden.lightclient.lightclientmessages.payment_hub_message import PaymentHubMessage
+from raiden.lightclient.models.light_client_payment import LightClientPayment, LightClientPaymentStatus
+from raiden.lightclient.models.light_client_protocol_message import LightClientProtocolMessageType
 
-from raiden.messages import RequestMonitoring, LockedTransfer, RevealSecret, Unlock, Delivered, SecretRequest, Processed
+from raiden.messages import RequestMonitoring, LockedTransfer, RevealSecret, Unlock, Delivered, SecretRequest, \
+    Processed, LockExpired
 from raiden.settings import DEFAULT_RETRY_TIMEOUT, DEVELOPMENT_CONTRACT_VERSION, HUB_MAX_LIGHT_CLIENTS
+
 from raiden.transfer import architecture, views, channel
 from raiden.transfer.events import (
     EventPaymentReceivedSuccess,
@@ -73,7 +73,6 @@ from raiden.utils import pex, typing
 from raiden.utils.gas_reserve import has_enough_gas_reserve
 from raiden.utils.typing import (
     Address,
-    AddressHex,
     Any,
     BlockSpecification,
     BlockTimeout,
@@ -94,7 +93,7 @@ from raiden.utils.typing import (
     TokenNetworkAddress,
     TokenNetworkID,
     Tuple,
-    SignedTransaction, InitiatorAddress, TargetAddress, PaymentWithFeeAmount, BlockExpiration)
+    SignedTransaction, InitiatorAddress, TargetAddress, PaymentWithFeeAmount)
 
 from raiden.rns_constants import RNS_ADDRESS_ZERO
 from raiden.utils.rns import is_rns_address
@@ -1144,16 +1143,20 @@ class RaidenAPI:
         self.raiden.initiate_send_balance_proof(sender_address, receiver_address, unlock)
 
     def initiate_send_delivered_light(self, sender_address: typing.Address, receiver_address: typing.Address,
-                                      delivered: Delivered, msg_order: int, payment_id: int):
-        self.raiden.initiate_send_delivered_light(sender_address, receiver_address, delivered, msg_order, payment_id)
+                                      delivered: Delivered, msg_order: int, payment_id: int, message_type: LightClientProtocolMessageType):
+        self.raiden.initiate_send_delivered_light(sender_address, receiver_address, delivered, msg_order, payment_id, message_type)
 
     def initiate_send_processed_light(self, sender_address: typing.Address, receiver_address: typing.Address,
-                                      processed: Processed, msg_order: int, payment_id: int):
-        self.raiden.initiate_send_processed_light(sender_address, receiver_address, processed, msg_order, payment_id)
+                                      processed: Processed, msg_order: int, payment_id: int, message_type: LightClientProtocolMessageType):
+        self.raiden.initiate_send_processed_light(sender_address, receiver_address, processed, msg_order, payment_id, message_type)
 
     def initiate_send_secret_request_light(self, sender_address: typing.Address, receiver_address: typing.Address,
-                                           secret_request: SecretRequest, msg_order: int, payment_id: int):
+                                           secret_request: SecretRequest):
         self.raiden.initiate_send_secret_request_light(sender_address, receiver_address, secret_request)
+
+    def initiate_send_lock_expired_light(self, sender_address: typing.Address, receiver_address: typing.Address,
+                                         lock_expired: LockExpired, payment_id: int):
+        self.raiden.initiate_send_lock_expired_light(sender_address, receiver_address, lock_expired, payment_id)
 
     def get_raiden_events_payment_history_with_timestamps_v2(
         self,
@@ -1685,7 +1688,7 @@ class RaidenAPI:
         token_address: typing.TokenAddress,
         amount: typing.TokenAmount,
         secrethash: typing.SecretHash
-    ) -> HubMessage:
+    ) -> HubResponseMessage:
         channel_state = views.get_channelstate_for(
             views.state_from_raiden(self.raiden),
             registry_address,
@@ -1722,15 +1725,18 @@ class RaidenAPI:
             # Persist the light_client_protocol_message associated
             order = 1
             LightClientMessageHandler.store_light_client_payment(payment, self.raiden.wal.storage)
-            LightClientMessageHandler.store_light_client_protocol_message(
+            lcpm_id = LightClientMessageHandler.store_light_client_protocol_message(
                 locked_transfer.message_identifier,
                 locked_transfer,
                 False,
                 payment.payment_id,
                 order,
+                LightClientProtocolMessageType.PaymentSuccessful,
                 self.raiden.wal
             )
-
-            return HubMessage(payment.payment_id, order, locked_transfer)
+            payment_hub_message = PaymentHubMessage(payment_id=payment.payment_id,
+                                                    message_order=order,
+                                                    message=locked_transfer, is_signed=False)
+            return HubResponseMessage(lcpm_id, LightClientProtocolMessageType.PaymentSuccessful, payment_hub_message)
         else:
             raise ChannelNotFound("Channel with given partner address doesnt exists")

@@ -1509,6 +1509,8 @@ class NettingChannelState(State):
         "close_transaction",
         "settle_transaction",
         "update_transaction",
+        "is_light_channel"
+        ""
     )
 
     def __init__(
@@ -1525,6 +1527,7 @@ class NettingChannelState(State):
         close_transaction: TransactionExecutionStatus = None,
         settle_transaction: TransactionExecutionStatus = None,
         update_transaction: TransactionExecutionStatus = None,
+        is_light_channel: bool = False
     ) -> None:
         if reveal_timeout >= settle_timeout:
             raise ValueError("reveal_timeout must be smaller than settle_timeout")
@@ -1579,9 +1582,10 @@ class NettingChannelState(State):
         self.settle_transaction = settle_transaction
         self.update_transaction = update_transaction
         self.mediation_fee = mediation_fee
+        self.is_light_channel = is_light_channel
 
     def __repr__(self) -> str:
-        return "<NettingChannelState id:{} opened:{} closed:{} settled:{} updated:{}>".format(
+        return "<NettingChannelState id:{} opened:{} closed:{} settled:{} updated:{} is_light_channel>".format(
             self.canonical_identifier.channel_identifier,
             self.open_transaction,
             self.close_transaction,
@@ -1617,6 +1621,7 @@ class NettingChannelState(State):
             and self.close_transaction == other.close_transaction
             and self.settle_transaction == other.settle_transaction
             and self.update_transaction == other.update_transaction
+            and self.is_light_channel == other.is_light_channel
         )
 
     @property
@@ -1643,6 +1648,7 @@ class NettingChannelState(State):
             "partner_state": self.partner_state,
             "open_transaction": self.open_transaction,
             "deposit_transaction_queue": self.deposit_transaction_queue,
+            "is_light_channel": self.is_light_channel
         }
 
         if self.close_transaction is not None:
@@ -1666,6 +1672,7 @@ class NettingChannelState(State):
             our_state=data["our_state"],
             partner_state=data["partner_state"],
             open_transaction=data["open_transaction"],
+            is_light_channel=data["is_light_channel"]
         )
         close_transaction = data.get("close_transaction")
         if close_transaction is not None:

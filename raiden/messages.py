@@ -75,10 +75,8 @@ __all__ = (
     "SignedMessage",
     "ToDevice",
     "Unlock",
-    "UpdatePFS",
     "decode",
     "from_dict",
-    "message_from_sendevent",
 )
 
 _senders_cache = LRUCache(maxsize=128)

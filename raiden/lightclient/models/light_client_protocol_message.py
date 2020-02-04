@@ -1,6 +1,13 @@
 import string
+from enum import Enum
 
 from raiden.messages import Message
+
+class LightClientProtocolMessageType(Enum):
+    PaymentSuccessful = "PaymentSuccessful"
+    PaymentFailure = "PaymentFailure"
+    PaymentExpired = "PaymentExpired"
+    SettlementRequired = "SettlementRequired"
 
 
 class LightClientProtocolMessage:
@@ -12,6 +19,7 @@ class LightClientProtocolMessage:
         message_order: int,
         light_client_payment_id: int,
         identifier: string,
+        message_type : LightClientProtocolMessageType,
         unsigned_message: Message = None,
         signed_message: Message = None,
         internal_msg_identifier: int = None
@@ -19,6 +27,7 @@ class LightClientProtocolMessage:
         self.identifier = int(identifier)
         self.is_signed = is_signed
         self.message_order = message_order
+        self.message_type = message_type
         self.unsigned_message = unsigned_message
         self.signed_message = signed_message
         self.light_client_payment_id = light_client_payment_id
@@ -36,12 +45,12 @@ class LightClientProtocolMessage:
             "identifier": self.identifier,
             "is_signed": self.is_signed,
             "message_order": self.message_order,
+            "message_type": self.message_type.value,
             "unsigned_message": unsigned_msg_dict,
             "signed_message": signed_msg_dict,
             "light_client_payment_id": self.light_client_payment_id,
-            "internal_msg_identifer": self.internal_msg_identifier
+            "internal_msg_identifier": self.internal_msg_identifier
         }
-
         return result
 
 
@@ -54,6 +63,7 @@ class DbLightClientProtocolMessage:
         self.identifier = light_client_protocol_message.identifier
         self.message_order = light_client_protocol_message.message_order
         self.light_client_payment_id = light_client_protocol_message.light_client_payment_id
+        self.message_type = light_client_protocol_message.message_type
         self.unsigned_message = light_client_protocol_message.unsigned_message
         self.signed_message = light_client_protocol_message.signed_message
 

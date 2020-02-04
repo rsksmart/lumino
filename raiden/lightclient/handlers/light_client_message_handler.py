@@ -6,18 +6,18 @@ from eth_utils import to_checksum_address
 
 from raiden.lightclient.lightclientmessages.light_client_non_closing_balance_proof import \
     LightClientNonClosingBalanceProof
-from raiden.lightclient.lightclientmessages.light_client_payment import LightClientPayment
-from raiden.lightclient.lightclientmessages.light_client_protocol_message import LightClientProtocolMessage, \
-    DbLightClientProtocolMessage
+from raiden.lightclient.models.light_client_payment import LightClientPayment
+from raiden.lightclient.models.light_client_protocol_message import LightClientProtocolMessage, \
+    LightClientProtocolMessageType
 from raiden.messages import Message, LockedTransfer, SecretRequest, RevealSecret, Secret, Processed, Delivered, Unlock, \
     LockExpired
 from raiden.storage.sqlite import SerializedSQLiteStorage
 from raiden.storage.wal import WriteAheadLog
-from typing import List
 
 
 def build_light_client_protocol_message(identifier: int, message: Message, signed: bool, payment_id: int,
-                                        order: int) -> LightClientProtocolMessage:
+                                        order: int,
+                                        message_type: LightClientProtocolMessageType) -> LightClientProtocolMessage:
     if signed:
         signed_msg = message
         unsigned_msg = None
@@ -29,6 +29,7 @@ def build_light_client_protocol_message(identifier: int, message: Message, signe
         order,
         payment_id,
         identifier,
+        message_type,
         unsigned_msg,
         signed_msg
 
@@ -39,32 +40,13 @@ class LightClientMessageHandler:
     log = structlog.get_logger(__name__)  # pylint: disable=invalid-name
 
     @classmethod
-    def store_light_client_protocol_messages(cls, messages: List[Message], wal: WriteAheadLog):
-        protocol_messages = list(map(build_light_client_protocol_message, messages))
-        assert len(messages) == len(protocol_messages), "Light client protocol message persist error"
-        to_store = []
-        for msg_dto in protocol_messages:
-            to_store.append(DbLightClientProtocolMessage(msg_dto))
-        return wal.storage.write_light_client_protocol_messages(to_store)
-
-    @classmethod
     def store_light_client_protocol_message(cls, identifier: int, message: Message, signed: bool, payment_id: int,
-                                            order: int,
+                                            order: int, message_type: LightClientProtocolMessageType,
                                             wal: WriteAheadLog):
         return wal.storage.write_light_client_protocol_message(
             message,
             build_light_client_protocol_message(identifier, message, signed,
-                                                payment_id, order)
-        )
-
-    @classmethod
-    def store_received_locked_transfer(cls, identifier: int, message: Message, signed: bool, payment_id: int,
-                                       order: int,
-                                       storage: SerializedSQLiteStorage):
-        return storage.write_light_client_protocol_message(
-            message,
-            build_light_client_protocol_message(identifier, message, signed,
-                                                payment_id, order)
+                                                payment_id, order, message_type)
         )
 
     @classmethod
@@ -72,17 +54,25 @@ class LightClientMessageHandler:
         cls, message: Message,
         payment_id: int,
         order: int,
+        message_type: LightClientProtocolMessageType,
         wal: WriteAheadLog
     ):
-        return wal.storage.update_light_client_protocol_message_set_signed_data(payment_id, order, message)
+        return wal.storage.update_light_client_protocol_message_set_signed_data(payment_id, order, message,
+                                                                                str(message_type.value))
 
     @classmethod
     def store_light_client_payment(cls, payment: LightClientPayment, storage: SerializedSQLiteStorage):
-        return storage.write_light_client_payment(payment)
+        exists_payment = storage.get_light_client_payment(payment.payment_id)
+        if not exists_payment:
+            storage.write_light_client_payment(payment)
 
     @classmethod
-    def is_light_client_protocol_message_already_stored(cls, payment_id: int, order: int, wal: WriteAheadLog):
-        existing_message = wal.storage.is_light_client_protocol_message_already_stored(payment_id, order)
+    def is_light_client_protocol_message_already_stored(cls, payment_id: int, order: int,
+                                                        message_type: LightClientProtocolMessageType, wal: WriteAheadLog
+                                                        ):
+        existing_message = wal.storage.is_light_client_protocol_message_already_stored(payment_id, order,
+                                                                                       str(message_type.value))
+
         if existing_message:
             return LightClientProtocolMessage(existing_message[4] is not None,
                                               existing_message[3],
@@ -101,28 +91,37 @@ class LightClientMessageHandler:
     @classmethod
     def get_light_client_protocol_message_by_identifier(cls, message_identifier: int, wal: WriteAheadLog):
         message = wal.storage.get_light_client_protocol_message_by_identifier(message_identifier)
-        return LightClientProtocolMessage(message[3] is not None, message[1], message[4], message[0], message[2],
+        return LightClientProtocolMessage(message[3] is not None, message[1], message[4], message[0], message[5],
+                                          message[2],
                                           message[3])
 
     @classmethod
     def get_light_client_payment_locked_transfer(cls, payment_identifier: int, wal: WriteAheadLog):
-        message = wal.storage.get_light_client_payment_locked_transfer(payment_identifier)
-        return LightClientProtocolMessage(message[3] is not None, message[1], message[4], message[0], message[2],
-                                          message[3])
+        message = wal.storage.get_light_client_payment_locked_transfer(payment_identifier,
+                                                                       str(
+                                                                           LightClientProtocolMessageType.PaymentSuccessful.value))
+        identifier = message[0]
+        message_order = message[1]
+        unsigned_message = message[3]
+        signed_message = message[4]
+        payment_id = message[5]
+        return LightClientProtocolMessage(signed_message is not None, message_order, payment_id, identifier,
+                                          LightClientProtocolMessageType.PaymentSuccessful, unsigned_message,
+                                          signed_message)
 
     @staticmethod
     def get_order_for_ack(ack_parent_type: string, ack_type: string, is_delivered_from_initiator: bool = False):
         switcher_processed = {
             LockedTransfer.__name__: 3,
             Secret.__name__: 13,
-            LockExpired.__name__: -3
+            LockExpired.__name__: 3
         }
         switcher_delivered = {
             LockedTransfer.__name__: 4 if is_delivered_from_initiator else 2,
             RevealSecret.__name__: 10 if is_delivered_from_initiator else 8,
             SecretRequest.__name__: 6,
             Secret.__name__: 14 if is_delivered_from_initiator else 12,
-            LockExpired.__name__: -2
+            LockExpired.__name__: 4 if is_delivered_from_initiator else 2,
 
         }
         if ack_type.lower() == "processed":
@@ -148,6 +147,13 @@ class LightClientMessageHandler:
             json_message = protocol_message.signed_message
         json_message = json.loads(json_message)
 
+        # Set message type
+        first_message_is_le = protocol_message.message_order == 1 and json_message["type"] == "LockExpired"
+
+        message_type = LightClientProtocolMessageType.PaymentSuccessful
+        if first_message_is_le:
+            message_type = LightClientProtocolMessageType.PaymentExpired
+
         order = LightClientMessageHandler.get_order_for_ack(json_message["type"], message.__class__.__name__.lower())
         if order == -1:
             cls.log.error("Unable to find principal message for {} {}: ".format(message.__class__.__name__,
@@ -157,8 +163,14 @@ class LightClientMessageHandler:
                 message_identifier, protocol_message.light_client_payment_id, order, wal)
             if not exists:
                 LightClientMessageHandler.store_light_client_protocol_message(
-                    message_identifier, message, True, protocol_message.light_client_payment_id, order,
-                    wal)
+                    message_identifier,
+                    message,
+                    True,
+                    protocol_message.light_client_payment_id,
+                    order,
+                    message_type,
+                    wal
+                )
             else:
                 cls.log.info("Message for lc already received, ignoring db storage")
 
@@ -169,7 +181,6 @@ class LightClientMessageHandler:
         # get first by message identifier
         protocol_message = LightClientMessageHandler.get_light_client_protocol_message_by_identifier(
             message_identifier, wal)
-        json_message = None
         if protocol_message.signed_message is None:
             json_message = protocol_message.unsigned_message
         else:
@@ -177,11 +188,18 @@ class LightClientMessageHandler:
 
         json_message = json.loads(json_message)
 
-        first_message_is_lt = protocol_message.message_order == 1
+        # Set message type
+        first_message_is_lt = protocol_message.message_order == 1 and json_message["type"] == "LockedTransfer"
+        first_message_is_le = protocol_message.message_order == 1 and json_message["type"] == "LockExpired"
+
+        message_type = LightClientProtocolMessageType.PaymentSuccessful
+        if first_message_is_le:
+            message_type = LightClientProtocolMessageType.PaymentExpired
+
+        # Check if message is from initiator or it is a reception
         is_delivered_from_initiator = True
         delivered_sender = message.sender
         if not first_message_is_lt:
-            #
             # get lt to get the payment identifier
             locked_transfer = LightClientMessageHandler.get_light_client_payment_locked_transfer(
                 protocol_message.light_client_payment_id, wal)
@@ -195,8 +213,11 @@ class LightClientMessageHandler:
             if to_checksum_address(delivered_sender) != to_checksum_address(payment_initiator):
                 is_delivered_from_initiator = False
 
+        # Get the msg order
         order = LightClientMessageHandler.get_order_for_ack(json_message["type"], message.__class__.__name__.lower(),
                                                             is_delivered_from_initiator)
+
+        # Persist the message
         if order == -1:
             cls.log.error("Unable to find principal message for {} {}: ".format(message.__class__.__name__,
                                                                                 message_identifier))
@@ -206,6 +227,7 @@ class LightClientMessageHandler:
             if not exists:
                 LightClientMessageHandler.store_light_client_protocol_message(
                     message_identifier, message, True, protocol_message.light_client_payment_id, order,
+                    message_type,
                     wal)
             else:
                 cls.log.info("Message for lc already received, ignoring db storage")

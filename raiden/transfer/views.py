@@ -558,11 +558,11 @@ def list_channelstate_for_tokennetwork(
     token_network = get_token_network_by_token_address(
         chain_state, payment_network_id, token_address
     )
-
+    result = list()
     if token_network:
-        result = list(token_network.channelidentifiers_to_channels.values())
-    else:
-        result = []
+        for channel_address in token_network.channelidentifiers_to_channels.values():
+            for channel in channel_address.values():
+                result.append(channel)
 
     return result
 
