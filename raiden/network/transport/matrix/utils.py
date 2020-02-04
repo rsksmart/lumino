@@ -39,7 +39,7 @@ from raiden.network.transport.matrix.client import GMatrixClient, Room, User
 from raiden.network.utils import get_http_rtt
 from raiden.utils import pex
 from raiden.utils.signer import Signer, recover
-from raiden.utils.typing import Address, ChainID
+from raiden.utils.typing import Address, ChainID, Signature
 from raiden_contracts.constants import ID_TO_NETWORKNAME
 from ecies import decrypt
 
@@ -48,6 +48,7 @@ log = structlog.get_logger(__name__)
 
 JOIN_RETRIES = 10
 USERID_RE = re.compile(r"^@(0x[0-9a-f]{40})(?:\.[0-9a-f]{8})?(?::.+)?$")
+DISPLAY_NAME_HEX_RE = re.compile(r"^0x[0-9a-fA-F]{130}$")
 ROOM_NAME_SEPARATOR = "_"
 ROOM_NAME_PREFIX = "raiden"
 
@@ -76,18 +77,15 @@ USER_PRESENCE_TO_ADDRESS_REACHABILITY = {
 
 class UserAddressManager:
     """ Matrix user <-> eth address mapping and user / address reachability helper.
-
     In Raiden the smallest unit of addressability is a node with an associated Ethereum address.
     In Matrix it's a user. Matrix users are (at the moment) bound to a specific homeserver.
     Since we want to provide resiliency against unavailable homeservers a single Raiden node with
     a single Ethereum address can be in control over multiple Matrix users on multiple homeservers.
-
     Therefore we need to perform a many-to-one mapping of Matrix users to Ethereum addresses.
     Each Matrix user has a presence state (ONLINE, OFFLINE).
     One of the preconditions of running a Raiden node is that there can always only be one node
     online for a particular address at a time.
     That means we can synthesize the reachability of an address from the user presence states.
-
     This helper internally tracks both the user presence and address reachability for addresses
     that have been marked as being 'interesting' (by calling the `.add_address()` method).
     Additionally it provides the option of passing callbacks that will be notified when
@@ -130,14 +128,12 @@ class UserAddressManager:
 
     def add_userid_for_address(self, address: Address, user_id: str):
         """ Add a ``user_id`` for the given ``address``.
-
         Implicitly adds the address if it was unknown before.
         """
         self._address_to_userids[address].add(user_id)
 
     def add_userids_for_address(self, address: Address, user_ids: Iterable[str]):
         """ Add multiple ``user_ids`` for the given ``address``.
-
         Implicitly adds any addresses if they were unknown before.
         """
         self._address_to_userids[address].update(user_ids)
@@ -158,7 +154,6 @@ class UserAddressManager:
 
     def force_user_presence(self, user: User, presence: UserPresence):
         """ Forcibly set the ``user`` presence to ``presence``.
-
         This method is only provided to cover an edge case in our use of the Matrix protocol and
         should **not** generally be used.
         """
@@ -167,9 +162,7 @@ class UserAddressManager:
     def refresh_address_presence(self, address: Address):
         """
         Update synthesized address presence state from cached user presence states.
-
         Triggers callback (if any) in case the state has changed.
-
         This method is only provided to cover an edge case in our use of the Matrix protocol and
         should **not** generally be used.
         """
@@ -203,7 +196,6 @@ class UserAddressManager:
     def _presence_listener(self, event: Dict[str, Any]):
         """
         Update cached user presence state from Matrix presence events.
-
         Due to the possibility of nodes using accounts on multiple homeservers a composite
         address state is synthesised from the cached individual user presence states.
         """
@@ -259,11 +251,9 @@ class UserAddressManager:
 
 def join_global_room(client: GMatrixClient, name: str, servers: Sequence[str] = ()) -> Room:
     """Join or create a global public room with given name
-
     First, try to join room on own server (client-configured one)
     If can't, try to join on each one of servers, and if able, alias it in our server
     If still can't, create a public room with name in our server
-
     Params:
         client: matrix-python-sdk client instance
         name: name or alias of the room (without #-prefix or server name suffix)
@@ -459,7 +449,6 @@ def login_or_register(
 ) -> User:
 
     """Login to a Raiden matrix server with password and displayname proof-of-keys
-
     - Username is in the format: 0x<eth_address>(.<suffix>)?, where the suffix is not required,
     but a deterministic (per-account) random 8-hex string to prevent DoS by other users registering
     our address
@@ -467,7 +456,6 @@ def login_or_register(
     creation spam
     - Displayname currently is the signature of the whole user_id (including homeserver), to be
     verified by other peers. May include in the future other metadata such as protocol version
-
     Params:
         client: GMatrixClient instance configured with desired homeserver
         signer: raiden.utils.signer.Signer instance for signing password and displayname
@@ -491,9 +479,10 @@ def login_or_register(
 
         _try_login_or_register(client, base_username, password, server_name, server_url, seed)
 
-        name = encode_hex(signer.sign(client.user_id.encode()))
+        signature_bytes = signer.sign(client.user_id.encode())
+        signature_hex = encode_hex(signature_bytes)
         user = client.get_user(client.user_id)
-        user.set_display_name(name)
+        user.set_display_name(signature_hex)
 
     log.info("Login or register for Hub Node is successfully run")
     return user
@@ -512,7 +501,11 @@ def validate_userid_signature(user: User) -> Optional[Address]:
 
     try:
         displayname = user.get_display_name()
-        recovered = recover(data=user.user_id.encode(), signature=decode_hex(displayname))
+        if DISPLAY_NAME_HEX_RE.match(displayname):
+            signature_bytes = decode_hex(displayname)
+        else:
+            return None
+        recovered = recover(data=user.user_id.encode(), signature=Signature(signature_bytes))
         if not (address and recovered and recovered == address):
             return None
     except (
@@ -528,7 +521,6 @@ def validate_userid_signature(user: User) -> Optional[Address]:
 
 def sort_servers_closest(servers: Sequence[str]) -> Sequence[Tuple[str, float]]:
     """Sorts a list of servers by http round-trip time
-
     Params:
         servers: sequence of http server urls
     Returns:
@@ -552,7 +544,6 @@ def sort_servers_closest(servers: Sequence[str]) -> Sequence[Tuple[str, float]]:
 
 def make_client(servers: List[str], *args, **kwargs) -> GMatrixClient:
     """Given a list of possible servers, chooses the closest available and create a GMatrixClient
-
     Params:
         servers: list of servers urls, with scheme (http or https)
         Rest of args and kwargs are forwarded to GMatrixClient constructor
@@ -589,7 +580,6 @@ def make_client(servers: List[str], *args, **kwargs) -> GMatrixClient:
 def make_room_alias(chain_id: ChainID, *suffixes: str) -> str:
     """Given a chain_id and any number of suffixes (global room names, pair of addresses),
     compose and return the canonical room name for raiden network
-
     network name from raiden_contracts.constants.ID_TO_NETWORKNAME is used for name, if available,
     else numeric id
     Params:

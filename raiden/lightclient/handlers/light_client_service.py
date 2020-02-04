@@ -1,11 +1,12 @@
 from eth_utils.typing import ChecksumAddress
 
-from raiden.lightclient.lightclientmessages.light_client_payment import LightClientPayment
-from raiden.lightclient.lightclientmessages.light_client_protocol_message import DbLightClientProtocolMessage, \
-    LightClientProtocolMessage
+from raiden.lightclient.models.client_model import ClientModel, ClientType
+from raiden.lightclient.lightclientmessages.hub_response_message import HubResponseMessage
+from raiden.lightclient.models.light_client_payment import LightClientPayment
+from raiden.lightclient.models.light_client_protocol_message import LightClientProtocolMessage, LightClientProtocolMessageType
+from raiden.lightclient.lightclientmessages.payment_hub_message import PaymentHubMessage
 from raiden.storage.sqlite import SerializedSQLiteStorage
 from raiden.storage.wal import WriteAheadLog
-from .client_model import ClientModel, ClientType
 from raiden.utils.typing import List, Optional
 
 
@@ -38,18 +39,21 @@ class LightClientService:
     @classmethod
     def get_light_client_messages(cls, from_message: int, light_client: ChecksumAddress, wal: WriteAheadLog):
         messages = wal.storage.get_light_client_messages(from_message, light_client)
-        result: List[LightClientProtocolMessage] = []
+        result: List[HubResponseMessage] = []
         for message in messages:
             signed = message[0]
             order = message[1]
             payment_id = message[2]
             unsigned_msg = message[3]
             signed_msg = message[4]
-            identifier = message[5]
             internal_identifier = message[6]
-            result.append(
-                LightClientProtocolMessage(signed, order, payment_id, identifier, unsigned_msg, signed_msg,
-                                           internal_identifier))
+            message_type = LightClientProtocolMessageType[message[7]]
+            message = signed_msg if signed_msg is not None else unsigned_msg
+            payment_hub_message = PaymentHubMessage(payment_id=payment_id,
+                                                    message_order=order,
+                                                    message=message, is_signed=signed)
+            hub_message = HubResponseMessage(internal_identifier, message_type, payment_hub_message)
+            result.append(hub_message)
         return result
 
     @classmethod
@@ -63,20 +67,3 @@ class LightClientService:
             payment = LightClientPayment(payment[1], payment[2], payment[3], payment[4], payment[5],
                                          payment[6], payment[7], payment[0])
         return payment
-
-    @classmethod
-    def is_get_messages_request_valid(cls, message_request: dict):
-        payment_ids = list(message_request.keys())
-        msg_orders = list(message_request.values())
-        valid_payment_ids = len(payment_ids) > 0
-        valid_msg_orders = len(msg_orders) > 0
-        if not valid_msg_orders or not valid_payment_ids:
-            return False
-        else:
-            for payment_id in payment_ids:
-                if type(payment_id) is not str:
-                    return False
-            for message_order in msg_orders:
-                if type(message_order) is not int:
-                    return False
-        return True

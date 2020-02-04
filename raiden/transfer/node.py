@@ -1,4 +1,7 @@
-from raiden.messages import RevealSecret, Unlock
+from datetime import date
+
+from raiden.lightclient.models.light_client_payment import LightClientPayment
+from raiden.lightclient.models.light_client_protocol_message import LightClientProtocolMessageType
 from raiden.transfer import channel, token_network, views
 from raiden.transfer.architecture import (
     ContractReceiveStateChange,
@@ -8,7 +11,6 @@ from raiden.transfer.architecture import (
     StateChange,
     TransitionResult,
 )
-from raiden.transfer.channel import compute_merkletree_with, create_sendlockedtransfer
 from raiden.transfer.events import (
     ContractSendChannelBatchUnlock,
     ContractSendChannelClose,
@@ -18,8 +20,8 @@ from raiden.transfer.events import (
 )
 from raiden.transfer.identifiers import CanonicalIdentifier, QueueIdentifier
 from raiden.transfer.mediated_transfer import initiator_manager, mediator, target
-from raiden.transfer.mediated_transfer.events import CHANNEL_IDENTIFIER_GLOBAL_QUEUE, SendBalanceProof, \
-    StoreMessageEvent
+from raiden.transfer.mediated_transfer.events import CHANNEL_IDENTIFIER_GLOBAL_QUEUE, StoreMessageEvent, \
+    SendLockExpiredLight
 from raiden.transfer.mediated_transfer.state import (
     InitiatorPaymentState,
     MediatorTransferState,
@@ -35,7 +37,8 @@ from raiden.transfer.mediated_transfer.state_change import (
     ReceiveTransferRefund,
     ReceiveTransferRefundCancelRoute,
     ActionInitInitiatorLight, ReceiveSecretRequestLight, ActionSendSecretRevealLight, ReceiveSecretRevealLight,
-    ActionSendUnlockLight, ActionInitTargetLight, ActionSendSecretRequestLight)
+    ActionSendUnlockLight, ActionInitTargetLight, ActionSendSecretRequestLight, ActionSendLockExpiredLight,
+    ReceiveLockExpiredLight)
 from raiden.transfer.state import (
     ChainState,
     InitiatorTask,
@@ -43,7 +46,6 @@ from raiden.transfer.state import (
     PaymentNetworkState,
     TargetTask,
     TokenNetworkState,
-    NettingChannelState,
     LightClientTransportState,
     NodeTransportState)
 from raiden.transfer.state_change import (
@@ -70,7 +72,7 @@ from raiden.transfer.state_change import (
     ReceiveProcessed,
     ReceiveUnlock,
     ReceiveUnlockLight, ContractReceiveChannelClosedLight, ContractReceiveChannelSettledLight)
-from raiden.utils import sha3
+
 from raiden.utils.typing import (
     MYPY_ANNOTATION,
     BlockHash,
@@ -87,7 +89,7 @@ from raiden.utils.typing import (
     Union,
     Address, AddressHex)
 
-from eth_utils import to_canonical_address, keccak, decode_hex
+from eth_utils import to_canonical_address
 
 # All State changes that are subdispatched as token network actions
 TokenNetworkStateChange = Union[
@@ -206,7 +208,7 @@ def subdispatch_to_all_lockedtransfers(
 
 
 def subdispatch_to_paymenttask(
-    chain_state: ChainState, state_change: StateChange, secrethash: SecretHash
+    chain_state: ChainState, state_change: StateChange, secrethash: SecretHash, storage=None
 ) -> TransitionResult[ChainState]:
     block_number = chain_state.block_number
     block_hash = chain_state.block_hash
@@ -281,7 +283,7 @@ def subdispatch_to_paymenttask(
                     channel_state=channel_state,
                     pseudo_random_generator=pseudo_random_generator,
                     block_number=block_number,
-                    storage=None
+                    storage=storage
                 )
                 events = sub_iteration.events
 
@@ -308,9 +310,24 @@ def handle_init_unlock_light(
         balance_proof = channel.create_send_balance_proof_light(channel_state, state_change.unlock,
                                                                 state_change.sender, state_change.receiver)
         store_signed_bp = StoreMessageEvent(balance_proof.message_identifier, balance_proof.payment_identifier, 11,
-                                            state_change.unlock, True)
+                                            state_change.unlock, True, LightClientProtocolMessageType.PaymentSuccessful)
         events.append(balance_proof)
         events.append(store_signed_bp)
+    return TransitionResult(chain_state, events)
+
+
+def handle_init_send_lock_expired_light(
+    chain_state: ChainState, state_change: ActionSendLockExpiredLight
+) -> TransitionResult[ChainState]:
+    signed_lock_expired = state_change.signed_lock_expired
+    send_lock_expired_light = SendLockExpiredLight(state_change.receiver, signed_lock_expired.message_identifier,
+                                                   signed_lock_expired, state_change.signed_lock_expired.secrethash,
+                                                   state_change.payment_id)
+    store_lock_expired_light = StoreMessageEvent(signed_lock_expired.message_identifier, state_change.payment_id,
+                                                 1, signed_lock_expired, True,
+                                                 LightClientProtocolMessageType.PaymentExpired)
+
+    events = [send_lock_expired_light, store_lock_expired_light]
     return TransitionResult(chain_state, events)
 
 
@@ -388,7 +405,8 @@ def subdispatch_mediatortask(
             iteration = mediator.state_transition(
                 mediator_state=mediator_state,
                 state_change=state_change,
-                channelidentifiers_to_channels=token_network_state.channelidentifiers_to_channels.get(chain_state.our_address),
+                channelidentifiers_to_channels=token_network_state.channelidentifiers_to_channels.get(
+                    chain_state.our_address),
                 nodeaddresses_to_networkstates=chain_state.nodeaddresses_to_networkstates,
                 pseudo_random_generator=pseudo_random_generator,
                 block_number=block_number,
@@ -786,6 +804,12 @@ def handle_receive_lock_expired(
     return subdispatch_to_paymenttask(chain_state, state_change, state_change.secrethash)
 
 
+def handle_receive_lock_expired_light(
+    chain_state: ChainState, state_change: ReceiveLockExpiredLight, storage
+) -> TransitionResult[ChainState]:
+    return subdispatch_to_paymenttask(chain_state, state_change, state_change.secrethash, storage)
+
+
 def handle_receive_transfer_refund(
     chain_state: ChainState, state_change: ReceiveTransferRefund
 ) -> TransitionResult[ChainState]:
@@ -832,6 +856,7 @@ def handle_receive_unlock(
 ) -> TransitionResult[ChainState]:
     secrethash = state_change.secrethash
     return subdispatch_to_paymenttask(chain_state, state_change, secrethash)
+
 
 def handle_receive_unlock_light(
     chain_state: ChainState, state_change: ReceiveUnlockLight
@@ -984,6 +1009,9 @@ def handle_state_change(
     elif type(state_change) == ReceiveLockExpired:
         assert isinstance(state_change, ReceiveLockExpired), MYPY_ANNOTATION
         iteration = handle_receive_lock_expired(chain_state, state_change)
+    elif type(state_change) == ReceiveLockExpiredLight:
+        assert isinstance(state_change, ReceiveLockExpiredLight), MYPY_ANNOTATION
+        iteration = handle_receive_lock_expired_light(chain_state, state_change, storage)
     elif type(state_change) == ActionInitInitiatorLight:
         iteration = handle_init_initiator_light(chain_state, state_change)
     elif type(state_change) == ActionSendSecretRevealLight:
@@ -996,6 +1024,9 @@ def handle_state_change(
     elif type(state_change) == ActionSendUnlockLight:
         assert isinstance(state_change, ActionSendUnlockLight), MYPY_ANNOTATION
         iteration = handle_init_unlock_light(chain_state, state_change)
+    elif type(state_change) == ActionSendLockExpiredLight:
+        assert isinstance(state_change, ActionSendLockExpiredLight), MYPY_ANNOTATION
+        iteration = handle_init_send_lock_expired_light(chain_state, state_change)
     assert chain_state is not None, "chain_state must be set"
     return iteration
 
@@ -1122,7 +1153,7 @@ def is_transaction_effect_satisfied(
         # channel exists for our_address and partner_address
         if partner_address:
             channel_state = views.get_channelstate_by_token_network_and_partner(
-                chain_state, TokenNetworkID(state_change.token_network_identifier), partner_address
+                chain_state, TokenNetworkID(state_change.token_network_identifier), our_address, partner_address
             )
             # If the channel was cleared, that means that both
             # sides of the channel were successfully unlocked.

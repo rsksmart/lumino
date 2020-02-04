@@ -8,6 +8,7 @@ from raiden.tests.utils.detect_failure import raise_on_failure
 from raiden.transfer import channel, views
 from raiden.transfer.state import CHANNEL_STATE_OPENED
 from raiden.constants import EMPTY_PAYMENT_HASH_INVOICE
+from raiden.utils.typing import TokenAmount
 
 
 def wait_for_transaction(receiver, registry_address, token_address, sender_address):
@@ -85,33 +86,33 @@ def run_test_participant_selection(raiden_network, token_addresses):
     registry_address = raiden_network[0].raiden.default_registry.address
     one_to_n_address = raiden_network[0].raiden.default_one_to_n_address
     token_address = token_addresses[0]
-
-    # connect the first node (will register the token if necessary)
+    # connect the first node - this will register the token and open the first channel
+    # Since there is no other nodes available to connect to this call will do nothing more
     RaidenAPI(raiden_network[0].raiden).token_network_connect(
-        registry_address=registry_address, token_address=token_address, funds=100
+        registry_address=registry_address, token_address=token_address, funds=TokenAmount(100)
     )
 
     # Test invalid argument values
     with pytest.raises(InvalidAmount):
         RaidenAPI(raiden_network[0].raiden).token_network_connect(
-            registry_address=registry_address, token_address=token_address, funds=-1
+            registry_address=registry_address, token_address=token_address, funds=TokenAmount(-1)
         )
     with pytest.raises(InvalidAmount):
         RaidenAPI(raiden_network[0].raiden).token_network_connect(
             registry_address=registry_address,
             token_address=token_address,
-            funds=100,
+            funds=TokenAmount(100),
             joinable_funds_target=2,
         )
     with pytest.raises(InvalidAmount):
         RaidenAPI(raiden_network[0].raiden).token_network_connect(
             registry_address=registry_address,
             token_address=token_address,
-            funds=100,
+            funds=TokenAmount(100),
             joinable_funds_target=-1,
         )
 
-    # connect the other nodes
+    # Call the connect endpoint for all but the first node
     connect_greenlets = [
         gevent.spawn(
             RaidenAPI(app.raiden).token_network_connect, registry_address, token_address, 100
@@ -173,15 +174,16 @@ def run_test_participant_selection(raiden_network, token_addresses):
             (
                 channel_state
                 for channel_state in RaidenAPI(sender).get_channel_list(
-                    registry_address=registry_address, token_address=token_address
-                )
+                registry_address=registry_address, token_address=token_address
+            )
                 if channel_state.our_state.contract_balance > 0
-                and channel_state.partner_state.contract_balance > 0
+                   and channel_state.partner_state.contract_balance > 0
             ),
             None,
         )  # choose a fully funded channel from sender
         if sender_channel:
             break
+    assert sender_channel
     registry_address = sender.default_registry.address
 
     receiver = next(
@@ -194,24 +196,26 @@ def run_test_participant_selection(raiden_network, token_addresses):
     receiver_channel = RaidenAPI(receiver).get_channel_list(
         registry_address=registry_address,
         token_address=token_address,
+        creator_address=receiver.address,
         partner_address=sender.address,
     )
     assert len(receiver_channel) == 1
-    receiver_channel = receiver_channel[0]
 
-    exception = ValueError("partner not reachable")
-    with gevent.Timeout(30, exception=exception):
+    with gevent.Timeout(30, exception=ValueError("partner not reachable")):
         waiting.wait_for_healthy(sender, receiver.address, 1)
 
-    amount = 1
     RaidenAPI(sender).transfer_and_wait(
-        registry_address, token_address, amount, receiver.address,
+        registry_address=registry_address,
+        token_address=token_address,
+        amount=1,
+        target=receiver.address,
         transfer_timeout=10,
         payment_hash_invoice=EMPTY_PAYMENT_HASH_INVOICE
     )
 
-    exception = ValueError("timeout while waiting for incoming transaction")
-    with gevent.Timeout(30, exception=exception):
+    with gevent.Timeout(
+        30, exception=ValueError("timeout while waiting for incoming transaction")
+    ):
         wait_for_transaction(receiver, registry_address, token_address, sender.address)
 
     # test `leave()` method

@@ -3,6 +3,7 @@ import pytest
 
 from raiden import waiting
 from raiden.app import App
+from raiden.constants import EMPTY_PAYMENT_HASH_INVOICE
 from raiden.message_handler import MessageHandler
 from raiden.network.transport import MatrixTransport
 from raiden.raiden_event_handler import RaidenEventHandler
@@ -187,6 +188,7 @@ def run_test_payment_statuses_are_restored(raiden_network, token_addresses, netw
             amount=amount,
             target=app1.raiden.address,
             identifier=identifier,
+            payment_hash_invoice=EMPTY_PAYMENT_HASH_INVOICE,
         )
         assert payment_status.payment_identifier == identifier
 

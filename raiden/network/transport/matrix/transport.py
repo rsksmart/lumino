@@ -195,14 +195,9 @@ class _RetryQueue(Runnable):
                 "Partner not reachable. Skipping.", partner=pex(self.receiver), status=status
             )
             return
-        # sort output by channel_identifier (so global/unordered queue goes first)
-        # inside queue, preserve order in which messages were enqueued
-        ordered_queue = sorted(
-            self._message_queue, key=lambda d: d.queue_identifier.channel_identifier
-        )
         message_texts = [
             data.text
-            for data in ordered_queue
+            for data in self._message_queue
             # if expired_gen generator yields False, message was sent recently, so skip it
             if next(data.expiration_generator)
         ]
@@ -453,7 +448,11 @@ class MatrixTransport(Runnable):
         self._client.api.session.close()
 
         self.log.debug("Matrix stopped", config=self._config)
-        del self.log
+        try:
+            del self.log
+        except AttributeError:
+            # During shutdown the log attribute may have already been collected
+            pass
         # parent may want to call get() after stop(), to ensure _run errors are re-raised
         # we don't call it here to avoid deadlock when self crashes and calls stop() on finally
 

@@ -1,11 +1,10 @@
 import structlog
-import json
 
-from eth_utils import to_checksum_address, encode_hex
+from eth_utils import to_checksum_address
 
-from raiden.constants import EMPTY_SECRET, TEST_PAYMENT_ID
-from raiden.lightclient.light_client_message_handler import LightClientMessageHandler
-from raiden.lightclient.light_client_service import LightClientService
+from raiden.constants import EMPTY_SECRET
+from raiden.lightclient.handlers.light_client_message_handler import LightClientMessageHandler
+from raiden.lightclient.handlers.light_client_service import LightClientService
 from raiden.messages import (
     Delivered,
     LockedTransfer,
@@ -19,7 +18,6 @@ from raiden.messages import (
 )
 from raiden.raiden_service import RaidenService
 from raiden.routing import get_best_routes
-from raiden.storage.wal import WriteAheadLog
 from raiden.transfer import views
 from raiden.transfer.architecture import StateChange
 from raiden.transfer.mediated_transfer.state import lockedtransfersigned_from_message
@@ -29,11 +27,11 @@ from raiden.transfer.mediated_transfer.state_change import (
     ReceiveSecretReveal,
     ReceiveTransferRefund,
     ReceiveTransferRefundCancelRoute,
-    ReceiveSecretRequestLight, ReceiveSecretRevealLight)
+    ReceiveSecretRequestLight, ReceiveSecretRevealLight, ReceiveLockExpiredLight)
 from raiden.transfer.state import balanceproof_from_envelope
 from raiden.transfer.state_change import ReceiveDelivered, ReceiveProcessed, ReceiveUnlock, ReceiveUnlockLight
 from raiden.utils import pex, random_secret
-from raiden.utils.typing import MYPY_ANNOTATION, InitiatorAddress, PaymentAmount, TokenNetworkID, Union
+from raiden.utils.typing import MYPY_ANNOTATION, InitiatorAddress, PaymentAmount, TokenNetworkID
 
 log = structlog.get_logger(__name__)  # pylint: disable=invalid-name
 
@@ -57,7 +55,7 @@ class MessageHandler:
 
         elif type(message) == LockExpired:
             assert isinstance(message, LockExpired), MYPY_ANNOTATION
-            self.handle_message_lockexpired(raiden, message)
+            self.handle_message_lockexpired(raiden, message, is_light_client)
 
         elif type(message) == RefundTransfer:
             assert isinstance(message, RefundTransfer), MYPY_ANNOTATION
@@ -130,14 +128,23 @@ class MessageHandler:
             raiden.handle_and_track_state_change(state_change)
 
     @staticmethod
-    def handle_message_lockexpired(raiden: RaidenService, message: LockExpired) -> None:
+    def handle_message_lockexpired(raiden: RaidenService, message: LockExpired, is_light_client=False) -> None:
         balance_proof = balanceproof_from_envelope(message)
-        state_change = ReceiveLockExpired(
-            balance_proof=balance_proof,
-            secrethash=message.secrethash,
-            message_identifier=message.message_identifier,
-        )
-        raiden.handle_and_track_state_change(state_change)
+        if is_light_client:
+            state_change = ReceiveLockExpiredLight(
+                balance_proof=balance_proof,
+                secrethash=message.secrethash,
+                message_identifier=message.message_identifier,
+                lock_expired=message
+            )
+            raiden.handle_and_track_state_change(state_change)
+        else:
+            state_change = ReceiveLockExpired(
+                balance_proof=balance_proof,
+                secrethash=message.secrethash,
+                message_identifier=message.message_identifier,
+            )
+            raiden.handle_and_track_state_change(state_change)
 
     @staticmethod
     def handle_message_refundtransfer(raiden: RaidenService, message: RefundTransfer) -> None:
