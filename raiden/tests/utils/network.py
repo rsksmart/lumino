@@ -18,6 +18,7 @@ from raiden.tests.utils.factories import UNIT_CHAIN_ID
 from raiden.tests.utils.protocol import HoldRaidenEventHandler, WaitForMessage
 from raiden.transfer.identifiers import CanonicalIdentifier
 from raiden.transfer.views import state_from_raiden
+from raiden.ui.app import _setup_matrix
 from raiden.utils import BlockNumber, merge_dict, pex
 from raiden.utils.typing import Address, Optional
 from raiden.waiting import wait_for_payment_network
@@ -149,7 +150,6 @@ def create_all_channels_for_network(
 def network_with_minimum_channels(apps, channels_per_node):
     """ Return the channels that should be created so that each app has at
     least `channels_per_node` with the other apps.
-
     Yields a two-tuple (app1, app2) that must be connected to respect
     `channels_per_node`. Any preexisting channels will be ignored, so the nodes
     might end up with more channels open than `channels_per_node`.
@@ -227,7 +227,6 @@ def create_network_channels(raiden_apps, channels_per_node):
 def create_sequential_channels(raiden_apps, channels_per_node):
     """ Create a fully connected network with `num_nodes`, the nodes are
     connect sequentially.
-
     Returns:
         A list of apps of size `num_nodes`, with the property that every
         sequential pair in the list has an open channel with `deposit` for each
@@ -342,6 +341,10 @@ def create_apps(
                             "private_rooms": private_rooms,
                         }
                     },
+                    "services": {
+                        "pathfinding_service_address": None,
+                        "monitoring_enabled": False
+                    }
                 },
             )
 
@@ -360,7 +363,7 @@ def create_apps(
             user_deposit = blockchain.user_deposit(user_deposit_address)
 
         if use_matrix:
-            transport = MatrixTransport(config["transport"]["matrix"])
+            transport = _setup_matrix(config)
         else:
             throttle_policy = TokenBucket(
                 config["transport"]["udp"]["throttle_capacity"],
@@ -465,12 +468,11 @@ def wait_for_usable_channel(
     retry_timeout=DEFAULT_RETRY_TIMEOUT,
 ):
     """ Wait until the channel from app0 to app1 is usable.
-
     The channel and the deposits are registered, and the partner network state
     is reachable.
     """
     waiting.wait_for_newchannel(
-        app0.raiden, registry_address, token_address, app1.raiden.address, retry_timeout
+        app0.raiden, registry_address, token_address, app1.raiden.address, app0.raiden.address, retry_timeout
     )
 
     waiting.wait_for_participant_newbalance(
@@ -487,7 +489,7 @@ def wait_for_usable_channel(
         app0.raiden,
         registry_address,
         token_address,
-        app1.raiden.address,
+        app0.raiden.address,
         app1.raiden.address,
         partner_deposit,
         retry_timeout,

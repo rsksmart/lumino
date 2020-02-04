@@ -68,7 +68,6 @@ class ConnectionManager:
     BOOTSTRAP_ADDR = decode_hex(BOOTSTRAP_ADDR_HEX)
 
     def __init__(self, raiden, token_network_identifier):
-
         from raiden.api.python import RaidenAPI
         chain_state = views.state_from_raiden(raiden)
         token_network_state = views.get_token_network_by_identifier(
@@ -310,6 +309,7 @@ class ConnectionManager:
                 token_address=self.token_address,
                 partner_address=partner,
                 total_deposit=total_deposit,
+                creator_address=self.raiden.address
             )
         except InvalidDBData:
             raise
