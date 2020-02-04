@@ -299,8 +299,7 @@ def handle_transferrefundcancelroute(
     channel_state = channelidentifiers_to_channels.get(initiator_state.transfer.initiator)
     if channel_state:
         channel_state = channel_state.get(channel_identifier)
-
-    if not channel_state:
+    else:
         return TransitionResult(payment_state, list())
 
     refund_transfer = state_change.transfer
