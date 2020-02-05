@@ -178,6 +178,15 @@ class SQLiteStorage:
             last_id = cursor.lastrowid
         return last_id
 
+    def update_light_client_payment_status(self, light_client_payment_id, status):
+        with self.write_lock, self.conn:
+            cursor = self.conn.execute(
+                "UPDATE light_client_payment SET payment_status =? WHERE payment_hash=?", (str(status.value), light_client_payment_id)
+            )
+            last_id = cursor.lastrowid
+
+        return last_id
+
     def write_light_client_protocol_message(self, msg_dto):
         with self.write_lock, self.conn:
             cursor = self.conn.execute(
@@ -202,14 +211,19 @@ class SQLiteStorage:
         return last_id
 
     def is_light_client_protocol_message_already_stored(self, payment_id: int, order: int,
-                                                        message_type: str):
+                                                        message_type: str, message_protocol_type:str):
         cursor = self.conn.cursor()
         cursor.execute(
             """
             SELECT *
-                FROM light_client_protocol_message WHERE light_client_payment_id = ? and message_order = ? and message_type = ?;
+                FROM light_client_protocol_message WHERE light_client_payment_id = ? and message_order = ? and message_type = ?
+                AND (json_extract(light_client_protocol_message.unsigned_message, '$') is not NULL 
+                AND json_extract(light_client_protocol_message.unsigned_message, '$.type') == ? 
+                OR json_extract(light_client_protocol_message.signed_message, '$') is not NULL 
+                AND json_extract(light_client_protocol_message.signed_message, '$.type') == ?)
+
             """,
-            (str(payment_id), order, message_type)
+            (str(payment_id), order, message_type,message_protocol_type,message_protocol_type)
         )
 
         return cursor.fetchone()
@@ -1330,16 +1344,15 @@ class SQLiteStorage:
         )
         return cursor.fetchone()
 
-    def get_light_client_payment_locked_transfer(self, payment_identifier, message_type):
+    def get_light_client_payment_locked_transfer(self, payment_identifier):
         cursor = self.conn.cursor()
         cursor.execute(
             "SELECT identifier, message_order,message_type, unsigned_message, signed_message, light_client_payment_id" +
             " FROM light_client_protocol_message A INNER JOIN light_client_payment B" +
             " ON A.light_client_payment_id = B.payment_id" +
             " WHERE A.message_order = 1" +
-            " AND A.message_type = ?" +
             " AND B.payment_id = ?",
-            (message_type, str(payment_identifier)),
+            (str(payment_identifier),),
         )
         return cursor.fetchone()
 

@@ -6,7 +6,7 @@ from eth_utils import to_checksum_address
 
 from raiden.lightclient.lightclientmessages.light_client_non_closing_balance_proof import \
     LightClientNonClosingBalanceProof
-from raiden.lightclient.models.light_client_payment import LightClientPayment
+from raiden.lightclient.models.light_client_payment import LightClientPayment, LightClientPaymentStatus
 from raiden.lightclient.models.light_client_protocol_message import LightClientProtocolMessage, \
     LightClientProtocolMessageType
 from raiden.messages import Message, LockedTransfer, SecretRequest, RevealSecret, Secret, Processed, Delivered, Unlock, \
@@ -67,11 +67,20 @@ class LightClientMessageHandler:
             storage.write_light_client_payment(payment)
 
     @classmethod
-    def is_light_client_protocol_message_already_stored(cls, payment_id: int, order: int,
-                                                        message_type: LightClientProtocolMessageType, wal: WriteAheadLog
+    def update_light_client_payment_status(cls, payment_id: int, status: LightClientPaymentStatus, storage: SerializedSQLiteStorage):
+        exists_payment = storage.get_light_client_payment(payment_id)
+        if not exists_payment:
+            storage.update_light_client_payment_status(payment_id, status, storage)
+
+    @classmethod
+    def is_light_client_protocol_message_already_stored(cls, payment_id: int,
+                                                        order: int,
+                                                        message_type: LightClientProtocolMessageType,
+                                                        message_protocol_type: str,
+                                                        wal: WriteAheadLog
                                                         ):
         existing_message = wal.storage.is_light_client_protocol_message_already_stored(payment_id, order,
-                                                                                       str(message_type.value))
+                                                                                       str(message_type.value), message_protocol_type)
 
         if existing_message:
             return LightClientProtocolMessage(existing_message[4] is not None,
@@ -97,9 +106,7 @@ class LightClientMessageHandler:
 
     @classmethod
     def get_light_client_payment_locked_transfer(cls, payment_identifier: int, wal: WriteAheadLog):
-        message = wal.storage.get_light_client_payment_locked_transfer(payment_identifier,
-                                                                       str(
-                                                                           LightClientProtocolMessageType.PaymentSuccessful.value))
+        message = wal.storage.get_light_client_payment_locked_transfer(payment_identifier)
         identifier = message[0]
         message_order = message[1]
         unsigned_message = message[3]

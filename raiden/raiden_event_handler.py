@@ -183,6 +183,7 @@ class RaidenEventHandler(EventHandler):
             store_message_event.payment_id,
             store_message_event.message_order,
             store_message_event.message_type,
+            store_message_event.message.to_dict()["type"],
             raiden.wal)
         if not existing_message:
             LightClientMessageHandler.store_light_client_protocol_message(store_message_event.message_id,
