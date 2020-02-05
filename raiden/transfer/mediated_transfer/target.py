@@ -245,7 +245,23 @@ def handle_inittarget_light(
                                                            LightClientProtocolMessageType.PaymentSuccessful)
             channel_events.append(store_secret_request_event)
             channel_events.append(store_locked_transfer_event)
-
+        elif not safe_to_wait:
+            # If transfer expired, persist the LockedTransfer in order that the LC can get it and respond with Delivered msg
+            # Also persist the payment on with expired status
+            payment = LightClientPayment(
+                state_change.transfer.target, state_change.transfer.initiator,
+                False,
+                channel_state.token_network_identifier,
+                transfer.lock.amount,
+                str(date.today()),
+                LightClientPaymentStatus.Expired,
+                transfer.payment_identifier
+            )
+            LightClientMessageHandler.store_light_client_payment(payment, storage)
+            store_expired_locked_transfer_event = StoreMessageEvent(transfer.message_identifier, transfer.payment_identifier, 1,
+                                                            state_change.signed_lockedtransfer, True,
+                                                            LightClientProtocolMessageType.PaymentExpired)
+            channel_events.append(store_expired_locked_transfer_event)
         iteration = TransitionResult(target_state, channel_events)
     else:
         # If the balance proof is not valid, do *not* create a task. Otherwise it's
@@ -602,18 +618,9 @@ def handle_lock_expired_light(
     block_number: BlockNumber,
     storage
 ) -> TransitionResult[TargetTransferState]:
-    """Persist the failing payment."""
-    payment = LightClientPayment(
-        state_change.lock_expired.recipient, state_change.lock_expired.sender,
-        False,
-        channel_state.token_network_identifier,
-        state_change.lock_expired.transferred_amount,
-        str(date.today()),
-        LightClientPaymentStatus.Failed,
-        target_state.transfer.payment_identifier
-    )
-
-    LightClientMessageHandler.store_light_client_payment(payment, storage)
+    """Update the status of the payment to Expired ."""
+    LightClientMessageHandler.update_light_client_payment_status(target_state.transfer.payment_identifier,
+                                                                 LightClientPaymentStatus.Expired, storage)
     """Remove expired locks from channel states."""
     result = channel.handle_receive_lock_expired_light(
         channel_state=channel_state, state_change=state_change, block_number=block_number,
