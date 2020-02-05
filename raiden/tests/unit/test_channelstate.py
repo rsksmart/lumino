@@ -240,6 +240,7 @@ def test_channelstate_update_contract_balance():
         deposit_transaction=deposit_transaction,
         block_number=block_number,
         block_hash=block_hash,
+        participant=our_model1.participant_address
     )
 
     iteration = channel.state_transition(
@@ -283,6 +284,7 @@ def test_channelstate_decreasing_contract_balance():
         deposit_transaction=deposit_transaction,
         block_number=deposit_block_number,
         block_hash=deposit_block_hash,
+        participant=our_model1.participant_address
     )
 
     iteration = channel.state_transition(
@@ -321,6 +323,7 @@ def test_channelstate_repeated_contract_balance():
         deposit_transaction=deposit_transaction,
         block_number=deposit_block_number,
         block_hash=deposit_block_hash,
+        participant=our_model1.participant_address
     )
 
     our_model2 = our_model1._replace(
@@ -369,6 +372,7 @@ def test_deposit_must_wait_for_confirmation():
         deposit_transaction=deposit_transaction,
         block_number=block_number,
         block_hash=block_hash,
+        participant=our_model1.participant_address
     )
     iteration = channel.state_transition(
         channel_state=deepcopy(channel_state),
@@ -1329,6 +1333,7 @@ def test_channelstate_unlock_unlocked_onchain():
         block_hash=make_block_hash(),
         partner_onchain_locksroot=make_32bytes(),  # non empty
         our_onchain_locksroot=EMPTY_MERKLE_ROOT,
+        participant1=our_model1.participant_address
     )
 
     iteration = channel.handle_channel_settled(channel_state, settle_state_change)
@@ -1371,7 +1376,12 @@ def test_action_close_must_change_the_channel_state():
     channel_state = create_channel_from_models(our_model1, partner_model1, partner_key1)
 
     block_number = 10
-    state_change = ActionChannelClose(canonical_identifier=channel_state.canonical_identifier)
+    state_change = ActionChannelClose(
+        canonical_identifier=channel_state.canonical_identifier,
+        participant1=our_model1.participant_address,
+        participant2=partner_model1.participant_address,
+        signed_close_tx=""
+    )
     iteration = channel.state_transition(
         channel_state=channel_state,
         state_change=state_change,
@@ -1405,7 +1415,12 @@ def test_update_must_be_called_if_close_lost_race():
     assert is_valid, msg
 
     block_number = 10
-    state_change = ActionChannelClose(canonical_identifier=channel_state.canonical_identifier)
+    state_change = ActionChannelClose(
+        canonical_identifier=channel_state.canonical_identifier,
+        participant1=our_model1.participant_address,
+        participant2=partner_model1.participant_address,
+        signed_close_tx=""
+    )
     iteration = channel.state_transition(
         channel_state=channel_state,
         state_change=state_change,
@@ -1433,7 +1448,12 @@ def test_update_transfer():
     channel_state = create_channel_from_models(our_model1, partner_model1, partner_key1)
 
     block_number = 10
-    state_change = ActionChannelClose(canonical_identifier=channel_state.canonical_identifier)
+    state_change = ActionChannelClose(
+        canonical_identifier=channel_state.canonical_identifier,
+        participant1=our_model1.participant_address,
+        participant2=partner_model1.participant_address,
+        signed_close_tx=""
+    )
     iteration = channel.state_transition(
         channel_state=channel_state,
         state_change=state_change,

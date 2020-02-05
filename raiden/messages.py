@@ -75,7 +75,6 @@ __all__ = (
     "SignedMessage",
     "ToDevice",
     "Unlock",
-    "UpdatePFS",
     "decode",
     "from_dict",
 )

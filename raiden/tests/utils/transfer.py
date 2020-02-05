@@ -66,7 +66,7 @@ def get_channelstate(
     app0: App, app1: App, token_network_identifier: TokenNetworkID
 ) -> NettingChannelState:
     channel_state = views.get_channelstate_by_token_network_and_partner(
-        views.state_from_app(app0), token_network_identifier, app1.raiden.address
+        views.state_from_app(app0), token_network_identifier, app0.raiden.address, app1.raiden.address
     )
     return channel_state
 

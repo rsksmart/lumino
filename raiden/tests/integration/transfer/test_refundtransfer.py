@@ -71,8 +71,11 @@ def run_test_refund_messages(raiden_chain, token_addresses, deposit, network_wai
     refund_amount = deposit // 2
     identifier = 1
     payment_status = app0.raiden.mediated_transfer_async(
-        token_network_identifier, refund_amount, app2.raiden.address, identifier,
-        payment_hash_invoice=EMPTY_PAYMENT_HASH_INVOICE
+        token_network_identifier=token_network_identifier,
+        amount=refund_amount,
+        target=app2.raiden.address,
+        identifier=identifier,
+        payment_hash_invoice=EMPTY_PAYMENT_HASH_INVOICE,
     )
     msg = "Must fail, there are no routes available"
     assert payment_status.payment_done.wait() is False, msg
@@ -215,7 +218,10 @@ def run_test_refund_transfer(
     identifier_refund = 3
     amount_refund = 50
     payment_status = app0.raiden.mediated_transfer_async(
-        token_network_identifier, amount_refund, app2.raiden.address, identifier_refund,
+        token_network_identifier=token_network_identifier,
+        amount=amount_refund,
+        target=app2.raiden.address,
+        identifier=identifier_refund,
         payment_hash_invoice=EMPTY_PAYMENT_HASH_INVOICE
     )
     msg = "there is no path with capacity, the transfer must fail"

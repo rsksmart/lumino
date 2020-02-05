@@ -171,7 +171,9 @@ def make_raiden_service_mock(
     raiden_service.wal = wal
 
     token_network = MockTokenNetwork()
-    token_network.channelidentifiers_to_channels[channel_identifier] = MockChannelState()
+    address_channels = dict()
+    address_channels[channel_identifier] = MockChannelState()
+    token_network.channelidentifiers_to_channels[raiden_service.address] = address_channels
     token_network.partneraddresses_to_channelidentifiers[partner] = [channel_identifier]
 
     payment_network = MockPaymentNetwork()
