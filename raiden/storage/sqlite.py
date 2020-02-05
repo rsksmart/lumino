@@ -181,7 +181,7 @@ class SQLiteStorage:
     def update_light_client_payment_status(self, light_client_payment_id, status):
         with self.write_lock, self.conn:
             cursor = self.conn.execute(
-                "UPDATE light_client_payment SET payment_status =? WHERE payment_hash=?", (str(status.value), light_client_payment_id)
+                "UPDATE light_client_payment SET payment_status =? WHERE payment_id=?", (str(status.value), light_client_payment_id)
             )
             last_id = cursor.lastrowid
 
