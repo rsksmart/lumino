@@ -23,7 +23,7 @@ class LightClientPayment:
         partner_address: AddressHex,
         is_lc_initiator: int,
         token_network_id: TokenNetworkID,
-        amount: int,
+        amount: string,
         created_on: string,
         payment_status: LightClientPaymentStatus,
         identifier: string
@@ -34,7 +34,7 @@ class LightClientPayment:
         self.partner_address = to_checksum_address(partner_address)
         self.is_lc_initiator = is_lc_initiator
         self.token_network_id = to_checksum_address(token_network_id)
-        self.amount = amount
+        self.amount = int(amount)
         self.created_on = created_on
         self.payment_status = payment_status
 

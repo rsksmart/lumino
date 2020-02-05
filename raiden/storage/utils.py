@@ -103,7 +103,7 @@ CREATE TABLE IF NOT EXISTS light_client_payment(
     partner_address TEXT NOT NULL, 
     is_lc_initiator INTEGER DEFAULT 1,
     token_network_id TEXT NOT NULL,
-    amount INTEGER NOT NULL,
+    amount TEXT NOT NULL,
     created_on TEXT NOT NULL, 
     payment_status  TEXT CHECK  (payment_status in ('InProgress', 'Expired', 'Failed', 'Done', 'Pending', 'Deleted' ) ) NOT NULL DEFAULT 'Pending',
     FOREIGN KEY(light_client_address) REFERENCES client(address)
