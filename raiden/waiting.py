@@ -277,6 +277,8 @@ def wait_for_settle(
     token_address: TokenAddress,
     channel_ids: List[ChannelID],
     retry_timeout: float,
+    partner_addresses: List[Address],
+
 ) -> None:
     """Wait until all channels are settled.
 
@@ -290,6 +292,7 @@ def wait_for_settle(
         channel_ids=channel_ids,
         retry_timeout=retry_timeout,
         target_states=(CHANNEL_STATE_SETTLED,),
+        partner_addresses=partner_addresses,
     )
 
 

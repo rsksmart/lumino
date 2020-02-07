@@ -180,6 +180,7 @@ class ConnectionManager:
                 self.token_address,
                 channel_ids,
                 self.raiden.alarm.sleep_time,
+                partner_addresses,
             )
 
         return channels_to_close
