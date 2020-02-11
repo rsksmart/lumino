@@ -7,6 +7,7 @@ from eth_utils import to_checksum_address, encode_hex
 from raiden.blockchain.events import Event
 from raiden.blockchain.state import get_channel_state
 from raiden.connection_manager import ConnectionManager
+from raiden.exceptions import AddressWithoutCode
 from raiden.lightclient.handlers.light_client_message_handler import LightClientMessageHandler
 from raiden.lightclient.handlers.light_client_service import LightClientService
 from raiden.network.proxies.utils import get_onchain_locksroots
@@ -52,27 +53,30 @@ def handle_tokennetwork_new(raiden: "RaidenService", event: Event):
     token_network_address = args["token_network_address"]
     token_address = typing.TokenAddress(args["token_address"])
     block_hash = data["block_hash"]
+    # from raiden.network.rpc.client import check_address_has_code
+    # check_address_has_code(raiden.chain.client, token_network_address, 'TokenNetwork')
+    try:
+        token_network_proxy = raiden.chain.token_network(token_network_address)
+        raiden.blockchain_events.add_token_network_listener(
+            token_network_proxy=token_network_proxy,
+            contract_manager=raiden.contract_manager,
+            from_block=block_number,
+        )
 
-    token_network_proxy = raiden.chain.token_network(token_network_address)
-    raiden.blockchain_events.add_token_network_listener(
-        token_network_proxy=token_network_proxy,
-        contract_manager=raiden.contract_manager,
-        from_block=block_number,
-    )
+        token_network_state = TokenNetworkState(token_network_address, token_address)
 
-    token_network_state = TokenNetworkState(token_network_address, token_address)
+        transaction_hash = event.event_data["transaction_hash"]
 
-    transaction_hash = event.event_data["transaction_hash"]
-
-    new_token_network = ContractReceiveNewTokenNetwork(
-        transaction_hash=transaction_hash,
-        payment_network_identifier=event.originating_contract,
-        token_network=token_network_state,
-        block_number=block_number,
-        block_hash=block_hash,
-    )
-    raiden.handle_and_track_state_change(new_token_network)
-
+        new_token_network = ContractReceiveNewTokenNetwork(
+            transaction_hash=transaction_hash,
+            payment_network_identifier=event.originating_contract,
+            token_network=token_network_state,
+            block_number=block_number,
+            block_hash=block_hash,
+        )
+        raiden.handle_and_track_state_change(new_token_network)
+    except AddressWithoutCode:
+        log.info("TokenAddress without code, Address: %s", to_checksum_address(token_address))
 
 def handle_channel_new(raiden: "RaidenService", event: Event):
     data = event.event_data

@@ -182,7 +182,7 @@ def check_address_has_code(client: "JSONRPCClient", address: Address, contract_n
     """ Checks that the given address contains code. """
     result = client.web3.eth.getCode(to_checksum_address(address), "latest")
 
-    if not result:
+    if not result or result == b'\x00':
         if contract_name:
             formated_contract_name = "[{}]: ".format(contract_name)
         else:
