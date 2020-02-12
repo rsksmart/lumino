@@ -53,8 +53,6 @@ def handle_tokennetwork_new(raiden: "RaidenService", event: Event):
     token_network_address = args["token_network_address"]
     token_address = typing.TokenAddress(args["token_address"])
     block_hash = data["block_hash"]
-    # from raiden.network.rpc.client import check_address_has_code
-    # check_address_has_code(raiden.chain.client, token_network_address, 'TokenNetwork')
     try:
         token_network_proxy = raiden.chain.token_network(token_network_address)
         raiden.blockchain_events.add_token_network_listener(
