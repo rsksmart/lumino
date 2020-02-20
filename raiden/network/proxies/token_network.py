@@ -1,4 +1,4 @@
-from collections import defaultdict, namedtuple
+from collections import defaultdict
 from typing import Any, Dict, List, NamedTuple, Optional, Tuple
 from dataclasses import dataclass
 

@@ -48,7 +48,7 @@ from raiden.lightclient.models.light_client_payment import LightClientPayment, L
 from raiden.lightclient.models.light_client_protocol_message import LightClientProtocolMessageType
 
 from raiden.messages import RequestMonitoring, LockedTransfer, RevealSecret, Unlock, Delivered, SecretRequest, \
-    Processed, LockExpired, Lock
+    Processed, LockExpired
 from raiden.settings import DEFAULT_RETRY_TIMEOUT, DEVELOPMENT_CONTRACT_VERSION, HUB_MAX_LIGHT_CLIENTS
 
 from raiden.transfer import architecture, views

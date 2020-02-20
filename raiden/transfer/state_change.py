@@ -21,7 +21,7 @@ from raiden.transfer.state import (
     TransactionChannelNewBalance,
 )
 from raiden.transfer.utils import pseudo_random_generator_from_json
-from raiden.utils import pex, sha3, decode_hex
+from raiden.utils import pex, sha3
 from raiden.utils.serialization import (
     deserialize_blockhash,
     deserialize_bytes,
@@ -60,8 +60,7 @@ from raiden.utils.typing import (
     TokenNetworkID,
     TransactionHash,
     TransferID,
-    AddressHex,
-    SignedTransaction)
+    AddressHex)
 
 
 class Block(StateChange):

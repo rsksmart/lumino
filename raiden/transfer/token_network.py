@@ -1,6 +1,4 @@
-from eth_utils import to_checksum_address, to_normalized_address, decode_hex
-from eth_utils.typing import ChecksumAddress
-
+from eth_utils import decode_hex
 from raiden.transfer import channel, views
 from raiden.transfer.architecture import Event, StateChange, TransitionResult
 from raiden.transfer.state import TokenNetworkState, NettingChannelState
@@ -16,8 +14,7 @@ from raiden.transfer.state_change import (
     ContractReceiveRouteNew,
     ContractReceiveUpdateTransfer,
     ContractReceiveChannelClosedLight, ContractReceiveChannelSettledLight)
-from raiden.utils.typing import MYPY_ANNOTATION, BlockHash, BlockNumber, List, Union, Dict, ChannelID, Address, \
-    AddressHex, Tuple
+from raiden.utils.typing import MYPY_ANNOTATION, BlockHash, BlockNumber, List, Union, Dict, AddressHex
 
 # TODO: The proper solution would be to introduce a marker for state changes
 # that contains channel IDs and other specific channel attributes
