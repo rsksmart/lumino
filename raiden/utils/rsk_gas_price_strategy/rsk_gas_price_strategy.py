@@ -153,7 +153,7 @@ def construct_time_based_gas_price_strategy(max_wait_seconds,
         that the transaction will be mined within ``max_wait_seconds``.  0 means 0%
         and 100 means 100%.
     """
-    def time_based_gas_price_strategy(web3, transaction_params):
+    def time_based_gas_price_strategy(web3):
         avg_block_time = _get_avg_block_time(web3, sample_size=sample_size)
         wait_blocks = int(math.ceil(max_wait_seconds / avg_block_time))
 

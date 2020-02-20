@@ -922,12 +922,13 @@ class RaidenAPI:
                 chain_state=views.state_from_raiden(self.raiden),
                 payment_network_id=registry_address,
                 token_addresses_split=token_addresses_split,
-                node_address=self.address
+                _node_address=self.address
             )
 
         return result
 
-    def _check_token_address_format(self, token_address):
+    @staticmethod
+    def _check_token_address_format(token_address):
         if token_address and not is_binary_address(token_address):
             raise InvalidAddress('Expected binary address format for token in get_channel_list')
 
@@ -1121,7 +1122,7 @@ class RaidenAPI:
             payment_network_id=payment_network_identifier,
             token_address=token_address,
         )
-        payment_status = self.raiden.mediated_transfer_async_light(
+        self.raiden.mediated_transfer_async_light(
             token_network_identifier=token_network_identifier,
             amount=amount,
             creator=creator,
@@ -1261,7 +1262,8 @@ class RaidenAPI:
         invoice = self.raiden.wal.storage.query_invoice(payment_hash)
         return invoice
 
-    def decode_invoice(self, coded_invoice):
+    @staticmethod
+    def decode_invoice(coded_invoice):
         return decode_invoice(coded_invoice)
 
     def get_blockchain_events_network(
@@ -1564,11 +1566,12 @@ class RaidenAPI:
 
         return matches
 
-    def _match_in(self, data, query):
+    @staticmethod
+    def _match_in(data, query):
         matches = []
         for item in data:
             if isinstance(item, dict):
-                for key, value in item.items():
+                for _, value in item.items():
                     if query in value:
                         matches.append(item)
                 # Remove duplicate dicts
@@ -1600,7 +1603,8 @@ class RaidenAPI:
 
         return token_addresses
 
-    def _get_node_addresses_for_search(self, token_network):
+    @staticmethod
+    def _get_node_addresses_for_search(token_network):
         node_addresses = []
         nodes = token_network.network_graph.channel_identifier_to_participants.values()
         for node_address_tuple in nodes:

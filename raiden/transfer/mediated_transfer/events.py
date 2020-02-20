@@ -83,7 +83,10 @@ class StoreMessageEvent(Event):
         restored = cls(
             payment_id=int(data["payment_id"]),
             message_id=int(data["message_id"]),
-            message_order=int(data["message_order"])
+            message_order=int(data["message_order"]),
+            message=None,
+            is_signed=None,
+            message_type=None
         )
         return restored
 
@@ -792,7 +795,8 @@ class SendSecretRequestLight(SendMessageEvent):
             amount=PaymentWithFeeAmount(int(data["amount"])),
             expiration=BlockExpiration(int(data["expiration"])),
             secrethash=deserialize_secret_hash(data["secrethash"]),
-            signed_secret_request=data["signed_secret_request"]
+            signed_secret_request=data["signed_secret_request"],
+            sender=None
         )
 
         return restored

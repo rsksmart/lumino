@@ -217,9 +217,9 @@ class SQLiteStorage:
             """
             SELECT *
                 FROM light_client_protocol_message WHERE light_client_payment_id = ? and message_order = ? and message_type = ?
-                AND (json_extract(light_client_protocol_message.unsigned_message, '$') is not NULL 
-                AND json_extract(light_client_protocol_message.unsigned_message, '$.type') == ? 
-                OR json_extract(light_client_protocol_message.signed_message, '$') is not NULL 
+                AND (json_extract(light_client_protocol_message.unsigned_message, '$') is not NULL
+                AND json_extract(light_client_protocol_message.unsigned_message, '$.type') == ?
+                OR json_extract(light_client_protocol_message.signed_message, '$') is not NULL
                 AND json_extract(light_client_protocol_message.signed_message, '$.type') == ?)
 
             """,
@@ -340,18 +340,18 @@ class SQLiteStorage:
 
         cursor.execute(
             """
-            SELECT 
-                identifier, 
-                type, 
-                status, 
-                expiration_date, 
-                encode, 
-                payment_hash, 
-                secret, 
-                currency, 
-                amount, 
-                description, 
-                target_address, 
+            SELECT
+                identifier,
+                type,
+                status,
+                expiration_date,
+                encode,
+                payment_hash,
+                secret,
+                currency,
+                amount,
+                description,
+                target_address,
                 token_address
             FROM invoices WHERE payment_hash = ?;
             """,
@@ -381,7 +381,7 @@ class SQLiteStorage:
 
         cursor.execute(
             """
-            SELECT 
+            SELECT
                 address,
                 password,
                 api_key,
@@ -399,7 +399,8 @@ class SQLiteStorage:
 
         return light_clients
 
-    def light_clients_to_list_of_dicts(self, light_clients):
+    @staticmethod
+    def light_clients_to_list_of_dicts(light_clients):
         list_of_dicts = []
         for light_client in light_clients:
             light_client_dict = {"address": light_client[0],
@@ -417,7 +418,7 @@ class SQLiteStorage:
 
         cursor.execute(
             """
-            SELECT 
+            SELECT
                 address,
                 password,
                 api_key,
@@ -869,7 +870,7 @@ class SQLiteStorage:
                       '$.identifier') IN ({})
                    AND
                    json_extract(state_events.data,
-                      '$._type') IN ({})        
+                      '$._type') IN ({})
            """
 
         query = query.format("\'" + str(identifier) + "\'", "\'" + event_type + "\'")
@@ -938,16 +939,16 @@ class SQLiteStorage:
                                limit,
                                offset):
 
-        query = """ 
+        query = """
 
             SELECT
-                data, 
+                data,
                 log_time
             FROM
                 state_events
             WHERE
                 json_extract(state_events.data,
-                        '$._type') IN ({}) {} {} {} {} 
+                        '$._type') IN ({}) {} {} {} {}
             LIMIT ? OFFSET ?
 
                     """
@@ -990,7 +991,8 @@ class SQLiteStorage:
 
         return query, tuple_for_execute
 
-    def _get_query_for_node_address(self, node_address_label, or_contiional):
+    @staticmethod
+    def _get_query_for_node_address(node_address_label, or_contiional):
 
         result = " AND json_extract(state_events.data, '$.{}') = ? "
 
@@ -1002,13 +1004,15 @@ class SQLiteStorage:
             result = result.format(node_address_label)
         return result
 
-    def _get_token_network_identifier_query(self, token_network_identifier):
+    @staticmethod
+    def _get_token_network_identifier_query(token_network_identifier):
         result = " "
         if token_network_identifier is not None:
             result = " AND json_extract(state_events.data,'$.token_network_identifier') = ? "
         return result
 
-    def _get_event_type_query(self, event_type: int = None):
+    @staticmethod
+    def _get_event_type_query(event_type: int = None):
 
         event_type_result = ['raiden.transfer.events.EventPaymentReceivedSuccess',
                              'raiden.transfer.events.EventPaymentSentFailed',
@@ -1023,7 +1027,8 @@ class SQLiteStorage:
 
         return event_type_result
 
-    def _get_date_range_query(self, from_date, to_date):
+    @staticmethod
+    def _get_date_range_query(from_date, to_date):
         date_range_result = " "
         if from_date is not None and to_date is not None:
             date_range_result = " AND log_time BETWEEN ? and ? "
@@ -1034,8 +1039,8 @@ class SQLiteStorage:
 
         return date_range_result
 
-    def _get_tuple_to_get_payments(self,
-                                   token_network_identifier,
+    @staticmethod
+    def _get_tuple_to_get_payments(token_network_identifier,
                                    our_address,
                                    initiator_address,
                                    target_address,
@@ -1126,7 +1131,7 @@ class SQLiteStorage:
 
     def _get_general_data_payments(self):
 
-        query = """ 
+        query = """
             SELECT
                 CASE
                     {}
@@ -1137,8 +1142,8 @@ class SQLiteStorage:
                 state_events
             WHERE
                 json_extract(state_events.data,'$._type') IN ({})
-            GROUP BY                
-                json_extract(state_events.data,'$._type')          
+            GROUP BY
+                json_extract(state_events.data,'$._type')
         """
 
         event_type_result = self._get_event_type_query()
@@ -1153,19 +1158,21 @@ class SQLiteStorage:
 
         return cursor.fetchall()
 
-    def _get_sql_case_type_event_payment(self):
+    @staticmethod
+    def _get_sql_case_type_event_payment():
         case_type_event = """
 
         json_extract(state_events.data,'$._type')
                     WHEN 'raiden.transfer.events.EventPaymentReceivedSuccess' THEN '1'
                     WHEN 'raiden.transfer.events.EventPaymentSentFailed' THEN '2'
-                    WHEN 'raiden.transfer.events.EventPaymentSentSuccess' THEN '3' 
+                    WHEN 'raiden.transfer.events.EventPaymentSentSuccess' THEN '3'
 
         """
         return case_type_event
 
-    def _get_sql_case_type_label_event_type(self):
-        case_event_type_label = """        
+    @staticmethod
+    def _get_sql_case_type_label_event_type():
+        case_event_type_label = """
 
         json_extract(state_events.data,'$._type')
                     WHEN 'raiden.transfer.events.EventPaymentReceivedSuccess' THEN 'Payment Received'
@@ -1185,14 +1192,14 @@ class SQLiteStorage:
         base_query = '''
 
             SELECT
-                log_time, 
+                log_time,
                 data
             FROM
                 state_events
             WHERE
                 json_extract(state_events.data,
-                '$._type') IN ({})	
-            LIMIT ?	
+                '$._type') IN ({})
+            LIMIT ?
 
         '''
 
@@ -1238,9 +1245,9 @@ class SQLiteStorage:
 		        {}
 	        END event_type_label,
 	        COUNT(json_extract(state_events.data, '$._type')) AS quantity,
-	        log_time,	                   
+	        log_time,
 	        STRFTIME("%m", log_time) AS month_of_year_code,
-	        CASE 
+	        CASE
 	            STRFTIME("%m", log_time)
 	                WHEN '01' THEN 'JAN'
 	                WHEN '02' THEN 'FEB'
@@ -1254,7 +1261,7 @@ class SQLiteStorage:
 	                WHEN '10' THEN 'OCT'
 	                WHEN '11' THEN 'NOV'
 	                WHEN '12' THEN 'DIC'
-	        END month_of_year_label 	     
+	        END month_of_year_label
         FROM
 	        state_events
         WHERE
@@ -1334,7 +1341,7 @@ class SQLiteStorage:
         cursor = self.conn.cursor()
         cursor.execute(
             """
-           SELECT internal_bp_identifier, sender, light_client_payment_id, secret_hash, nonce, channel_id, 
+           SELECT internal_bp_identifier, sender, light_client_payment_id, secret_hash, nonce, channel_id,
             token_network_address, balance_proof, lc_balance_proof_signature
             FROM light_client_balance_proof
             WHERE channel_id  = ?

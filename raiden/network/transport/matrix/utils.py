@@ -390,6 +390,7 @@ def _check_previous_login(client: GMatrixClient,
             current_address=base_username,
             current_server=server_name,
         )
+    return None
 
 
 def _try_login_or_register(client: GMatrixClient,

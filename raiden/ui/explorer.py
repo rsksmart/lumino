@@ -20,7 +20,7 @@ def register(explorer_endpoint, rsk_address, rns_domain):
             log.info("Succesfully registered into Lumino Explorer")
         else:
             log.info("Warning: There was an error registering into Lumino Explorer. Status: " + str(response.status_code))
-    except requests.exceptions.RequestException as e:
+    except requests.exceptions.RequestException:
         log.info("Warning: Could not connect to Lumino Explorer. Your node will not be registered.")
 
 

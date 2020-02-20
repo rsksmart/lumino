@@ -70,7 +70,6 @@ def logs_blocks_sanity_check(from_block: BlockSpecification, to_block: BlockSpec
 
 
 def geth_assert_rpc_interfaces(web3: Web3):
-
     try:
         web3.version.node
     except ValueError:
@@ -105,7 +104,6 @@ def geth_assert_rpc_interfaces(web3: Web3):
 
 
 def parity_assert_rpc_interfaces(web3: Web3):
-
     try:
         web3.version.node
     except ValueError:
@@ -873,7 +871,7 @@ class JSONRPCClient:
 
     def check_for_insufficient_eth(
         self,
-        address: Address,
+        _address: Address,
         transaction_name: str,
         transaction_executed: bool,
         required_gas: int,

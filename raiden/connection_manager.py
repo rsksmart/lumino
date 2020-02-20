@@ -211,10 +211,11 @@ class ConnectionManager:
         # deciding on the deposit
         with self.lock, token_network_proxy.channel_operations_lock[partner_address]:
             channel_state = views.get_channelstate_for(
-                views.state_from_raiden(self.raiden),
-                self.token_network_identifier,
-                self.token_address,
-                partner_address,
+                chain_state=views.state_from_raiden(self.raiden),
+                payment_network_id=self.token_network_identifier,
+                token_address=self.token_address,
+                creator_address=None,
+                partner_address=partner_address
             )
 
             if not channel_state:
@@ -231,7 +232,11 @@ class ConnectionManager:
 
             try:
                 self.api.set_total_channel_deposit(
-                    self.registry_address, self.token_address, partner_address, joining_funds
+                    registry_address=self.registry_address,
+                    token_address=self.token_address,
+                    creator_address=None,
+                    partner_address=partner_address,
+                    total_deposit=joining_funds
                 )
             except RaidenRecoverableError:
                 log.info("Channel not in opened state", node=pex(self.raiden.address))

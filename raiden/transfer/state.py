@@ -672,11 +672,12 @@ class TokenNetworkGraphState(State):
     def __ne__(self, other: Any) -> bool:
         return not self.__eq__(other)
 
-    def _same_channel_tuple(self, participant1: Address, participant2: Address, graph_tuple: Tuple[Address, Address]) -> bool:
+    @staticmethod
+    def _same_channel_tuple(participant1: Address, participant2: Address, graph_tuple: Tuple[Address, Address]) -> bool:
         return graph_tuple[0] == participant1 and graph_tuple[1] == participant2 or graph_tuple[0] == participant2 and graph_tuple[1] == participant1
 
     def channel_exists(self, participant1: Address, participant2: Address) -> bool:
-        for key, val in self.channel_identifier_to_participants.items():
+        for _key, val in self.channel_identifier_to_participants.items():
             if self._same_channel_tuple(participant1, participant2, val):
                 return True
         return False
