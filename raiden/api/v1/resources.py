@@ -1,4 +1,3 @@
-import string
 from typing import Dict
 
 from flask import Blueprint

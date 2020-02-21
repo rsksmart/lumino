@@ -7,7 +7,6 @@ from eth_utils import to_checksum_address, to_hex
 from raiden.constants import EMPTY_BALANCE_HASH, EMPTY_HASH, EMPTY_MESSAGE_HASH, EMPTY_SIGNATURE
 from raiden.exceptions import ChannelOutdatedError, RaidenUnrecoverableError
 from raiden.lightclient.handlers.light_client_message_handler import LightClientMessageHandler
-from raiden.lightclient.models.light_client_protocol_message import LightClientProtocolMessageType
 from raiden.message_event_convertor import message_from_sendevent
 from raiden.network.proxies.payment_channel import PaymentChannel
 from raiden.network.proxies.token_network import TokenNetwork

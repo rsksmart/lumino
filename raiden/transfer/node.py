@@ -1,6 +1,3 @@
-from datetime import date
-
-from raiden.lightclient.models.light_client_payment import LightClientPayment
 from raiden.lightclient.models.light_client_protocol_message import LightClientProtocolMessageType
 from raiden.transfer import channel, token_network, views
 from raiden.transfer.architecture import (

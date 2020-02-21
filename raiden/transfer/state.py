@@ -6,7 +6,7 @@ from random import Random
 from typing import TYPE_CHECKING, Tuple
 
 import networkx
-from eth_utils import encode_hex, to_canonical_address, to_checksum_address, to_normalized_address
+from eth_utils import encode_hex, to_canonical_address, to_checksum_address
 
 from raiden.constants import EMPTY_MERKLE_ROOT, UINT64_MAX, UINT256_MAX
 from raiden.encoding import messages

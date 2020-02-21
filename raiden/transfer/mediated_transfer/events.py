@@ -6,7 +6,7 @@ from raiden.messages import RevealSecret, Unlock, Message, SecretRequest, LockEx
 
 from raiden.transfer.architecture import Event, SendMessageEvent
 from raiden.transfer.mediated_transfer.state import LockedTransferUnsignedState
-from raiden.transfer.state import BalanceProofUnsignedState, BalanceProofSignedState
+from raiden.transfer.state import BalanceProofUnsignedState
 from raiden.utils import pex, sha3
 from raiden.utils.serialization import deserialize_secret, deserialize_secret_hash, serialize_bytes
 from raiden.utils.typing import (

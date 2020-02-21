@@ -2,7 +2,7 @@ import string
 from enum import Enum
 from eth_utils import to_checksum_address
 
-from raiden.utils.typing import AddressHex, TokenNetworkID, Secret
+from raiden.utils.typing import AddressHex, TokenNetworkID
 
 
 class LightClientPaymentStatus(Enum):

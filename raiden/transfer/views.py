@@ -1,7 +1,7 @@
 from raiden.transfer import channel
 from raiden.transfer.architecture import ContractSendEvent
 from raiden.transfer.identifiers import CanonicalIdentifier
-from eth_utils import to_canonical_address, to_checksum_address
+from eth_utils import to_canonical_address
 
 from raiden.transfer.state import (
     CHANNEL_STATE_CLOSED,

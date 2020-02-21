@@ -2,8 +2,7 @@
 import heapq
 import random
 
-from datetime import date
-from eth_utils import encode_hex, decode_hex
+from eth_utils import encode_hex
 
 from raiden.constants import (
     EMPTY_HASH_KECCAK,
@@ -12,10 +11,7 @@ from raiden.constants import (
     UINT256_MAX,
     EMPTY_PAYMENT_HASH_INVOICE
 )
-from raiden.lightclient.handlers.light_client_message_handler import LightClientMessageHandler
-from raiden.lightclient.models.light_client_payment import LightClientPayment, LightClientPaymentStatus
 from raiden.lightclient.models.light_client_protocol_message import LightClientProtocolMessageType
-from raiden.message_event_convertor import message_from_sendevent
 from raiden.messages import Unlock, LockExpired
 from raiden.settings import DEFAULT_NUMBER_OF_BLOCK_CONFIRMATIONS
 from raiden.transfer.architecture import Event, StateChange, TransitionResult
@@ -116,8 +112,7 @@ from raiden.utils.typing import (
     TokenNetworkID,
     Tuple,
     Union,
-    cast,
-    Signature)
+    cast)
 
 from raiden.billing.invoices.handlers.invoice_handler import handle_received_invoice
 
