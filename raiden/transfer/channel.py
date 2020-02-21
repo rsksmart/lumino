@@ -1763,9 +1763,9 @@ def handle_receive_lockedtransfer_light(
 
 
 def handle_receive_refundtransfercancelroute(
-    channel_state: NettingChannelState, refund_transfer: LockedTransferSignedState
+    channel_state: NettingChannelState, refund_transfer: LockedTransferSignedState, storage
 ) -> EventsOrError:
-    return handle_receive_lockedtransfer(channel_state, refund_transfer, None)
+    return handle_receive_lockedtransfer(channel_state, refund_transfer, storage)
 
 
 def handle_unlock(channel_state: NettingChannelState, unlock: ReceiveUnlock) -> EventsOrError:

@@ -196,12 +196,12 @@ def subdispatch_by_canonical_id(
 
 
 def subdispatch_to_all_lockedtransfers(
-    chain_state: ChainState, state_change: StateChange
+    chain_state: ChainState, state_change: StateChange, storage=None
 ) -> TransitionResult[ChainState]:
     events = list()
 
     for secrethash in list(chain_state.payment_mapping.secrethashes_to_task.keys()):
-        result = subdispatch_to_paymenttask(chain_state, state_change, secrethash)
+        result = subdispatch_to_paymenttask(chain_state, state_change, secrethash, storage)
         events.extend(result.events)
 
     return TransitionResult(chain_state, events)
@@ -235,6 +235,7 @@ def subdispatch_to_paymenttask(
                     token_network_state.channelidentifiers_to_channels,
                     pseudo_random_generator,
                     block_number,
+                    storage
                 )
                 events = sub_iteration.events
                 if sub_iteration.new_state is None:
@@ -547,7 +548,7 @@ def inplace_delete_message(
             message_queue.remove(message)
 
 
-def handle_block(chain_state: ChainState, state_change: Block) -> TransitionResult[ChainState]:
+def handle_block(chain_state: ChainState, state_change: Block, storage=None) -> TransitionResult[ChainState]:
     block_number = state_change.block_number
     chain_state.block_number = block_number
     chain_state.block_hash = state_change.block_hash
@@ -559,7 +560,7 @@ def handle_block(chain_state: ChainState, state_change: Block) -> TransitionResu
         block_number=block_number,
         block_hash=chain_state.block_hash,
     )
-    transfers_result = subdispatch_to_all_lockedtransfers(chain_state, state_change)
+    transfers_result = subdispatch_to_all_lockedtransfers(chain_state, state_change, storage)
     events = channels_result.events + transfers_result.events
     return TransitionResult(chain_state, events)
 
@@ -819,10 +820,10 @@ def handle_receive_transfer_refund(
 
 
 def handle_receive_transfer_refund_cancel_route(
-    chain_state: ChainState, state_change: ReceiveTransferRefundCancelRoute
+    chain_state: ChainState, state_change: ReceiveTransferRefundCancelRoute, storage
 ) -> TransitionResult[ChainState]:
     return subdispatch_to_paymenttask(
-        chain_state, state_change, state_change.transfer.lock.secrethash
+        chain_state, state_change, state_change.transfer.lock.secrethash, storage
     )
 
 
@@ -900,7 +901,7 @@ def handle_state_change(
 ) -> TransitionResult[ChainState]:
     if type(state_change) == Block:
         assert isinstance(state_change, Block), MYPY_ANNOTATION
-        iteration = handle_block(chain_state, state_change)
+        iteration = handle_block(chain_state, state_change, storage)
     elif type(state_change) == ActionInitChain:
         assert isinstance(state_change, ActionInitChain), MYPY_ANNOTATION
         iteration = handle_chain_init(chain_state, state_change)
@@ -987,7 +988,7 @@ def handle_state_change(
         iteration = handle_secret_reveal(chain_state, state_change)
     elif type(state_change) == ReceiveTransferRefundCancelRoute:
         assert isinstance(state_change, ReceiveTransferRefundCancelRoute), MYPY_ANNOTATION
-        iteration = handle_receive_transfer_refund_cancel_route(chain_state, state_change)
+        iteration = handle_receive_transfer_refund_cancel_route(chain_state, state_change, storage)
     elif type(state_change) == ReceiveTransferRefund:
         assert isinstance(state_change, ReceiveTransferRefund), MYPY_ANNOTATION
         iteration = handle_receive_transfer_refund(chain_state, state_change)

@@ -290,6 +290,7 @@ def handle_transferrefundcancelroute(
     channelidentifiers_to_channels: ChannelMap,
     pseudo_random_generator: random.Random,
     block_number: BlockNumber,
+    storage
 ) -> TransitionResult[InitiatorPaymentState]:
     initiator_state = payment_state.initiator_transfers.get(state_change.transfer.lock.secrethash)
     if not initiator_state:
@@ -318,7 +319,7 @@ def handle_transferrefundcancelroute(
         return TransitionResult(payment_state, list())
 
     is_valid, channel_events, _, _ = channel.handle_receive_refundtransfercancelroute(
-        channel_state, refund_transfer
+        channel_state, refund_transfer, storage
     )
 
     events.extend(channel_events)
@@ -596,6 +597,7 @@ def state_transition(
     channelidentifiers_to_channels: ChannelMap,
     pseudo_random_generator: random.Random,
     block_number: BlockNumber,
+    storage=None
 ) -> TransitionResult[InitiatorPaymentState]:
     # pylint: disable=unidiomatic-typecheck
     if type(state_change) == Block:
@@ -660,6 +662,7 @@ def state_transition(
             channelidentifiers_to_channels=channelidentifiers_to_channels,
             pseudo_random_generator=pseudo_random_generator,
             block_number=block_number,
+            storage=storage
         )
     elif type(state_change) == ActionCancelPayment:
         assert isinstance(state_change, ActionCancelPayment), MYPY_ANNOTATION
