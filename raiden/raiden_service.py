@@ -917,7 +917,7 @@ class RaidenService(Runnable):
 
         events_queues = views.get_all_messagequeues(chain_state)
 
-        for queue_identifier, _ in events_queues.items():
+        for queue_identifier, _event_queue in events_queues.items():
             self.start_health_check_for(queue_identifier.recipient)
 
             # for event in event_queue:
