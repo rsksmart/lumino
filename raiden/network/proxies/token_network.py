@@ -278,7 +278,7 @@ class TokenNetwork:
         if not gas_limit:
             self.proxy.jsonrpc_client.check_for_insufficient_eth(
                 transaction_name="openChannel",
-                address=self.node_address,
+                _address=self.node_address,
                 transaction_executed=False,
                 required_gas=GAS_REQUIRED_FOR_OPEN_CHANNEL,
                 block_identifier=checking_block,
@@ -680,7 +680,7 @@ class TokenNetwork:
     ):
         self.proxy.jsonrpc_client.check_for_insufficient_eth(
             transaction_name="setTotalDeposit",
-            address=creator,
+            _address=creator,
             transaction_executed=transaction_executed,
             required_gas=GAS_REQUIRED_FOR_SET_TOTAL_DEPOSIT,
             block_identifier=block_identifier,
@@ -1191,7 +1191,7 @@ class TokenNetwork:
 
                 self.proxy.jsonrpc_client.check_for_insufficient_eth(
                     transaction_name="closeChannel",
-                    address=self.node_address,
+                    _address=self.node_address,
                     transaction_executed=True,
                     required_gas=GAS_REQUIRED_FOR_CLOSE_CHANNEL,
                     block_identifier=failed_at_blocknumber,
@@ -1395,7 +1395,7 @@ class TokenNetwork:
 
                 self.proxy.jsonrpc_client.check_for_insufficient_eth(
                     transaction_name="closeChannel",
-                    address=self.node_address,
+                    _address=self.node_address,
                     transaction_executed=True,
                     required_gas=GAS_REQUIRED_FOR_CLOSE_CHANNEL,
                     block_identifier=failed_at_blocknumber,
@@ -1686,7 +1686,7 @@ class TokenNetwork:
 
             self.proxy.jsonrpc_client.check_for_insufficient_eth(
                 transaction_name="updateNonClosingBalanceProof",
-                address=self.node_address,
+                _address=self.node_address,
                 transaction_executed=False,
                 required_gas=GAS_REQUIRED_FOR_UPDATE_BALANCE_PROOF,
                 block_identifier=failed_at_blocknumber,
@@ -1993,7 +1993,7 @@ class TokenNetwork:
 
             self.proxy.jsonrpc_client.check_for_insufficient_eth(
                 transaction_name="updateNonClosingBalanceProof",
-                address=self.node_address,
+                _address=self.node_address,
                 transaction_executed=False,
                 required_gas=GAS_REQUIRED_FOR_UPDATE_BALANCE_PROOF,
                 block_identifier=failed_at_blocknumber,
@@ -2100,7 +2100,7 @@ class TokenNetwork:
 
             self.proxy.jsonrpc_client.check_for_insufficient_eth(
                 transaction_name="unlock",
-                address=self.node_address,
+                _address=self.node_address,
                 transaction_executed=transaction_executed,
                 required_gas=UNLOCK_TX_GAS_LIMIT,
                 block_identifier=block,
@@ -2228,7 +2228,7 @@ class TokenNetwork:
 
             self.proxy.jsonrpc_client.check_for_insufficient_eth(
                 transaction_name="settleChannel",
-                address=self.node_address,
+                _address=self.node_address,
                 transaction_executed=transaction_executed,
                 required_gas=GAS_REQUIRED_FOR_SETTLE_CHANNEL,
                 block_identifier=block,
