@@ -116,7 +116,7 @@ class UserDeposit:
 
                 self.proxy.jsonrpc_client.check_for_insufficient_eth(
                     transaction_name="deposit",
-                    _address=self.node_address,
+                    address=self.node_address,
                     transaction_executed=transaction_executed,
                     required_gas=GAS_REQUIRED_FOR_UDC_DEPOSIT,
                     block_identifier=block,

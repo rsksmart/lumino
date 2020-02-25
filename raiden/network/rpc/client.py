@@ -871,7 +871,7 @@ class JSONRPCClient:
 
     def check_for_insufficient_eth(
         self,
-        _address: Address,
+        address: Address,
         transaction_name: str,
         transaction_executed: bool,
         required_gas: int,
@@ -890,7 +890,7 @@ class JSONRPCClient:
         if transaction_executed:
             return
 
-        our_address = to_checksum_address(self.address)
+        our_address = to_checksum_address(address)
         balance = self.web3.eth.getBalance(our_address, block_identifier)
         required_balance = required_gas * self.gas_price()
         if balance < required_balance:

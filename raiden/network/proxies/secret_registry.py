@@ -256,7 +256,7 @@ class SecretRegistry:
             # assert/revert, and the account should always be funded
             self.proxy.jsonrpc_client.check_for_insufficient_eth(
                 transaction_name="registerSecretBatch",
-                _address=self.node_address,
+                address=self.node_address,
                 transaction_executed=True,
                 required_gas=gas_limit,
                 block_identifier=checking_block,

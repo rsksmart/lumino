@@ -570,8 +570,7 @@ def list_channelstate_for_tokennetwork(
 def list_channelstate_for_tokennetwork_lumino(
     chain_state: ChainState,
     payment_network_id: PaymentNetworkID,
-    token_addresses_split,
-    _node_address
+    token_addresses_split
 ) -> List[NettingChannelState]:
     channels_by_token = []
 

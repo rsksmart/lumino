@@ -921,8 +921,7 @@ class RaidenAPI:
             result = views.list_channelstate_for_tokennetwork_lumino(
                 chain_state=views.state_from_raiden(self.raiden),
                 payment_network_id=registry_address,
-                token_addresses_split=token_addresses_split,
-                _node_address=self.address
+                token_addresses_split=token_addresses_split
             )
 
         return result
