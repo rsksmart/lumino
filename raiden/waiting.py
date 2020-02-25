@@ -157,7 +157,6 @@ def wait_for_payment_balance(
         chain_state=views.state_from_raiden(raiden),
         payment_network_id=payment_network_id,
         token_address=token_address,
-        creator_address=None,
         partner_address=partner_address
     )
 
@@ -171,7 +170,6 @@ def wait_for_payment_balance(
             chain_state=views.state_from_raiden(raiden),
             payment_network_id=payment_network_id,
             token_address=token_address,
-            creator_address=None,
             partner_address=partner_address
         )
 
@@ -321,6 +319,7 @@ def wait_for_settle_all_channels(raiden: "RaidenService", retry_timeout: float) 
                 List[ChannelID], token_network_state.channelidentifiers_to_channels.keys()
             )
 
+            # TODO: partner_addresses cant be None, we should specify a value here #jonaf2103
             wait_for_settle(
                 raiden=raiden,
                 payment_network_id=payment_network_id,

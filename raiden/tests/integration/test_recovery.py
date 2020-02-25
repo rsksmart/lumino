@@ -210,10 +210,10 @@ def test_recovery_unhappy_case(
     )
 
     channel01 = views.get_channelstate_for(
-        views.state_from_app(app1),
-        app1.raiden.default_registry.address,
-        token_address,
-        app0.raiden.address,
+        chain_state=views.state_from_app(app1),
+        payment_network_id=app1.raiden.default_registry.address,
+        token_address=token_address,
+        creator_address=app0.raiden.address
     )
 
     waiting.wait_for_settle(

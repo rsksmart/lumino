@@ -1302,8 +1302,7 @@ def _get_channels_close_events(
                 channel.events_for_close(
                     channel_state=channel_state,
                     block_number=chain_state.block_number,
-                    block_hash=chain_state.block_hash,
-                    signed_close_tx=None
+                    block_hash=chain_state.block_hash
                 )
             )
     return events

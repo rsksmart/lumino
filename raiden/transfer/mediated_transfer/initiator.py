@@ -310,6 +310,7 @@ def try_new_route_light(
             events.append(store_signed_lt)
 
         else:
+            # pylint: disable=no-member
             transfer_failed = EventPaymentSentFailed(
                 payment_network_identifier=transfer_description.payment_network_identifier,
                 token_network_identifier=transfer_description.token_network_identifier,

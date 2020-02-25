@@ -1191,6 +1191,8 @@ def create_unlock(
     )
 
     if is_light_client:
+        # TODO: sender and signed_balance_proof should have a value since that value is used later so
+        #  this is wrong @jonaf2103
         unlock_lock = SendBalanceProofLight(
             sender=None,
             recipient=recipient,
@@ -1341,7 +1343,7 @@ def send_unlock(
 
 def events_for_close(
     channel_state: NettingChannelState, block_number: BlockNumber, block_hash: BlockHash,
-    signed_close_tx: str
+    signed_close_tx: str = None
 ) -> List[Event]:
     events: List[Event] = list()
 
@@ -1426,7 +1428,7 @@ def events_for_expired_lock(
     channel_state: NettingChannelState,
     locked_lock: LockType,
     pseudo_random_generator: random.Random,
-    payment_identifier: int
+    payment_identifier: int = None
 ) -> List[Union[SendLockExpired, ProcessLockExpiredLight]]:
     msg = "caller must make sure the channel is open"
     assert get_status(channel_state) == CHANNEL_STATE_OPENED, msg
