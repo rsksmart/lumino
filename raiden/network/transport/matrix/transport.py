@@ -907,7 +907,7 @@ class MatrixTransport(Runnable):
         if self._stop_event.ready():
             return None
         address_hex = to_normalized_address(address)
-        msg = f"address not health checked: me: {self._user_id}, peer: {address_hex}"
+        _msg = f"address not health checked: me: {self._user_id}, peer: {address_hex}"
         #FIXME mmartinez
       #  assert address and self._address_mgr.is_address_known(address), msg
 

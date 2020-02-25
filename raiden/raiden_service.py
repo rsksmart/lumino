@@ -917,7 +917,7 @@ class RaidenService(Runnable):
 
         events_queues = views.get_all_messagequeues(chain_state)
 
-        for queue_identifier, event_queue in events_queues.items():
+        for queue_identifier, _event_queue in events_queues.items():
             self.start_health_check_for(queue_identifier.recipient)
 
             # for event in event_queue:
@@ -965,7 +965,7 @@ class RaidenService(Runnable):
         msg = "The node state was not yet recovered, cant read balance proofs. node:{self!r}"
         assert self.wal, msg
 
-        current_balance_proofs = views.detect_balance_proof_change(
+        views.detect_balance_proof_change(
             old_state=ChainState(
                 pseudo_random_generator=chain_state.pseudo_random_generator,
                 block_number=GENESIS_BLOCK_NUMBER,
@@ -1105,7 +1105,8 @@ class RaidenService(Runnable):
               expire.
         """
 
-        payment_status = self.start_mediated_transfer_without_secret_light(
+        # payment_status was here before as a variable
+        self.start_mediated_transfer_without_secret_light(
             token_network_identifier=token_network_identifier,
             amount=amount,
             fee=fee,

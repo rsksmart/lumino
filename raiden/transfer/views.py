@@ -570,8 +570,7 @@ def list_channelstate_for_tokennetwork(
 def list_channelstate_for_tokennetwork_lumino(
     chain_state: ChainState,
     payment_network_id: PaymentNetworkID,
-    token_addresses_split,
-    node_address
+    token_addresses_split
 ) -> List[NettingChannelState]:
     channels_by_token = []
 
@@ -625,7 +624,7 @@ def filter_channels_by_partneraddress(
         if node_address in token_network.channelidentifiers_to_channels:
             channels = token_network.channelidentifiers_to_channels[node_address]
             if channels is not None:
-                for channelId, channel in channels.items():
+                for _channelId, channel in channels.items():
                     for partner_address in partner_addresses:
                         if channel.partner_state.address == partner_address:
                             if channel.close_transaction is None or channel.close_transaction.result != 'success':

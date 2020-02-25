@@ -476,7 +476,7 @@ class APIServer(Runnable):
         # Setup Schedule Config for background jobs
         node_address = to_checksum_address(self.rest_api.raiden_api.address)
 
-        setup_schedule_config(self, config['explorerendpoint'], config['discoverable'], node_address,
+        setup_schedule_config(config['explorerendpoint'], config['discoverable'], node_address,
                               self.rest_api.raiden_api.raiden)
 
         self._is_raiden_running()
@@ -506,7 +506,7 @@ class APIServer(Runnable):
         if not self.rest_api.raiden_api.raiden:
             raise RuntimeError("The RaidenService must be started before the API can be used")
 
-    def _serve_webui(self, file_name='index.html'):  # pylint: disable=redefined-builtin
+    def _serve_webui(self, _file_name='index.html'):  # pylint: disable=redefined-builtin
         return send_from_directory(self.flask_app.root_path + '/webui', 'index.html')
 
     def _run(self):
@@ -694,7 +694,7 @@ class RestAPI:
         token_address: typing.TokenAddress,
         signed_tx: typing.SignedTransaction,
         settle_timeout: typing.BlockTimeout = None,
-        total_deposit: typing.TokenAmount = None,
+        _total_deposit: typing.TokenAmount = None,
     ):
         log.debug(
             "Opening channel for light client",
@@ -1259,7 +1259,8 @@ class RestAPI:
 
         return result
 
-    def _get_events_group_by_month(self, month, data):
+    @staticmethod
+    def _get_events_group_by_month(month, data):
         return [dashboardItem for dashboardItem in data if dashboardItem.month_of_year_label == month]
 
     def get_raiden_internal_events_with_timestamps(self, limit, offset):
@@ -1767,12 +1768,14 @@ class RestAPI:
 
         return self.update_channel_state(registry_address, channel_state)
 
-    def validate_channel_status(self, channel_state):
+    @staticmethod
+    def validate_channel_status(channel_state):
         if channel.get_status(channel_state) != CHANNEL_STATE_OPENED:
             return api_error(
                 errors="Attempted to close an already closed channel",
                 status_code=HTTPStatus.CONFLICT,
             )
+        return None
 
     def update_channel_state(self, registry_address, channel_state):
         updated_channel_state = self.raiden_api.get_channel(
@@ -1940,7 +1943,7 @@ class RestAPI:
         if token_network_address is None:
             return api_error(
                 errors="Token network address must not be empty.",
-                status_code=HTTPStatus.BAD_REQUESTCONFLICT,
+                status_code=HTTPStatus.BAD_REQUEST,
             )
 
         network_graph = self.raiden_api.get_network_graph(token_network_address)
@@ -1978,7 +1981,7 @@ class RestAPI:
         if query is None:
             return api_error(
                 errors="Query param must not be empty.",
-                status_code=HTTPStatus.BAD_REQUESTCONFLICT,
+                status_code=HTTPStatus.BAD_REQUEST,
             )
 
         search_result = self.raiden_api.search_lumino(registry_address, query, only_receivers)

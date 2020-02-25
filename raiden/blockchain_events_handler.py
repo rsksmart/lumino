@@ -188,8 +188,8 @@ def handle_channel_new_balance(raiden: "RaidenService", event: Event):
 
     # Channels will only be registered if this node is a participant or LC is a participant
     if previous_channel_state is not None:
-        previous_balance = previous_channel_state.our_state.contract_balance
-        balance_was_zero = previous_balance == 0
+        # previous_balance = previous_channel_state.our_state.contract_balance
+        # balance_was_zero = previous_balance == 0
 
         deposit_transaction = TransactionChannelNewBalance(
             participant_address, total_deposit, block_number

@@ -98,7 +98,8 @@ class EventHandler(ABC):
 
 class RaidenEventHandler(EventHandler):
 
-    def event_from_light_client(self, chain_state: ChainState, partner_address: AddressHex,
+    @staticmethod
+    def event_from_light_client(chain_state: ChainState, partner_address: AddressHex,
                                 canonical_identifier: CanonicalIdentifier):
         return views.get_channelstate_by_canonical_identifier_and_address(chain_state, canonical_identifier,
                                                                           partner_address)

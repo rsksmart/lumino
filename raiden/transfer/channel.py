@@ -1192,6 +1192,7 @@ def create_unlock(
 
     if is_light_client:
         unlock_lock = SendBalanceProofLight(
+            sender=None,
             recipient=recipient,
             channel_identifier=channel_state.identifier,
             message_identifier=message_identifier,
@@ -1199,6 +1200,7 @@ def create_unlock(
             token_address=token_address,
             secret=secret,
             balance_proof=balance_proof,
+            signed_balance_proof=None
         )
     else:
         unlock_lock = SendBalanceProof(

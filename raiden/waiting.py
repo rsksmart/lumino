@@ -154,7 +154,11 @@ def wait_for_payment_balance(
         raise ValueError("target_address must be one of the channel participants")
 
     channel_state = views.get_channelstate_for(
-        views.state_from_raiden(raiden), payment_network_id, token_address, partner_address
+        chain_state=views.state_from_raiden(raiden),
+        payment_network_id=payment_network_id,
+        token_address=token_address,
+        creator_address=None,
+        partner_address=partner_address
     )
 
     while balance(channel_state) < target_balance:
@@ -164,7 +168,11 @@ def wait_for_payment_balance(
         log.critical("wait", b=balance(channel_state), t=target_balance)
         gevent.sleep(retry_timeout)
         channel_state = views.get_channelstate_for(
-            views.state_from_raiden(raiden), payment_network_id, token_address, partner_address
+            chain_state=views.state_from_raiden(raiden),
+            payment_network_id=payment_network_id,
+            token_address=token_address,
+            creator_address=None,
+            partner_address=partner_address
         )
 
 
@@ -319,6 +327,7 @@ def wait_for_settle_all_channels(raiden: "RaidenService", retry_timeout: float) 
                 token_address=TokenAddress(token_network_id),
                 channel_ids=channel_ids,
                 retry_timeout=retry_timeout,
+                partner_addresses=None
             )
 
 

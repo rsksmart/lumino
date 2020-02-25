@@ -70,7 +70,6 @@ def logs_blocks_sanity_check(from_block: BlockSpecification, to_block: BlockSpec
 
 
 def geth_assert_rpc_interfaces(web3: Web3):
-
     try:
         web3.version.node
     except ValueError:
@@ -105,7 +104,6 @@ def geth_assert_rpc_interfaces(web3: Web3):
 
 
 def parity_assert_rpc_interfaces(web3: Web3):
-
     try:
         web3.version.node
     except ValueError:
@@ -892,7 +890,7 @@ class JSONRPCClient:
         if transaction_executed:
             return
 
-        our_address = to_checksum_address(self.address)
+        our_address = to_checksum_address(address)
         balance = self.web3.eth.getBalance(our_address, block_identifier)
         required_balance = required_gas * self.gas_price()
         if balance < required_balance:
