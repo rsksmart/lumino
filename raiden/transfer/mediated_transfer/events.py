@@ -74,7 +74,10 @@ class StoreMessageEvent(Event):
         result = {
             "payment_id": str(self.payment_id),
             "message_id": str(self.message_id),
-            "message_order": str(self.message_order)
+            "message_order": str(self.message_order),
+            "message": self.message.to_dict(),
+            "is_signed": str(self.is_signed),
+            "message_type": str(self.message_type)
         }
         return result
 
@@ -84,9 +87,9 @@ class StoreMessageEvent(Event):
             payment_id=int(data["payment_id"]),
             message_id=int(data["message_id"]),
             message_order=int(data["message_order"]),
-            message=None,
-            is_signed=None,
-            message_type=None
+            message=Message.from_dict(data["message"]),
+            is_signed=bool(data["is_signed"]),
+            message_type=LightClientProtocolMessageType(data["message_type"])
         )
         return restored
 
@@ -637,7 +640,6 @@ class SendBalanceProofLight(SendMessageEvent):
 
     def __init__(
         self,
-        sender: Address,
         recipient: Address,
         channel_identifier: ChannelID,
         message_identifier: MessageID,
@@ -645,7 +647,8 @@ class SendBalanceProofLight(SendMessageEvent):
         token_address: TokenAddress,
         secret: Secret,
         balance_proof: BalanceProofUnsignedState,
-        signed_balance_proof: Unlock
+        signed_balance_proof: Unlock = None,
+        sender: Address = None,
     ) -> None:
         super().__init__(recipient, channel_identifier, message_identifier)
         self.sender = sender
@@ -780,7 +783,8 @@ class SendSecretRequestLight(SendMessageEvent):
             "amount": str(self.amount),
             "expiration": str(self.expiration),
             "secrethash": serialize_bytes(self.secrethash),
-            "signed_secret_request": self.signed_secret_request
+            "signed_secret_request": self.signed_secret_request,
+            "sender": to_checksum_address(self.sender)
         }
 
         return result
@@ -796,7 +800,7 @@ class SendSecretRequestLight(SendMessageEvent):
             expiration=BlockExpiration(int(data["expiration"])),
             secrethash=deserialize_secret_hash(data["secrethash"]),
             signed_secret_request=data["signed_secret_request"],
-            sender=None
+            sender=to_canonical_address(data["sender"])
         )
 
         return restored

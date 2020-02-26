@@ -506,8 +506,8 @@ class APIServer(Runnable):
         if not self.rest_api.raiden_api.raiden:
             raise RuntimeError("The RaidenService must be started before the API can be used")
 
-    def _serve_webui(self, _file_name='index.html'):  # pylint: disable=redefined-builtin
-        return send_from_directory(self.flask_app.root_path + '/webui', 'index.html')
+    def _serve_webui(self, file_name='index.html'):  # pylint: disable=redefined-builtin
+        return send_from_directory(self.flask_app.root_path + '/webui', file_name)
 
     def _run(self):
         try:
@@ -693,8 +693,7 @@ class RestAPI:
         partner_address: typing.Address,
         token_address: typing.TokenAddress,
         signed_tx: typing.SignedTransaction,
-        settle_timeout: typing.BlockTimeout = None,
-        _total_deposit: typing.TokenAmount = None,
+        settle_timeout: typing.BlockTimeout = None
     ):
         log.debug(
             "Opening channel for light client",

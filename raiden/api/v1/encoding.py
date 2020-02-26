@@ -361,7 +361,6 @@ class ChannelLightPutSchema(BaseSchema):
     partner_address = AddressField(required=True)
     signed_tx = fields.String(required=True)
     settle_timeout = fields.Integer(missing=None)
-    total_deposit = fields.Integer(default=None, missing=None)
 
     class Meta:
         strict = True

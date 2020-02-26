@@ -214,7 +214,6 @@ class ConnectionManager:
                 chain_state=views.state_from_raiden(self.raiden),
                 payment_network_id=self.token_network_identifier,
                 token_address=self.token_address,
-                creator_address=None,
                 partner_address=partner_address
             )
 
@@ -231,6 +230,7 @@ class ConnectionManager:
                 return
 
             try:
+                # TODO: creator address cant be None we should specify a value here #jonaf2103
                 self.api.set_total_channel_deposit(
                     registry_address=self.registry_address,
                     token_address=self.token_address,

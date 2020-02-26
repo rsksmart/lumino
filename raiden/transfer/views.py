@@ -274,8 +274,8 @@ def get_channelstate_for(
     chain_state: ChainState,
     payment_network_id: PaymentNetworkID,
     token_address: TokenAddress,
-    creator_address: Address,
-    partner_address: Address
+    creator_address: Address = None,
+    partner_address: Address = None
 ) -> Optional[NettingChannelState]:
     """ Return the NettingChannelState if it exists, None otherwise. """
     token_network = get_token_network_by_token_address(
