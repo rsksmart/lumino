@@ -87,7 +87,7 @@ class StoreMessageEvent(Event):
             payment_id=int(data["payment_id"]),
             message_id=int(data["message_id"]),
             message_order=int(data["message_order"]),
-            message=Message.from_dic(data["message"]),
+            message=Message.from_dict(data["message"]),
             is_signed=bool(data["is_signed"]),
             message_type=LightClientProtocolMessageType(data["message_type"])
         )
