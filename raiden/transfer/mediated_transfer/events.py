@@ -640,7 +640,6 @@ class SendBalanceProofLight(SendMessageEvent):
 
     def __init__(
         self,
-        sender: Address,
         recipient: Address,
         channel_identifier: ChannelID,
         message_identifier: MessageID,
@@ -648,7 +647,8 @@ class SendBalanceProofLight(SendMessageEvent):
         token_address: TokenAddress,
         secret: Secret,
         balance_proof: BalanceProofUnsignedState,
-        signed_balance_proof: Unlock
+        signed_balance_proof: Unlock = None,
+        sender: Address = None,
     ) -> None:
         super().__init__(recipient, channel_identifier, message_identifier)
         self.sender = sender

@@ -1191,10 +1191,7 @@ def create_unlock(
     )
 
     if is_light_client:
-        # TODO: sender and signed_balance_proof should have a value since that value is used later so
-        #  this is wrong @jonaf2103
         unlock_lock = SendBalanceProofLight(
-            sender=None,
             recipient=recipient,
             channel_identifier=channel_state.identifier,
             message_identifier=message_identifier,
@@ -1202,7 +1199,6 @@ def create_unlock(
             token_address=token_address,
             secret=secret,
             balance_proof=balance_proof,
-            signed_balance_proof=None
         )
     else:
         unlock_lock = SendBalanceProof(
