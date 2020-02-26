@@ -75,7 +75,7 @@ class StoreMessageEvent(Event):
             "payment_id": str(self.payment_id),
             "message_id": str(self.message_id),
             "message_order": str(self.message_order),
-            "message": str(self.message),
+            "message": self.message.to_dict(),
             "is_signed": str(self.is_signed),
             "message_type": str(self.message_type)
         }
@@ -87,9 +87,9 @@ class StoreMessageEvent(Event):
             payment_id=int(data["payment_id"]),
             message_id=int(data["message_id"]),
             message_order=int(data["message_order"]),
-            message=data["message"],
-            is_signed=data["is_signed"],
-            message_type=data["message_type"]
+            message=Message.from_dic(data["message"]),
+            is_signed=bool(data["is_signed"]),
+            message_type=LightClientProtocolMessageType(data["message_type"])
         )
         return restored
 
@@ -784,7 +784,7 @@ class SendSecretRequestLight(SendMessageEvent):
             "expiration": str(self.expiration),
             "secrethash": serialize_bytes(self.secrethash),
             "signed_secret_request": self.signed_secret_request,
-            "sender": self.sender
+            "sender": to_checksum_address(self.sender)
         }
 
         return result
@@ -800,7 +800,7 @@ class SendSecretRequestLight(SendMessageEvent):
             expiration=BlockExpiration(int(data["expiration"])),
             secrethash=deserialize_secret_hash(data["secrethash"]),
             signed_secret_request=data["signed_secret_request"],
-            sender=data["sender"]
+            sender=to_canonical_address(data["sender"])
         )
 
         return restored
