@@ -1,4 +1,4 @@
-from raiden.network.transport.matrix.transport import MatrixTransport, _RetryQueue, MatrixLightClientTransport, NodeTransport  # noqa
+from raiden.network.transport.matrix.transport import CurrentLightClientConnection, MatrixTransport, _RetryQueue, MatrixLightClientTransport, NodeTransport  # noqa
 from raiden.network.transport.matrix.utils import (  # noqa
     AddressReachability,
     UserPresence,
@@ -7,5 +7,5 @@ from raiden.network.transport.matrix.utils import (  # noqa
     make_client,
     make_room_alias,
     sort_servers_closest,
-    validate_userid_signature,
+    validate_userid_signature
 )

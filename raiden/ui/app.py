@@ -11,6 +11,8 @@ from web3 import HTTPProvider, Web3
 from definitions import ROOT_DIR
 import json
 from eth_utils import encode_hex
+
+from raiden.network.transport.matrix.transport import get_current_light_client_connection
 from raiden.storage import serialize, sqlite
 
 from raiden.accounts import AccountManager
@@ -93,11 +95,13 @@ def _setup_matrix(config):
 
         light_client_transports = []
         for light_client in light_clients:
-            light_client_transport = get_matrix_light_client_instance(config["transport"]["matrix"],
-                                             light_client['password'],
-                                             light_client['display_name'],
-                                             light_client['seed_retry'],
-                                             light_client['address'])
+            light_client_transport = get_matrix_light_client_instance(
+                config["transport"]["matrix"],
+                light_client['password'],
+                light_client['display_name'],
+                light_client['seed_retry'],
+                light_client['address'],
+                get_current_light_client_connection(light_client))
 
             light_client_transports.append(light_client_transport)
 
@@ -112,8 +116,15 @@ def _setup_matrix(config):
     return node_transport
 
 
-def get_matrix_light_client_instance(config, password, display_name, seed_retry, address):
-    light_client_transport = MatrixLightClientTransport(config, password, display_name, seed_retry, address)
+def get_matrix_light_client_instance(config, password, display_name, seed_retry, address, current_connection):
+    light_client_transport = MatrixLightClientTransport(
+        config,
+        password,
+        display_name,
+        seed_retry,
+        address,
+        current_connection
+    )
     return light_client_transport
 
 

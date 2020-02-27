@@ -1632,6 +1632,7 @@ class RaidenAPI:
     def register_light_client(self,
                               address,
                               signed_password,
+                              server_name,
                               signed_display_name,
                               signed_seed_retry):
 
@@ -1655,7 +1656,10 @@ class RaidenAPI:
                     address=address,
                     encrypt_signed_password=encrypt_signed_password.hex(),
                     encrypt_signed_display_name=encrypt_signed_display_name.hex(),
-                    encrypt_signed_seed_retry=encrypt_signed_seed_retry.hex())
+                    encrypt_signed_seed_retry=encrypt_signed_seed_retry.hex(),
+                    current_server_name=server_name,
+                    pending_authorization=0
+                )
 
                 if result > 0:
                     result = {"address": address,

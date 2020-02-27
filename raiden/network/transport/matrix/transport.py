@@ -41,6 +41,7 @@ from raiden.network.transport.matrix.utils import (
 )
 from raiden.network.transport.udp import udp_utils
 from raiden.raiden_service import RaidenService
+from raiden.storage import serialize, sqlite
 from raiden.transfer import views
 from raiden.transfer.identifiers import QueueIdentifier
 from raiden.transfer.mediated_transfer.events import CHANNEL_IDENTIFIER_GLOBAL_QUEUE
@@ -266,14 +267,44 @@ class _RetryQueue(Runnable):
         return f"<{self.__class__.__name__} for {to_normalized_address(self.receiver)}>"
 
 
+class CurrentLightClientConnection:
+    def __init__(self,
+                 light_client):
+        self.light_client = light_client
+
+    def get_server_name(self):
+        return self.light_client["current_server_name"]
+
+    def get_pending_authorization(self):
+        return self.light_client["pending_authorization"]
+
+    def server_is_available(self, available_servers: list):
+        if available_servers is None:
+            return False
+        return ("http://" + self.get_server_name()) in available_servers or \
+               ("https://" + self.get_server_name()) in available_servers
+
+    def get_server_url(self, available_servers: list):
+        server_name = self.get_server_name()
+        for available_server_url in available_servers:
+            if (("http://" + server_name) == available_server_url) or \
+               (("https://" + server_name) == available_server_url):
+                return available_server_url
+
+
+def get_current_light_client_connection(light_client):
+    return CurrentLightClientConnection(light_client)
+
+
 class MatrixTransport(Runnable):
     _room_prefix = "raiden"
     _room_sep = "_"
     log = log
 
-    def __init__(self, config: dict):
+    def __init__(self, config: dict, current_connection: CurrentLightClientConnection = None):
         super().__init__()
         self._config = config
+        self._current_connection = current_connection
         self._raiden_service: Optional[RaidenService] = None
         if config["server"] == "auto":
             available_servers = config["available_servers"]
@@ -290,12 +321,29 @@ class MatrixTransport(Runnable):
                 config["retry_interval"],
             )
 
-        self._client: GMatrixClient = make_client(
-            available_servers,
-            http_pool_maxsize=4,
-            http_retry_timeout=40,
-            http_retry_delay=_http_retry_delay,
-        )
+        self._client = None
+
+        # If a current connection is available and the server is up we try that first,
+        # otherwise we just do what we usually do.
+
+        if current_connection is not None and \
+           current_connection.server_is_available(available_servers):
+            light_client_available_server = list()
+            light_client_available_server.append(current_connection.get_server_url(available_servers))
+            self._client: GMatrixClient = make_client(
+                light_client_available_server,
+                http_pool_maxsize=4,
+                http_retry_timeout=40,
+                http_retry_delay=_http_retry_delay,
+            )
+        else:
+            self._client: GMatrixClient = make_client(
+                available_servers,
+                http_pool_maxsize=4,
+                http_retry_timeout=40,
+                http_retry_delay=_http_retry_delay,
+            )
+
         self._server_url = self._client.api.base_url
         self._server_name = config.get("server_name", urlparse(self._server_url).netloc)
 
@@ -1362,8 +1410,9 @@ class MatrixLightClientTransport(MatrixTransport):
                  _encrypted_light_client_password_signature: str,
                  _encrypted_light_client_display_name_signature: str,
                  _encrypted_light_client_seed_for_retry_signature: str,
-                 _address: str):
-        super().__init__(config)
+                 _address: str,
+                 current_connection: CurrentLightClientConnection):
+        super().__init__(config, current_connection)
         self._encrypted_light_client_password_signature = _encrypted_light_client_password_signature
         self._encrypted_light_client_display_name_signature = _encrypted_light_client_display_name_signature
         self._encrypted_light_client_seed_for_retry_signature = _encrypted_light_client_seed_for_retry_signature
@@ -1381,6 +1430,13 @@ class MatrixLightClientTransport(MatrixTransport):
         self._stop_event.clear()
         self._raiden_service = raiden_service
         self._message_handler = message_handler
+
+        if self._current_connection is not None:
+            if self._current_connection is not None and self._current_connection.get_server_name() is not None:
+                storage = sqlite.SerializedSQLiteStorage(
+                    database_path=self._raiden_service.database_path, serializer=serialize.JSONSerializer()
+                )
+                storage.update_light_client_connection_status(self._address, True)
 
         prev_user_id: Optional[str]
         prev_access_token: Optional[str]

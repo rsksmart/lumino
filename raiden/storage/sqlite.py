@@ -387,7 +387,9 @@ class SQLiteStorage:
                 api_key,
                 type,
                 display_name,
-                seed_retry
+                seed_retry,
+                current_server_name,
+                pending_authorization
             FROM client;
             """,
             ()
@@ -408,7 +410,9 @@ class SQLiteStorage:
                                  "api_key": light_client[2],
                                  "type": light_client[3],
                                  "display_name": light_client[4],
-                                 "seed_retry": light_client[5]}
+                                 "seed_retry": light_client[5],
+                                 "current_server_name": light_client[6],
+                                 "pending_authorization": light_client[7]}
             list_of_dicts.append(light_client_dict)
 
         return list_of_dicts
@@ -424,7 +428,9 @@ class SQLiteStorage:
                 api_key,
                 type,
                 display_name,
-                seed_retry
+                seed_retry,
+                current_server_name,
+                pending_authorization
             FROM client WHERE address = ?;
             """,
             (address,)
@@ -438,7 +444,9 @@ class SQLiteStorage:
                                  "api_key": light_client[2],
                                  "type": light_client[3],
                                  "display_name": light_client[4],
-                                 "seed_retry": light_client[5]}
+                                 "seed_retry": light_client[5],
+                                 "current_server_name": light_client[6],
+                                 "pending_authorization": light_client[7]}
 
         return light_client_dict
 
@@ -451,14 +459,18 @@ class SQLiteStorage:
                 "api_key, "
                 "type, "
                 "display_name, "
-                "seed_retry)"
-                "VALUES(?, ?, ?, ?, ?, ?)",
+                "seed_retry, "
+                "current_server_name, "
+                "pending_authorization) "
+                "VALUES(?, ?, ?, ?, ?, ?, ?, ?)",
                 (kwargs['address'],
                  kwargs['encrypt_signed_password'],
                  kwargs['api_key'],
                  ClientType.LIGHT.value,
                  kwargs['encrypt_signed_display_name'],
-                 kwargs['encrypt_signed_seed_retry'],),
+                 kwargs['encrypt_signed_seed_retry'],
+                 kwargs['current_server_name'],
+                 kwargs['pending_authorization']),
             )
             last_id = cursor.lastrowid
 
@@ -1534,4 +1546,15 @@ class SerializedSQLiteStorage(SQLiteStorage):
                  )
             )
             last_id = cursor.lastrowid
+        return last_id
+
+    def update_light_client_connection_status(self, address, pending_authorization: bool):
+        with self.write_lock, self.conn:
+            cursor = self.conn.execute(
+                "UPDATE client SET pending_authorization = ? WHERE address = ?",
+                (str(pending_authorization).upper(),
+                 address)
+            )
+            last_id = cursor.lastrowid
+
         return last_id
