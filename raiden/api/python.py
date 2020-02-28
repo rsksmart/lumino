@@ -1757,7 +1757,7 @@ class RaidenAPI:
         if light_client:
             log.debug("Checking key " + api_key + " for LC with address " + light_client["address"])
             if light_client["pending_for_deletion"]:
-                self.raiden.wal.delete_light_client(light_client["address"])
+                self.raiden.wal.storage.delete_light_client(light_client["address"])
                 force_on_boarding = True
         else:
             log.debug("No light client available for api key" + api_key)
