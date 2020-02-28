@@ -27,7 +27,6 @@ from raiden.lightclient.lightclientmessages.light_client_non_closing_balance_pro
 from raiden.lightclient.models.light_client_protocol_message import LightClientProtocolMessageType
 from raiden.messages import LockedTransfer, Delivered, RevealSecret, Unlock, SecretRequest, Processed, \
     LockExpired
-from raiden.network.transport.matrix.transport import get_current_light_client_connection
 from raiden.rns_constants import RNS_ADDRESS_ZERO
 from raiden.utils.rns import is_rns_address
 from webargs.flaskparser import parser
@@ -2063,13 +2062,13 @@ class RestAPI:
             signed_seed_retry)
 
         if light_client is not None and light_client["result_code"] == 0:
+
             matrix_light_client_transport_instance = get_matrix_light_client_instance(
                 self.raiden_api.raiden.config["transport"]["matrix"],
                 password=light_client["encrypt_signed_password"],
                 display_name=light_client["encrypt_signed_display_name"],
                 seed_retry=light_client["encrypt_signed_seed_retry"],
-                address=light_client["address"],
-                current_connection=get_current_light_client_connection(light_client))
+                address=light_client["address"])
 
             self.raiden_api.raiden.start_transport_in_runtime(transport=matrix_light_client_transport_instance,
                                                               chain_state=views.state_from_raiden(

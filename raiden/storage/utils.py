@@ -93,9 +93,7 @@ CREATE TABLE IF NOT EXISTS client (
     seed_retry TEXT NOT NULL,
     api_key TEXT NOT NULL,
     type TEXT CHECK ( type IN ('HUB','FULL','LIGHT') ) NOT NULL DEFAULT 'FULL',
-    current_server_name TEXT NULL,
-    current_server_url TEXT NULL,
-    pending_authorization INTEGER NOT NULL DEFAULT 0
+    current_server_name TEXT NULL
 );
 """
 

@@ -52,6 +52,10 @@ DISPLAY_NAME_HEX_RE = re.compile(r"^0x[0-9a-fA-F]{130}$")
 ROOM_NAME_SEPARATOR = "_"
 ROOM_NAME_PREFIX = "raiden"
 
+HTTP_PREFIX = "http"
+HTTPS_PREFIX = "https"
+URL_STARTER_PREFIX = "://"
+
 
 class UserPresence(Enum):
     ONLINE = "online"
@@ -671,3 +675,48 @@ def validate_and_parse_message(data, peer_address) -> List[Message]:
             messages.append(message)
 
     return messages
+
+
+def get_available_servers_from_config(config: dict):
+    """
+        This function returns the available servers from the matrix configuration dictionary or throws an
+        error if no valid matrix server is available
+
+        Config has to be raiden_api.raiden.config["transport"]["matrix"]
+    """
+    if config["server"] == "auto":
+        return config["available_servers"]
+    elif urlparse(config["server"]).scheme in {HTTP_PREFIX, HTTPS_PREFIX}:
+        return [config["server"]]
+    else:
+        raise TransportError('Invalid matrix server specified (valid values: "auto" or a URL)')
+
+
+def server_is_available(server_name, available_servers: list):
+    """
+        This function returns if a server is available from a list of servers
+        Example:
+            server_name could be persephone.raidentransport.digitalvirtues.com
+            available_servers could be [ "https://persephone.raidentransport.digitalvirtues.com", "https://raidentransport.mycryptoapi.com" ]
+
+            This function will return true since the server name is available
+    """
+    if available_servers is None:
+        return False
+    return (HTTP_PREFIX + URL_STARTER_PREFIX + server_name) in available_servers or \
+           (HTTPS_PREFIX + URL_STARTER_PREFIX + server_name) in available_servers
+
+
+def get_server_url(server_name, available_servers: list):
+    """
+        This function returns the server url from a list of servers
+        Example:
+            server_name could be persephone.raidentransport.digitalvirtues.com
+            available_servers could be [ "https://persephone.raidentransport.digitalvirtues.com", "https://raidentransport.mycryptoapi.com" ]
+
+            This function will return https://persephone.raidentransport.digitalvirtues.com since matches the name
+    """
+    for available_server_url in available_servers:
+        if ((HTTP_PREFIX + URL_STARTER_PREFIX + server_name) == available_server_url) or \
+           ((HTTPS_PREFIX + URL_STARTER_PREFIX + server_name) == available_server_url):
+            return available_server_url

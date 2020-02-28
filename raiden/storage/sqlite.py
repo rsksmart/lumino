@@ -1548,13 +1548,9 @@ class SerializedSQLiteStorage(SQLiteStorage):
             last_id = cursor.lastrowid
         return last_id
 
-    def update_light_client_connection_status(self, address, pending_authorization: bool):
+    def delete_light_client(self, address):
         with self.write_lock, self.conn:
-            cursor = self.conn.execute(
-                "UPDATE client SET pending_authorization = ? WHERE address = ?",
-                (str(pending_authorization).upper(),
-                 address)
-            )
+            cursor = self.conn.execute("DELETE FROM client WHERE address = ?", (address,))
             last_id = cursor.lastrowid
 
         return last_id

@@ -12,7 +12,7 @@ from definitions import ROOT_DIR
 import json
 from eth_utils import encode_hex
 
-from raiden.network.transport.matrix.transport import get_current_light_client_connection
+from raiden.network.transport.matrix.utils import get_available_servers_from_config, server_is_available
 from raiden.storage import serialize, sqlite
 
 from raiden.accounts import AccountManager
@@ -95,13 +95,25 @@ def _setup_matrix(config):
 
         light_client_transports = []
         for light_client in light_clients:
+
+            current_server_name = None
+
+            if light_client["current_server_name"]:
+                current_server_name = light_client["current_server_name"]
+                available_servers = get_available_servers_from_config(config["transport"]["matrix"])
+                if not server_is_available(current_server_name, available_servers):
+                    # we delete the light client because it's associated to a server that is not available anymore so we
+                    # need to force a new on-boarding
+                    storage.delete_light_client(light_client["address"])
+                    continue
+
             light_client_transport = get_matrix_light_client_instance(
                 config["transport"]["matrix"],
                 light_client['password'],
                 light_client['display_name'],
                 light_client['seed_retry'],
                 light_client['address'],
-                get_current_light_client_connection(light_client))
+                current_server_name)
 
             light_client_transports.append(light_client_transport)
 
@@ -116,14 +128,14 @@ def _setup_matrix(config):
     return node_transport
 
 
-def get_matrix_light_client_instance(config, password, display_name, seed_retry, address, current_connection):
+def get_matrix_light_client_instance(config, password, display_name, seed_retry, address, current_server_name):
     light_client_transport = MatrixLightClientTransport(
         config,
         password,
         display_name,
         seed_retry,
         address,
-        current_connection
+        current_server_name
     )
     return light_client_transport
 
