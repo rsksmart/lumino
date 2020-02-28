@@ -102,9 +102,10 @@ def _setup_matrix(config):
                 current_server_name = light_client["current_server_name"]
                 available_servers = get_available_servers_from_config(config["transport"]["matrix"])
                 if not server_is_available(current_server_name, available_servers):
-                    # we delete the light client because it's associated to a server that is not available anymore so we
-                    # need to force a new on-boarding
-                    storage.delete_light_client(light_client["address"])
+                    # we flag the light client as pending for deletion because it's associated to a server that
+                    # is not available anymore so we need to force a new on-boarding, the next request from that LC will
+                    # delete it and respond with an error to control the re-onboard
+                    storage.flag_light_client_as_pending_for_deletion(light_client["address"])
                     log.info("No available server with name " + current_server_name +
                              ", LC has been deleted from DB, on-boarding is needed for LC with address: " +
                              light_client["address"])
@@ -131,7 +132,14 @@ def _setup_matrix(config):
     return node_transport
 
 
-def get_matrix_light_client_instance(config, password, display_name, seed_retry, address, current_server_name):
+def get_matrix_light_client_instance(
+    config,
+    password,
+    display_name,
+    seed_retry,
+    address,
+    current_server_name: str = None
+):
     light_client_transport = MatrixLightClientTransport(
         config,
         password,

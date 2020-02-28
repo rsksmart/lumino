@@ -180,6 +180,8 @@ def test_light_client_onboarding_new_user():
         address=address,
         encrypt_signed_password=encrypt_signed_password.hex(),
         encrypt_signed_display_name=encrypt_signed_display_name.hex(),
-        encrypt_signed_seed_retry=encrypt_signed_seed_retry.hex())
+        encrypt_signed_seed_retry=encrypt_signed_seed_retry.hex(),
+        current_server_name=None,
+        pending_for_deletion=0)
 
     assert result is not None

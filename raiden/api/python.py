@@ -1,3 +1,5 @@
+from http import HTTPStatus
+
 import gevent
 import structlog
 from gevent import Greenlet
@@ -15,6 +17,8 @@ from ecies import encrypt
 
 import raiden.blockchain.events as blockchain_events
 from raiden import waiting
+from raiden.api.rest import api_error
+from raiden.api.validations.api_error_builder import ApiErrorBuilder
 from raiden.api.validations.channel_validator import ChannelValidator
 from raiden.constants import (
     GENESIS_BLOCK_NUMBER,
@@ -118,8 +122,8 @@ from raiden.settings import (
 from raiden.utils.cli import get_matrix_servers
 
 from raiden.network.transport.matrix.utils import (
-    make_client
-)
+    make_client,
+    server_is_available, get_available_servers_from_config)
 
 from urllib.parse import urlparse
 
@@ -1657,7 +1661,8 @@ class RaidenAPI:
                     encrypt_signed_password=encrypt_signed_password.hex(),
                     encrypt_signed_display_name=encrypt_signed_display_name.hex(),
                     encrypt_signed_seed_retry=encrypt_signed_seed_retry.hex(),
-                    current_server_name=server_name
+                    current_server_name=server_name,
+                    pending_for_deletion=0
                 )
 
                 if result > 0:
@@ -1739,3 +1744,28 @@ class RaidenAPI:
             return HubResponseMessage(lcpm_id, LightClientProtocolMessageType.PaymentSuccessful, payment_hub_message)
         else:
             raise ChannelNotFound("Channel with given partner address doesnt exists")
+
+    def validate_light_client(self, api_key: str):
+        """
+            This function checks if this api key is valid and also if the LC
+            associated has a valid matrix server to login, this function only returns
+            if something went wrong, this is because of the flask before_request behaviour
+            https://flask.palletsprojects.com/en/0.12.x/api/#flask.Flask.before_request
+        """
+        light_client = self.raiden.wal.storage.get_light_client_by_api_key(api_key)
+        force_on_boarding = False
+        if light_client:
+            log.debug("Checking key " + api_key + " for LC with address " + light_client["address"])
+            if light_client["pending_for_deletion"]:
+                self.raiden.wal.delete_light_client(light_client["address"])
+                force_on_boarding = True
+        else:
+            log.debug("No light client available for api key" + api_key)
+            force_on_boarding = True
+
+        if force_on_boarding:
+            return ApiErrorBuilder.build_and_log_error(
+                errors="Invalid LC api key, LC need to execute on-board again.",
+                status_code=HTTPStatus.FORBIDDEN,
+                log=log
+            )

@@ -93,7 +93,8 @@ CREATE TABLE IF NOT EXISTS client (
     seed_retry TEXT NOT NULL,
     api_key TEXT NOT NULL,
     type TEXT CHECK ( type IN ('HUB','FULL','LIGHT') ) NOT NULL DEFAULT 'FULL',
-    current_server_name TEXT NULL
+    current_server_name TEXT NULL,
+    pending_for_deletion INTEGER NULL DEFAULT 0
 );
 """
 

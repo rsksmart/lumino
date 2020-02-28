@@ -388,7 +388,8 @@ class SQLiteStorage:
                 type,
                 display_name,
                 seed_retry,
-                current_server_name
+                current_server_name,
+                pending_for_deletion
             FROM client;
             """,
             ()
@@ -427,10 +428,43 @@ class SQLiteStorage:
                 type,
                 display_name,
                 seed_retry,
-                current_server_name
+                current_server_name,
+                pending_for_deletion
             FROM client WHERE address = ?;
             """,
             (address,)
+        )
+
+        light_client = cursor.fetchone()
+        light_client_dict = None
+        if light_client is not None:
+            light_client_dict = {"address": light_client[0],
+                                 "password": light_client[1],
+                                 "api_key": light_client[2],
+                                 "type": light_client[3],
+                                 "display_name": light_client[4],
+                                 "seed_retry": light_client[5],
+                                 "current_server_name": light_client[6]}
+
+        return light_client_dict
+
+    def get_light_client_by_api_key(self, api_key: str):
+        cursor = self.conn.cursor()
+
+        cursor.execute(
+            """
+            SELECT
+                address,
+                password,
+                api_key,
+                type,
+                display_name,
+                seed_retry,
+                current_server_name,
+                pending_for_deletion
+            FROM client WHERE api_key = ?;
+            """,
+            (api_key,)
         )
 
         light_client = cursor.fetchone()
@@ -456,15 +490,17 @@ class SQLiteStorage:
                 "type, "
                 "display_name, "
                 "seed_retry, "
-                "current_server_name) "
-                "VALUES(?, ?, ?, ?, ?, ?, ?)",
+                "current_server_name,"
+                "pending_for_deletion) "
+                "VALUES(?, ?, ?, ?, ?, ?, ?, ?)",
                 (kwargs['address'],
                  kwargs['encrypt_signed_password'],
                  kwargs['api_key'],
                  ClientType.LIGHT.value,
                  kwargs['encrypt_signed_display_name'],
                  kwargs['encrypt_signed_seed_retry'],
-                 kwargs['current_server_name']),
+                 kwargs['current_server_name'],
+                 kwargs['pending_for_deletion']),
             )
             last_id = cursor.lastrowid
 
@@ -1545,6 +1581,13 @@ class SerializedSQLiteStorage(SQLiteStorage):
     def delete_light_client(self, address):
         with self.write_lock, self.conn:
             cursor = self.conn.execute("DELETE FROM client WHERE address = ?", (address,))
+            last_id = cursor.lastrowid
+
+        return last_id
+
+    def flag_light_client_as_pending_for_deletion(self, address):
+        with self.write_lock, self.conn:
+            cursor = self.conn.execute("UPDATE client SET pending_for_deletion = TRUE WHERE address = ?", (address,))
             last_id = cursor.lastrowid
 
         return last_id
