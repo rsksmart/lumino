@@ -684,12 +684,15 @@ def get_available_servers_from_config(config: dict):
 
         Config has to be raiden_api.raiden.config["transport"]["matrix"]
     """
-    if config["server"] == "auto":
-        return config["available_servers"]
-    elif urlparse(config["server"]).scheme in {HTTP_PREFIX, HTTPS_PREFIX}:
-        return [config["server"]]
-    else:
-        raise TransportError('Invalid matrix server specified (valid values: "auto" or a URL)')
+    try:
+        if config["server"] == "auto":
+            return config["available_servers"]
+        elif urlparse(config["server"]).scheme in {HTTP_PREFIX, HTTPS_PREFIX}:
+            return [config["server"]]
+        else:
+            raise TransportError('Invalid matrix server specified (valid values: "auto" or a URL)')
+    except:
+        raise TransportError('Invalid configuration dict, server or available_servers keys are needed')
 
 
 def server_is_available(server_name, available_servers: list):
@@ -697,14 +700,17 @@ def server_is_available(server_name, available_servers: list):
         This function returns if a server is available from a list of servers
         Example:
             server_name could be persephone.raidentransport.digitalvirtues.com
-            available_servers could be [ "https://persephone.raidentransport.digitalvirtues.com", "https://raidentransport.mycryptoapi.com" ]
+            available_servers could be [
+                "https://persephone.raidentransport.digitalvirtues.com",
+                "https://raidentransport.mycryptoapi.com"
+             ]
 
             This function will return true since the server name is available
     """
-    if available_servers is None:
-        return False
-    return (HTTP_PREFIX + URL_STARTER_PREFIX + server_name) in available_servers or \
-           (HTTPS_PREFIX + URL_STARTER_PREFIX + server_name) in available_servers
+    if available_servers:
+        return (HTTP_PREFIX + URL_STARTER_PREFIX + server_name) in available_servers or \
+               (HTTPS_PREFIX + URL_STARTER_PREFIX + server_name) in available_servers
+    return False
 
 
 def get_server_url(server_name, available_servers: list):
@@ -712,7 +718,10 @@ def get_server_url(server_name, available_servers: list):
         This function returns the server url from a list of servers
         Example:
             server_name could be persephone.raidentransport.digitalvirtues.com
-            available_servers could be [ "https://persephone.raidentransport.digitalvirtues.com", "https://raidentransport.mycryptoapi.com" ]
+            available_servers could be [
+                "https://persephone.raidentransport.digitalvirtues.com",
+                "https://raidentransport.mycryptoapi.com"
+             ]
 
             This function will return https://persephone.raidentransport.digitalvirtues.com since matches the name
     """

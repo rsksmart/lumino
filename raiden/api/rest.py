@@ -2052,12 +2052,10 @@ class RestAPI:
                 status_code=HTTPStatus.CONFLICT,
             )
 
-        server_name = password
-
         light_client = self.raiden_api.register_light_client(
             address,
             signed_password,
-            server_name,
+            password,
             signed_display_name,
             signed_seed_retry)
 

@@ -105,6 +105,9 @@ def _setup_matrix(config):
                     # we delete the light client because it's associated to a server that is not available anymore so we
                     # need to force a new on-boarding
                     storage.delete_light_client(light_client["address"])
+                    log.info("No available server with name " + current_server_name +
+                             ", LC has been deleted from DB, on-boarding is needed for LC with address: " +
+                             light_client["address"])
                     continue
 
             light_client_transport = get_matrix_light_client_instance(

@@ -286,24 +286,12 @@ class MatrixTransport(Runnable):
                 config["retry_interval"],
             )
 
-        self._client = None
-
-        if current_server_name:
-            light_client_available_server = list()
-            light_client_available_server.append(get_server_url(current_server_name, available_servers))
-            self._client: GMatrixClient = make_client(
-                light_client_available_server,
-                http_pool_maxsize=4,
-                http_retry_timeout=40,
-                http_retry_delay=_http_retry_delay,
-            )
-        else:
-            self._client: GMatrixClient = make_client(
-                available_servers,
-                http_pool_maxsize=4,
-                http_retry_timeout=40,
-                http_retry_delay=_http_retry_delay,
-            )
+        self._client: GMatrixClient = make_client(
+            [get_server_url(current_server_name, available_servers)] if current_server_name else available_servers,
+            http_pool_maxsize=4,
+            http_retry_timeout=40,
+            http_retry_delay=_http_retry_delay,
+        )
 
         self._server_url = self._client.api.base_url
         self._server_name = config.get("server_name", urlparse(self._server_url).netloc)
