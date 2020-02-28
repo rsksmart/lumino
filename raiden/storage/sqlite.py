@@ -388,8 +388,7 @@ class SQLiteStorage:
                 type,
                 display_name,
                 seed_retry,
-                current_server_name,
-                pending_authorization
+                current_server_name
             FROM client;
             """,
             ()
@@ -411,8 +410,7 @@ class SQLiteStorage:
                                  "type": light_client[3],
                                  "display_name": light_client[4],
                                  "seed_retry": light_client[5],
-                                 "current_server_name": light_client[6],
-                                 "pending_authorization": light_client[7]}
+                                 "current_server_name": light_client[6]}
             list_of_dicts.append(light_client_dict)
 
         return list_of_dicts
@@ -429,8 +427,7 @@ class SQLiteStorage:
                 type,
                 display_name,
                 seed_retry,
-                current_server_name,
-                pending_authorization
+                current_server_name
             FROM client WHERE address = ?;
             """,
             (address,)
@@ -445,8 +442,7 @@ class SQLiteStorage:
                                  "type": light_client[3],
                                  "display_name": light_client[4],
                                  "seed_retry": light_client[5],
-                                 "current_server_name": light_client[6],
-                                 "pending_authorization": light_client[7]}
+                                 "current_server_name": light_client[6]}
 
         return light_client_dict
 
@@ -460,17 +456,15 @@ class SQLiteStorage:
                 "type, "
                 "display_name, "
                 "seed_retry, "
-                "current_server_name, "
-                "pending_authorization) "
-                "VALUES(?, ?, ?, ?, ?, ?, ?, ?)",
+                "current_server_name) "
+                "VALUES(?, ?, ?, ?, ?, ?, ?)",
                 (kwargs['address'],
                  kwargs['encrypt_signed_password'],
                  kwargs['api_key'],
                  ClientType.LIGHT.value,
                  kwargs['encrypt_signed_display_name'],
                  kwargs['encrypt_signed_seed_retry'],
-                 kwargs['current_server_name'],
-                 kwargs['pending_authorization']),
+                 kwargs['current_server_name']),
             )
             last_id = cursor.lastrowid
 

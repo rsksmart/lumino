@@ -1657,8 +1657,7 @@ class RaidenAPI:
                     encrypt_signed_password=encrypt_signed_password.hex(),
                     encrypt_signed_display_name=encrypt_signed_display_name.hex(),
                     encrypt_signed_seed_retry=encrypt_signed_seed_retry.hex(),
-                    current_server_name=server_name,
-                    pending_authorization=0
+                    current_server_name=server_name
                 )
 
                 if result > 0:
