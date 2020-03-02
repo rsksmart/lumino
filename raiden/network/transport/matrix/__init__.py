@@ -7,5 +7,5 @@ from raiden.network.transport.matrix.utils import (  # noqa
     make_client,
     make_room_alias,
     sort_servers_closest,
-    validate_userid_signature,
+    validate_userid_signature
 )

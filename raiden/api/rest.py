@@ -146,6 +146,8 @@ from raiden.ui.app import get_matrix_light_client_instance
 
 log = structlog.get_logger(__name__)
 
+LIGHT_CLIENT_API_KEY_HEADER = 'HTTP_X_API_KEY'
+
 URLS_FN_V1 = [
     ("/channels", ChannelsResource),
     ("/channels/<hexaddress:token_address>", ChannelsResourceByTokenAddress),
@@ -463,6 +465,14 @@ class APIServer(Runnable):
                             self.rest_api.raiden_api.validate_token_app(cookie[1])
                 elif 'HTTP_TOKEN' in request_headers.environ:
                     self.rest_api.raiden_api.validate_token_app(request_headers.environ['HTTP_TOKEN'])
+                if LIGHT_CLIENT_API_KEY_HEADER in request_headers.environ:
+                    # we check that this api key is for a valid LC and that the LC
+                    # is associated with a valid matrix server
+                    lc_validation_result = self.rest_api.raiden_api.validate_light_client(
+                        request_headers.environ[LIGHT_CLIENT_API_KEY_HEADER]
+                    )
+                    if lc_validation_result:
+                        return lc_validation_result
 
         if web_ui:
             self._set_ui_endpoint()
@@ -2055,10 +2065,12 @@ class RestAPI:
         light_client = self.raiden_api.register_light_client(
             address,
             signed_password,
+            password,
             signed_display_name,
             signed_seed_retry)
 
         if light_client is not None and light_client["result_code"] == 0:
+
             matrix_light_client_transport_instance = get_matrix_light_client_instance(
                 self.raiden_api.raiden.config["transport"]["matrix"],
                 password=light_client["encrypt_signed_password"],

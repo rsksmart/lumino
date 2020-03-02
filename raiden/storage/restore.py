@@ -1,5 +1,4 @@
 from raiden.exceptions import RaidenUnrecoverableError
-from raiden.raiden_service import RaidenService
 from raiden.storage.wal import restore_to_state_change
 from raiden.transfer import node, views
 from raiden.transfer.identifiers import CanonicalIdentifier

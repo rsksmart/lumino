@@ -12,7 +12,7 @@ from gevent.queue import JoinableQueue
 from matrix_client.errors import MatrixRequestError
 
 from raiden.constants import DISCOVERY_DEFAULT_ROOM
-from raiden.exceptions import InvalidAddress, TransportError, UnknownAddress, UnknownTokenAddress
+from raiden.exceptions import InvalidAddress, UnknownAddress, UnknownTokenAddress
 from raiden.message_handler import MessageHandler
 from raiden.messages import (
     Delivered,
@@ -38,7 +38,7 @@ from raiden.network.transport.matrix.utils import (
     make_room_alias,
     validate_and_parse_message,
     validate_userid_signature,
-)
+    get_available_servers_from_config, get_server_url)
 from raiden.network.transport.udp import udp_utils
 from raiden.raiden_service import RaidenService
 from raiden.transfer import views
@@ -271,16 +271,12 @@ class MatrixTransport(Runnable):
     _room_sep = "_"
     log = log
 
-    def __init__(self, config: dict):
+    def __init__(self, config: dict, current_server_name: str = None):
         super().__init__()
         self._config = config
         self._raiden_service: Optional[RaidenService] = None
-        if config["server"] == "auto":
-            available_servers = config["available_servers"]
-        elif urlparse(config["server"]).scheme in {"http", "https"}:
-            available_servers = [config["server"]]
-        else:
-            raise TransportError('Invalid matrix server specified (valid values: "auto" or a URL)')
+
+        available_servers = get_available_servers_from_config(self._config)
 
         def _http_retry_delay() -> Iterable[float]:
             # below constants are defined in raiden.app.App.DEFAULT_CONFIG
@@ -291,11 +287,12 @@ class MatrixTransport(Runnable):
             )
 
         self._client: GMatrixClient = make_client(
-            available_servers,
+            [get_server_url(current_server_name, available_servers)] if current_server_name else available_servers,
             http_pool_maxsize=4,
             http_retry_timeout=40,
             http_retry_delay=_http_retry_delay,
         )
+
         self._server_url = self._client.api.base_url
         self._server_name = config.get("server_name", urlparse(self._server_url).netloc)
 
@@ -1362,8 +1359,9 @@ class MatrixLightClientTransport(MatrixTransport):
                  _encrypted_light_client_password_signature: str,
                  _encrypted_light_client_display_name_signature: str,
                  _encrypted_light_client_seed_for_retry_signature: str,
-                 _address: str):
-        super().__init__(config)
+                 _address: str,
+                 current_server_name: str = None):
+        super().__init__(config, current_server_name)
         self._encrypted_light_client_password_signature = _encrypted_light_client_password_signature
         self._encrypted_light_client_display_name_signature = _encrypted_light_client_display_name_signature
         self._encrypted_light_client_seed_for_retry_signature = _encrypted_light_client_seed_for_retry_signature
