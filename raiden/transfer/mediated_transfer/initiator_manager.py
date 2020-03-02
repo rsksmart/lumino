@@ -381,7 +381,12 @@ def handle_lock_expired(
         return TransitionResult(payment_state, list())
 
     channel_identifier = initiator_state.channel_identifier
-    channel_state = channelidentifiers_to_channels.get(channel_identifier)
+
+    channels_from_address = channelidentifiers_to_channels.get(initiator_state.transfer.initiator)
+    if not channels_from_address:
+        return TransitionResult(payment_state, list())
+
+    channel_state = channels_from_address.get(channel_identifier)
 
     if not channel_state:
         return TransitionResult(payment_state, list())
