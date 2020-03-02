@@ -396,7 +396,10 @@ def send_lockedtransfer(
     total_amount = PaymentWithFeeAmount(
         transfer_description.amount + transfer_description.allocated_fee
     )
-
+    #TODO Rodrigo delete this
+    import structlog
+    log = structlog.get_logger(__name__)  # pylint: disable=invalid-name
+    log.info("Secrethash: " + transfer_description.secrethash.hex())
     lockedtransfer_event = channel.send_lockedtransfer(
         channel_state=channel_state,
         initiator=transfer_description.initiator,

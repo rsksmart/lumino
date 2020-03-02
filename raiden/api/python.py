@@ -174,7 +174,10 @@ def get_transfer_from_task(
     role = views.role_from_transfer_task(transfer_task)
     transfer: LockedTransferType
     if isinstance(transfer_task, InitiatorTask):
-        transfer = transfer_task.manager_state.initiator_transfers[secrethash].transfer
+        if secrethash in transfer_task.manager_state.initiator_transfers:
+            transfer = transfer_task.manager_state.initiator_transfers[secrethash].transfer
+        else:
+            return None, ""
     elif isinstance(transfer_task, MediatorTask):
         pairs = transfer_task.mediator_state.transfers_pair
         if pairs:

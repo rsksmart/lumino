@@ -1,3 +1,4 @@
+import copy
 from datetime import date
 
 from raiden.lightclient.models.light_client_payment import LightClientPayment
@@ -822,8 +823,16 @@ def handle_receive_transfer_refund(
 def handle_receive_transfer_refund_cancel_route(
     chain_state: ChainState, state_change: ReceiveTransferRefundCancelRoute, storage
 ) -> TransitionResult[ChainState]:
+
+    new_secrethash = state_change.secrethash
+    current_payment_task = chain_state.payment_mapping.secrethashes_to_task[
+        state_change.transfer.lock.secrethash
+    ]
+    chain_state.payment_mapping.secrethashes_to_task.update(
+        {new_secrethash: copy.deepcopy(current_payment_task)}
+    )
     return subdispatch_to_paymenttask(
-        chain_state, state_change, state_change.transfer.lock.secrethash, storage
+        chain_state, state_change, new_secrethash, storage
     )
 
 
