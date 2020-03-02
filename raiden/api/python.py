@@ -17,7 +17,6 @@ from ecies import encrypt
 
 import raiden.blockchain.events as blockchain_events
 from raiden import waiting
-from raiden.api.rest import api_error
 from raiden.api.validations.api_error_builder import ApiErrorBuilder
 from raiden.api.validations.channel_validator import ChannelValidator
 from raiden.constants import (
@@ -121,9 +120,7 @@ from raiden.settings import (
 
 from raiden.utils.cli import get_matrix_servers
 
-from raiden.network.transport.matrix.utils import (
-    make_client,
-    server_is_available, get_available_servers_from_config)
+from raiden.network.transport.matrix.utils import make_client
 
 from urllib.parse import urlparse
 
