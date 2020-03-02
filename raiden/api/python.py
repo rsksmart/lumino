@@ -1758,7 +1758,11 @@ class RaidenAPI:
                 force_on_boarding = True
         else:
             log.debug("No light client available for api key" + api_key)
-            force_on_boarding = True
+            return ApiErrorBuilder.build_and_log_error(
+                errors="There is no light client associated with the api key provided.",
+                status_code=HTTPStatus.FORBIDDEN,
+                log=log
+            )
 
         if force_on_boarding:
             return ApiErrorBuilder.build_and_log_error(

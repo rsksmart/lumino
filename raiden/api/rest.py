@@ -468,7 +468,11 @@ class APIServer(Runnable):
                 if LIGHT_CLIENT_API_KEY_HEADER in request_headers.environ:
                     # we check that this api key is for a valid LC and that the LC
                     # is associated with a valid matrix server
-                    self.rest_api.raiden_api.validate_light_client(request_headers.environ[LIGHT_CLIENT_API_KEY_HEADER])
+                    lc_validation_result = self.rest_api.raiden_api.validate_light_client(
+                        request_headers.environ[LIGHT_CLIENT_API_KEY_HEADER]
+                    )
+                    if lc_validation_result:
+                        return lc_validation_result
 
         if web_ui:
             self._set_ui_endpoint()
