@@ -107,7 +107,7 @@ def _setup_matrix(config):
                     # delete it and respond with an error to control the re-onboard
                     storage.flag_light_client_as_pending_for_deletion(light_client["address"])
                     log.info("No available server with name " + current_server_name +
-                             ", LC has been deleted from DB, on-boarding is needed for LC with address: " +
+                             ", LC has been flagged for deletion from DB, on-boarding is needed for LC with address: " +
                              light_client["address"])
                     continue
 
