@@ -1742,7 +1742,7 @@ class TokenNetwork:
         else:
             log.info("updateNonClosingBalanceProof successful", **log_details)
         finally:
-            # if an error occurred we need to delete the non closing balance proof from the database
+            # we need to delete the non closing balance proof from the database to avoid re-send it
             log.info("Deleting non closing balance proof for channel id " + str(channel_identifier), **log_details)
             raiden.wal.storage.delete_light_client_non_closing_balance_proof(channel_id=channel_identifier)
 
