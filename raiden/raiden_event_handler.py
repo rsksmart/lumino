@@ -438,10 +438,12 @@ class RaidenEventHandler(EventHandler):
     ):
         balance_proof = channel_update_event.balance_proof
 
-        if balance_proof:
+        # checking that this balance proof exists on the database
+        db_balance_proof = raiden.wal.storage.get_latest_light_client_non_closing_balance_proof(channel_id=balance_proof.channel_identifier)
+
+        if db_balance_proof:
             canonical_identifier = balance_proof.canonical_identifier
             channel = raiden.chain.payment_channel(canonical_identifier=canonical_identifier)
-            partner_address = None
             if channel_update_event.lc_address == channel.participant2:
                 partner_address = channel.participant1
             else:
@@ -455,6 +457,7 @@ class RaidenEventHandler(EventHandler):
                 partner_signature=balance_proof.signature,
                 signature=channel_update_event.lc_bp_signature,
                 block_identifier=channel_update_event.triggered_by_block_hash,
+                raiden=raiden
             )
 
     @staticmethod
