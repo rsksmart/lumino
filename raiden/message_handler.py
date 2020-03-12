@@ -28,7 +28,7 @@ from raiden.transfer.mediated_transfer.state_change import (
     ReceiveSecretRequest,
     ReceiveSecretReveal,
     ReceiveTransferRefund,
-    ReceiveTransferRefundCancelRoute,
+    ActionTransferReroute,
     ReceiveSecretRequestLight, ReceiveSecretRevealLight)
 from raiden.transfer.state import balanceproof_from_envelope
 from raiden.transfer.state_change import ReceiveDelivered, ReceiveProcessed, ReceiveUnlock, ReceiveUnlockLight
@@ -141,10 +141,10 @@ class MessageHandler:
 
     @staticmethod
     def handle_message_refundtransfer(raiden: RaidenService, message: RefundTransfer) -> None:
-        token_network_address = message.token_network_address
-        from_transfer = lockedtransfersigned_from_message(message)
         chain_state = views.state_from_raiden(raiden)
+        from_transfer = lockedtransfersigned_from_message(message)
 
+        token_network_address = message.token_network_address
         # FIXME: Shouldn't request routes here
         routes, _ = get_best_routes(
             chain_state=chain_state,
@@ -165,15 +165,15 @@ class MessageHandler:
         state_change: StateChange
         if role == "initiator":
             old_secret = views.get_transfer_secret(chain_state, from_transfer.lock.secrethash)
+            is_secret_known = old_secret is not None and old_secret != EMPTY_SECRET
             # We currently don't allow multi routes if the initiator does not
             # hold the secret. In such case we remove all other possible routes
             # which allow the API call to return with with an error message.
             if old_secret == EMPTY_SECRET:
                 routes = list()
 
-            secret = random_secret()
-            state_change = ReceiveTransferRefundCancelRoute(
-                routes=routes, transfer=from_transfer, secret=secret
+            state_change = ActionTransferReroute(
+                routes=routes, transfer=from_transfer, secret=random_secret()
             )
         else:
             state_change = ReceiveTransferRefund(transfer=from_transfer, routes=routes)

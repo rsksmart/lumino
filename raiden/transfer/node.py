@@ -33,7 +33,7 @@ from raiden.transfer.mediated_transfer.state_change import (
     ReceiveSecretRequest,
     ReceiveSecretReveal,
     ReceiveTransferRefund,
-    ReceiveTransferRefundCancelRoute,
+    ActionTransferReroute,
     ActionInitInitiatorLight, ReceiveSecretRequestLight, ActionSendSecretRevealLight, ReceiveSecretRevealLight,
     ActionSendUnlockLight, ActionInitTargetLight, ActionSendSecretRequestLight)
 from raiden.transfer.state import (
@@ -795,7 +795,7 @@ def handle_receive_transfer_refund(
 
 
 def handle_receive_transfer_refund_cancel_route(
-    chain_state: ChainState, state_change: ReceiveTransferRefundCancelRoute
+    chain_state: ChainState, state_change: ActionTransferReroute
 ) -> TransitionResult[ChainState]:
     return subdispatch_to_paymenttask(
         chain_state, state_change, state_change.transfer.lock.secrethash
@@ -960,8 +960,8 @@ def handle_state_change(
     elif type(state_change) == ReceiveSecretReveal:
         assert isinstance(state_change, ReceiveSecretReveal), MYPY_ANNOTATION
         iteration = handle_secret_reveal(chain_state, state_change)
-    elif type(state_change) == ReceiveTransferRefundCancelRoute:
-        assert isinstance(state_change, ReceiveTransferRefundCancelRoute), MYPY_ANNOTATION
+    elif type(state_change) == ActionTransferReroute:
+        assert isinstance(state_change, ActionTransferReroute), MYPY_ANNOTATION
         iteration = handle_receive_transfer_refund_cancel_route(chain_state, state_change)
     elif type(state_change) == ReceiveTransferRefund:
         assert isinstance(state_change, ReceiveTransferRefund), MYPY_ANNOTATION

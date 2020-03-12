@@ -21,7 +21,7 @@ from raiden.transfer.mediated_transfer.state_change import (
     ReceiveLockExpired,
     ReceiveSecretRequest,
     ReceiveSecretReveal,
-    ReceiveTransferRefundCancelRoute,
+    ActionTransferReroute,
     ActionInitInitiatorLight, ReceiveSecretRequestLight, ActionSendSecretRevealLight, ReceiveSecretRevealLight,
     ActionSendUnlockLight)
 from raiden.transfer.state import RouteState
@@ -286,7 +286,7 @@ def handle_cancelpayment(
 
 def handle_transferrefundcancelroute(
     payment_state: InitiatorPaymentState,
-    state_change: ReceiveTransferRefundCancelRoute,
+    state_change: ActionTransferReroute,
     channelidentifiers_to_channels: ChannelMap,
     pseudo_random_generator: random.Random,
     block_number: BlockNumber,
@@ -649,9 +649,9 @@ def state_transition(
             channelidentifiers_to_channels=channelidentifiers_to_channels,
             pseudo_random_generator=pseudo_random_generator,
         )
-    elif type(state_change) == ReceiveTransferRefundCancelRoute:
-        assert isinstance(state_change, ReceiveTransferRefundCancelRoute), MYPY_ANNOTATION
-        msg = "ReceiveTransferRefundCancelRoute should be accompanied by a valid payment state"
+    elif type(state_change) == ActionTransferReroute:
+        assert isinstance(state_change, ActionTransferReroute), MYPY_ANNOTATION
+        msg = "ActionTransferReroute should be accompanied by a valid payment state"
         assert payment_state, msg
         iteration = handle_transferrefundcancelroute(
             payment_state=payment_state,

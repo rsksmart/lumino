@@ -524,7 +524,7 @@ class ReceiveSecretRevealLight(AuthenticatedSenderStateChange):
         return instance
 
 
-class ReceiveTransferRefundCancelRoute(BalanceProofStateChange):
+class ActionTransferReroute(BalanceProofStateChange):
     """ A RefundTransfer message received by the initiator will cancel the current
     route.
     """
@@ -544,13 +544,13 @@ class ReceiveTransferRefundCancelRoute(BalanceProofStateChange):
         self.secret = secret
 
     def __repr__(self) -> str:
-        return "<ReceiveTransferRefundCancelRoute sender:{} transfer:{}>".format(
+        return "<ActionTransferReroute sender:{} transfer:{}>".format(
             pex(self.sender), self.transfer
         )
 
     def __eq__(self, other: Any) -> bool:
         return (
-            isinstance(other, ReceiveTransferRefundCancelRoute)
+            isinstance(other, ActionTransferReroute)
             and self.sender == other.sender
             and self.transfer == other.transfer
             and self.routes == other.routes
@@ -571,7 +571,7 @@ class ReceiveTransferRefundCancelRoute(BalanceProofStateChange):
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "ReceiveTransferRefundCancelRoute":
+    def from_dict(cls, data: Dict[str, Any]) -> "ActionTransferReroute":
         instance = cls(
             routes=data["routes"],
             transfer=data["transfer"],

@@ -14,7 +14,7 @@ from raiden.tests.utils.network import payment_channel_open_and_deposit
 from raiden.tests.utils.transfer import get_channelstate, transfer
 from raiden.transfer import views
 from raiden.transfer.mediated_transfer.events import SendSecretReveal
-from raiden.transfer.mediated_transfer.state_change import ReceiveTransferRefundCancelRoute
+from raiden.transfer.mediated_transfer.state_change import ActionTransferReroute
 from raiden.utils import sha3
 
 # pylint: disable=too-many-locals
@@ -288,5 +288,5 @@ def run_regression_payment_complete_after_refund_to_the_initiator(
     )
 
     assert raiden_state_changes_search_for_item(
-        raiden=app0, item_type=ReceiveTransferRefundCancelRoute, attributes={}
+        raiden=app0, item_type=ActionTransferReroute, attributes={}
     )
