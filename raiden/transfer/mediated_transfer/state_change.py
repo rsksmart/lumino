@@ -266,6 +266,12 @@ class ActionInitTargetLight(BalanceProofStateChange):
         return cls(route=data["route"], transfer=data["transfer"], signed_lockedtransfer=data["signed_lockedtransfer"])
 
 
+class ReceiveTransferCancelRoute(BalanceProofStateChange):
+    """ A mediator sends us a refund due to a failed route """
+
+    transfer: LockedTransferSignedState
+
+
 class ReceiveLockExpired(BalanceProofStateChange):
     """ A LockExpired message received. """
 

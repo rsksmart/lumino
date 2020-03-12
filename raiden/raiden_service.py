@@ -663,6 +663,68 @@ class RaidenService(Runnable):
     def on_message(self, message: Message, is_light_client: bool = False):
         self.message_handler.on_message(self, message, is_light_client)
 
+    def handle_and_track_state_changes(self, state_changes: List[StateChange]) -> None:
+        """ Dispatch the state change and does not handle the exceptions.
+
+        When the method is used the exceptions are tracked and re-raised in the
+        raiden service thread.
+        """
+        if len(state_changes) == 0:
+            return
+
+        for greenlet in self.handle_state_changes(state_changes):
+            self.add_pending_greenlet(greenlet)
+
+    def handle_state_changes(self, state_changes: List[StateChange]) -> List[Greenlet]:
+        """ Dispatch the state change and return the processing threads.
+
+        Use this for error reporting, failures in the returned greenlets,
+        should be re-raised using `gevent.joinall` with `raise_error=True`.
+        """
+        assert self.wal, f"WAL not restored. node:{self!r}"
+        log.debug(
+            "State changes",
+            node=to_checksum_address(self.address),
+            state_changes=[
+                _redact_secret(serialize.JSONSerializer.serialize(state_change))
+                for state_change in state_changes
+            ],
+        )
+
+        old_state = views.state_from_raiden(self)
+        new_state, raiden_event_list = self.wal.log_and_dispatch(state_changes)
+
+        for changed_balance_proof in views.detect_balance_proof_change(old_state, new_state):
+            update_services_from_balance_proof(
+                self,
+                chain_state=new_state,
+                balance_proof=changed_balance_proof,
+            )
+
+        log.debug(
+            "Raiden events",
+            node=to_checksum_address(self.address),
+            raiden_events=[
+                _redact_secret(serialize.JSONSerializer.serialize(event)) for event in raiden_event_list
+            ],
+        )
+
+        greenlets: List[Greenlet] = list()
+        if self.ready_to_process_events:
+            for raiden_event in raiden_event_list:
+                greenlets.append(
+                    self.handle_event(chain_state=new_state, raiden_event=raiden_event)
+                )
+
+            state_changes_count = self.wal.storage.count_state_changes()
+            new_snapshot_group = state_changes_count // SNAPSHOT_STATE_CHANGES_COUNT
+            if new_snapshot_group > self.snapshot_group:
+                log.debug("Storing snapshot", snapshot_id=new_snapshot_group)
+                self.wal.snapshot()
+                self.snapshot_group = new_snapshot_group
+
+        return greenlets
+
     def handle_and_track_state_change(self, state_change: StateChange):
         """ Dispatch the state change and does not handle the exceptions.
 

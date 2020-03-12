@@ -1,3 +1,5 @@
+import copy
+
 from raiden.messages import RevealSecret, Unlock
 from raiden.transfer import channel, token_network, views
 from raiden.transfer.architecture import (
@@ -35,7 +37,7 @@ from raiden.transfer.mediated_transfer.state_change import (
     ReceiveTransferRefund,
     ActionTransferReroute,
     ActionInitInitiatorLight, ReceiveSecretRequestLight, ActionSendSecretRevealLight, ReceiveSecretRevealLight,
-    ActionSendUnlockLight, ActionInitTargetLight, ActionSendSecretRequestLight)
+    ActionSendUnlockLight, ActionInitTargetLight, ActionSendSecretRequestLight, ReceiveTransferCancelRoute)
 from raiden.transfer.state import (
     ChainState,
     InitiatorTask,
@@ -797,6 +799,21 @@ def handle_receive_transfer_refund(
 def handle_receive_transfer_refund_cancel_route(
     chain_state: ChainState, state_change: ActionTransferReroute
 ) -> TransitionResult[ChainState]:
+
+    new_secrethash = state_change.secrethash
+    current_payment_task = chain_state.payment_mapping.secrethashes_to_task[
+        state_change.transfer.lock.secrethash
+    ]
+    chain_state.payment_mapping.secrethashes_to_task.update(
+        {new_secrethash: copy.deepcopy(current_payment_task)}
+    )
+
+    return subdispatch_to_paymenttask(chain_state, state_change, new_secrethash)
+
+
+def handle_receive_transfer_cancel_route(
+    chain_state: ChainState, state_change: ReceiveTransferCancelRoute
+) -> TransitionResult[ChainState]:
     return subdispatch_to_paymenttask(
         chain_state, state_change, state_change.transfer.lock.secrethash
     )
@@ -915,6 +932,9 @@ def handle_state_change(
     elif type(state_change) == ActionUpdateTransportAuthData:
         assert isinstance(state_change, ActionUpdateTransportAuthData), MYPY_ANNOTATION
         iteration = handle_update_transport_authdata(chain_state, state_change)
+    elif type(state_change) == ReceiveTransferCancelRoute:
+        assert isinstance(state_change, ReceiveTransferCancelRoute), MYPY_ANNOTATION
+        iteration = handle_receive_transfer_cancel_route(chain_state, state_change)
     elif type(state_change) == ContractReceiveNewPaymentNetwork:
         assert isinstance(state_change, ContractReceiveNewPaymentNetwork), MYPY_ANNOTATION
         iteration = handle_new_payment_network(chain_state, state_change)

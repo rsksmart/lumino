@@ -2,6 +2,7 @@ import random
 
 from eth_utils import keccak
 
+from raiden.routing import get_best_routes
 from raiden.transfer import channel
 from raiden.transfer.architecture import Event, StateChange, TransitionResult
 from raiden.transfer.events import EventPaymentSentFailed
@@ -23,8 +24,8 @@ from raiden.transfer.mediated_transfer.state_change import (
     ReceiveSecretReveal,
     ActionTransferReroute,
     ActionInitInitiatorLight, ReceiveSecretRequestLight, ActionSendSecretRevealLight, ReceiveSecretRevealLight,
-    ActionSendUnlockLight)
-from raiden.transfer.state import RouteState
+    ActionSendUnlockLight, ReceiveTransferCancelRoute)
+from raiden.transfer.state import RouteState, ChainState
 from raiden.transfer.state_change import ActionCancelPayment, Block, ContractReceiveSecretReveal
 from raiden.utils.typing import (
     MYPY_ANNOTATION,
@@ -284,21 +285,32 @@ def handle_cancelpayment(
     return TransitionResult(payment_state, events)
 
 
-def handle_transferrefundcancelroute(
+def handle_failroute(
+    payment_state: InitiatorPaymentState, state_change: ReceiveTransferCancelRoute
+) -> TransitionResult[InitiatorPaymentState]:
+
+    events: List[Event] = list()
+
+    initiator_state = payment_state.initiator_transfers.get(state_change.transfer.lock.secrethash)
+    if initiator_state is not None and can_cancel(initiator_state):
+        cancel_events = cancel_current_route(payment_state, initiator_state)
+        events.extend(cancel_events)
+
+    return TransitionResult(payment_state, events)
+
+
+def handle_transferreroute(
     payment_state: InitiatorPaymentState,
     state_change: ActionTransferReroute,
     channelidentifiers_to_channels: ChannelMap,
     pseudo_random_generator: random.Random,
     block_number: BlockNumber,
 ) -> TransitionResult[InitiatorPaymentState]:
-    initiator_state = payment_state.initiator_transfers.get(state_change.transfer.lock.secrethash)
-    if not initiator_state:
-        return TransitionResult(payment_state, list())
-
-    channel_identifier = initiator_state.channel_identifier
-    channel_state = channelidentifiers_to_channels[initiator_state.transfer.initiator].get(channel_identifier)
-
-    if not channel_state:
+    try:
+        initiator_state = payment_state.initiator_transfers.get(state_change.transfer.lock.secrethash)
+        channel_identifier = initiator_state.channel_identifier
+        channel_state = channelidentifiers_to_channels[initiator_state.transfer.initiator].get(channel_identifier)
+    except KeyError:
         return TransitionResult(payment_state, list())
 
     refund_transfer = state_change.transfer
@@ -311,22 +323,15 @@ def handle_transferrefundcancelroute(
     )
 
     is_valid_refund = channel.refund_transfer_matches_transfer(refund_transfer, original_transfer)
-
-    events = list()
-    if not is_valid_lock or not is_valid_refund:
-        return TransitionResult(payment_state, list())
-
-    is_valid, channel_events, _, _ = channel.handle_receive_refundtransfercancelroute(
+    is_valid, channel_events, _ = channel.handle_receive_refundtransfercancelroute(
         channel_state, refund_transfer
     )
 
-    events.extend(channel_events)
-
-    if not is_valid:
+    if not is_valid_lock or not is_valid_refund or not is_valid:
         return TransitionResult(payment_state, list())
 
-    route_failed_event = EventRouteFailed(secrethash=original_transfer.lock.secrethash)
-    events.append(route_failed_event)
+    events: List[Event] = []
+    events.extend(channel_events)
 
     old_description = initiator_state.transfer_description
     transfer_description = TransferDescriptionWithSecretState(
@@ -352,6 +357,17 @@ def handle_transferrefundcancelroute(
     )
 
     events.extend(sub_iteration.events)
+
+    if sub_iteration.new_state is None:
+        # Here we don't delete the initiator state, but instead let it live.
+        # It will be deleted when the lock expires. We do that so that we
+        # still have an initiator payment task around to process the
+        # LockExpired message that our partner will send us.
+        # https://github.com/raiden-network/raiden/issues/3146#issuecomment-447378046
+        return TransitionResult(payment_state, events)
+
+    new_transfer = sub_iteration.new_state.transfer
+    payment_state.initiator_transfers[new_transfer.lock.secrethash] = sub_iteration.new_state
 
     return TransitionResult(payment_state, events)
 
@@ -622,6 +638,12 @@ def state_transition(
             state_change=state_change,
             channelidentifiers_to_channels=channelidentifiers_to_channels
         )
+    elif type(state_change) == ReceiveTransferCancelRoute:
+        assert isinstance(state_change, ReceiveTransferCancelRoute), MYPY_ANNOTATION
+        assert (
+            payment_state
+        ), "ReceiveTransferCancelRoute should be accompanied by a valid payment state"
+        iteration = handle_failroute(payment_state=payment_state, state_change=state_change)
     elif type(state_change) == ReceiveSecretRequest:
         assert isinstance(state_change, ReceiveSecretRequest), MYPY_ANNOTATION
         assert payment_state, "ReceiveSecretRequest should be accompanied by a valid payment state"
@@ -653,7 +675,7 @@ def state_transition(
         assert isinstance(state_change, ActionTransferReroute), MYPY_ANNOTATION
         msg = "ActionTransferReroute should be accompanied by a valid payment state"
         assert payment_state, msg
-        iteration = handle_transferrefundcancelroute(
+        iteration = handle_transferreroute(
             payment_state=payment_state,
             state_change=state_change,
             channelidentifiers_to_channels=channelidentifiers_to_channels,
