@@ -46,7 +46,7 @@ networkx==2.1
 parsimonious==0.8.0
 pexpect==4.6.0
 pickleshare==0.7.4
-psutil==5.4.7
+psutil==5.6.6
 ptyprocess==0.6.0
 py-geth==2.1.0
 py-solc==3.2.0
