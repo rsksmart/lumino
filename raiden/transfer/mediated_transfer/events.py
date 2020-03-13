@@ -122,6 +122,7 @@ class SendLockExpired(SendMessageEvent):
             "balance_proof": self.balance_proof,
             "secrethash": serialize_bytes(self.secrethash),
             "recipient": to_checksum_address(self.recipient),
+            "payment_identifier": self.payment_identifier,
         }
 
         return result
@@ -133,6 +134,7 @@ class SendLockExpired(SendMessageEvent):
             message_identifier=MessageID(int(data["message_identifier"])),
             balance_proof=data["balance_proof"],
             secrethash=deserialize_secret_hash(data["secrethash"]),
+            payment_identifier=data["payment_identifier"],
         )
 
         return restored

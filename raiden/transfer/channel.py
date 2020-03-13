@@ -1404,7 +1404,7 @@ def create_sendexpiredlock(
         message_identifier=message_identifier_from_prng(pseudo_random_generator),
         balance_proof=balance_proof,
         secrethash=locked_lock.secrethash,
-        payment_identifier= payment_identifier
+        payment_identifier=payment_identifier,
     )
 
     return send_lock_expired, merkletree

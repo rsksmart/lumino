@@ -162,19 +162,18 @@ class MessageHandler:
             chain_state=chain_state, secrethash=from_transfer.lock.secrethash
         )
 
-        state_changes: List[StateChange] = []
+        state_change: StateChange
 
         if role == "initiator":
             old_secret = views.get_transfer_secret(chain_state, from_transfer.lock.secrethash)
             is_secret_known = old_secret is not None and old_secret != EMPTY_SECRET
 
-            state_changes.append(
-                ReceiveTransferCancelRoute(
-                    balance_proof=from_transfer.balance_proof,
-                    # transfer=from_transfer,
-                    # sender=from_transfer.balance_proof.sender,  # pylint: disable=no-member
-                )
+            state_change = ReceiveTransferCancelRoute(
+                balance_proof=from_transfer.balance_proof,
+                transfer=from_transfer,
+                sender=from_transfer.balance_proof.sender,  # pylint: disable=no-member
             )
+            raiden.handle_and_track_state_change(state_change)
 
             # Currently, the only case where we can be initiators and not
             # know the secret is if the transfer is part of an atomic swap. In
@@ -182,17 +181,15 @@ class MessageHandler:
             # transfer. In all other cases we can try to find another route
             # (and generate a new secret)
             if is_secret_known:
-                state_changes.append(
-                    ActionTransferReroute(
-                        routes=routes,
-                        transfer=from_transfer,
-                        secret=random_secret()
-                    )
+                state_change = ActionTransferReroute(
+                    routes=routes,
+                    transfer=from_transfer,
+                    secret=random_secret()
                 )
         else:
-            state_changes.append(ReceiveTransferRefund(transfer=from_transfer, routes=routes))
+            state_change = ReceiveTransferRefund(transfer=from_transfer, routes=routes)
 
-        raiden.handle_and_track_state_changes(state_changes)
+        raiden.handle_and_track_state_change(state_change)
 
     @staticmethod
     def handle_message_lockedtransfer(raiden: RaidenService, message: LockedTransfer) -> None:

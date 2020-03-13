@@ -323,8 +323,8 @@ def handle_transferreroute(
     )
 
     is_valid_refund = channel.refund_transfer_matches_transfer(refund_transfer, original_transfer)
-    is_valid, channel_events, _ = channel.handle_receive_refundtransfercancelroute(
-        channel_state, refund_transfer
+    is_valid, channel_events, _, _ = channel.handle_receive_lockedtransfer(
+        channel_state, refund_transfer, None
     )
 
     if not is_valid_lock or not is_valid_refund or not is_valid:
@@ -365,9 +365,6 @@ def handle_transferreroute(
         # LockExpired message that our partner will send us.
         # https://github.com/raiden-network/raiden/issues/3146#issuecomment-447378046
         return TransitionResult(payment_state, events)
-
-    new_transfer = sub_iteration.new_state.transfer
-    payment_state.initiator_transfers[new_transfer.lock.secrethash] = sub_iteration.new_state
 
     return TransitionResult(payment_state, events)
 

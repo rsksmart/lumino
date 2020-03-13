@@ -269,7 +269,30 @@ class ActionInitTargetLight(BalanceProofStateChange):
 class ReceiveTransferCancelRoute(BalanceProofStateChange):
     """ A mediator sends us a refund due to a failed route """
 
-    transfer: LockedTransferSignedState
+    def __init__(
+        self,
+        balance_proof: BalanceProofSignedState,
+        transfer: LockedTransferSignedState,
+        sender: Address,
+    ) -> None:
+        super().__init__(balance_proof)
+        self.transfer = transfer
+        self.sender = sender
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "balance_proof": self.balance_proof,
+            "transfer": self.transfer,
+            "sender": to_checksum_address(self.sender),
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "ReceiveTransferCancelRoute":
+        return cls(
+            balance_proof=data["balance_proof"],
+            transfer=data["transfer"],
+            sender=to_canonical_address(data["sender"]),
+        )
 
 
 class ReceiveLockExpired(BalanceProofStateChange):
