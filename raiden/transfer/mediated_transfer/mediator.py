@@ -959,6 +959,7 @@ def events_to_remove_expired_locks(
                     channel_state=channel_state,
                     locked_lock=lock,
                     pseudo_random_generator=pseudo_random_generator,
+                    payment_identifier=transfer_pair.payee_transfer.payment_identifier,
                 )
                 events.extend(expired_lock_events)
 
