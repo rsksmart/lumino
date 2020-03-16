@@ -70,7 +70,6 @@ def logs_blocks_sanity_check(from_block: BlockSpecification, to_block: BlockSpec
 
 
 def geth_assert_rpc_interfaces(web3: Web3):
-
     try:
         web3.version.node
     except ValueError:
@@ -105,7 +104,6 @@ def geth_assert_rpc_interfaces(web3: Web3):
 
 
 def parity_assert_rpc_interfaces(web3: Web3):
-
     try:
         web3.version.node
     except ValueError:
@@ -182,7 +180,7 @@ def check_address_has_code(client: "JSONRPCClient", address: Address, contract_n
     """ Checks that the given address contains code. """
     result = client.web3.eth.getCode(to_checksum_address(address), "latest")
 
-    if not result:
+    if not result or result == b'\x00':
         if contract_name:
             formated_contract_name = "[{}]: ".format(contract_name)
         else:
@@ -892,7 +890,7 @@ class JSONRPCClient:
         if transaction_executed:
             return
 
-        our_address = to_checksum_address(self.address)
+        our_address = to_checksum_address(address)
         balance = self.web3.eth.getBalance(our_address, block_identifier)
         required_balance = required_gas * self.gas_price()
         if balance < required_balance:

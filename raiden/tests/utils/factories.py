@@ -824,53 +824,51 @@ class ChannelSet:
     def partner_address(self, index: int) -> Address:
         return self.get_sub_channel(index).partner_state.address
 
-    def get_route(self, key: str, channel_key: str) -> RouteState:
-        return make_route_from_channel(self.channels[key][channel_key])
+    def get_route(self, node_address: str, channel_identifier: str) -> RouteState:
+        return make_route_from_channel(self.channels[node_address][channel_identifier])
 
-    def get_routes(self, *args) -> List[RouteState]:
+    def get_routes(self) -> List[RouteState]:
         routes = []
-        for key in (args or self.channels.keys()):
+        for key in self.channels.keys():
             for channel_key in self.channels[key].keys():
                 routes.append(self.get_route(key, channel_key))
         return routes
 
-    def get_routes_by_index(self, *args) -> List[RouteState]:
+    def get_routes_by_index(self, indexes: list) -> List[RouteState]:
         counter = 0
         ret_routes = []
         for key in self.channels.keys():
             for channel_key in self.channels[key].keys():
-                if counter in args:
+                if counter in indexes:
                     ret_routes.append(self.get_route(key, channel_key))
-                    counter += 1
-                else:
-                    counter += 1
+                counter += 1
         return ret_routes
 
-    def get_route_by_index(self, *args) -> RouteState:
+    def get_route_by_index(self, index: int) -> RouteState:
         counter = 0
         for key in self.channels.keys():
             for channel_key in self.channels[key].keys():
-                if counter in args:
+                if counter == index:
                     return self.get_route(key, channel_key)
                 else:
                     counter += 1
         return None
 
-    def get_sub_channel(self, item: int) -> NettingChannelState:
+    def get_sub_channel(self, index: int) -> NettingChannelState:
         counter = 0
         for key in self.channels.keys():
             for sub_channel_key in self.channels[key].keys():
-                if counter == item:
+                if counter == index:
                     return self.channels[key][sub_channel_key]
                 else:
                     counter += 1
 
         return None
 
-    def __getitem__(self, item: int) -> NettingChannelState:
+    def __getitem__(self, index: int) -> NettingChannelState:
         counter = 0
         for key in self.channels.keys():
-            if counter == item:
+            if counter == index:
                 return self.channels[key]
             else:
                 counter += 1
@@ -936,7 +934,7 @@ def mediator_make_channel_pair(
 def mediator_make_init_action(
     channels: ChannelSet, transfer: LockedTransferSignedState
 ) -> ActionInitMediator:
-    return ActionInitMediator(channels.get_routes_by_index(1), channels.get_route_by_index(0), transfer)
+    return ActionInitMediator(channels.get_routes_by_index([1]), channels.get_route_by_index(0), transfer)
 
 
 class MediatorTransfersPair(NamedTuple):
@@ -975,23 +973,25 @@ def make_transfers_pair(
         )
         for i in range(number_of_channels)
     ]
-    channel_set = make_channel_set(
-        properties=properties_list, defaults=defaults, token_address=UNIT_TRANSFER_DESCRIPTION.initiator)
+    channels = make_channel_set(properties=properties_list, defaults=defaults, token_address=ChannelSet.ADDRESSES[0])c
 
     lock_expiration = block_number + UNIT_REVEAL_TIMEOUT * 2
     pseudo_random_generator = random.Random()
     transfers_pairs = list()
-    payer_index = 0
-    for key in channel_set.channels[UNIT_TRANSFER_DESCRIPTION.initiator].keys():
-        receiver_channel = channel_set.channels[UNIT_TRANSFER_DESCRIPTION.initiator][key]
+
+    for payer_index in range(number_of_channels - 1):
+        payee_index = payer_index + 1
+
+        receiver_channel = channels.get_sub_channel(payer_index)
         received_transfer = create(
             LockedTransferSignedStateProperties(
+                initiator=ChannelSet.ADDRESSES[0],
                 amount=amount,
                 expiration=lock_expiration,
                 payment_identifier=UNIT_TRANSFER_IDENTIFIER,
                 canonical_identifier=receiver_channel.canonical_identifier,
                 sender=receiver_channel.partner_state.address,
-                pkey=channel_set.partner_privatekeys[payer_index],
+                pkey=ChannelSet.partner_privatekeys[payer_index],
             )
         )
 
@@ -1002,8 +1002,8 @@ def make_transfers_pair(
 
         message_identifier = message_identifier_from_prng(pseudo_random_generator)
         lockedtransfer_event = channel.send_lockedtransfer(
-            channel_state=receiver_channel,
-            initiator=UNIT_TRANSFER_INITIATOR,
+            channel_state=channels.get_sub_channel(payee_index),
+            initiator=ChannelSet.ADDRESSES[0],
             target=UNIT_TRANSFER_TARGET,
             amount=amount,
             message_identifier=message_identifier,
@@ -1016,7 +1016,7 @@ def make_transfers_pair(
 
         lock_timeout = lock_expiration - block_number
         assert mediator.is_channel_usable(
-            candidate_channel_state=receiver_channel,
+            candidate_channel_state=channels.get_sub_channel(payee_index),
             transfer_amount=amount,
             lock_timeout=lock_timeout,
         )
@@ -1027,7 +1027,7 @@ def make_transfers_pair(
         payer_index += 1
 
     return MediatorTransfersPair(
-        channel_set=channel_set,
+        channel_set=channels,
         transfers_pair=transfers_pairs,
         amount=amount,
         block_number=block_number,

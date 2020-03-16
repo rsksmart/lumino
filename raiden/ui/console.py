@@ -278,8 +278,13 @@ class ConsoleTools:
             registry_address, token_address, peer_address, settle_timeout=settle_timeout
         )
 
+        # TODO: creator_address cant be None, we should specify a value here #jonaf2103
         return self._api.set_total_channel_deposit(
-            registry_address, token_address, peer_address, total_deposit
+            registry_address=registry_address,
+            token_address=token_address,
+            creator_address=None,
+            partner_address=peer_address,
+            total_deposit=total_deposit
         )
 
     def wait_for_contract(self, contract_address_hex, timeout=None):

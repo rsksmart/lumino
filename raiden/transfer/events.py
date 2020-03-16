@@ -1,5 +1,3 @@
-from typing import TYPE_CHECKING
-
 from eth_utils import to_bytes, to_canonical_address, to_checksum_address, to_hex, to_normalized_address
 
 from raiden.constants import UINT256_MAX
@@ -34,13 +32,6 @@ from raiden.utils.typing import (
     TokenNetworkAddress,
     TokenNetworkID,
     Signature)
-
-if TYPE_CHECKING:
-    # pylint: disable=unused-import
-    from raiden.transfer.state import BalanceProofSignedState
-
-
-# pylint: disable=too-many-arguments,too-few-public-methods
 
 
 class ContractSendChannelClose(ContractSendEvent):

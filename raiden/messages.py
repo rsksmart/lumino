@@ -21,7 +21,7 @@ from raiden.transfer.balance_proof import (
 )
 from raiden.transfer.identifiers import CanonicalIdentifier
 
-from raiden.transfer.state import BalanceProofSignedState, NettingChannelState
+from raiden.transfer.state import BalanceProofSignedState
 from raiden.transfer.utils import hash_balance_data
 from raiden.utils import ishash, pex, sha3
 from raiden.utils.signer import Signer, recover
@@ -34,7 +34,6 @@ from raiden.utils.typing import (
     ChainID,
     ChannelID,
     Dict,
-    FeeAmount,
     InitiatorAddress,
     Locksroot,
     MessageID,
@@ -75,10 +74,8 @@ __all__ = (
     "SignedMessage",
     "ToDevice",
     "Unlock",
-    "UpdatePFS",
     "decode",
     "from_dict",
-    "message_from_sendevent",
 )
 
 _senders_cache = LRUCache(maxsize=128)

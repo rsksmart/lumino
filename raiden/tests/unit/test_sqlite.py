@@ -240,6 +240,7 @@ def test_get_event_with_balance_proof():
         message_identifier=next(counter),
         balance_proof=make_balance_proof_from_counter(counter),
         secrethash=sha3(factories.make_secret(next(counter))),
+        payment_identifier=0
     )
     locked_transfer = SendLockedTransfer(
         recipient=factories.make_address(),

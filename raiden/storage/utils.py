@@ -90,9 +90,11 @@ CREATE TABLE IF NOT EXISTS client (
     address TEXT PRIMARY KEY,
     password TEXT NOT NULL,
     display_name TEXT NOT NULL,
-    seed_retry TEXT NOT NULL, 
+    seed_retry TEXT NOT NULL,
     api_key TEXT NOT NULL,
-    type TEXT CHECK ( type IN ('HUB','FULL','LIGHT') ) NOT NULL DEFAULT 'FULL'
+    type TEXT CHECK ( type IN ('HUB','FULL','LIGHT') ) NOT NULL DEFAULT 'FULL',
+    current_server_name TEXT NULL,
+    pending_for_deletion INTEGER NULL DEFAULT 0
 );
 """
 
@@ -100,13 +102,13 @@ DB_CREATE_LIGHT_CLIENT_PAYMENT = """
 CREATE TABLE IF NOT EXISTS light_client_payment(
     payment_id TEXT PRIMARY KEY,
     light_client_address TEXT NOT NULL,
-    partner_address TEXT NOT NULL, 
+    partner_address TEXT NOT NULL,
     is_lc_initiator INTEGER DEFAULT 1,
     token_network_id TEXT NOT NULL,
-    amount INTEGER NOT NULL,
-    created_on TEXT NOT NULL, 
+    amount TEXT NOT NULL,
+    created_on TEXT NOT NULL,
     payment_status  TEXT CHECK  (payment_status in ('InProgress', 'Expired', 'Failed', 'Done', 'Pending', 'Deleted' ) ) NOT NULL DEFAULT 'Pending',
-    FOREIGN KEY(light_client_address) REFERENCES client(address)
+    FOREIGN KEY(light_client_address) REFERENCES client(address) ON DELETE CASCADE ON UPDATE CASCADE
 );
 """
 
@@ -114,11 +116,12 @@ DB_CREATE_LIGHT_CLIENT_PROTOCOL_MESSAGE = """
 CREATE TABLE IF NOT EXISTS light_client_protocol_message (
     internal_msg_identifier INTEGER PRIMARY KEY AUTOINCREMENT,
     identifier TEXT,
-    light_client_payment_id TEXT NULLABLE REFERENCES light_client_payment(payment_id),
-    message_order INTEGER, 
+    light_client_payment_id TEXT NULLABLE REFERENCES light_client_payment(payment_id) ON DELETE CASCADE ON UPDATE CASCADE,
+    message_order INTEGER,
     unsigned_message JSON,
-    signed_message JSON
-    );
+    signed_message JSON,
+    message_type TEXT CHECK (message_type in ('PaymentSuccessful', 'PaymentFailure', 'PaymentExpired', 'SettlementRequired')) NOT NULL
+);
 """
 
 DB_CREATE_LIGHT_CLIENT_BALANCE_PROOF = """
@@ -132,8 +135,8 @@ CREATE TABLE IF NOT EXISTS light_client_balance_proof (
     token_network_address TEXT,
     balance_proof JSON,
     lc_balance_proof_signature TEXT,
-    FOREIGN KEY(light_client_payment_id)  REFERENCES light_client_payment(payment_id)
-    );
+    FOREIGN KEY(light_client_payment_id)  REFERENCES light_client_payment(payment_id) ON DELETE CASCADE ON UPDATE CASCADE
+);
 """
 
 DB_SCRIPT_CREATE_TABLES = """

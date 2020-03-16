@@ -6,7 +6,7 @@ from random import Random
 from typing import TYPE_CHECKING, Tuple
 
 import networkx
-from eth_utils import encode_hex, to_canonical_address, to_checksum_address, to_normalized_address
+from eth_utils import encode_hex, to_canonical_address, to_checksum_address
 
 from raiden.constants import EMPTY_MERKLE_ROOT, UINT64_MAX, UINT256_MAX
 from raiden.encoding import messages
@@ -672,11 +672,12 @@ class TokenNetworkGraphState(State):
     def __ne__(self, other: Any) -> bool:
         return not self.__eq__(other)
 
-    def _same_channel_tuple(self, participant1: Address, participant2: Address, graph_tuple: Tuple[Address, Address]) -> bool:
+    @staticmethod
+    def _same_channel_tuple(participant1: Address, participant2: Address, graph_tuple: Tuple[Address, Address]) -> bool:
         return graph_tuple[0] == participant1 and graph_tuple[1] == participant2 or graph_tuple[0] == participant2 and graph_tuple[1] == participant1
 
     def channel_exists(self, participant1: Address, participant2: Address) -> bool:
-        for key, val in self.channel_identifier_to_participants.items():
+        for _key, val in self.channel_identifier_to_participants.items():
             if self._same_channel_tuple(participant1, participant2, val):
                 return True
         return False
@@ -1509,6 +1510,8 @@ class NettingChannelState(State):
         "close_transaction",
         "settle_transaction",
         "update_transaction",
+        "is_light_channel"
+        ""
     )
 
     def __init__(
@@ -1525,6 +1528,7 @@ class NettingChannelState(State):
         close_transaction: TransactionExecutionStatus = None,
         settle_transaction: TransactionExecutionStatus = None,
         update_transaction: TransactionExecutionStatus = None,
+        is_light_channel: bool = False
     ) -> None:
         if reveal_timeout >= settle_timeout:
             raise ValueError("reveal_timeout must be smaller than settle_timeout")
@@ -1579,9 +1583,10 @@ class NettingChannelState(State):
         self.settle_transaction = settle_transaction
         self.update_transaction = update_transaction
         self.mediation_fee = mediation_fee
+        self.is_light_channel = is_light_channel
 
     def __repr__(self) -> str:
-        return "<NettingChannelState id:{} opened:{} closed:{} settled:{} updated:{}>".format(
+        return "<NettingChannelState id:{} opened:{} closed:{} settled:{} updated:{} is_light_channel>".format(
             self.canonical_identifier.channel_identifier,
             self.open_transaction,
             self.close_transaction,
@@ -1617,6 +1622,7 @@ class NettingChannelState(State):
             and self.close_transaction == other.close_transaction
             and self.settle_transaction == other.settle_transaction
             and self.update_transaction == other.update_transaction
+            and self.is_light_channel == other.is_light_channel
         )
 
     @property
@@ -1643,6 +1649,7 @@ class NettingChannelState(State):
             "partner_state": self.partner_state,
             "open_transaction": self.open_transaction,
             "deposit_transaction_queue": self.deposit_transaction_queue,
+            "is_light_channel": self.is_light_channel
         }
 
         if self.close_transaction is not None:
@@ -1666,6 +1673,7 @@ class NettingChannelState(State):
             our_state=data["our_state"],
             partner_state=data["partner_state"],
             open_transaction=data["open_transaction"],
+            is_light_channel=data["is_light_channel"]
         )
         close_transaction = data.get("close_transaction")
         if close_transaction is not None:

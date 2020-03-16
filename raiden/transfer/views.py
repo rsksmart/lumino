@@ -1,7 +1,7 @@
 from raiden.transfer import channel
 from raiden.transfer.architecture import ContractSendEvent
 from raiden.transfer.identifiers import CanonicalIdentifier
-from eth_utils import to_canonical_address, to_checksum_address
+from eth_utils import to_canonical_address
 
 from raiden.transfer.state import (
     CHANNEL_STATE_CLOSED,
@@ -274,8 +274,8 @@ def get_channelstate_for(
     chain_state: ChainState,
     payment_network_id: PaymentNetworkID,
     token_address: TokenAddress,
-    creator_address: Address,
-    partner_address: Address
+    creator_address: Address = None,
+    partner_address: Address = None
 ) -> Optional[NettingChannelState]:
     """ Return the NettingChannelState if it exists, None otherwise. """
     token_network = get_token_network_by_token_address(
@@ -558,11 +558,11 @@ def list_channelstate_for_tokennetwork(
     token_network = get_token_network_by_token_address(
         chain_state, payment_network_id, token_address
     )
-
+    result = list()
     if token_network:
-        result = list(token_network.channelidentifiers_to_channels.values())
-    else:
-        result = []
+        for channel_address in token_network.channelidentifiers_to_channels.values():
+            for channel in channel_address.values():
+                result.append(channel)
 
     return result
 
@@ -570,8 +570,7 @@ def list_channelstate_for_tokennetwork(
 def list_channelstate_for_tokennetwork_lumino(
     chain_state: ChainState,
     payment_network_id: PaymentNetworkID,
-    token_addresses_split,
-    node_address
+    token_addresses_split
 ) -> List[NettingChannelState]:
     channels_by_token = []
 
@@ -625,7 +624,7 @@ def filter_channels_by_partneraddress(
         if node_address in token_network.channelidentifiers_to_channels:
             channels = token_network.channelidentifiers_to_channels[node_address]
             if channels is not None:
-                for channelId, channel in channels.items():
+                for _channelId, channel in channels.items():
                     for partner_address in partner_addresses:
                         if channel.partner_state.address == partner_address:
                             if channel.close_transaction is None or channel.close_transaction.result != 'success':

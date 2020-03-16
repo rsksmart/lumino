@@ -1,3 +1,5 @@
+from http import HTTPStatus
+
 import gevent
 import structlog
 from gevent import Greenlet
@@ -9,21 +11,19 @@ import os
 import dateutil.parser
 from datetime import datetime, date
 from dateutil.relativedelta import relativedelta
-from eth_utils import is_binary_address, to_checksum_address, to_canonical_address, to_normalized_address, decode_hex, \
-    encode_hex
+from eth_utils import is_binary_address, to_checksum_address, to_canonical_address, to_normalized_address, encode_hex
 
-from ecies import encrypt, decrypt
-from ecies.utils import generate_eth_key, generate_key
+from ecies import encrypt
 
 import raiden.blockchain.events as blockchain_events
 from raiden import waiting
+from raiden.api.validations.api_error_builder import ApiErrorBuilder
 from raiden.api.validations.channel_validator import ChannelValidator
 from raiden.constants import (
     GENESIS_BLOCK_NUMBER,
     RED_EYES_PER_TOKEN_NETWORK_LIMIT,
     UINT256_MAX,
-    Environment,
-    EMPTY_PAYMENT_HASH_INVOICE)
+    Environment)
 from raiden.exceptions import (
     AlreadyRegisteredTokenAddress,
     ChannelNotFound,
@@ -36,23 +36,25 @@ from raiden.exceptions import (
     InvalidAmount,
     InvalidSecret,
     InvalidSecretHash,
-    InvalidSettleTimeout,
     TokenAppNotFound,
     TokenAppExpired,
     RaidenRecoverableError,
-    TokenNotRegistered,
     UnknownTokenAddress,
     InvoiceCoding,
     UnhandledLightClient)
-from raiden.lightclient.light_client_message_handler import LightClientMessageHandler
-from raiden.lightclient.light_client_service import LightClientService
-from raiden.lightclient.light_client_utils import LightClientUtils
-from raiden.lightclient.lightclientmessages.hub_message import HubMessage
-from raiden.lightclient.lightclientmessages.light_client_payment import LightClientPayment, LightClientPaymentStatus
+from raiden.lightclient.handlers.light_client_message_handler import LightClientMessageHandler
+from raiden.lightclient.handlers.light_client_service import LightClientService
+from raiden.lightclient.handlers.light_client_utils import LightClientUtils
+from raiden.lightclient.lightclientmessages.hub_response_message import HubResponseMessage
+from raiden.lightclient.lightclientmessages.payment_hub_message import PaymentHubMessage
+from raiden.lightclient.models.light_client_payment import LightClientPayment, LightClientPaymentStatus
+from raiden.lightclient.models.light_client_protocol_message import LightClientProtocolMessageType
 
-from raiden.messages import RequestMonitoring, LockedTransfer, RevealSecret, Unlock, Delivered, SecretRequest, Processed
+from raiden.messages import RequestMonitoring, LockedTransfer, RevealSecret, Unlock, Delivered, SecretRequest, \
+    Processed, LockExpired
 from raiden.settings import DEFAULT_RETRY_TIMEOUT, DEVELOPMENT_CONTRACT_VERSION, HUB_MAX_LIGHT_CLIENTS
-from raiden.transfer import architecture, views, channel
+
+from raiden.transfer import architecture, views
 from raiden.transfer.events import (
     EventPaymentReceivedSuccess,
     EventPaymentSentFailed,
@@ -73,7 +75,6 @@ from raiden.utils import pex, typing
 from raiden.utils.gas_reserve import has_enough_gas_reserve
 from raiden.utils.typing import (
     Address,
-    AddressHex,
     Any,
     BlockSpecification,
     BlockTimeout,
@@ -94,7 +95,7 @@ from raiden.utils.typing import (
     TokenNetworkAddress,
     TokenNetworkID,
     Tuple,
-    SignedTransaction, InitiatorAddress, TargetAddress, PaymentWithFeeAmount, BlockExpiration)
+    SignedTransaction)
 
 from raiden.rns_constants import RNS_ADDRESS_ZERO
 from raiden.utils.rns import is_rns_address
@@ -119,9 +120,7 @@ from raiden.settings import (
 
 from raiden.utils.cli import get_matrix_servers
 
-from raiden.network.transport.matrix.utils import (
-    make_client
-)
+from raiden.network.transport.matrix.utils import make_client
 
 from urllib.parse import urlparse
 
@@ -923,13 +922,13 @@ class RaidenAPI:
             result = views.list_channelstate_for_tokennetwork_lumino(
                 chain_state=views.state_from_raiden(self.raiden),
                 payment_network_id=registry_address,
-                token_addresses_split=token_addresses_split,
-                node_address=self.address
+                token_addresses_split=token_addresses_split
             )
 
         return result
 
-    def _check_token_address_format(self, token_address):
+    @staticmethod
+    def _check_token_address_format(token_address):
         if token_address and not is_binary_address(token_address):
             raise InvalidAddress('Expected binary address format for token in get_channel_list')
 
@@ -1123,7 +1122,7 @@ class RaidenAPI:
             payment_network_id=payment_network_identifier,
             token_address=token_address,
         )
-        payment_status = self.raiden.mediated_transfer_async_light(
+        self.raiden.mediated_transfer_async_light(
             token_network_identifier=token_network_identifier,
             amount=amount,
             creator=creator,
@@ -1144,16 +1143,20 @@ class RaidenAPI:
         self.raiden.initiate_send_balance_proof(sender_address, receiver_address, unlock)
 
     def initiate_send_delivered_light(self, sender_address: typing.Address, receiver_address: typing.Address,
-                                      delivered: Delivered, msg_order: int, payment_id: int):
-        self.raiden.initiate_send_delivered_light(sender_address, receiver_address, delivered, msg_order, payment_id)
+                                      delivered: Delivered, msg_order: int, payment_id: int, message_type: LightClientProtocolMessageType):
+        self.raiden.initiate_send_delivered_light(sender_address, receiver_address, delivered, msg_order, payment_id, message_type)
 
     def initiate_send_processed_light(self, sender_address: typing.Address, receiver_address: typing.Address,
-                                      processed: Processed, msg_order: int, payment_id: int):
-        self.raiden.initiate_send_processed_light(sender_address, receiver_address, processed, msg_order, payment_id)
+                                      processed: Processed, msg_order: int, payment_id: int, message_type: LightClientProtocolMessageType):
+        self.raiden.initiate_send_processed_light(sender_address, receiver_address, processed, msg_order, payment_id, message_type)
 
     def initiate_send_secret_request_light(self, sender_address: typing.Address, receiver_address: typing.Address,
-                                           secret_request: SecretRequest, msg_order: int, payment_id: int):
+                                           secret_request: SecretRequest):
         self.raiden.initiate_send_secret_request_light(sender_address, receiver_address, secret_request)
+
+    def initiate_send_lock_expired_light(self, sender_address: typing.Address, receiver_address: typing.Address,
+                                         lock_expired: LockExpired, payment_id: int):
+        self.raiden.initiate_send_lock_expired_light(sender_address, receiver_address, lock_expired, payment_id)
 
     def get_raiden_events_payment_history_with_timestamps_v2(
         self,
@@ -1259,7 +1262,8 @@ class RaidenAPI:
         invoice = self.raiden.wal.storage.query_invoice(payment_hash)
         return invoice
 
-    def decode_invoice(self, coded_invoice):
+    @staticmethod
+    def decode_invoice(coded_invoice):
         return decode_invoice(coded_invoice)
 
     def get_blockchain_events_network(
@@ -1562,11 +1566,12 @@ class RaidenAPI:
 
         return matches
 
-    def _match_in(self, data, query):
+    @staticmethod
+    def _match_in(data, query):
         matches = []
         for item in data:
             if isinstance(item, dict):
-                for key, value in item.items():
+                for _, value in item.items():
                     if query in value:
                         matches.append(item)
                 # Remove duplicate dicts
@@ -1598,7 +1603,8 @@ class RaidenAPI:
 
         return token_addresses
 
-    def _get_node_addresses_for_search(self, token_network):
+    @staticmethod
+    def _get_node_addresses_for_search(token_network):
         node_addresses = []
         nodes = token_network.network_graph.channel_identifier_to_participants.values()
         for node_address_tuple in nodes:
@@ -1627,6 +1633,7 @@ class RaidenAPI:
     def register_light_client(self,
                               address,
                               signed_password,
+                              server_name,
                               signed_display_name,
                               signed_seed_retry):
 
@@ -1650,7 +1657,10 @@ class RaidenAPI:
                     address=address,
                     encrypt_signed_password=encrypt_signed_password.hex(),
                     encrypt_signed_display_name=encrypt_signed_display_name.hex(),
-                    encrypt_signed_seed_retry=encrypt_signed_seed_retry.hex())
+                    encrypt_signed_seed_retry=encrypt_signed_seed_retry.hex(),
+                    current_server_name=server_name,
+                    pending_for_deletion=0
+                )
 
                 if result > 0:
                     result = {"address": address,
@@ -1685,7 +1695,7 @@ class RaidenAPI:
         token_address: typing.TokenAddress,
         amount: typing.TokenAmount,
         secrethash: typing.SecretHash
-    ) -> HubMessage:
+    ) -> HubResponseMessage:
         channel_state = views.get_channelstate_for(
             views.state_from_raiden(self.raiden),
             registry_address,
@@ -1695,22 +1705,16 @@ class RaidenAPI:
         )
         if channel_state:
             chain_state = views.state_from_raiden(self.raiden)
-            # Build autogenerated values
-            lt_autogenerated_values = LightClientUtils.build_lt_autogen_values(chain_state, channel_state)
-            # Create locked transfer event
-            locked_transfer, merkle_tree_state = channel.create_sendlockedtransfer(
-                channel_state,
-                InitiatorAddress(creator_address),
-                TargetAddress(partner_address),
-                PaymentWithFeeAmount(amount),
-                lt_autogenerated_values.message_identifier,
-                lt_autogenerated_values.payment_identifier,
-                EMPTY_PAYMENT_HASH_INVOICE,
-                lt_autogenerated_values.lock_expiration,
-                secrethash)
 
-            # Get the LockedTransfer message
-            locked_transfer = LockedTransfer.from_event(locked_transfer)
+            locked_transfer = LightClientUtils.create_locked_transfer(
+                chain_state=chain_state,
+                channel_state=channel_state,
+                amount=amount,
+                secrethash=secrethash,
+                creator_address=creator_address,
+                partner_address=partner_address,
+            )
+
             # Create the light_client_payment
             is_lc_initiator = 1
             payment = LightClientPayment(creator_address, partner_address,
@@ -1722,15 +1726,47 @@ class RaidenAPI:
             # Persist the light_client_protocol_message associated
             order = 1
             LightClientMessageHandler.store_light_client_payment(payment, self.raiden.wal.storage)
-            LightClientMessageHandler.store_light_client_protocol_message(
+            lcpm_id = LightClientMessageHandler.store_light_client_protocol_message(
                 locked_transfer.message_identifier,
                 locked_transfer,
                 False,
                 payment.payment_id,
                 order,
+                LightClientProtocolMessageType.PaymentSuccessful,
                 self.raiden.wal
             )
-
-            return HubMessage(payment.payment_id, order, locked_transfer)
+            payment_hub_message = PaymentHubMessage(payment_id=payment.payment_id,
+                                                    message_order=order,
+                                                    message=locked_transfer, is_signed=False)
+            return HubResponseMessage(lcpm_id, LightClientProtocolMessageType.PaymentSuccessful, payment_hub_message)
         else:
             raise ChannelNotFound("Channel with given partner address doesnt exists")
+
+    def validate_light_client(self, api_key: str):
+        """
+            This function checks if this api key is valid and also if the LC
+            associated has a valid matrix server to login, this function only returns
+            if something went wrong, this is because of the flask before_request behaviour
+            https://flask.palletsprojects.com/en/0.12.x/api/#flask.Flask.before_request
+        """
+        light_client = self.raiden.wal.storage.get_light_client_by_api_key(api_key)
+        force_on_boarding = False
+        if light_client:
+            log.debug("Checking key " + api_key + " for LC with address " + light_client["address"])
+            if light_client["pending_for_deletion"]:
+                self.raiden.wal.storage.delete_light_client(light_client["address"])
+                force_on_boarding = True
+        else:
+            log.debug("No light client available for api key" + api_key)
+            return ApiErrorBuilder.build_and_log_error(
+                errors="There is no light client associated with the api key provided.",
+                status_code=HTTPStatus.FORBIDDEN,
+                log=log
+            )
+
+        if force_on_boarding:
+            return ApiErrorBuilder.build_and_log_error(
+                errors="Invalid LC api key, LC need to execute on-board again.",
+                status_code=HTTPStatus.FORBIDDEN,
+                log=log
+            )

@@ -21,7 +21,7 @@ from raiden.transfer.state import (
     TransactionChannelNewBalance,
 )
 from raiden.transfer.utils import pseudo_random_generator_from_json
-from raiden.utils import pex, sha3, decode_hex
+from raiden.utils import pex, sha3
 from raiden.utils.serialization import (
     deserialize_blockhash,
     deserialize_bytes,
@@ -60,8 +60,7 @@ from raiden.utils.typing import (
     TokenNetworkID,
     TransactionHash,
     TransferID,
-    AddressHex,
-    SignedTransaction)
+    AddressHex)
 
 
 class Block(StateChange):
@@ -189,9 +188,10 @@ class ActionChannelClose(StateChange):
     """ User is closing an existing channel. """
 
     def __init__(self, canonical_identifier: CanonicalIdentifier,
-                 signed_close_tx: str,
                  participant1: AddressHex,
-                 participant2: AddressHex) -> None:
+                 participant2: AddressHex,
+                 signed_close_tx: str = None
+                 ) -> None:
         self.canonical_identifier = canonical_identifier
         self.signed_close_tx = signed_close_tx
         self.participant1 = participant1

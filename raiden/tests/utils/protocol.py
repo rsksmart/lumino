@@ -43,10 +43,10 @@ class WaitForMessage(MessageHandler):
         self.waiting[message_type].append(waiting)
         return waiting.async_result
 
-    def on_message(self, raiden: RaidenService, message: Message) -> None:
+    def on_message(self, raiden: RaidenService, message: Message, is_light_client: bool = False) -> None:
         # First handle the message, and then set the events, to ensure the
         # expected side-effects of the message are applied
-        super().on_message(raiden, message)
+        super().on_message(raiden, message, is_light_client)
 
         for waiting in self.waiting[type(message)]:
             if check_nested_attrs(message, waiting.attributes):

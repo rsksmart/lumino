@@ -1,6 +1,4 @@
-from eth_utils import to_checksum_address, to_normalized_address, decode_hex
-from eth_utils.typing import ChecksumAddress
-
+from eth_utils import decode_hex
 from raiden.transfer import channel, views
 from raiden.transfer.architecture import Event, StateChange, TransitionResult
 from raiden.transfer.state import TokenNetworkState, NettingChannelState
@@ -16,8 +14,7 @@ from raiden.transfer.state_change import (
     ContractReceiveRouteNew,
     ContractReceiveUpdateTransfer,
     ContractReceiveChannelClosedLight, ContractReceiveChannelSettledLight)
-from raiden.utils.typing import MYPY_ANNOTATION, BlockHash, BlockNumber, List, Union, Dict, ChannelID, Address, \
-    AddressHex, Tuple
+from raiden.utils.typing import MYPY_ANNOTATION, BlockHash, BlockNumber, List, Union, Dict, AddressHex
 
 # TODO: The proper solution would be to introduce a marker for state changes
 # that contains channel IDs and other specific channel attributes
@@ -121,7 +118,7 @@ def handle_channelnew(
         addresses_to_ids[our_address].append(channel_identifier)
         addresses_to_ids[partner_address].append(channel_identifier)
 
-        return TransitionResult(token_network_state, events)
+    return TransitionResult(token_network_state, events)
 
 
 def handle_balance(
@@ -142,7 +139,7 @@ def handle_balance(
 
 def handle_closed(
     token_network_state: TokenNetworkState,
-    state_change: ContractReceiveChannelClosed,
+    state_change: Union[ContractReceiveChannelClosed, ContractReceiveChannelClosedLight],
     block_number: BlockNumber,
     block_hash: BlockHash,
 ) -> TransitionResult:
@@ -207,7 +204,7 @@ def handle_batch_unlock(
     block_hash: BlockHash,
 ) -> TransitionResult:
     events = list()
-    channel_state = token_network_state.channelidentifiers_to_channels.get(
+    channel_state = token_network_state.channelidentifiers_to_channels[state_change.participant].get(
         state_change.canonical_identifier.channel_identifier
     )
     if channel_state is not None:
@@ -224,7 +221,7 @@ def handle_batch_unlock(
                 channel_state.partner_state.address
             ].remove(channel_state.identifier)
 
-            del token_network_state.channelidentifiers_to_channels[channel_state.identifier]
+            del token_network_state.channelidentifiers_to_channels[state_change.participant][channel_state.identifier]
 
     return TransitionResult(token_network_state, events)
 

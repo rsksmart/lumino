@@ -10,7 +10,6 @@ from eth_utils import (
 )
 from marshmallow import Schema, SchemaOpts, fields, post_dump, post_load, pre_load
 
-from raiden.lightclient.lightclientmessages.hub_message import HubMessage
 from raiden.utils.rns import is_rns_address
 from webargs import validate
 from werkzeug.exceptions import NotFound
@@ -362,7 +361,6 @@ class ChannelLightPutSchema(BaseSchema):
     partner_address = AddressField(required=True)
     signed_tx = fields.String(required=True)
     settle_timeout = fields.Integer(missing=None)
-    total_deposit = fields.Integer(default=None, missing=None)
 
     class Meta:
         strict = True
@@ -383,7 +381,7 @@ class CreatePaymentLightPostSchema(BaseSchema):
         decoding_class = dict
 
 
-class PaymentLightGetSchema(BaseSchema):
+class LightClientMessageGetSchema(BaseSchema):
     from_message = fields.Int(required=True)
 
     class Meta:
@@ -392,11 +390,12 @@ class PaymentLightGetSchema(BaseSchema):
 
 
 class PaymentLightPutSchema(BaseSchema):
-    message_id = fields.Integer(required=True)
+    payment_id = fields.Integer(required=True)
     message_order = fields.Integer(required=True)
     message = fields.Dict(required=True)
     sender = AddressField(required=True)
     receiver = AddressField(required=True)
+    message_type_value = fields.String(required=True)
 
     class Meta:
         strict = True

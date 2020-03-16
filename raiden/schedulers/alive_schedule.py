@@ -40,6 +40,6 @@ def notice_explorer_to_be_alive(endpoint_explorer, discoverable, node_address, r
             else:
                 log.info("Warning: send alive signal to Lumino Explorer, is not posible because node is not registered")
 
-    except requests.exceptions.RequestException as e:
+    except requests.exceptions.RequestException:
         log.info("Warning: Could not connect to Lumino Explorer. Your node will not send alive signal.")
 

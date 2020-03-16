@@ -11,6 +11,8 @@ from web3 import HTTPProvider, Web3
 from definitions import ROOT_DIR
 import json
 from eth_utils import encode_hex
+
+from raiden.network.transport.matrix.utils import get_available_servers_from_config, server_is_available
 from raiden.storage import serialize, sqlite
 
 from raiden.accounts import AccountManager
@@ -93,11 +95,29 @@ def _setup_matrix(config):
 
         light_client_transports = []
         for light_client in light_clients:
-            light_client_transport = get_matrix_light_client_instance(config["transport"]["matrix"],
-                                             light_client['password'],
-                                             light_client['display_name'],
-                                             light_client['seed_retry'],
-                                             light_client['address'])
+
+            current_server_name = None
+
+            if light_client["current_server_name"]:
+                current_server_name = light_client["current_server_name"]
+                available_servers = get_available_servers_from_config(config["transport"]["matrix"])
+                if not server_is_available(current_server_name, available_servers):
+                    # we flag the light client as pending for deletion because it's associated to a server that
+                    # is not available anymore so we need to force a new on-boarding, the next request from that LC will
+                    # delete it and respond with an error to control the re-onboard
+                    storage.flag_light_client_as_pending_for_deletion(light_client["address"])
+                    log.info("No available server with name " + current_server_name +
+                             ", LC has been flagged for deletion from DB, on-boarding is needed for LC with address: " +
+                             light_client["address"])
+                    continue
+
+            light_client_transport = get_matrix_light_client_instance(
+                config["transport"]["matrix"],
+                light_client['password'],
+                light_client['display_name'],
+                light_client['seed_retry'],
+                light_client['address'],
+                current_server_name)
 
             light_client_transports.append(light_client_transport)
 
@@ -112,8 +132,22 @@ def _setup_matrix(config):
     return node_transport
 
 
-def get_matrix_light_client_instance(config, password, display_name, seed_retry, address):
-    light_client_transport = MatrixLightClientTransport(config, password, display_name, seed_retry, address)
+def get_matrix_light_client_instance(
+    config,
+    password,
+    display_name,
+    seed_retry,
+    address,
+    current_server_name: str = None
+):
+    light_client_transport = MatrixLightClientTransport(
+        config,
+        password,
+        display_name,
+        seed_retry,
+        address,
+        current_server_name
+    )
     return light_client_transport
 
 

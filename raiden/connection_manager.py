@@ -6,7 +6,6 @@ from eth_utils import decode_hex
 from gevent.lock import Semaphore
 
 from raiden import waiting
-from raiden.api.python import RaidenAPI
 from raiden.constants import Environment
 from raiden.exceptions import (
     DepositMismatch,
@@ -69,6 +68,7 @@ class ConnectionManager:
     BOOTSTRAP_ADDR = decode_hex(BOOTSTRAP_ADDR_HEX)
 
     def __init__(self, raiden, token_network_identifier):
+        from raiden.api.python import RaidenAPI
         chain_state = views.state_from_raiden(raiden)
         token_network_state = views.get_token_network_by_identifier(
             chain_state, token_network_identifier
@@ -180,6 +180,7 @@ class ConnectionManager:
                 self.token_address,
                 channel_ids,
                 self.raiden.alarm.sleep_time,
+                partner_addresses,
             )
 
         return channels_to_close
@@ -210,10 +211,10 @@ class ConnectionManager:
         # deciding on the deposit
         with self.lock, token_network_proxy.channel_operations_lock[partner_address]:
             channel_state = views.get_channelstate_for(
-                views.state_from_raiden(self.raiden),
-                self.token_network_identifier,
-                self.token_address,
-                partner_address,
+                chain_state=views.state_from_raiden(self.raiden),
+                payment_network_id=self.token_network_identifier,
+                token_address=self.token_address,
+                partner_address=partner_address
             )
 
             if not channel_state:
@@ -229,8 +230,13 @@ class ConnectionManager:
                 return
 
             try:
+                # TODO: creator address cant be None we should specify a value here #jonaf2103
                 self.api.set_total_channel_deposit(
-                    self.registry_address, self.token_address, partner_address, joining_funds
+                    registry_address=self.registry_address,
+                    token_address=self.token_address,
+                    creator_address=None,
+                    partner_address=partner_address,
+                    total_deposit=joining_funds
                 )
             except RaidenRecoverableError:
                 log.info("Channel not in opened state", node=pex(self.raiden.address))
@@ -309,6 +315,7 @@ class ConnectionManager:
                 token_address=self.token_address,
                 partner_address=partner,
                 total_deposit=total_deposit,
+                creator_address=self.raiden.address
             )
         except InvalidDBData:
             raise

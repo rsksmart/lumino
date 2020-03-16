@@ -930,6 +930,8 @@ def events_to_remove_expired_locks(
     for transfer_pair in mediator_state.transfers_pair:
         balance_proof = transfer_pair.payee_transfer.balance_proof
         channel_identifier = balance_proof.channel_identifier
+        # FIXME: channelidentifiers_to_channels it's a dic, we should get the value using
+        #  channelidentifiers_to_channels[someid] before calling get
         channel_state = channelidentifiers_to_channels.get(channel_identifier)
         if not channel_state:
             continue

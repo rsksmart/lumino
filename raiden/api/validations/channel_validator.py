@@ -5,15 +5,13 @@ from eth_utils import is_binary_address, to_checksum_address
 from raiden.api.validations.api_error_builder import ApiErrorBuilder
 from raiden.api.validations.validation_result import TokenExists, EnoughBalance
 from raiden.exceptions import AddressWithoutCode, InvalidSettleTimeout, InvalidAddress, DuplicatedChannelError, \
-    TokenNotRegistered, InsufficientGasReserve, UnknownTokenAddress, DepositMismatch, DepositOverLimit, \
-    InsufficientFunds
+    TokenNotRegistered, InsufficientGasReserve, UnknownTokenAddress
 from raiden.network.blockchain_service import BlockChainService
 from raiden.network.proxies import Token, TokenNetworkRegistry, TokenNetwork
 from raiden.transfer import views
-from raiden.transfer.state import NettingChannelState
 from raiden.utils import typing, pex
 from raiden.utils.gas_reserve import has_enough_gas_reserve
-from raiden.utils.typing import PaymentNetworkID, TokenAddress, Address, BlockTimeout, TokenAmount, List, Optional
+from raiden.utils.typing import PaymentNetworkID, TokenAddress, Address, BlockTimeout
 
 
 class ChannelValidator:

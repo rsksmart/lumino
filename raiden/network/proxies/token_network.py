@@ -1,4 +1,4 @@
-from collections import defaultdict, namedtuple
+from collections import defaultdict
 from typing import Any, Dict, List, NamedTuple, Optional, Tuple
 from dataclasses import dataclass
 
@@ -1437,6 +1437,7 @@ class TokenNetwork:
         closing_signature: Signature,
         non_closing_signature: Signature,
         given_block_identifier: BlockSpecification,
+        raiden: "RaidenService"
     ):
         log_details = {
             "token_network": pex(self.address),
@@ -1566,175 +1567,184 @@ class TokenNetwork:
             non_closing_signature=non_closing_signature,
         )
 
-        if gas_limit:
-            transaction_hash = self.proxy.transact(
-                "updateNonClosingBalanceProof",
-                safe_gas_limit(gas_limit, GAS_REQUIRED_FOR_UPDATE_BALANCE_PROOF),
-                channel_identifier=channel_identifier,
-                closing_participant=partner,
-                non_closing_participant=lc_address,
-                balance_hash=balance_hash,
-                nonce=nonce,
-                additional_hash=additional_hash,
-                closing_signature=closing_signature,
-                non_closing_signature=non_closing_signature,
-            )
+        try:
 
-            self.client.poll(transaction_hash)
-            receipt_or_none = check_transaction_threw(self.client, transaction_hash)
+            if gas_limit:
+                transaction_hash = self.proxy.transact(
+                    "updateNonClosingBalanceProof",
+                    safe_gas_limit(gas_limit, GAS_REQUIRED_FOR_UPDATE_BALANCE_PROOF),
+                    channel_identifier=channel_identifier,
+                    closing_participant=partner,
+                    non_closing_participant=lc_address,
+                    balance_hash=balance_hash,
+                    nonce=nonce,
+                    additional_hash=additional_hash,
+                    closing_signature=closing_signature,
+                    non_closing_signature=non_closing_signature,
+                )
 
-            if receipt_or_none:
-                # Because the gas estimation succeeded it is known that:
-                # - The channel existed.
-                # - The channel was at the state closed.
-                # - The partner node was the closing address.
-                # - The account had enough balance to pay for the gas (however
-                #   there is a race condition for multiple transactions #3890)
+                self.client.poll(transaction_hash)
+                receipt_or_none = check_transaction_threw(self.client, transaction_hash)
 
-                # These checks do not have problems with race conditions because
-                # `poll`ing waits for the transaction to be confirmed.
-                mining_block = int(receipt_or_none["blockNumber"])
+                if receipt_or_none:
+                    # Because the gas estimation succeeded it is known that:
+                    # - The channel existed.
+                    # - The channel was at the state closed.
+                    # - The partner node was the closing address.
+                    # - The account had enough balance to pay for the gas (however
+                    #   there is a race condition for multiple transactions #3890)
 
-                if receipt_or_none["cumulativeGasUsed"] == gas_limit:
-                    msg = (
-                        "update transfer failed and all gas was used. Estimate gas "
-                        "may have underestimated update transfer, or succeeded even "
-                        "though an assert is triggered, or the smart contract code "
-                        "has an conditional assert."
+                    # These checks do not have problems with race conditions because
+                    # `poll`ing waits for the transaction to be confirmed.
+                    mining_block = int(receipt_or_none["blockNumber"])
+
+                    if receipt_or_none["cumulativeGasUsed"] == gas_limit:
+                        msg = (
+                            "update transfer failed and all gas was used. Estimate gas "
+                            "may have underestimated update transfer, or succeeded even "
+                            "though an assert is triggered, or the smart contract code "
+                            "has an conditional assert."
+                        )
+                        raise RaidenRecoverableError(msg)
+
+                    channel_data = self._detail_channel(
+                        participant1=lc_address,
+                        participant2=partner,
+                        block_identifier=mining_block,
+                        channel_identifier=channel_identifier,
                     )
-                    raise RaidenRecoverableError(msg)
 
-                channel_data = self._detail_channel(
-                    participant1=lc_address,
+                    # The channel identifier can be set to 0 if the channel is
+                    # settled, or it could have a higher value if a new channel was
+                    # opened. A lower value is an unrecoverable error.
+                    was_channel_gone = (
+                        channel_data.channel_identifier == 0
+                        or channel_data.channel_identifier > channel_identifier
+                    )
+
+                    if was_channel_gone:
+                        msg = (
+                            f"The provided channel identifier does not match the value "
+                            f"on-chain at the block the update transfer was mined ({mining_block}). "
+                            f"provided_channel_identifier={channel_identifier}, "
+                            f"onchain_channel_identifier={channel_data.channel_identifier}"
+                        )
+                        raise RaidenRecoverableError(msg)
+
+                    if channel_data.state >= ChannelState.SETTLED:
+                        # This should never happen if the settlement window and gas
+                        # price estimation is done properly.
+                        #
+                        # This is a race condition that cannot be prevented,
+                        # therefore it is a recoverable error.
+                        msg = "Channel was already settled when update transfer was mined."
+                        raise RaidenRecoverableError(msg)
+
+                    if channel_data.settle_block_number < mining_block:
+                        # The channel is cleared from the smart contract's storage
+                        # on call to settle, this means that settle_block_number
+                        # may be zero, therefore this check must be done after the
+                        # channel's state check.
+                        #
+                        # This is a race condition that cannot be prevented,
+                        # therefore it is a recoverable error.
+                        msg = "update transfer was mined after the settlement " "window."
+                        raise RaidenRecoverableError(msg)
+
+                    partner_details = self._detail_participant(
+                        channel_identifier=channel_identifier,
+                        participant=partner,
+                        partner=lc_address,
+                        block_identifier=mining_block,
+                    )
+                    if partner_details.nonce != nonce:
+                        # A higher value should be impossible because a signature
+                        # from this node is necessary and this node should send the
+                        # partner's balance proof with the highest nonce
+                        #
+                        # A lower value means some unexpected failure.
+                        msg = (
+                            f"update transfer failed, the on-chain nonce is higher then our expected "
+                            f"value expected={nonce} actual={partner_details.nonce}"
+                        )
+                        raise RaidenUnrecoverableError(msg)
+
+                    if channel_data.state < ChannelState.CLOSED:
+                        msg = (
+                            f"The channel state changed unexpectedly. "
+                            f"block=({mining_block}) onchain_state={channel_data.state}"
+                        )
+                        raise RaidenUnrecoverableError(msg)
+
+                    raise RaidenUnrecoverableError("update transfer failed for an unknown reason")
+
+            else:
+                # The transaction would have failed if sent, figure out why.
+                # The latest block can not be used reliably because of reorgs,
+                # therefore every call using this block has to handle pruned data.
+                failed_at = self.proxy.jsonrpc_client.get_block("latest")
+                failed_at_blockhash = encode_hex(failed_at["hash"])
+                failed_at_blocknumber = failed_at["number"]
+
+                self.proxy.jsonrpc_client.check_for_insufficient_eth(
+                    transaction_name="updateNonClosingBalanceProof",
+                    address=self.node_address,
+                    transaction_executed=False,
+                    required_gas=GAS_REQUIRED_FOR_UPDATE_BALANCE_PROOF,
+                    block_identifier=failed_at_blocknumber,
+                )
+
+                detail = self._detail_channel(
+                    participant1=self.node_address,
                     participant2=partner,
-                    block_identifier=mining_block,
+                    block_identifier=failed_at_blockhash,
                     channel_identifier=channel_identifier,
                 )
 
-                # The channel identifier can be set to 0 if the channel is
-                # settled, or it could have a higher value if a new channel was
-                # opened. A lower value is an unrecoverable error.
-                was_channel_gone = (
-                    channel_data.channel_identifier == 0
-                    or channel_data.channel_identifier > channel_identifier
-                )
-
-                if was_channel_gone:
+                if detail.state < ChannelState.CLOSED:
                     msg = (
-                        f"The provided channel identifier does not match the value "
-                        f"on-chain at the block the update transfer was mined ({mining_block}). "
-                        f"provided_channel_identifier={channel_identifier}, "
-                        f"onchain_channel_identifier={channel_data.channel_identifier}"
+                        f"cannot call update_transfer channel has not been closed yet. "
+                        f"current_state={detail.state}"
+                    )
+                    raise RaidenUnrecoverableError(msg)
+
+                if detail.state >= ChannelState.SETTLED:
+                    msg = (
+                        f"cannot call update_transfer channel has been settled already. "
+                        f"current_state={detail.state}"
                     )
                     raise RaidenRecoverableError(msg)
 
-                if channel_data.state >= ChannelState.SETTLED:
-                    # This should never happen if the settlement window and gas
-                    # price estimation is done properly.
-                    #
-                    # This is a race condition that cannot be prevented,
-                    # therefore it is a recoverable error.
-                    msg = "Channel was already settled when update transfer was mined."
-                    raise RaidenRecoverableError(msg)
+                if detail.settle_block_number < failed_at_blocknumber:
+                    raise RaidenRecoverableError(
+                        "update_transfer transation sent after settlement window"
+                    )
 
-                if channel_data.settle_block_number < mining_block:
-                    # The channel is cleared from the smart contract's storage
-                    # on call to settle, this means that settle_block_number
-                    # may be zero, therefore this check must be done after the
-                    # channel's state check.
-                    #
-                    # This is a race condition that cannot be prevented,
-                    # therefore it is a recoverable error.
-                    msg = "update transfer was mined after the settlement " "window."
-                    raise RaidenRecoverableError(msg)
-
+                # At this point it is known the channel is CLOSED on block
+                # `failed_at_blockhash`
                 partner_details = self._detail_participant(
                     channel_identifier=channel_identifier,
                     participant=partner,
-                    partner=lc_address,
-                    block_identifier=mining_block,
+                    partner=self.node_address,
+                    block_identifier=failed_at_blockhash,
                 )
-                if partner_details.nonce != nonce:
-                    # A higher value should be impossible because a signature
-                    # from this node is necessary and this node should send the
-                    # partner's balance proof with the highest nonce
-                    #
-                    # A lower value means some unexpected failure.
-                    msg = (
-                        f"update transfer failed, the on-chain nonce is higher then our expected "
-                        f"value expected={nonce} actual={partner_details.nonce}"
+
+                if not partner_details.is_closer:
+                    raise RaidenUnrecoverableError(
+                        "update_transfer cannot be sent if the partner did not close the channel"
                     )
-                    raise RaidenUnrecoverableError(msg)
 
-                if channel_data.state < ChannelState.CLOSED:
-                    msg = (
-                        f"The channel state changed unexpectedly. "
-                        f"block=({mining_block}) onchain_state={channel_data.state}"
-                    )
-                    raise RaidenUnrecoverableError(msg)
-
-                raise RaidenUnrecoverableError("update transfer failed for an unknown reason")
-
+                raise RaidenUnrecoverableError("update_transfer failed for an unknown reason")
+        except Exception:
+            log.info("An error occurred trying to update the non closing balance proof for channel id " +
+                     str(channel_identifier), **log_details)
+            raise
         else:
-            # The transaction would have failed if sent, figure out why.
-
-            # The latest block can not be used reliably because of reorgs,
-            # therefore every call using this block has to handle pruned data.
-            failed_at = self.proxy.jsonrpc_client.get_block("latest")
-            failed_at_blockhash = encode_hex(failed_at["hash"])
-            failed_at_blocknumber = failed_at["number"]
-
-            self.proxy.jsonrpc_client.check_for_insufficient_eth(
-                transaction_name="updateNonClosingBalanceProof",
-                address=self.node_address,
-                transaction_executed=False,
-                required_gas=GAS_REQUIRED_FOR_UPDATE_BALANCE_PROOF,
-                block_identifier=failed_at_blocknumber,
-            )
-
-            detail = self._detail_channel(
-                participant1=self.node_address,
-                participant2=partner,
-                block_identifier=failed_at_blockhash,
-                channel_identifier=channel_identifier,
-            )
-
-            if detail.state < ChannelState.CLOSED:
-                msg = (
-                    f"cannot call update_transfer channel has not been closed yet. "
-                    f"current_state={detail.state}"
-                )
-                raise RaidenUnrecoverableError(msg)
-
-            if detail.state >= ChannelState.SETTLED:
-                msg = (
-                    f"cannot call update_transfer channel has been settled already. "
-                    f"current_state={detail.state}"
-                )
-                raise RaidenRecoverableError(msg)
-
-            if detail.settle_block_number < failed_at_blocknumber:
-                raise RaidenRecoverableError(
-                    "update_transfer transation sent after settlement window"
-                )
-
-            # At this point it is known the channel is CLOSED on block
-            # `failed_at_blockhash`
-            partner_details = self._detail_participant(
-                channel_identifier=channel_identifier,
-                participant=partner,
-                partner=self.node_address,
-                block_identifier=failed_at_blockhash,
-            )
-
-            if not partner_details.is_closer:
-                raise RaidenUnrecoverableError(
-                    "update_transfer cannot be sent if the partner did not close the channel"
-                )
-
-            raise RaidenUnrecoverableError("update_transfer failed for an unknown reason")
-
-        log.info("updateNonClosingBalanceProof successful", **log_details)
+            log.info("updateNonClosingBalanceProof successful", **log_details)
+        finally:
+            # we need to delete the non closing balance proof from the database to avoid re-send it
+            log.info("Deleting non closing balance proof for channel id " + str(channel_identifier), **log_details)
+            raiden.wal.storage.delete_light_client_non_closing_balance_proof(channel_id=channel_identifier)
 
     def update_transfer(
         self,
