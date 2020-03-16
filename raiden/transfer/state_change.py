@@ -188,9 +188,10 @@ class ActionChannelClose(StateChange):
     """ User is closing an existing channel. """
 
     def __init__(self, canonical_identifier: CanonicalIdentifier,
-                 signed_close_tx: str,
                  participant1: AddressHex,
-                 participant2: AddressHex) -> None:
+                 participant2: AddressHex,
+                 signed_close_tx: str = None
+                 ) -> None:
         self.canonical_identifier = canonical_identifier
         self.signed_close_tx = signed_close_tx
         self.participant1 = participant1
