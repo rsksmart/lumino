@@ -259,7 +259,7 @@ def test_channel_data_removed_after_unlock(
     )
 
     token_network_state_after_unlock = channel_unlock_iteration.new_state
-    ids_to_channels = token_network_state_after_unlock.channelidentifiers_to_channels
+    ids_to_channels = token_network_state_after_unlock.channelidentifiers_to_channels[chain_state.our_address]
     assert len(ids_to_channels) == 0
 
 

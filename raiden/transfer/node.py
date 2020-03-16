@@ -1122,7 +1122,7 @@ def is_transaction_effect_satisfied(
         # channel exists for our_address and partner_address
         if partner_address:
             channel_state = views.get_channelstate_by_token_network_and_partner(
-                chain_state, TokenNetworkID(state_change.token_network_identifier), our_address, partner_address
+                chain_state, TokenNetworkID(state_change.token_network_identifier), partner_address
             )
             # If the channel was cleared, that means that both
             # sides of the channel were successfully unlocked.

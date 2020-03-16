@@ -1380,6 +1380,7 @@ def test_action_close_must_change_the_channel_state():
         canonical_identifier=channel_state.canonical_identifier,
         participant1=our_model1.participant_address,
         participant2=partner_model1.participant_address,
+        signed_close_tx=""
     )
     iteration = channel.state_transition(
         channel_state=channel_state,
@@ -1418,6 +1419,7 @@ def test_update_must_be_called_if_close_lost_race():
         canonical_identifier=channel_state.canonical_identifier,
         participant1=our_model1.participant_address,
         participant2=partner_model1.participant_address,
+        signed_close_tx=""
     )
     iteration = channel.state_transition(
         channel_state=channel_state,
@@ -1450,6 +1452,7 @@ def test_update_transfer():
         canonical_identifier=channel_state.canonical_identifier,
         participant1=our_model1.participant_address,
         participant2=partner_model1.participant_address,
+        signed_close_tx=""
     )
     iteration = channel.state_transition(
         channel_state=channel_state,

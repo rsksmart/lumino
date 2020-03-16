@@ -87,9 +87,7 @@ def netting_channel_state(chain_state, token_network_state, payment_network_stat
     )
 
     channel_id = canonical_identifier.channel_identifier
-    address_channels = dict()
-    address_channels[channel_id] = channel_state
     token_network_state.partneraddresses_to_channelidentifiers[partner].append(channel_id)
-    token_network_state.channelidentifiers_to_channels[chain_state.our_address] = address_channels
+    token_network_state.channelidentifiers_to_channels[channel_id] = channel_state
 
     return channel_state
