@@ -333,16 +333,16 @@ class RaidenEventHandler(EventHandler):
         payment_status = raiden.targets_to_identifiers_to_statuses[target].pop(
             payment_identifier, None
         )
-
-        handle_receive_events_with_payments(raiden.wal.storage,
-                                            payment_status.payment_hash_invoice,
-                                            'raiden.transfer.events.EventPaymentSentFailed',
-                                            payment_identifier)
+        if payment_status:
+            handle_receive_events_with_payments(raiden.wal.storage,
+                                                payment_status.payment_hash_invoice,
+                                                'raiden.transfer.events.EventPaymentSentFailed',
+                                                payment_identifier)
 
         # In the case of a refund transfer the payment fails earlier
         # but the lock expiration will generate a second
         # EventPaymentSentFailed message which we can ignore here
-        if payment_status:
+
             payment_status.payment_done.set(False)
 
     @staticmethod
