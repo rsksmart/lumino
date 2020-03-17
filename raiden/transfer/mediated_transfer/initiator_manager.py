@@ -8,8 +8,7 @@ from raiden.transfer.events import EventPaymentSentFailed
 from raiden.transfer.mediated_transfer import initiator
 from raiden.transfer.mediated_transfer.events import (
     EventUnlockClaimFailed,
-    EventUnlockFailed,
-    EventRouteFailed)
+    EventUnlockFailed)
 from raiden.transfer.mediated_transfer.state import (
     InitiatorPaymentState,
     InitiatorTransferState,

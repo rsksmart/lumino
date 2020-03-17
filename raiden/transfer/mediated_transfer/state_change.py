@@ -294,6 +294,15 @@ class ReceiveTransferCancelRoute(BalanceProofStateChange):
             sender=to_canonical_address(data["sender"]),
         )
 
+    def __eq__(self, other: Any) -> bool:
+        return (
+            isinstance(other, ReceiveTransferCancelRoute)
+            and self.balance_proof == other.balance_proof
+            and self.transfer == other.transfer
+            and self.sender == other.sender
+            and super().__eq__(other)
+        )
+
 
 class ReceiveLockExpired(BalanceProofStateChange):
     """ A LockExpired message received. """
