@@ -2,13 +2,11 @@ import random
 
 from eth_utils import keccak
 
-from raiden.routing import get_best_routes
 from raiden.transfer import channel
 from raiden.transfer.architecture import Event, StateChange, TransitionResult
 from raiden.transfer.events import EventPaymentSentFailed
 from raiden.transfer.mediated_transfer import initiator
 from raiden.transfer.mediated_transfer.events import (
-    EventRouteFailed,
     EventUnlockClaimFailed,
     EventUnlockFailed,
 )
@@ -24,8 +22,8 @@ from raiden.transfer.mediated_transfer.state_change import (
     ReceiveSecretReveal,
     ActionTransferReroute,
     ActionInitInitiatorLight, ReceiveSecretRequestLight, ActionSendSecretRevealLight, ReceiveSecretRevealLight,
-    ActionSendUnlockLight, ReceiveTransferCancelRoute)
-from raiden.transfer.state import RouteState, ChainState
+    ReceiveTransferCancelRoute)
+from raiden.transfer.state import RouteState
 from raiden.transfer.state_change import ActionCancelPayment, Block, ContractReceiveSecretReveal
 from raiden.utils.typing import (
     MYPY_ANNOTATION,
