@@ -9,7 +9,7 @@ from raiden.transfer.mediated_transfer import initiator
 from raiden.transfer.mediated_transfer.events import (
     EventUnlockClaimFailed,
     EventUnlockFailed,
-)
+    EventRouteFailed)
 from raiden.transfer.mediated_transfer.state import (
     InitiatorPaymentState,
     InitiatorTransferState,
@@ -391,10 +391,10 @@ def handle_lock_expired(
         return TransitionResult(payment_state, list())
 
     channel_identifier = initiator_state.channel_identifier
-    channel_state = channelidentifiers_to_channels[
-        initiator_state.transfer_description.initiator].get(channel_identifier)
-
-    if not channel_state:
+    try:
+        channel_state = channelidentifiers_to_channels[
+            initiator_state.transfer_description.initiator].get(channel_identifier)
+    except KeyError:
         return TransitionResult(payment_state, list())
 
     secrethash = initiator_state.transfer.lock.secrethash
