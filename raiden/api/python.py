@@ -1696,6 +1696,7 @@ class RaidenAPI:
         amount: typing.TokenAmount,
         secrethash: typing.SecretHash
     ) -> HubResponseMessage:
+
         channel_state = views.get_channelstate_for(
             views.state_from_raiden(self.raiden),
             registry_address,
@@ -1703,6 +1704,13 @@ class RaidenAPI:
             creator_address,
             partner_address,
         )
+        if not channel_state:
+            channel_state = views.get_channelstate_for(
+                views.state_from_raiden(self.raiden),
+                registry_address,
+                token_address,
+                creator_address,
+            )
         if channel_state:
             chain_state = views.state_from_raiden(self.raiden)
 
