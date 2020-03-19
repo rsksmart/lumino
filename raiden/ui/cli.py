@@ -233,11 +233,12 @@ def options(func):
                 "--routing-mode",
                 help=(
                     "Specify the routing mode to be used.\n"
-                    '"basic": use local routing\n'
                     '"pfs": use the path finding service\n'
+                    '"local": use local routing, but send updates to the PFS\n'
+                    '"private": use local routing and don\'t send updates to the PFS\n'
                 ),
                 type=EnumChoiceType(RoutingMode),
-                default=RoutingMode.BASIC.value,
+                default=RoutingMode.PFS.value,
                 show_default=True,
             ),
             option(
@@ -632,6 +633,7 @@ def smoketest(ctx, debug, eth_client):
         port = next(free_port_generator)
 
         args["api_address"] = "localhost:" + str(port)
+        args["routing_mode"] = RoutingMode.PRIVATE
 
         if args["transport"] == "udp":
             with SocketFactory("127.0.0.1", port, strategy="none") as mapped_socket:
