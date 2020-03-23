@@ -231,6 +231,7 @@ class PaymentChannel:
         partner_signature: Signature,
         signature: Signature,
         block_identifier: BlockSpecification,
+        raiden: "RaidenService"
     ):
         """ Updates the channel using the provided balance proof. """
         self.token_network.update_transfer_light(
@@ -243,6 +244,7 @@ class PaymentChannel:
             closing_signature=partner_signature,
             non_closing_signature=signature,
             given_block_identifier=block_identifier,
+            raiden=raiden
         )
 
     def update_transfer(

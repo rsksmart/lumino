@@ -973,24 +973,21 @@ def make_transfers_pair(
         )
         for i in range(number_of_channels)
     ]
-    channels = make_channel_set(properties=properties_list, defaults=defaults, token_address=ChannelSet.ADDRESSES[0])
+    channels = make_channel_set(properties=properties_list, defaults=defaults, token_address=UNIT_TRANSFER_DESCRIPTION.initiator)
 
     lock_expiration = block_number + UNIT_REVEAL_TIMEOUT * 2
     pseudo_random_generator = random.Random()
     transfers_pairs = list()
-
-    for payer_index in range(number_of_channels - 1):
-        payee_index = payer_index + 1
-
-        receiver_channel = channels.get_sub_channel(payer_index)
+    payer_index = 0
+    for key in channels.channels[UNIT_TRANSFER_DESCRIPTION.initiator].keys():
+        receiver_channel = channels.channels[UNIT_TRANSFER_DESCRIPTION.initiator][key]
         received_transfer = create(
             LockedTransferSignedStateProperties(
-                initiator=ChannelSet.ADDRESSES[0],
                 amount=amount,
                 expiration=lock_expiration,
                 payment_identifier=UNIT_TRANSFER_IDENTIFIER,
                 canonical_identifier=receiver_channel.canonical_identifier,
-                sender=channels.partner_address(payer_index),
+                sender=receiver_channel.partner_state.address,
                 pkey=channels.partner_privatekeys[payer_index],
             )
         )
@@ -1002,8 +999,8 @@ def make_transfers_pair(
 
         message_identifier = message_identifier_from_prng(pseudo_random_generator)
         lockedtransfer_event = channel.send_lockedtransfer(
-            channel_state=channels.get_sub_channel(payee_index),
-            initiator=ChannelSet.ADDRESSES[0],
+            channel_state=receiver_channel,
+            initiator=UNIT_TRANSFER_INITIATOR,
             target=UNIT_TRANSFER_TARGET,
             amount=amount,
             message_identifier=message_identifier,
@@ -1016,7 +1013,7 @@ def make_transfers_pair(
 
         lock_timeout = lock_expiration - block_number
         assert mediator.is_channel_usable(
-            candidate_channel_state=channels.get_sub_channel(payee_index),
+            candidate_channel_state=receiver_channel,
             transfer_amount=amount,
             lock_timeout=lock_timeout,
         )
@@ -1024,9 +1021,10 @@ def make_transfers_pair(
 
         pair = MediationPairState(received_transfer, lockedtransfer_event.recipient, sent_transfer)
         transfers_pairs.append(pair)
+        payer_index += 1
 
     return MediatorTransfersPair(
-        channel_set=channels,
+        channels=channels,
         transfers_pair=transfers_pairs,
         amount=amount,
         block_number=block_number,

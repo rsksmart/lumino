@@ -1757,12 +1757,6 @@ def handle_receive_lockedtransfer_light(
     return is_valid, events, msg, handle_invoice_result
 
 
-def handle_receive_refundtransfercancelroute(
-    channel_state: NettingChannelState, refund_transfer: LockedTransferSignedState
-) -> EventsOrError:
-    return handle_receive_lockedtransfer(channel_state, refund_transfer, None)
-
-
 def handle_unlock(channel_state: NettingChannelState, unlock: ReceiveUnlock) -> EventsOrError:
     is_valid, msg, unlocked_merkletree = is_valid_unlock(
         unlock, channel_state, channel_state.partner_state

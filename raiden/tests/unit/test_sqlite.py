@@ -19,7 +19,7 @@ from raiden.transfer.mediated_transfer.state_change import (
     ActionInitTarget,
     ReceiveLockExpired,
     ReceiveTransferRefund,
-    ReceiveTransferRefundCancelRoute,
+    ActionTransferReroute,
 )
 from raiden.transfer.state import BalanceProofUnsignedState
 from raiden.transfer.state_change import ReceiveUnlock
@@ -169,7 +169,7 @@ def test_get_state_change_with_balance_proof():
     transfer_refund = ReceiveTransferRefund(
         transfer=make_signed_transfer_from_counter(counter), routes=list()
     )
-    transfer_refund_cancel_route = ReceiveTransferRefundCancelRoute(
+    transfer_refund_cancel_route = ActionTransferReroute(
         routes=list(),
         transfer=make_signed_transfer_from_counter(counter),
         secret=sha3(factories.make_secret(next(counter))),
@@ -200,7 +200,7 @@ def test_get_state_change_with_balance_proof():
     assert isinstance(stored_statechanges[0], ReceiveLockExpired)
     assert isinstance(stored_statechanges[1], ReceiveUnlock)
     assert isinstance(stored_statechanges[2], ReceiveTransferRefund)
-    assert isinstance(stored_statechanges[3], ReceiveTransferRefundCancelRoute)
+    assert isinstance(stored_statechanges[3], ActionTransferReroute)
     assert isinstance(stored_statechanges[4], ActionInitMediator)
     assert isinstance(stored_statechanges[5], ActionInitTarget)
 

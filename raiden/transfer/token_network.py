@@ -139,7 +139,7 @@ def handle_balance(
 
 def handle_closed(
     token_network_state: TokenNetworkState,
-    state_change: ContractReceiveChannelClosed,
+    state_change: Union[ContractReceiveChannelClosed, ContractReceiveChannelClosedLight],
     block_number: BlockNumber,
     block_hash: BlockHash,
 ) -> TransitionResult:

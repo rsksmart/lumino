@@ -266,6 +266,44 @@ class ActionInitTargetLight(BalanceProofStateChange):
         return cls(route=data["route"], transfer=data["transfer"], signed_lockedtransfer=data["signed_lockedtransfer"])
 
 
+class ReceiveTransferCancelRoute(BalanceProofStateChange):
+    """ A mediator sends us a refund due to a failed route """
+
+    def __init__(
+        self,
+        balance_proof: BalanceProofSignedState,
+        transfer: LockedTransferSignedState,
+        sender: Address,
+    ) -> None:
+        super().__init__(balance_proof)
+        self.transfer = transfer
+        self.sender = sender
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "balance_proof": self.balance_proof,
+            "transfer": self.transfer,
+            "sender": to_checksum_address(self.sender),
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "ReceiveTransferCancelRoute":
+        return cls(
+            balance_proof=data["balance_proof"],
+            transfer=data["transfer"],
+            sender=to_canonical_address(data["sender"]),
+        )
+
+    def __eq__(self, other: Any) -> bool:
+        return (
+            isinstance(other, ReceiveTransferCancelRoute)
+            and self.balance_proof == other.balance_proof
+            and self.transfer == other.transfer
+            and self.sender == other.sender
+            and super().__eq__(other)
+        )
+
+
 class ReceiveLockExpired(BalanceProofStateChange):
     """ A LockExpired message received. """
 
@@ -574,7 +612,7 @@ class ReceiveSecretRevealLight(AuthenticatedSenderStateChange):
         return instance
 
 
-class ReceiveTransferRefundCancelRoute(BalanceProofStateChange):
+class ActionTransferReroute(BalanceProofStateChange):
     """ A RefundTransfer message received by the initiator will cancel the current
     route.
     """
@@ -594,13 +632,13 @@ class ReceiveTransferRefundCancelRoute(BalanceProofStateChange):
         self.secret = secret
 
     def __repr__(self) -> str:
-        return "<ReceiveTransferRefundCancelRoute sender:{} transfer:{}>".format(
+        return "<ActionTransferReroute sender:{} transfer:{}>".format(
             pex(self.sender), self.transfer
         )
 
     def __eq__(self, other: Any) -> bool:
         return (
-            isinstance(other, ReceiveTransferRefundCancelRoute)
+            isinstance(other, ActionTransferReroute)
             and self.sender == other.sender
             and self.transfer == other.transfer
             and self.routes == other.routes
@@ -621,7 +659,7 @@ class ReceiveTransferRefundCancelRoute(BalanceProofStateChange):
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "ReceiveTransferRefundCancelRoute":
+    def from_dict(cls, data: Dict[str, Any]) -> "ActionTransferReroute":
         instance = cls(
             routes=data["routes"],
             transfer=data["transfer"],

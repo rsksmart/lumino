@@ -1396,6 +1396,10 @@ class SQLiteStorage:
         )
         return cursor.fetchone()
 
+    def delete_light_client_non_closing_balance_proof(self, channel_id):
+        with self.write_lock, self.conn:
+            self.conn.execute("DELETE FROM light_client_balance_proof WHERE channel_id = ?", (channel_id,))
+
     def get_light_client_payment_locked_transfer(self, payment_identifier):
         cursor = self.conn.cursor()
         cursor.execute(
@@ -1583,10 +1587,7 @@ class SerializedSQLiteStorage(SQLiteStorage):
 
     def delete_light_client(self, address):
         with self.write_lock, self.conn:
-            cursor = self.conn.execute("DELETE FROM client WHERE address = ?", (address,))
-            last_id = cursor.lastrowid
-
-        return last_id
+            self.conn.execute("DELETE FROM client WHERE address = ?", (address,))
 
     def flag_light_client_as_pending_for_deletion(self, address):
         with self.write_lock, self.conn:

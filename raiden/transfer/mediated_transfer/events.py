@@ -134,7 +134,6 @@ class SendLockExpired(SendMessageEvent):
             "secrethash": serialize_bytes(self.secrethash),
             "recipient": to_checksum_address(self.recipient),
             "payment_identifier": str(self.payment_identifier),
-
         }
 
         return result
