@@ -7,7 +7,7 @@ from requests.exceptions import ConnectTimeout
 from web3 import Web3
 
 from raiden.accounts import AccountManager
-from raiden.constants import SQLITE_MIN_REQUIRED_VERSION, Environment, RoutingMode
+from raiden.constants import SQLITE_MIN_REQUIRED_VERSION, Environment
 from raiden.exceptions import EthNodeCommunicationError, EthNodeInterfaceError
 from raiden.network.blockchain_service import BlockChainService
 from raiden.network.proxies.service_registry import ServiceRegistry
