@@ -7,7 +7,7 @@ from requests.exceptions import ConnectTimeout
 from web3 import Web3
 
 from raiden.accounts import AccountManager
-from raiden.constants import SQLITE_MIN_REQUIRED_VERSION, Environment, RoutingMode
+from raiden.constants import SQLITE_MIN_REQUIRED_VERSION, Environment
 from raiden.exceptions import EthNodeCommunicationError, EthNodeInterfaceError
 from raiden.network.blockchain_service import BlockChainService
 from raiden.network.proxies.service_registry import ServiceRegistry
@@ -137,27 +137,17 @@ def check_smart_contract_addresses(
 
 
 def check_pfs_configuration(
-    routing_mode: RoutingMode,
-    environment_type: Environment,
-    service_registry: Optional[ServiceRegistry],
-    pathfinding_service_address: str,
+    service_registry: Optional[ServiceRegistry], pathfinding_service_address: str
 ) -> None:
-    if routing_mode == RoutingMode.PFS:
-        if environment_type == Environment.PRODUCTION:
-            click.secho(
-                "Requested production mode and PFS routing mode. This is not supported", fg="red"
-            )
-            sys.exit(1)
-
-        if not service_registry and not pathfinding_service_address:
-            click.secho(
-                "Requested PFS routing mode but no service registry or no specific pathfinding "
-                " service address is provided. Please provide it via either the "
-                "--service-registry-contract-address or the --pathfinding-service-address "
-                "argument",
-                fg="red",
-            )
-            sys.exit(1)
+    if not service_registry and not pathfinding_service_address:
+        click.secho(
+            "Requested PFS routing mode but no service registry or no specific pathfinding "
+            " service address is provided. Please provide it via either the "
+            "--service-registry-contract-address or the --pathfinding-service-address "
+            "argument",
+            fg="red",
+        )
+        sys.exit(1)
 
 
 def check_synced(blockchain_service: BlockChainService) -> None:

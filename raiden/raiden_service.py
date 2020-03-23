@@ -21,7 +21,7 @@ from raiden.constants import (
     SECRET_LENGTH,
     SNAPSHOT_STATE_CHANGES_COUNT,
     Environment,
-)
+    RoutingMode)
 from raiden.exceptions import (
     InvalidAddress,
     InvalidDBData,
@@ -275,6 +275,7 @@ class RaidenService(Runnable):
         transport,
         raiden_event_handler,
         message_handler,
+        routing_mode: RoutingMode,
         config,
         discovery=None,
         user_deposit=None,
@@ -289,6 +290,7 @@ class RaidenService(Runnable):
         self.default_one_to_n_address = default_one_to_n_address
         self.default_secret_registry = default_secret_registry
         self.default_service_registry = default_service_registry
+        self.routing_mode = routing_mode
         self.config = config
 
         self.signer: Signer = LocalSigner(self.chain.client.privkey)

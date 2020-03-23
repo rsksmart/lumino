@@ -217,7 +217,8 @@ def setup_proxies_or_exit(
 
     if routing_mode == RoutingMode.PFS:
         check_pfs_configuration(
-            routing_mode, environment_type, service_registry, pathfinding_service_address
+            service_registry=service_registry,
+            pathfinding_service_address=pathfinding_service_address,
         )
 
         pfs_config = configure_pfs_or_exit(

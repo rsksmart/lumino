@@ -62,7 +62,7 @@ from raiden_contracts.contract_manager import ContractManager
 log = structlog.get_logger(__name__)
 
 
-def _setup_matrix(config):
+def _setup_matrix(config: Dict[str, Any], routing_mode: RoutingMode) -> MatrixTransport:
     if config["transport"]["matrix"].get("available_servers") is None:
         # fetch list of known servers from raiden-network/raiden-tranport repo
         available_servers_url = DEFAULT_MATRIX_KNOWN_SERVERS[config["environment_type"]]
@@ -70,11 +70,10 @@ def _setup_matrix(config):
         log.debug("Fetching available matrix servers", available_servers=available_servers)
         config["transport"]["matrix"]["available_servers"] = available_servers
 
-    # TODO: This needs to be adjusted once #3735 gets implemented
-    # Add PFS broadcast room if enabled
-    if config["services"]["pathfinding_service_address"] is not None:
-        if PATH_FINDING_BROADCASTING_ROOM not in config["transport"]["matrix"]["global_rooms"]:
-            config["transport"]["matrix"]["global_rooms"].append(PATH_FINDING_BROADCASTING_ROOM)
+    # Add PFS broadcast room when not in private mode
+    if routing_mode != RoutingMode.PRIVATE:
+        if PATH_FINDING_BROADCASTING_ROOM not in config["transport"]["matrix"]["broadcast_rooms"]:
+            config["transport"]["matrix"]["broadcast_rooms"].append(PATH_FINDING_BROADCASTING_ROOM)
 
     # Add monitoring service broadcast room if enabled
     if config["services"]["monitoring_enabled"] is True:
@@ -350,11 +349,17 @@ def run_app(
             config, blockchain_service, address, contracts, endpoint_registry_contract_address
         )
     elif transport == "matrix":
-        transport = _setup_matrix(config)
+        transport = _setup_matrix(config, routing_mode)
     else:
         raise RuntimeError(f'Unknown transport type "{transport}" given')
 
     raiden_event_handler = RaidenEventHandler()
+
+    # TODO mmarcosmartinez7 add PFSFeedbackEventHandler
+    # Only send feedback when PFS is used
+    # if routing_mode == RoutingMode.PFS:
+
+        # event_handler = PFSFeedbackEventHandler(raiden_event_handler)
 
     message_handler = MessageHandler()
 
@@ -375,6 +380,7 @@ def run_app(
             raiden_event_handler=raiden_event_handler,
             message_handler=message_handler,
             discovery=discovery,
+            routing_mode=routing_mode,
             user_deposit=proxies.user_deposit,
         )
     except RaidenError as e:
