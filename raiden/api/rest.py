@@ -2069,7 +2069,7 @@ class RestAPI:
             signed_display_name,
             signed_seed_retry)
 
-        if light_client is not None and light_client["result_code"] == 0:
+        if light_client is not None and light_client["result_code"] == 200:
 
             matrix_light_client_transport_instance = get_matrix_light_client_instance(
                 self.raiden_api.raiden.config["transport"]["matrix"],
