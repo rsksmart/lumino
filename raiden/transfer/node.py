@@ -951,7 +951,7 @@ def handle_state_change(
         iteration = handle_init_target(chain_state, state_change, storage, chain_state.our_address)
     elif type(state_change) == ActionInitTargetLight:
         assert isinstance(state_change, ActionInitTargetLight), MYPY_ANNOTATION
-        iteration = handle_init_target(chain_state, state_change, storage, state_change.transfer.initiator)
+        iteration = handle_init_target(chain_state, state_change, storage, state_change.transfer.target)
     elif type(state_change) == ActionUpdateTransportAuthData:
         assert isinstance(state_change, ActionUpdateTransportAuthData), MYPY_ANNOTATION
         iteration = handle_update_transport_authdata(chain_state, state_change)
