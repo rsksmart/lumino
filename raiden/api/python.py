@@ -1750,7 +1750,7 @@ class RaidenAPI:
                                                     message=locked_transfer, is_signed=False)
             return HubResponseMessage(lcpm_id, LightClientProtocolMessageType.PaymentSuccessful, payment_hub_message)
         else:
-            raise ChannelNotFound("Channel with given partner address doesnt exists")
+            raise ChannelNotFound("Your light client has 0 channels oppened")
 
     def validate_light_client(self, api_key: str):
         """
