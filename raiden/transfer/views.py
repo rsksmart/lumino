@@ -292,32 +292,57 @@ def get_channelstate_for(
     if token_network and creator_address in token_network.channelidentifiers_to_channels or \
         token_network and partner_address in token_network.channelidentifiers_to_channels:
         channels = []
-        if partner_address:
-            for channel_id in token_network.partneraddresses_to_channelidentifiers[partner_address]:
+        for channel_id in token_network.partneraddresses_to_channelidentifiers[partner_address]:
 
-                if creator_address in token_network.channelidentifiers_to_channels:
-                    channel = token_network.channelidentifiers_to_channels[creator_address].get(channel_id)
+            if creator_address in token_network.channelidentifiers_to_channels:
+                channel = token_network.channelidentifiers_to_channels[creator_address].get(channel_id)
 
-                if channel is None and partner_address in token_network.channelidentifiers_to_channels:
-                    # Check if partner address had a open channel, can be a hub node.
-                    channel = token_network.channelidentifiers_to_channels[partner_address].get(channel_id)
-                    address_to_get_channel_state = partner_address
+            if channel is None and partner_address in token_network.channelidentifiers_to_channels:
+                # Check if partner address had a open channel, can be a hub node.
+                channel = token_network.channelidentifiers_to_channels[partner_address].get(channel_id)
+                address_to_get_channel_state = partner_address
 
-                if channel is not None:
-                    if channel.close_transaction is None or channel.close_transaction.result != 'success':
-                        channels.append(token_network.channelidentifiers_to_channels[address_to_get_channel_state][channel_id])
-                channel = None
-        else:
-            for channel_id in token_network.partneraddresses_to_channelidentifiers[creator_address]:
+            if channel is not None:
+                if channel.close_transaction is None or channel.close_transaction.result != 'success':
+                    channels.append(token_network.channelidentifiers_to_channels[address_to_get_channel_state][channel_id])
+            channel = None
 
-                if creator_address in token_network.channelidentifiers_to_channels:
-                    channel = token_network.channelidentifiers_to_channels[creator_address].get(channel_id)
+        states = filter_channels_by_status(channels, [CHANNEL_STATE_UNUSABLE])
+        # If multiple channel states are found, return the last one.
+        if states:
+            channel_state = states[-1]
 
-                if channel is not None:
-                    if channel.close_transaction is None or channel.close_transaction.result != 'success':
-                        channels.append(
-                            token_network.channelidentifiers_to_channels[address_to_get_channel_state][channel_id])
-                channel = None
+    return channel_state
+
+
+def get_first_channelstate(
+    chain_state: ChainState,
+    payment_network_id: PaymentNetworkID,
+    token_address: TokenAddress,
+    creator_address: Address = None,
+) -> Optional[NettingChannelState]:
+    """ Return the NettingChannelState if it exists, None otherwise. """
+    token_network = get_token_network_by_token_address(
+        chain_state, payment_network_id, token_address
+    )
+
+    channel_state = None
+    address_to_get_channel_state = creator_address
+
+    channel = None
+    if token_network and creator_address in token_network.channelidentifiers_to_channels:
+        channels = []
+
+        for channel_id in token_network.partneraddresses_to_channelidentifiers[creator_address]:
+
+            if creator_address in token_network.channelidentifiers_to_channels:
+                channel = token_network.channelidentifiers_to_channels[creator_address].get(channel_id)
+
+            if channel is not None:
+                if channel.close_transaction is None or channel.close_transaction.result != 'success':
+                    channels.append(
+                        token_network.channelidentifiers_to_channels[address_to_get_channel_state][channel_id])
+            channel = None
 
         states = filter_channels_by_status(channels, [CHANNEL_STATE_UNUSABLE])
         # If multiple channel states are found, return the last one.

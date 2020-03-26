@@ -1704,13 +1704,15 @@ class RaidenAPI:
             creator_address,
             partner_address,
         )
+        #If we dont have a channel with the partner we need to get a channel to try a mediated transfer
         if not channel_state:
-            channel_state = views.get_channelstate_for(
+            channel_state = views.get_first_channelstate(
                 views.state_from_raiden(self.raiden),
                 registry_address,
                 token_address,
                 creator_address,
             )
+
         if channel_state:
             chain_state = views.state_from_raiden(self.raiden)
 
