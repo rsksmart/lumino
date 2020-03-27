@@ -611,6 +611,31 @@ def handle_block(
     return TransitionResult(target_state, events)
 
 
+def handle_lock_expired(
+    target_state: TargetTransferState,
+    state_change: ReceiveLockExpired,
+    channel_state: NettingChannelState,
+    block_number: BlockNumber,
+) -> TransitionResult[TargetTransferState]:
+    """Remove expired locks from channel states."""
+    result = channel.handle_receive_lock_expired(
+        channel_state=channel_state, state_change=state_change, block_number=block_number
+    )
+    assert result.new_state, "handle_receive_lock_expired should not delete the task"
+
+    if not channel.get_lock(result.new_state.partner_state, target_state.transfer.lock.secrethash):
+        transfer = target_state.transfer
+        unlock_failed = EventUnlockClaimFailed(
+            identifier=transfer.payment_identifier,
+            secrethash=transfer.lock.secrethash,
+            reason="Lock expired",
+        )
+        result.events.append(unlock_failed)
+        return TransitionResult(None, result.events)
+
+    return TransitionResult(target_state, result.events)
+
+
 def handle_lock_expired_light(
     target_state: TargetTransferState,
     state_change: ReceiveLockExpiredLight,
