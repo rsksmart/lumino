@@ -885,6 +885,8 @@ def handle_update_transport_authdata(
 ) -> TransitionResult[ChainState]:
     assert chain_state is not None, "chain_state must be set"
 
+    light_client_transport_state = None
+
     if state_change.address == b'00000000000000000000' or state_change.address == chain_state.our_address:
         if chain_state.last_node_transport_state_authdata is None:
             chain_state.last_node_transport_state_authdata = NodeTransportState('', [])
@@ -904,8 +906,10 @@ def handle_update_transport_authdata(
                     light_client_transport_state = \
                         LightClientTransportState(to_canonical_address(state_change.address),
                                                   state_change.auth_data)
-                    chain_state.last_node_transport_state_authdata.clients_last_transport_authdata.append(
-                        light_client_transport_state)
+
+    if light_client_transport_state:
+        chain_state.last_node_transport_state_authdata.clients_last_transport_authdata.append(
+            light_client_transport_state)
 
     return TransitionResult(chain_state, list())
 
