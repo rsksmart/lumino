@@ -16,7 +16,7 @@ from eth_utils import is_binary_address, to_checksum_address, to_canonical_addre
 from ecies import encrypt
 
 import raiden.blockchain.events as blockchain_events
-from raiden import waiting
+from raiden import waiting, routing
 from raiden.api.validations.api_error_builder import ApiErrorBuilder
 from raiden.api.validations.channel_validator import ChannelValidator
 from raiden.constants import (
@@ -95,7 +95,7 @@ from raiden.utils.typing import (
     TokenNetworkAddress,
     TokenNetworkID,
     Tuple,
-    SignedTransaction)
+    SignedTransaction, InitiatorAddress)
 
 from raiden.rns_constants import RNS_ADDRESS_ZERO
 from raiden.utils.rns import is_rns_address
@@ -1706,12 +1706,28 @@ class RaidenAPI:
         )
         #If we dont have a channel with the partner we need to get a channel to try a mediated transfer
         if not channel_state:
-            channel_state = views.get_first_channelstate(
-                views.state_from_raiden(self.raiden),
-                registry_address,
-                token_address,
-                creator_address,
+            token_network_id = views.get_token_network_by_token_address(
+                views.state_from_raiden(self.raiden), registry_address, token_address
             )
+            routes, _ = routing.get_best_routes(
+                chain_state=views.state_from_raiden(self.raiden),
+                token_network_id=token_network_id.address,
+                one_to_n_address=self.raiden.default_one_to_n_address,
+                from_address=InitiatorAddress(creator_address),
+                to_address=partner_address,
+                amount=amount,
+                previous_address=None,
+                config=self.raiden.config,
+                privkey=self.raiden.privkey,
+            )
+            if len(routes) > 0:
+                channel_state = views.get_channelstate_for(
+                    views.state_from_raiden(self.raiden),
+                    registry_address,
+                    token_address,
+                    creator_address,
+                    routes[0].node_address,
+                )
 
         if channel_state:
             chain_state = views.state_from_raiden(self.raiden)
