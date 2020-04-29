@@ -18,7 +18,7 @@ miniupnpc==2.0.2
 mirakuru==1.0.0
 netifaces==0.10.7
 networkx==2.1
-psutil==5.4.7
+psutil==5.6.6
 py-geth==2.1.0
 pysha3==1.0.2
 py-solc==3.2.0
