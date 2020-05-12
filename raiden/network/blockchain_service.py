@@ -25,9 +25,7 @@ from raiden.utils.typing import (
     Tuple,
 )
 from raiden_contracts.contract_manager import ContractManager
-from raiden.utils.namehash.namehash import namehash
-from raiden.network.rpc.smartcontract_proxy import ContractProxy
-from raiden.rns_constants import RNS_RESOLVER_ADDRESS, RNS_RESOLVER_ABI
+from raiden.rns_constants import RNS_ADDRESS, PUBLIC_RESOLVER_ADDRESS
 
 
 class BlockChainService:
@@ -251,8 +249,9 @@ class BlockChainService:
         return self.address_to_user_deposit[address]
 
     def get_address_from_rns(self, address=None) -> str:
-        contract = self.client.new_contract(RNS_RESOLVER_ABI, RNS_RESOLVER_ADDRESS)
-        proxy = ContractProxy(self.client, contract)
-        eip137hash = namehash(address)
-        resolved_address = proxy.contract.functions.addr(eip137hash).call()
+        from rns_sdk.index import RnsPy
+        rns_py = RnsPy(self.client.web3)
+        rns_py.set_rns(RNS_ADDRESS)
+        rns_py.set_public_resolver(PUBLIC_RESOLVER_ADDRESS)
+        resolved_address = rns_py.addr(address)
         return resolved_address
