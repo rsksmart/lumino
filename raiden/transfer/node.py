@@ -37,7 +37,7 @@ from raiden.transfer.mediated_transfer.state_change import (
     ActionTransferReroute,
     ActionInitInitiatorLight, ReceiveSecretRequestLight, ActionSendSecretRevealLight, ReceiveSecretRevealLight,
     ActionSendUnlockLight, ActionInitTargetLight, ActionSendSecretRequestLight, ActionSendLockExpiredLight,
-    ReceiveLockExpiredLight, ReceiveTransferCancelRoute)
+    ReceiveLockExpiredLight, ReceiveTransferCancelRoute, ReceiveTransferCancelRouteLight, ActionTransferRerouteLight)
 from raiden.transfer.state import (
     ChainState,
     InitiatorTask,
@@ -832,9 +832,20 @@ def handle_receive_transfer_refund_cancel_route(
 
     return subdispatch_to_paymenttask(chain_state, state_change, new_secrethash, storage)
 
+def handle_receive_transfer_refund_cancel_route_light(
+    chain_state: ChainState, state_change: ActionTransferRerouteLight, storage
+) -> TransitionResult[ChainState]:
+    return subdispatch_to_paymenttask(chain_state, state_change, state_change.transfer.lock.secrethash, storage)
 
 def handle_receive_transfer_cancel_route(
     chain_state: ChainState, state_change: ReceiveTransferCancelRoute
+) -> TransitionResult[ChainState]:
+    return subdispatch_to_paymenttask(
+        chain_state, state_change, state_change.transfer.lock.secrethash
+    )
+
+def handle_receive_transfer_cancel_route_light(
+    chain_state: ChainState, state_change: ReceiveTransferCancelRouteLight
 ) -> TransitionResult[ChainState]:
     return subdispatch_to_paymenttask(
         chain_state, state_change, state_change.transfer.lock.secrethash
@@ -958,6 +969,10 @@ def handle_state_change(
     elif type(state_change) == ReceiveTransferCancelRoute:
         assert isinstance(state_change, ReceiveTransferCancelRoute), MYPY_ANNOTATION
         iteration = handle_receive_transfer_cancel_route(chain_state, state_change)
+    elif type(state_change) == ReceiveTransferCancelRouteLight:
+        # TODO Rodrigo Change this name
+        assert isinstance(state_change, ReceiveTransferCancelRouteLight), MYPY_ANNOTATION
+        iteration = handle_receive_transfer_cancel_route_light(chain_state, state_change)
     elif type(state_change) == ContractReceiveNewPaymentNetwork:
         assert isinstance(state_change, ContractReceiveNewPaymentNetwork), MYPY_ANNOTATION
         iteration = handle_new_payment_network(chain_state, state_change)
@@ -1006,6 +1021,9 @@ def handle_state_change(
     elif type(state_change) == ActionTransferReroute:
         assert isinstance(state_change, ActionTransferReroute), MYPY_ANNOTATION
         iteration = handle_receive_transfer_refund_cancel_route(chain_state, state_change, storage)
+    elif type(state_change) == ActionTransferRerouteLight:
+        assert isinstance(state_change, ActionTransferRerouteLight), MYPY_ANNOTATION
+        iteration = handle_receive_transfer_refund_cancel_route_light(chain_state, state_change, storage)
     elif type(state_change) == ReceiveTransferRefund:
         assert isinstance(state_change, ReceiveTransferRefund), MYPY_ANNOTATION
         iteration = handle_receive_transfer_refund(chain_state, state_change)
