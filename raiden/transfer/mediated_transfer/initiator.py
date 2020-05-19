@@ -2,13 +2,13 @@ import random
 
 from eth_utils import to_canonical_address
 
-from raiden.constants import MAXIMUM_PENDING_TRANSFERS
+from raiden.constants import MAXIMUM_PENDING_TRANSFERS, EMPTY_PAYMENT_HASH_INVOICE
 from raiden.lightclient.models.light_client_protocol_message import LightClientProtocolMessageType
 from raiden.messages import LockedTransfer, Unlock
 from raiden.settings import DEFAULT_WAIT_BEFORE_LOCK_REMOVAL
 from raiden.transfer import channel
 from raiden.transfer.architecture import Event, TransitionResult
-from raiden.transfer.channel import create_sendlockedtransfer
+from raiden.transfer.channel import create_sendlockedtransfer, get_amount_locked, get_next_nonce
 from raiden.transfer.events import EventPaymentSentFailed, EventPaymentSentSuccess
 from raiden.transfer.mediated_transfer.events import (
     CHANNEL_IDENTIFIER_GLOBAL_QUEUE,
@@ -49,7 +49,7 @@ from raiden.utils.typing import (
     Secret,
     SecretHash,
     TokenNetworkID,
-    AddressHex)
+    AddressHex, TokenAmount, TokenNetworkAddress, TargetAddress, InitiatorAddress)
 
 
 def events_for_unlock_base(
@@ -232,6 +232,84 @@ def next_channel_from_routes(
 
     return None
 
+
+def create_new_route_light(
+    channelidentifiers_to_channels: ChannelMap,
+    available_routes: List[RouteState],
+    transfer_description: TransferDescriptionWithoutSecretState,
+    pseudo_random_generator: random.Random,
+    block_number: BlockNumber,
+) -> TransitionResult[InitiatorTransferState]:
+    channel_state = next_channel_from_routes(
+        available_routes=available_routes,
+        channelidentifiers_to_channels=channelidentifiers_to_channels,
+        transfer_amount=transfer_description.amount,
+        initiator=to_canonical_address(transfer_description.initiator)
+    )
+    events: List[Event] = list()
+    if channel_state is None:
+        if not available_routes:
+            reason = "there is no route available"
+        else:
+            reason = "none of the available routes could be used"
+        # TODO mmartinez handle persistance with status failure?
+        transfer_failed = EventPaymentSentFailed(
+            payment_network_identifier=transfer_description.payment_network_identifier,
+            token_network_identifier=transfer_description.token_network_identifier,
+            identifier=transfer_description.payment_identifier,
+            target=transfer_description.target,
+            reason=reason,
+        )
+        events.append(transfer_failed)
+
+        initiator_state = None
+    else:
+        # Todo Rodrigo
+        # Necesito crear un esqueleto de locked transfer aqui con los datos que tengo, para que el usuario agregue los datos restantes (en este caso seria un secrethash)
+        # Este secrethash sera usado para crear el objet Lock dentro del locked transfer, pero como aun aqui no tenemos interaccion con el LC...
+        message_identifier = message_identifier_from_prng(pseudo_random_generator)
+        amount = transfer_description.amount
+        creator_address = transfer_description.initiator
+        partner_address = transfer_description.target
+        payment_identifier = transfer_description.payment_identifier
+
+        our_balance_proof = channel_state.our_state.balance_proof
+        if our_balance_proof:
+            transferred_amount = our_balance_proof.transferred_amount
+        else:
+            transferred_amount = TokenAmount(0)
+        locked_amount = TokenAmount(get_amount_locked(channel_state.our_state) + amount)
+
+        locked_transfer = LockedTransfer(
+            chain_id=channel_state.canonical_identifier.chain_identifier,
+            message_identifier=message_identifier,
+            payment_identifier=payment_identifier,
+            payment_hash_invoice=EMPTY_PAYMENT_HASH_INVOICE,
+            nonce=get_next_nonce(channel_state.our_state),
+            token_network_address=TokenNetworkAddress(channel_state.canonical_identifier.token_network_address),
+            token=channel_state.token_address,
+            channel_identifier=channel_state.canonical_identifier.channel_identifier,
+            transferred_amount=transferred_amount,
+            locked_amount=locked_amount,
+            recipient=channel_state.partner_state.address,
+            locksroot=None,
+            lock=None,
+            target=TargetAddress(partner_address),
+            initiator=InitiatorAddress(creator_address),
+            fee=0,
+        )
+
+        # Persist the light_client_protocol_message associated
+        order = 1
+        store_signed_lt = StoreMessageEvent(locked_transfer.message_identifier,
+                                            locked_transfer.payment_identifier,
+                                            order,
+                                            locked_transfer,
+                                            False,
+                                            LightClientProtocolMessageType.PaymentSuccessful)
+        events.append(store_signed_lt)
+
+    return TransitionResult(initiator_state, events)
 
 def try_new_route_light(
     channelidentifiers_to_channels: ChannelMap,
