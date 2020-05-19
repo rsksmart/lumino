@@ -1024,7 +1024,7 @@ def make_transfers_pair(
         payer_index += 1
 
     return MediatorTransfersPair(
-        channels=channels,
+        channel_set=channels,
         transfers_pair=transfers_pairs,
         amount=amount,
         block_number=block_number,
