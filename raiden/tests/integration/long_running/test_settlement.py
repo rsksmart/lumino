@@ -85,7 +85,7 @@ def run_test_settle_is_automatically_called(raiden_network, token_addresses):
         token_address,
         [channel_identifier],
         app0.raiden.alarm.sleep_time,
-        app0.raiden.address
+        app1.raiden.address
     )
 
     channel_state = views.get_channelstate_for_close_channel(
@@ -102,6 +102,7 @@ def run_test_settle_is_automatically_called(raiden_network, token_addresses):
         token_address,
         [channel_identifier],
         app0.raiden.alarm.sleep_time,
+        app1.raiden.address
     )
 
     token_network = views.get_token_network_by_identifier(

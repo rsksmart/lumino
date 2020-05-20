@@ -11,7 +11,7 @@ from raiden.tests.utils.detect_failure import raise_on_failure
 from raiden.tests.utils.events import raiden_state_changes_search_for_item, search_for_item
 from raiden.tests.utils.factories import UNIT_CHAIN_ID
 from raiden.tests.utils.network import payment_channel_open_and_deposit
-from raiden.tests.utils.transfer import get_channelstate, transfer
+from raiden.tests.utils.transfer import get_channelstate, transfer, sign_and_inject
 from raiden.transfer import views
 from raiden.transfer.mediated_transfer.events import SendSecretReveal
 from raiden.transfer.mediated_transfer.state_change import ActionTransferReroute
@@ -178,7 +178,7 @@ def run_test_regression_multiple_revealsecret(raiden_network, token_addresses, t
         message_identifier=random.randint(0, UINT64_MAX),
         payment_identifier=payment_identifier,
         nonce=nonce,
-        token_network_address=app0.raiden.default_registry.address,
+        token_network_address=token_network_identifier,
         token=token,
         channel_identifier=channelstate_0_1.identifier,
         transferred_amount=transferred_amount,
@@ -190,8 +190,7 @@ def run_test_regression_multiple_revealsecret(raiden_network, token_addresses, t
         initiator=app0.raiden.address,
         payment_hash_invoice=EMPTY_PAYMENT_HASH_INVOICE
     )
-    app0.raiden.sign(mediated_transfer)
-    app1.raiden.on_messages([mediated_transfer])
+    sign_and_inject(mediated_transfer, app0.raiden.signer, app1)
 
     if transport_protocol is TransportProtocol.UDP:
         message_data = mediated_transfer.encode()

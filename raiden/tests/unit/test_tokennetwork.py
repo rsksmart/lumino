@@ -346,7 +346,7 @@ def test_mediator_clear_pairs_after_batch_unlock(
     token_network_state_after_settle = channel_settled_iteration.new_state
     ids_to_channels = token_network_state_after_settle.channelidentifiers_to_channels
     assert len(ids_to_channels) == 1
-    assert channel_state.identifier in ids_to_channels
+    assert channel_state.identifier in ids_to_channels[our_address]
 
     block_number = closed_block_number + 1
     channel_batch_unlock_state_change = ContractReceiveChannelBatchUnlock(
