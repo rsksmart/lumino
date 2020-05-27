@@ -146,8 +146,8 @@ def dont_handle_lock_expired_mock(app):
     """Takes in a raiden app and returns a mock context where lock_expired is not processed
     """
 
-    def do_nothing(raiden, message):  # pylint: disable=unused-argument
-        pass
+    def do_nothing(raiden, message, is_light_client):  # pylint: disable=unused-argument
+        return []
 
     return patch.object(
         app.raiden.message_handler, "handle_message_lockexpired", side_effect=do_nothing

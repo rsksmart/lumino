@@ -86,6 +86,7 @@ def run_test_node_can_settle_if_close_didnt_use_any_balance_proof(
         token_address=token_address,
         channel_ids=[channel_identifier],
         retry_timeout=app0.raiden.alarm.sleep_time,
+        partner_addresses=[app0.raiden.address]
     )
     state_changes = app0.raiden.wal.storage.get_statechanges_by_identifier(
         from_identifier=0, to_identifier="latest"
@@ -164,6 +165,7 @@ def run_test_node_can_settle_if_partner_does_not_call_update_transfer(
         token_address=token_address,
         channel_ids=[channel_identifier],
         retry_timeout=app0.raiden.alarm.sleep_time,
+        partner_addresses=[app0.raiden.address]
     )
     state_changes = app0.raiden.wal.storage.get_statechanges_by_identifier(
         from_identifier=0, to_identifier="latest"

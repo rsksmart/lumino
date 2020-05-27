@@ -204,9 +204,12 @@ def handle_batch_unlock(
     block_hash: BlockHash,
 ) -> TransitionResult:
     events = list()
-    channel_state = token_network_state.channelidentifiers_to_channels[state_change.participant].get(
-        state_change.canonical_identifier.channel_identifier
-    )
+    print("Entre con uno")
+    channel_state = None
+    if token_network_state.channelidentifiers_to_channels.get(state_change.participant) is not None:
+        channel_state = token_network_state.channelidentifiers_to_channels[state_change.participant].get(
+            state_change.canonical_identifier.channel_identifier
+        )
     if channel_state is not None:
         sub_iteration = channel.state_transition(
             channel_state=channel_state,
@@ -217,6 +220,8 @@ def handle_batch_unlock(
         events.extend(sub_iteration.events)
 
         if sub_iteration.new_state is None:
+            print("Borre con uno")
+
             token_network_state.partneraddresses_to_channelidentifiers[
                 channel_state.partner_state.address
             ].remove(channel_state.identifier)

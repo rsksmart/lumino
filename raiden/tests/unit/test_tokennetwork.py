@@ -367,7 +367,7 @@ def test_mediator_clear_pairs_after_batch_unlock(
     token_network_state = views.get_token_network_by_identifier(
         chain_state=chain_state, token_network_id=token_network_state.address
     )
-    ids_to_channels = token_network_state.channelidentifiers_to_channels
+    ids_to_channels = token_network_state.channelidentifiers_to_channels[our_address]
     assert len(ids_to_channels) == 0
 
     # Make sure that all is fine in the next block

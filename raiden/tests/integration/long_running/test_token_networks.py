@@ -62,6 +62,7 @@ def saturated_count(connection_managers, registry_address, token_address):
     ].count(True)
 
 
+# TODO: new neting channel failed
 # TODO: add test scenarios for
 # - subsequent `connect()` calls with different `funds` arguments
 # - `connect()` calls with preexisting channels
