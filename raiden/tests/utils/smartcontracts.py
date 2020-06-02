@@ -44,7 +44,6 @@ def deploy_tokens_and_fund_accounts(
     """ Deploy `number_of_tokens` ERC20 token instances with `token_amount` minted and
     distributed among `blockchain_services`. Optionally the instances will be registered with
     the raiden registry.
-
     Args:
         token_amount (int): number of units that will be created per token
         number_of_tokens (int): number of token instances that will be created
@@ -116,18 +115,13 @@ def get_test_contract(name):
     return contract_path, contracts
 
 
-def deploy_rpc_test_contract(deploy_client: JSONRPCClient, name: str):
-    contract_path = os.path.abspath(
-        os.path.join(os.path.dirname(__file__), "..", "smart_contracts", f"{name}.sol")
-    )
-    contracts = compile_files_cwd([contract_path])
-    contract_key = os.path.basename(contract_path) + ":" + name
-
-    contract_proxy, receipt = deploy_client.deploy_single_contract(
-        contract_name=name, contract=contracts[contract_key]
+def deploy_rpc_test_contract(deploy_client, name):
+    contract_path, contracts = get_test_contract(f"{name}.sol")
+    contract_proxy, _ = deploy_client.deploy_solidity_contract(
+        name, contracts, libraries=dict(), constructor_parameters=None, contract_path=contract_path
     )
 
-    return contract_proxy, receipt
+    return contract_proxy
 
 
 def get_list_of_block_numbers(item):

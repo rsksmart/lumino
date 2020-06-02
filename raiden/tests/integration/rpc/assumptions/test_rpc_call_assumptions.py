@@ -8,7 +8,7 @@ def test_call_invalid_selector(deploy_client):
     """ A JSON RPC call to a valid address but with an invalid selector returns
     the empty string.
     """
-    contract_proxy, _ = deploy_rpc_test_contract(deploy_client, "RpcTest")
+    contract_proxy = deploy_rpc_test_contract(deploy_client, "RpcTest")
     address = contract_proxy.contract_address
     assert len(deploy_client.web3.eth.getCode(to_checksum_address(address))) > 0
 
@@ -43,8 +43,7 @@ def test_call_with_a_block_number_before_smart_contract_deployed(deploy_client):
     """ A JSON RPC call using a block number where the smart contract was not
     yet deployed should raise.
     """
-    # contract_path, contracts = get_test_contract("RpcTest.sol")
-    contract_path, contracts = deploy_rpc_test_contract(deploy_client, "RpcTest")
+    contract_path, contracts = get_test_contract("RpcTest.sol")
     contract_proxy, receipt = deploy_client.deploy_solidity_contract(
         "RpcTest",
         contracts,

@@ -1,4 +1,4 @@
-pragma solidity ^0.5.4;
+pragma solidity ^0.6.8;
 
 contract RpcWithStorageTest {
     uint256[] data;
@@ -18,7 +18,7 @@ contract RpcWithStorageTest {
     function waste_storage(uint256 iterations) public {
         uint256 i;
         for (i=0; i<iterations; i++) {
-            data[data.length++] = i;
+            data.push(i);
         }
         emit RpcEvent(i);
     }
