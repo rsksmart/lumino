@@ -475,7 +475,7 @@ def handle_channel_batch_unlock(raiden: "RaidenService", event: Event):
         transaction_hash=transaction_hash,
         canonical_identifier=canonical_identifier,
         participant=args["participant"],
-        partner=partner,
+        partner=args["partner"],
         locksroot=args["locksroot"],
         unlocked_amount=args["unlocked_amount"],
         returned_tokens=args["returned_tokens"],
