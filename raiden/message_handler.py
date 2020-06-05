@@ -17,9 +17,7 @@ from raiden.messages import (
     Unlock,
 )
 from raiden.raiden_service import RaidenService
-from raiden.routing import get_best_routes
 from raiden.transfer import views
-from raiden.transfer.architecture import StateChange
 from raiden.transfer.mediated_transfer.state import lockedtransfersigned_from_message
 from raiden.transfer.mediated_transfer.state_change import (
     ReceiveLockExpired,
@@ -151,13 +149,9 @@ class MessageHandler:
         chain_state = views.state_from_raiden(raiden)
         from_transfer = lockedtransfersigned_from_message(message)
 
-        token_network_address = message.token_network_address
-
         role = views.get_transfer_role(
             chain_state=chain_state, secrethash=from_transfer.lock.secrethash
         )
-
-        state_change: StateChange
 
         if role == "initiator":
             old_secret = views.get_transfer_secret(chain_state, from_transfer.lock.secrethash)
