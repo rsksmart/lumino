@@ -108,12 +108,12 @@ class InitiatorPaymentState(State):
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "InitiatorPaymentState":
         restored = cls(
+            routes=data["routes"],
             initiator_transfers=map_dict(
                 deserialize_secret_hash, identity, data["initiator_transfers"]
             )
         )
         restored.cancelled_channels = data["cancelled_channels"]
-        restored.routes = data["routes"]
 
         return restored
 
