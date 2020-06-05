@@ -175,7 +175,7 @@ class MessageHandler:
                     secret=random_secret()
                 )
         else:
-            state_change = ReceiveTransferRefund(transfer=from_transfer, routes=routes)
+            state_change = ReceiveTransferRefund(transfer=from_transfer)
 
         raiden.handle_and_track_state_change(state_change)
 

@@ -1210,7 +1210,7 @@ def handle_refundtransfer(
 
         iteration = mediate_transfer(
             mediator_state,
-            mediator_state_change.routes,
+            mediator_state.routes,
             payer_channel,
             channelidentifiers_to_channels,
             nodeaddresses_to_networkstates,
