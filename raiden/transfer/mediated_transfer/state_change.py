@@ -618,7 +618,7 @@ class ActionTransferReroute(BalanceProofStateChange):
     """
 
     def __init__(
-        self, routes: List[RouteState], transfer: LockedTransferSignedState, secret: Secret
+        self, transfer: LockedTransferSignedState, secret: Secret
     ) -> None:
         if not isinstance(transfer, LockedTransferSignedState):
             raise ValueError("transfer must be an instance of LockedTransferSignedState")
@@ -627,7 +627,6 @@ class ActionTransferReroute(BalanceProofStateChange):
 
         super().__init__(transfer.balance_proof)
         self.transfer = transfer
-        self.routes = routes
         self.secrethash = secrethash
         self.secret = secret
 
@@ -641,7 +640,6 @@ class ActionTransferReroute(BalanceProofStateChange):
             isinstance(other, ActionTransferReroute)
             and self.sender == other.sender
             and self.transfer == other.transfer
-            and self.routes == other.routes
             and self.secret == other.secret
             and self.secrethash == other.secrethash
             and super().__eq__(other)
@@ -653,7 +651,6 @@ class ActionTransferReroute(BalanceProofStateChange):
     def to_dict(self) -> Dict[str, Any]:
         return {
             "secret": serialize_bytes(self.secret),
-            "routes": self.routes,
             "transfer": self.transfer,
             "balance_proof": self.balance_proof,
         }
@@ -661,7 +658,6 @@ class ActionTransferReroute(BalanceProofStateChange):
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "ActionTransferReroute":
         instance = cls(
-            routes=data["routes"],
             transfer=data["transfer"],
             secret=Secret(deserialize_bytes(data["secret"])),
         )

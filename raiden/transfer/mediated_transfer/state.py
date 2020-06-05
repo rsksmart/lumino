@@ -77,9 +77,10 @@ class InitiatorPaymentState(State):
     different secrethash.
     """
 
-    __slots__ = ("cancelled_channels", "initiator_transfers")
+    __slots__ = ("routes","cancelled_channels", "initiator_transfers")
 
-    def __init__(self, initiator_transfers: InitiatorTransfersMap) -> None:
+    def __init__(self, routes: List["RouteState"], initiator_transfers: InitiatorTransfersMap) -> None:
+        self.routes = routes
         self.initiator_transfers = initiator_transfers
         self.cancelled_channels: List[ChannelID] = list()
 
@@ -91,6 +92,7 @@ class InitiatorPaymentState(State):
             isinstance(other, InitiatorPaymentState)
             and self.initiator_transfers == other.initiator_transfers
             and self.cancelled_channels == other.cancelled_channels
+            and self.routes == other.routes
         )
 
     def __ne__(self, other: Any) -> bool:
@@ -100,6 +102,7 @@ class InitiatorPaymentState(State):
         return {
             "initiator_transfers": map_dict(serialize_bytes, identity, self.initiator_transfers),
             "cancelled_channels": self.cancelled_channels,
+            "routes": self.routes
         }
 
     @classmethod
@@ -110,6 +113,7 @@ class InitiatorPaymentState(State):
             )
         )
         restored.cancelled_channels = data["cancelled_channels"]
+        restored.routes = data["routes"]
 
         return restored
 

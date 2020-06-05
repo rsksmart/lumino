@@ -152,18 +152,6 @@ class MessageHandler:
         from_transfer = lockedtransfersigned_from_message(message)
 
         token_network_address = message.token_network_address
-        # FIXME: Shouldn't request routes here
-        routes, _ = get_best_routes(
-            chain_state=chain_state,
-            token_network_id=TokenNetworkID(token_network_address),
-            one_to_n_address=raiden.default_one_to_n_address,
-            from_address=InitiatorAddress(raiden.address),
-            to_address=from_transfer.target,
-            amount=PaymentAmount(from_transfer.lock.amount),  # FIXME: mypy; deprecated by #3863
-            previous_address=message.sender,
-            config=raiden.config,
-            privkey=raiden.privkey,
-        )
 
         role = views.get_transfer_role(
             chain_state=chain_state, secrethash=from_transfer.lock.secrethash
@@ -189,7 +177,6 @@ class MessageHandler:
             # (and generate a new secret)
             if is_secret_known:
                 state_change = ActionTransferReroute(
-                    routes=routes,
                     transfer=from_transfer,
                     secret=random_secret()
                 )
