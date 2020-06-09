@@ -2,7 +2,7 @@ import random
 
 from eth_utils import keccak
 
-from raiden.transfer import channel
+from raiden.transfer import channel, routes
 from raiden.transfer.architecture import Event, StateChange, TransitionResult
 from raiden.transfer.events import EventPaymentSentFailed
 from raiden.transfer.mediated_transfer import initiator
@@ -216,6 +216,7 @@ def handle_init(
         events = sub_iteration.events
         if sub_iteration.new_state:
             payment_state = InitiatorPaymentState(
+                routes=state_change.routes,
                 initiator_transfers={
                     sub_iteration.new_state.transfer.lock.secrethash: sub_iteration.new_state
                 }
@@ -241,6 +242,7 @@ def handle_init_light(
         events = sub_iteration.events
         if sub_iteration.new_state:
             payment_state = InitiatorPaymentState(
+                routes=state_change.routes,
                 initiator_transfers={
                     sub_iteration.new_state.transfer.lock.secrethash: sub_iteration.new_state
                 }
@@ -344,6 +346,10 @@ def handle_transferreroute(
     events: List[Event] = []
     events.extend(channel_events)
 
+    filtered_route_states = routes.filter_acceptable_routes(
+        route_states=payment_state.routes, blacklisted_channel_ids=payment_state.cancelled_channels
+    )
+
     old_description = initiator_state.transfer_description
     transfer_description = TransferDescriptionWithSecretState(
         payment_network_identifier=old_description.payment_network_identifier,
@@ -361,7 +367,7 @@ def handle_transferreroute(
         payment_state=payment_state,
         initiator_state=initiator_state,
         transfer_description=transfer_description,
-        available_routes=state_change.routes,
+        available_routes=filtered_route_states,
         channelidentifiers_to_channels=channelidentifiers_to_channels,
         pseudo_random_generator=pseudo_random_generator,
         block_number=block_number,

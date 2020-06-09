@@ -17,9 +17,7 @@ from raiden.messages import (
     Unlock,
 )
 from raiden.raiden_service import RaidenService
-from raiden.routing import get_best_routes
 from raiden.transfer import views
-from raiden.transfer.architecture import StateChange
 from raiden.transfer.mediated_transfer.state import lockedtransfersigned_from_message
 from raiden.transfer.mediated_transfer.state_change import (
     ReceiveLockExpired,
@@ -32,7 +30,7 @@ from raiden.transfer.mediated_transfer.state_change import (
 from raiden.transfer.state import balanceproof_from_envelope
 from raiden.transfer.state_change import ReceiveDelivered, ReceiveProcessed, ReceiveUnlock, ReceiveUnlockLight
 from raiden.utils import pex, random_secret
-from raiden.utils.typing import MYPY_ANNOTATION, InitiatorAddress, PaymentAmount, TokenNetworkID
+from raiden.utils.typing import MYPY_ANNOTATION, TokenNetworkID, InitiatorAddress, PaymentAmount
 
 log = structlog.get_logger(__name__)  # pylint: disable=invalid-name
 
@@ -152,7 +150,11 @@ class MessageHandler:
         chain_state = views.state_from_raiden(raiden)
         from_transfer = lockedtransfersigned_from_message(message)
         token_network_address = message.token_network_address
+        role = views.get_transfer_role(
+            chain_state=chain_state, secrethash=from_transfer.lock.secrethash
+        )
         if is_light_client:
+            from raiden.routing import get_best_routes
             routes, _ = get_best_routes(
                 chain_state=chain_state,
                 token_network_id=TokenNetworkID(token_network_address),
@@ -164,12 +166,6 @@ class MessageHandler:
                 config=raiden.config,
                 privkey=raiden.privkey,
             )
-
-            role = views.get_transfer_role(
-                chain_state=chain_state, secrethash=from_transfer.lock.secrethash
-            )
-
-            state_change: StateChange
 
             if role == "initiator":
                 state_change = ReceiveTransferCancelRouteLight(
@@ -184,29 +180,7 @@ class MessageHandler:
                     transfer=from_transfer
                 )
         else:
-            # FIXME: Shouldn't request routes here
-            routes, _ = get_best_routes(
-                chain_state=chain_state,
-                token_network_id=TokenNetworkID(token_network_address),
-                one_to_n_address=raiden.default_one_to_n_address,
-                from_address=InitiatorAddress(raiden.address),
-                to_address=from_transfer.target,
-                amount=PaymentAmount(from_transfer.lock.amount),  # FIXME: mypy; deprecated by #3863
-                previous_address=message.sender,
-                config=raiden.config,
-                privkey=raiden.privkey,
-            )
-
-            role = views.get_transfer_role(
-                chain_state=chain_state, secrethash=from_transfer.lock.secrethash
-            )
-
-            state_change: StateChange
-
             if role == "initiator":
-                # El HUB no conoce el secreto, por ende cuando llega a este punto se cae
-                # Deberiamos conseguir otro rol? O seria una parte diferente para este flujo?
-                # A mi criterio, como el refund no es mas que un locked transfer podriamos implementar algo muy similar a lo que es LT, cambiando el messagetype, o algun parametro para que el LC envie otro
                 old_secret = views.get_transfer_secret(chain_state, from_transfer.lock.secrethash)
                 is_secret_known = old_secret is not None and old_secret != EMPTY_SECRET
 
@@ -222,14 +196,13 @@ class MessageHandler:
                 # the case of an atomic swap, we will not try to re-route the
                 # transfer. In all other cases we can try to find another route
                 # (and generate a new secret)
-                if is_secret_known:
-                    state_change = ActionTransferReroute(
-                        routes=routes,
-                        transfer=from_transfer,
-                        secret=random_secret()
-                    )
+            if is_secret_known:
+                state_change = ActionTransferReroute(
+                    transfer=from_transfer,
+                    secret=random_secret()
+                )
             else:
-                state_change = ReceiveTransferRefund(transfer=from_transfer, routes=routes)
+                state_change = ReceiveTransferRefund(transfer=from_transfer)
 
         raiden.handle_and_track_state_change(state_change)
 

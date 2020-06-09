@@ -10,7 +10,7 @@ from raiden.constants import (
     RED_EYES_PER_TOKEN_NETWORK_LIMIT,
     UINT256_MAX,
     Environment,
-)
+    EMPTY_PAYMENT_HASH_INVOICE)
 from raiden.exceptions import (
     AlreadyRegisteredTokenAddress,
     DepositOverLimit,
@@ -389,6 +389,7 @@ def run_test_insufficient_funds(raiden_network, token_addresses, deposit):
         token_address,
         deposit + 1,
         target=app1.raiden.address,
+        payment_hash_invoice=EMPTY_PAYMENT_HASH_INVOICE
     )
     assert not result.payment_done.get()
 
