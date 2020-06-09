@@ -25,11 +25,13 @@ from raiden.transfer.mediated_transfer.state_change import (
     ReceiveSecretReveal,
     ReceiveTransferRefund,
     ActionTransferReroute,
-    ReceiveSecretRequestLight, ReceiveSecretRevealLight, ReceiveTransferCancelRoute, ReceiveLockExpiredLight)
+    ReceiveSecretRequestLight, ReceiveSecretRevealLight, ReceiveTransferCancelRoute, ReceiveLockExpiredLight,
+    ReceiveTransferCancelRouteLight, ActionTransferRerouteLight)
 from raiden.transfer.state import balanceproof_from_envelope
 from raiden.transfer.state_change import ReceiveDelivered, ReceiveProcessed, ReceiveUnlock, ReceiveUnlockLight
 from raiden.utils import pex, random_secret
-from raiden.utils.typing import MYPY_ANNOTATION
+from raiden.utils.typing import MYPY_ANNOTATION, TokenNetworkID, InitiatorAddress, PaymentAmount
+
 log = structlog.get_logger(__name__)  # pylint: disable=invalid-name
 
 
@@ -56,7 +58,7 @@ class MessageHandler:
 
         elif type(message) == RefundTransfer:
             assert isinstance(message, RefundTransfer), MYPY_ANNOTATION
-            self.handle_message_refundtransfer(raiden, message)
+            self.handle_message_refundtransfer(raiden, message, is_light_client)
 
         elif type(message) == LockedTransfer:
             assert isinstance(message, LockedTransfer), MYPY_ANNOTATION
@@ -144,37 +146,63 @@ class MessageHandler:
             raiden.handle_and_track_state_change(state_change)
 
     @staticmethod
-    def handle_message_refundtransfer(raiden: RaidenService, message: RefundTransfer) -> None:
+    def handle_message_refundtransfer(raiden: RaidenService, message: RefundTransfer, is_light_client=False) -> None:
         chain_state = views.state_from_raiden(raiden)
         from_transfer = lockedtransfersigned_from_message(message)
-
+        token_network_address = message.token_network_address
         role = views.get_transfer_role(
             chain_state=chain_state, secrethash=from_transfer.lock.secrethash
         )
-
-        if role == "initiator":
-            old_secret = views.get_transfer_secret(chain_state, from_transfer.lock.secrethash)
-            is_secret_known = old_secret is not None and old_secret != EMPTY_SECRET
-
-            state_change = ReceiveTransferCancelRoute(
-                balance_proof=from_transfer.balance_proof,
-                transfer=from_transfer,
-                sender=from_transfer.balance_proof.sender,  # pylint: disable=no-member
+        if is_light_client:
+            from raiden.routing import get_best_routes
+            routes, _ = get_best_routes(
+                chain_state=chain_state,
+                token_network_id=TokenNetworkID(token_network_address),
+                one_to_n_address=raiden.default_one_to_n_address,
+                from_address=InitiatorAddress(message.recipient),
+                to_address=from_transfer.target,
+                amount=PaymentAmount(from_transfer.lock.amount),
+                previous_address=message.sender,
+                config=raiden.config,
+                privkey=raiden.privkey,
             )
-            raiden.handle_and_track_state_change(state_change)
 
-            # Currently, the only case where we can be initiators and not
-            # know the secret is if the transfer is part of an atomic swap. In
-            # the case of an atomic swap, we will not try to re-route the
-            # transfer. In all other cases we can try to find another route
-            # (and generate a new secret)
+            if role == "initiator":
+                state_change = ReceiveTransferCancelRouteLight(
+                    balance_proof=from_transfer.balance_proof,
+                    transfer=from_transfer,
+                    sender=from_transfer.balance_proof.sender,  # pylint: disable=no-member
+                )
+                raiden.handle_and_track_state_change(state_change)
+
+                state_change = ActionTransferRerouteLight(
+                    routes=routes,
+                    transfer=from_transfer
+                )
+        else:
+            if role == "initiator":
+                old_secret = views.get_transfer_secret(chain_state, from_transfer.lock.secrethash)
+                is_secret_known = old_secret is not None and old_secret != EMPTY_SECRET
+
+                state_change = ReceiveTransferCancelRoute(
+                    balance_proof=from_transfer.balance_proof,
+                    transfer=from_transfer,
+                    sender=from_transfer.balance_proof.sender,  # pylint: disable=no-member
+                )
+                raiden.handle_and_track_state_change(state_change)
+
+                # Currently, the only case where we can be initiators and not
+                # know the secret is if the transfer is part of an atomic swap. In
+                # the case of an atomic swap, we will not try to re-route the
+                # transfer. In all other cases we can try to find another route
+                # (and generate a new secret)
             if is_secret_known:
                 state_change = ActionTransferReroute(
                     transfer=from_transfer,
                     secret=random_secret()
                 )
-        else:
-            state_change = ReceiveTransferRefund(transfer=from_transfer)
+            else:
+                state_change = ReceiveTransferRefund(transfer=from_transfer)
 
         raiden.handle_and_track_state_change(state_change)
 

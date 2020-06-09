@@ -79,7 +79,7 @@ class ChannelsResourceLight(BaseResource):
         this translates to 'get all light channels the node is connected with'
         """
         return self.rest_api.get_channel_list(
-            self.rest_api.raiden_api.raiden.default_registry.addressF
+            self.rest_api.raiden_api.raiden.default_registry.address
         )
 
     @use_kwargs(put_schema, locations=("json",))
