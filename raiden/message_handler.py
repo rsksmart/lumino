@@ -196,11 +196,11 @@ class MessageHandler:
                 # the case of an atomic swap, we will not try to re-route the
                 # transfer. In all other cases we can try to find another route
                 # (and generate a new secret)
-            if is_secret_known:
-                state_change = ActionTransferReroute(
-                    transfer=from_transfer,
-                    secret=random_secret()
-                )
+                if is_secret_known:
+                    state_change = ActionTransferReroute(
+                        transfer=from_transfer,
+                        secret=random_secret()
+                    )
             else:
                 state_change = ReceiveTransferRefund(transfer=from_transfer)
 
