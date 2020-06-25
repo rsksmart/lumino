@@ -1,7 +1,7 @@
 # pylint: disable=too-few-public-methods,too-many-arguments,too-many-instance-attributes
 
 from eth_utils import to_canonical_address, to_checksum_address
-from raiden.messages import RevealSecret, Unlock, LockedTransfer, SecretRequest, LockExpired
+from raiden.messages import RevealSecret, Unlock, LockedTransfer, SecretRequest, LockExpired, RefundTransfer
 
 from raiden.transfer.architecture import (
     AuthenticatedSenderStateChange,
@@ -938,3 +938,39 @@ class ActionSendUnlockLight(AuthenticatedSenderStateChange):
             receiver=to_canonical_address(data["receiver"])
         )
         return instance
+
+
+class StoreRefundTransferLight(StateChange):
+    """ Initial state of a refund transfer reception.
+
+    Args:
+        transfer: a message object that represents the refund transfer sent to a light client
+    """
+
+    def __init__(
+        self, transfer: RefundTransfer
+    ) -> None:
+        if not isinstance(transfer, RefundTransfer):
+            raise ValueError("transfer must be an RefundTransfer instance.")
+
+        self.transfer = transfer
+
+    def __repr__(self) -> str:
+        return "<StoreRefundTransferLight transfer:{}>".format(self.transfer)
+
+    def __eq__(self, other: Any) -> bool:
+        return (
+            isinstance(other, StoreRefundTransferLight)
+            and self.transfer == other.transfer
+        )
+
+    def __ne__(self, other: Any) -> bool:
+        return not self.__eq__(other)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {"transfer": self.transfer.to_dict()}
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "StoreRefundTransferLight":
+        return cls(transfer=data["transfer"])
+
