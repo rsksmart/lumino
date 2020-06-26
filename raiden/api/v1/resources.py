@@ -291,7 +291,8 @@ class CreatePaymentLightResource(BaseResource):
         partner_address: typing.Address,
         token_address: typing.TokenAddress,
         amount: typing.TokenAmount,
-        secrethash: typing.SecretHash
+        secrethash: typing.SecretHash,
+        prev_secrethash: typing.SecretHash = None
     ):
         return self.rest_api.create_light_client_payment(
             registry_address=self.rest_api.raiden_api.raiden.default_registry.address,
@@ -299,7 +300,8 @@ class CreatePaymentLightResource(BaseResource):
             partner_address=partner_address,
             token_address=token_address,
             amount=amount,
-            secrethash=secrethash
+            secrethash=secrethash,
+            prev_secrethash=prev_secrethash
         )
 
 

@@ -3,11 +3,13 @@ from enum import Enum
 
 from raiden.messages import Message
 
+
 class LightClientProtocolMessageType(Enum):
     PaymentSuccessful = "PaymentSuccessful"
     PaymentFailure = "PaymentFailure"
     PaymentExpired = "PaymentExpired"
     SettlementRequired = "SettlementRequired"
+    PaymentRefund = "PaymentRefund"
 
 
 class LightClientProtocolMessage:
@@ -19,7 +21,7 @@ class LightClientProtocolMessage:
         message_order: int,
         light_client_payment_id: int,
         identifier: string,
-        message_type : LightClientProtocolMessageType,
+        message_type: LightClientProtocolMessageType,
         unsigned_message: Message = None,
         signed_message: Message = None,
         internal_msg_identifier: int = None
@@ -56,6 +58,7 @@ class LightClientProtocolMessage:
 
 class DbLightClientProtocolMessage:
     """ Db representation of light client message """
+
     def __init__(
         self,
         light_client_protocol_message: LightClientProtocolMessage
@@ -66,4 +69,3 @@ class DbLightClientProtocolMessage:
         self.message_type = light_client_protocol_message.message_type
         self.unsigned_message = light_client_protocol_message.unsigned_message
         self.signed_message = light_client_protocol_message.signed_message
-

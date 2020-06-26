@@ -37,7 +37,8 @@ from raiden.transfer.mediated_transfer.state_change import (
     ActionTransferReroute,
     ActionInitInitiatorLight, ReceiveSecretRequestLight, ActionSendSecretRevealLight, ReceiveSecretRevealLight,
     ActionSendUnlockLight, ActionInitTargetLight, ActionSendSecretRequestLight, ActionSendLockExpiredLight,
-    ReceiveLockExpiredLight, ReceiveTransferCancelRoute, ReceiveTransferCancelRouteLight, ActionTransferRerouteLight)
+    ReceiveLockExpiredLight, ReceiveTransferCancelRoute, ReceiveTransferCancelRouteLight, ActionTransferRerouteLight,
+    StoreRefundTransferLight)
 from raiden.transfer.state import (
     ChainState,
     InitiatorTask,
@@ -329,6 +330,11 @@ def handle_init_send_lock_expired_light(
 
     events = [send_lock_expired_light, store_lock_expired_light]
     return TransitionResult(chain_state, events)
+
+
+def handle_store_refund_transfer_light( chain_state: ChainState, state_change: StoreRefundTransferLight
+                                        ) -> TransitionResult[ChainState]:
+    return subdispatch_to_paymenttask(chain_state, state_change, state_change.transfer.lock.secrethash)
 
 
 def subdispatch_initiatortask(
@@ -832,10 +838,6 @@ def handle_receive_transfer_refund_cancel_route(
 
     return subdispatch_to_paymenttask(chain_state, state_change, new_secrethash, storage)
 
-def handle_receive_transfer_refund_cancel_route_light(
-    chain_state: ChainState, state_change: ActionTransferRerouteLight, storage
-) -> TransitionResult[ChainState]:
-    return subdispatch_to_paymenttask(chain_state, state_change, state_change.transfer.lock.secrethash, storage)
 
 def handle_receive_transfer_cancel_route(
     chain_state: ChainState, state_change: ReceiveTransferCancelRoute
@@ -843,6 +845,7 @@ def handle_receive_transfer_cancel_route(
     return subdispatch_to_paymenttask(
         chain_state, state_change, state_change.transfer.lock.secrethash
     )
+
 
 def handle_receive_transfer_cancel_route_light(
     chain_state: ChainState, state_change: ReceiveTransferCancelRouteLight
@@ -1025,9 +1028,6 @@ def handle_state_change(
     elif type(state_change) == ActionTransferReroute:
         assert isinstance(state_change, ActionTransferReroute), MYPY_ANNOTATION
         iteration = handle_receive_transfer_refund_cancel_route(chain_state, state_change, storage)
-    elif type(state_change) == ActionTransferRerouteLight:
-        assert isinstance(state_change, ActionTransferRerouteLight), MYPY_ANNOTATION
-        iteration = handle_receive_transfer_refund_cancel_route_light(chain_state, state_change, storage)
     elif type(state_change) == ReceiveTransferRefund:
         assert isinstance(state_change, ReceiveTransferRefund), MYPY_ANNOTATION
         iteration = handle_receive_transfer_refund(chain_state, state_change)
@@ -1067,6 +1067,9 @@ def handle_state_change(
     elif type(state_change) == ActionSendLockExpiredLight:
         assert isinstance(state_change, ActionSendLockExpiredLight), MYPY_ANNOTATION
         iteration = handle_init_send_lock_expired_light(chain_state, state_change)
+    elif type(state_change) == StoreRefundTransferLight:
+        assert isinstance(state_change, StoreRefundTransferLight), MYPY_ANNOTATION
+        iteration = handle_store_refund_transfer_light(chain_state, state_change)
     assert chain_state is not None, "chain_state must be set"
     return iteration
 

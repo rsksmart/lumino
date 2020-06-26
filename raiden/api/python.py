@@ -54,7 +54,7 @@ from raiden.messages import RequestMonitoring, LockedTransfer, RevealSecret, Unl
     Processed, LockExpired
 from raiden.settings import DEFAULT_RETRY_TIMEOUT, DEVELOPMENT_CONTRACT_VERSION
 
-from raiden.transfer import architecture, views
+from raiden.transfer import architecture, views, routes
 from raiden.transfer.events import (
     EventPaymentReceivedSuccess,
     EventPaymentSentFailed,
@@ -1075,6 +1075,7 @@ class RaidenAPI:
         identifier: PaymentID,
         secrethash: SecretHash,
         signed_locked_transfer: LockedTransfer,
+        channel_identifier: ChannelID,
         payment_hash_invoice: PaymentHashInvoice = None
     ):
         current_state = views.state_from_raiden(self.raiden)
@@ -1130,7 +1131,8 @@ class RaidenAPI:
             identifier=identifier,
             secrethash=secrethash,
             payment_hash_invoice=payment_hash_invoice,
-            signed_locked_transfer=signed_locked_transfer
+            signed_locked_transfer=signed_locked_transfer,
+            channel_identifier=channel_identifier
         )
         return None
 
@@ -1143,12 +1145,16 @@ class RaidenAPI:
         self.raiden.initiate_send_balance_proof(sender_address, receiver_address, unlock)
 
     def initiate_send_delivered_light(self, sender_address: typing.Address, receiver_address: typing.Address,
-                                      delivered: Delivered, msg_order: int, payment_id: int, message_type: LightClientProtocolMessageType):
-        self.raiden.initiate_send_delivered_light(sender_address, receiver_address, delivered, msg_order, payment_id, message_type)
+                                      delivered: Delivered, msg_order: int, payment_id: int,
+                                      message_type: LightClientProtocolMessageType):
+        self.raiden.initiate_send_delivered_light(sender_address, receiver_address, delivered, msg_order, payment_id,
+                                                  message_type)
 
     def initiate_send_processed_light(self, sender_address: typing.Address, receiver_address: typing.Address,
-                                      processed: Processed, msg_order: int, payment_id: int, message_type: LightClientProtocolMessageType):
-        self.raiden.initiate_send_processed_light(sender_address, receiver_address, processed, msg_order, payment_id, message_type)
+                                      processed: Processed, msg_order: int, payment_id: int,
+                                      message_type: LightClientProtocolMessageType):
+        self.raiden.initiate_send_processed_light(sender_address, receiver_address, processed, msg_order, payment_id,
+                                                  message_type)
 
     def initiate_send_secret_request_light(self, sender_address: typing.Address, receiver_address: typing.Address,
                                            secret_request: SecretRequest):
@@ -1650,7 +1656,7 @@ class RaidenAPI:
 
             api_key = hexlify(os.urandom(20))
             api_key = api_key.decode("utf-8")
-            #Check for limit light client
+            # Check for limit light client
             result = self.raiden.wal.storage.save_light_client(
                 api_key=api_key,
                 address=address,
@@ -1690,8 +1696,12 @@ class RaidenAPI:
         partner_address: typing.AddressHex,
         token_address: typing.TokenAddress,
         amount: typing.TokenAmount,
-        secrethash: typing.SecretHash
+        secrethash: typing.SecretHash,
+        prev_secrethash: typing.SecretHash = None
     ) -> HubResponseMessage:
+
+        print(secrethash.hex())
+        print(secrethash)
 
         channel_state = views.get_channelstate_for(
             views.state_from_raiden(self.raiden),
@@ -1700,12 +1710,16 @@ class RaidenAPI:
             creator_address,
             partner_address,
         )
-        #If we dont have a channel with the partner we need to get a channel to try a mediated transfer
+        # If we dont have a channel with the partner we need to get a channel to try a mediated transfer
         if not channel_state:
+            # Here we can discriminate between a re-route and the first try to route a payment
+            # if a prev_secrethash is set, then we need to filter the previous canceled routes.
+
             token_network_id = views.get_token_network_by_token_address(
                 views.state_from_raiden(self.raiden), registry_address, token_address
             )
-            routes, _ = routing.get_best_routes(
+
+            possible_routes, _ = routing.get_best_routes(
                 chain_state=views.state_from_raiden(self.raiden),
                 token_network_id=token_network_id.address,
                 one_to_n_address=self.raiden.default_one_to_n_address,
@@ -1716,13 +1730,23 @@ class RaidenAPI:
                 config=self.raiden.config,
                 privkey=self.raiden.privkey,
             )
-            if len(routes) > 0:
+            if prev_secrethash is not None:
+                chain_state = views.state_from_raiden(self.raiden)
+                transfer_task : Optional[TransferTask] = views.get_transfer_task(chain_state, prev_secrethash)
+                if transfer_task is not None:
+                    print(transfer_task.manager_state.cancelled_channels)
+                    possible_routes = routes.filter_acceptable_routes(
+                        route_states=possible_routes, blacklisted_channel_ids=transfer_task.manager_state.cancelled_channels
+                    )
+                    print(possible_routes)
+            if len(possible_routes) > 0:
+                # TODO marcosmartinez7 Get the first channel from routes.
                 channel_state = views.get_channelstate_for(
                     views.state_from_raiden(self.raiden),
                     registry_address,
                     token_address,
                     creator_address,
-                    routes[0].node_address,
+                    possible_routes[0].node_address,
                 )
 
         if channel_state:

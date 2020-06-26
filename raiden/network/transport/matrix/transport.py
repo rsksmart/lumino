@@ -189,12 +189,7 @@ class _RetryQueue(Runnable):
         self.log.debug("Retrying message", receiver=to_normalized_address(self.receiver))
         status = self.transport._address_mgr.get_address_reachability(self.receiver)
 
-        if status is not AddressReachability.REACHABLE:
-            # if partner is not reachable, return
-            self.log.info(
-                "Partner not reachable. Skipping.", partner=pex(self.receiver), status=status
-            )
-            return
+
         message_texts = [
             data.text
             for data in self._message_queue
@@ -839,7 +834,7 @@ class MatrixTransport(Runnable):
         self._raiden_service.on_message(delivered)
 
     def _receive_message(self, message: Union[SignedRetrieableMessage, Processed]):
-        print("---- Matrix Received Message HUB Transport" + str(message))
+        print("---- Matrix Received Message HUB Transport" + str(message.sender) + str(message))
         assert self._raiden_service is not None
         self.log.info(
             "Message received",

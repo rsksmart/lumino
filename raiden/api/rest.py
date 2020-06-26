@@ -1566,7 +1566,8 @@ class RestAPI:
         message_identifier: typing.PaymentID,
         secret_hash: typing.SecretHash,
         payment_hash_invoice: typing.PaymentHashInvoice,
-        signed_locked_transfer: LockedTransfer
+        signed_locked_transfer: LockedTransfer,
+        channel_identifier: typing.ChannelID
     ):
         log.debug(
             "Initiating payment light",
@@ -1595,7 +1596,8 @@ class RestAPI:
                 identifier=payment_identifier,
                 secrethash=secret_hash,
                 payment_hash_invoice=payment_hash_invoice,
-                signed_locked_transfer=signed_locked_transfer
+                signed_locked_transfer=signed_locked_transfer,
+                channel_identifier=channel_identifier
             )
         except (
             InvalidAmount,
@@ -2165,7 +2167,7 @@ class RestAPI:
             self.initiate_payment_light(self.raiden_api.raiden.default_registry.address, lt.token, lt.initiator,
                                         lt.target, lt.locked_amount, lt.payment_identifier, payment_request.payment_id,
                                         lt.lock.secrethash,
-                                        EMPTY_PAYMENT_HASH_INVOICE, lt)
+                                        EMPTY_PAYMENT_HASH_INVOICE, lt, lt.channel_identifier)
         elif message["type"] == "Delivered":
             delivered = Delivered.from_dict(message)
             self.initiate_send_delivered_light(sender, receiver, delivered, message_order, payment_request.payment_id,
@@ -2196,7 +2198,8 @@ class RestAPI:
         partner_address: typing.AddressHex,
         token_address: typing.TokenAddress,
         amount: typing.TokenAmount,
-        secrethash: typing.SecretHash
+        secrethash: typing.SecretHash,
+        prev_secrethash: typing.SecretHash = None
     ):
         headers = request.headers
         api_key = headers.get("x-api-key")
@@ -2212,7 +2215,7 @@ class RestAPI:
         try:
             hub_message = self.raiden_api.create_light_client_payment(registry_address, creator_address,
                                                                       partner_address, token_address,
-                                                                      amount, secrethash)
+                                                                      amount, secrethash, prev_secrethash)
             return api_response(hub_message.to_dict())
         except ChannelNotFound as e:
             return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.NOT_FOUND, log=log)
