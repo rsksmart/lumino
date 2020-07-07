@@ -633,8 +633,6 @@ class RaidenAPI:
             signed_approval_tx=signed_approval_tx,
             signed_deposit_tx=signed_deposit_tx
         )
-        
-        channel_proxy.swap_participants(creator_address)
 
         waiting.wait_for_participant_newbalance(
             raiden=self.raiden,
