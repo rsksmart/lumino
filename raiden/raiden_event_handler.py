@@ -5,7 +5,7 @@ import structlog
 from eth_utils import to_checksum_address, to_hex
 
 from raiden.constants import EMPTY_BALANCE_HASH, EMPTY_HASH, EMPTY_MESSAGE_HASH, EMPTY_SIGNATURE
-from raiden.exceptions import ChannelOutdatedError, RaidenUnrecoverableError
+from raiden.exceptions import ChannelOutdatedError, RaidenUnrecoverableError, RaidenRecoverableError
 from raiden.lightclient.handlers.light_client_message_handler import LightClientMessageHandler
 from raiden.message_event_convertor import message_from_sendevent
 from raiden.network.proxies.payment_channel import PaymentChannel
@@ -566,7 +566,7 @@ class RaidenEventHandler(EventHandler):
             state_change_identifier = event_record.state_change_identifier
 
             if not state_change_identifier:
-                raise RaidenUnrecoverableError(
+                raise RaidenRecoverableError(
                     f"Failed to find event that match current channel locksroots. "
                     f"chain_id:{raiden.chain.network_id} "
                     f"token_network:{to_checksum_address(token_network_identifier)} "

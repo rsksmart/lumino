@@ -16,7 +16,7 @@ from raiden.transfer.mediated_transfer.state import (
     InitiatorPaymentState,
     InitiatorTransferState,
     TransferDescriptionWithSecretState,
-    TransferDescriptionWithoutSecretState)
+    )
 from raiden.transfer.mediated_transfer.state_change import (
     ActionInitInitiator,
     ReceiveLockExpired,
@@ -24,7 +24,7 @@ from raiden.transfer.mediated_transfer.state_change import (
     ReceiveSecretReveal,
     ActionTransferReroute,
     ActionInitInitiatorLight, ReceiveSecretRequestLight, ActionSendSecretRevealLight, ReceiveSecretRevealLight,
-    ReceiveTransferCancelRoute, ReceiveTransferCancelRouteLight, ActionTransferRerouteLight, StoreRefundTransferLight)
+    ReceiveTransferCancelRoute, StoreRefundTransferLight)
 from raiden.transfer.state import RouteState
 from raiden.transfer.state_change import ActionCancelPayment, Block, ContractReceiveSecretReveal
 from raiden.utils.typing import (
@@ -219,6 +219,8 @@ def handle_init(
 
         events = sub_iteration.events
         if sub_iteration.new_state:
+            # TODO marcosmartinez here the routes are always all routes, because the ActionInitInitiator doesnt take into account cancelled routes.
+            # Cancelled routes are added when a refund message comes.
             payment_state = InitiatorPaymentState(
                 routes=state_change.routes,
                 initiator_transfers={

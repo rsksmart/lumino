@@ -1,3 +1,4 @@
+import copy
 from http import HTTPStatus
 
 import gevent
@@ -14,6 +15,7 @@ from dateutil.relativedelta import relativedelta
 from eth_utils import is_binary_address, to_checksum_address, to_canonical_address, to_normalized_address, encode_hex
 
 from ecies import encrypt
+from raiden.transfer.mediated_transfer.initiator import next_channel_from_routes
 
 import raiden.blockchain.events as blockchain_events
 from raiden import waiting, routing
@@ -1703,8 +1705,10 @@ class RaidenAPI:
         print(secrethash.hex())
         print(secrethash)
 
+        chain_state = views.state_from_raiden(self.raiden)
+
         channel_state = views.get_channelstate_for(
-            views.state_from_raiden(self.raiden),
+            chain_state,
             registry_address,
             token_address,
             creator_address,
@@ -1731,8 +1735,16 @@ class RaidenAPI:
                 privkey=self.raiden.privkey,
             )
             if prev_secrethash is not None:
-                chain_state = views.state_from_raiden(self.raiden)
                 transfer_task : Optional[TransferTask] = views.get_transfer_task(chain_state, prev_secrethash)
+
+                new_secrethash = secrethash
+                current_payment_task = chain_state.payment_mapping.secrethashes_to_task[
+                    prev_secrethash
+                ]
+                chain_state.payment_mapping.secrethashes_to_task.update(
+                    {new_secrethash: copy.deepcopy(current_payment_task)}
+                )
+
                 if transfer_task is not None:
                     print(transfer_task.manager_state.cancelled_channels)
                     possible_routes = routes.filter_acceptable_routes(
@@ -1750,7 +1762,6 @@ class RaidenAPI:
                 )
 
         if channel_state:
-            chain_state = views.state_from_raiden(self.raiden)
 
             locked_transfer = LightClientUtils.create_locked_transfer(
                 chain_state=chain_state,
