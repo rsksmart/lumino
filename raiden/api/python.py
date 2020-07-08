@@ -625,6 +625,8 @@ class RaidenAPI:
             canonical_identifier=channel_state.canonical_identifier
         )
 
+        channel_proxy.swap_participants(creator_address)
+
         channel_proxy.set_total_deposit_light(
             total_deposit=total_deposit,
             block_identifier=views.state_from_raiden(self.raiden).block_hash,
