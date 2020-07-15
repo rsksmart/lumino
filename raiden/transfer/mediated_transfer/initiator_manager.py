@@ -208,25 +208,24 @@ def handle_init(
     block_number: BlockNumber,
 ) -> TransitionResult[InitiatorPaymentState]:
     events: List[Event] = list()
-    if payment_state is None:
-        sub_iteration = initiator.try_new_route(
-            channelidentifiers_to_channels=channelidentifiers_to_channels,
-            available_routes=state_change.routes,
-            transfer_description=state_change.transfer,
-            pseudo_random_generator=pseudo_random_generator,
-            block_number=block_number,
-        )
+    sub_iteration = initiator.try_new_route(
+        channelidentifiers_to_channels=channelidentifiers_to_channels,
+        available_routes=state_change.routes,
+        transfer_description=state_change.transfer,
+        pseudo_random_generator=pseudo_random_generator,
+        block_number=block_number,
+    )
 
-        events = sub_iteration.events
-        if sub_iteration.new_state:
-            # TODO marcosmartinez here the routes are always all routes, because the ActionInitInitiator doesnt take into account cancelled routes.
-            # Cancelled routes are added when a refund message comes.
-            payment_state = InitiatorPaymentState(
-                routes=state_change.routes,
-                initiator_transfers={
-                    sub_iteration.new_state.transfer.lock.secrethash: sub_iteration.new_state
-                }
-            )
+    events = sub_iteration.events
+    if sub_iteration.new_state:
+        # TODO marcosmartinez here the routes are always all routes, because the ActionInitInitiator doesnt take into account cancelled routes.
+        # Cancelled routes are added when a refund message comes.
+        payment_state = InitiatorPaymentState(
+            routes=state_change.routes,
+            initiator_transfers={
+                sub_iteration.new_state.transfer.lock.secrethash: sub_iteration.new_state
+            }
+        )
 
     return TransitionResult(payment_state, events)
 
@@ -237,23 +236,22 @@ def handle_init_light(
     channelidentifiers_to_channels: ChannelMap,
 ) -> TransitionResult[InitiatorPaymentState]:
     events: List[Event] = list()
-    if payment_state is None:
-        sub_iteration = initiator.try_new_route_light(
-            channelidentifiers_to_channels=channelidentifiers_to_channels,
-            channel_state=state_change.current_channel,
-            transfer_description=state_change.transfer,
-            signed_locked_transfer=state_change.signed_locked_transfer
-        )
+    sub_iteration = initiator.try_new_route_light(
+        channelidentifiers_to_channels=channelidentifiers_to_channels,
+        channel_state=state_change.current_channel,
+        transfer_description=state_change.transfer,
+        signed_locked_transfer=state_change.signed_locked_transfer
+    )
 
-        events = sub_iteration.events
-        if sub_iteration.new_state:
-            # TODO marcosmartinez7 routes?
-            payment_state = InitiatorPaymentState(
-                routes=[],
-                initiator_transfers={
-                    sub_iteration.new_state.transfer.lock.secrethash: sub_iteration.new_state
-                }
-            )
+    events = sub_iteration.events
+    if sub_iteration.new_state:
+        # TODO marcosmartinez7 routes?
+        payment_state = InitiatorPaymentState(
+            routes=[],
+            initiator_transfers={
+                sub_iteration.new_state.transfer.lock.secrethash: sub_iteration.new_state
+            }
+        )
 
     return TransitionResult(payment_state, events)
 

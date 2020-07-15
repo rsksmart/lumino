@@ -1258,7 +1258,7 @@ def handle_offchain_secretreveal(
         block_number=block_number,
     )
 
-    if is_secret_unknown and is_valid_reveal and not has_payer_transfer_expired:
+    if  is_valid_reveal and not has_payer_transfer_expired:
         iteration = secret_learned(
             state=mediator_state,
             channelidentifiers_to_channels=channelidentifiers_to_channels,
