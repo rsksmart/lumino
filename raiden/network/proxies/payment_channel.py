@@ -321,3 +321,7 @@ class PaymentChannel:
         )
 
         return channel_filter
+
+    def swap_participants(self, forced_participant_1):
+        if forced_participant_1 != self.participant1:
+            self.participant1, self.participant2 = self.participant2, self.participant1
