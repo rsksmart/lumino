@@ -1470,7 +1470,9 @@ class MatrixLightClientTransport(MatrixTransport):
             return None
         address_hex = to_normalized_address(address)
         msg = f"address not health checked: me: {self._user_id}, peer: {address_hex}"
-        assert address and self._address_mgr.is_address_known(address), msg
+        assert address
+        # TODO Precondition must be assert address and self._address_mgr.is_address_known(address), msg, but
+        # address is not healtchecked for mediated receptions assert address and self._address_mgr.is_address_known(address), msg
 
         # filter_private is done in _get_room_ids_for_address
         room_ids = self._get_room_ids_for_address(address)
