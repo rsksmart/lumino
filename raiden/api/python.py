@@ -15,7 +15,6 @@ from dateutil.relativedelta import relativedelta
 from eth_utils import is_binary_address, to_checksum_address, to_canonical_address, to_normalized_address, encode_hex
 
 from ecies import encrypt
-from raiden.transfer.mediated_transfer.initiator import next_channel_from_routes
 
 import raiden.blockchain.events as blockchain_events
 from raiden import waiting, routing

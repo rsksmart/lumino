@@ -1,7 +1,6 @@
 import structlog
 
 from eth_utils import to_checksum_address
-from raiden.transfer.mediated_transfer.events import StoreMessageEvent
 
 from raiden.constants import EMPTY_SECRET
 from raiden.lightclient.handlers.light_client_message_handler import LightClientMessageHandler
@@ -18,7 +17,6 @@ from raiden.messages import (
     Unlock,
 )
 from raiden.raiden_service import RaidenService
-from raiden.routing import get_best_routes
 from raiden.transfer import views
 from raiden.transfer.architecture import StateChange
 from raiden.transfer.mediated_transfer.state import lockedtransfersigned_from_message
@@ -33,7 +31,7 @@ from raiden.transfer.mediated_transfer.state_change import (
 from raiden.transfer.state import balanceproof_from_envelope
 from raiden.transfer.state_change import ReceiveDelivered, ReceiveProcessed, ReceiveUnlock, ReceiveUnlockLight
 from raiden.utils import pex, random_secret
-from raiden.utils.typing import MYPY_ANNOTATION, InitiatorAddress, PaymentAmount, TokenNetworkID
+from raiden.utils.typing import MYPY_ANNOTATION
 
 log = structlog.get_logger(__name__)  # pylint: disable=invalid-name
 

@@ -2,13 +2,13 @@ import random
 
 from eth_utils import to_canonical_address
 
-from raiden.constants import MAXIMUM_PENDING_TRANSFERS, EMPTY_PAYMENT_HASH_INVOICE
+from raiden.constants import MAXIMUM_PENDING_TRANSFERS
 from raiden.lightclient.models.light_client_protocol_message import LightClientProtocolMessageType
 from raiden.messages import LockedTransfer, Unlock
 from raiden.settings import DEFAULT_WAIT_BEFORE_LOCK_REMOVAL
 from raiden.transfer import channel
 from raiden.transfer.architecture import Event, TransitionResult
-from raiden.transfer.channel import create_sendlockedtransfer, get_amount_locked, get_next_nonce
+from raiden.transfer.channel import create_sendlockedtransfer
 from raiden.transfer.events import EventPaymentSentFailed, EventPaymentSentSuccess
 from raiden.transfer.mediated_transfer.events import (
     CHANNEL_IDENTIFIER_GLOBAL_QUEUE,
@@ -49,7 +49,7 @@ from raiden.utils.typing import (
     Secret,
     SecretHash,
     TokenNetworkID,
-    AddressHex, TokenAmount, TokenNetworkAddress, TargetAddress, InitiatorAddress)
+    AddressHex)
 
 
 def events_for_unlock_base(

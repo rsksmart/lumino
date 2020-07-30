@@ -116,6 +116,7 @@ def is_safe_to_wait(
     )
     return False, msg
 
+
 def is_channel_usable(
     candidate_channel_state: NettingChannelState,
     transfer_amount: PaymentWithFeeAmount,
@@ -1240,7 +1241,8 @@ def handle_offchain_secretreveal(
         transfer_secrethash=mediator_state.secrethash,
         secret=mediator_state_change.secret,
     )
-    is_secret_unknown = mediator_state.secret is None
+    # TODO marcosmartinez7 refund transfers wasnt working.
+    # is_secret_unknown = mediator_state.secret is None
 
     # a SecretReveal should be rejected if the payer transfer
     # has expired. To check for this, we use the last
@@ -1258,7 +1260,8 @@ def handle_offchain_secretreveal(
         block_number=block_number,
     )
 
-    if  is_valid_reveal and not has_payer_transfer_expired:
+    # TODO marcosmartinez7 this condicion must include and is_secret_unknown
+    if is_valid_reveal and not has_payer_transfer_expired:
         iteration = secret_learned(
             state=mediator_state,
             channelidentifiers_to_channels=channelidentifiers_to_channels,
