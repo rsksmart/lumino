@@ -96,3 +96,4 @@ keystores
 raiden/raiden-*
 createEnv
 startPartner
+raiden/api/webui/static/endpointConfig.js
