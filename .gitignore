@@ -94,5 +94,3 @@ keystores
 
 # raiden logs
 raiden/raiden-*
-createEnv
-startPartner
