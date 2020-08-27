@@ -2,9 +2,9 @@
 
 ## Prerequisites
 
-1. Access to a synched RSK node. You can do this in a variety of ways:
-	1. Run your own node on TestNet or MainNet, see [https://github.com/rsksmart/rskj/wiki/Install-RskJ-and-join-the-RSK-Orchid-Mainnet-Beta](https://github.com/rsksmart/rskj/wiki/Install-RskJ-and-join-the-RSK-Orchid-Mainnet-Beta)
-	2. Compile and run a RSK node locally, see [https://github.com/rsksmart/rskj/wiki/Compile-and-run-a-RSK-node-locally](https://github.com/rsksmart/rskj/wiki/Compile-and-run-a-RSK-node-locally)
+1. Access to a synced RSK node. You can do this in a variety of ways:
+	1. Run your own node on Testnet or Mainnet, see [Node (RSKj): Install](https://developers.rsk.co/rsk/node/install/)
+	2. Compile and run a RSK node locally, see [Node (RSKj): Contribute](https://developers.rsk.co/rsk/node/contribute/)
 2. An RSK account with an RBTC balance NOT lower than 0.001 RBTC
 3. Ubuntu 18.04+
 
