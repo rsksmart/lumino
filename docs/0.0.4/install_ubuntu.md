@@ -10,123 +10,132 @@
 
 ## Install required libraries/software
 
-### Install Python 3.7
+### 1. Install Python 3.7
 
-Update your packages and install pre-requisites:
+Update your packages and install pre-requisites by executing:
 
-```
+```shell script
 sudo apt update
 sudo apt install software-properties-common
 ```
 
 Add deadsnakes PPA to your sources list:
 
-```
+```shell script
 sudo add-apt-repository ppa:deadsnakes/ppa
 ```
 
-Once the repository is enabled install Python 3.7:
+Once the repository is enabled, install Python 3.7:
 
-```
+```shell script
 sudo apt install python3.7
 ```
 
+### 2. Install Python 3.7-dev
 
-### Install Python 3.7-dev
+If you didn't update your local APT repository, execute:
 
-If you didn't update your local APT repository:
-
-```
+```shell script
 sudo apt update
 ```
 
 To install python 3.7-dev run the following command:
 
-```
+```shell script
 sudo apt-get install libpq-dev python3.7-dev
 ```
 
-### Install PIP
+### 3. Install `pip`
 
+If you didn't update your local APT repository, execute:
 
-If you didn't update your local APT repository:
-
-```
+```shell script
 sudo apt update
 ```
 
-Install pip3:
+Install `pip3` by executing:
 
-```
+```shell script
 sudo apt-get install python3-pip
 ```
 
-### Install virtualenv
+### 4. Install `virtualenv`
 
-If you didn't update your local APT repository:
+If you didn't update your local APT repository, execute:
 
-```
+```shell script
 sudo apt update
 ```
 
-Install virtualenv:
+Install `virtualenv` by executing:
 
-```
+```shell script
 sudo apt-get install virtualenv
 ```
 
-### Install Lumino Invoicing dependencies
+### 5. Install Lumino Invoicing dependencies
 
 Lumino includes a billing that is based on the Lighting Network invoicing feature. In order to install Lumino, the following dependencies are required:
 
-```
+```shell script
 sudo apt install libsecp256k1-dev
 
 sudo apt-get install libssl-dev build-essential automake pkg-config libtool libffi-dev libgmp-dev libyaml-cpp-dev
-
 ```
-
-
 
 ## Build RIF Lumino from code
 
+### 1. Get the code
 
-1. Get the code from [https://github.com/rsksmart/lumino/releases/tag/0.0.4](https://github.com/rsksmart/lumino/releases/tag/0.0.4)
-2. Uncompress the downloaded file 
-2. Go to the path you uncompressed the code in the previous step (lets call this path `$RIF_LUMINO_PATH`)
-3. Create python virtual env for RIF Lumino (this needs to be performed only once) and execute the following command:
+Get the code from [the Github page](https://github.com/rsksmart/lumino/). You can either clone the repo or get the compressed code from the [releases page](https://github.com/rsksmart/lumino/releases). 
 
-```
+Let's call your local path in which the code resides `$RIF_LUMINO_PATH`.
+
+### 2. Create an environment
+
+You'll only need to create a python virtual environment for RIF Lumino once. 
+
+Execute the following command:
+
+```shell script
 virtualenv -p <PATH_TO_PYTHON3.7> clientEnv
 ```
 
 **Note:**
-Replace `<PATH_TO_PYTHON3.7>` with the path where Python3.7 is installed in your system. In the case of Ubuntu OS, this is usually `/usr/bin/python3.7`
 
-4. Activate python virtual env, by executing the following command:
+Replace `<PATH_TO_PYTHON3.7>` with the path where Python3.7 is installed in your system. In the case of Ubuntu OS, this is usually `/usr/bin/python3.7`.
 
+You can verify your path to Python3.7 by executing:
+```shell script
+which python3
 ```
+
+### 3. Activate the environment
+Activate the python virtualenv by executing the following command:
+
+```shell script
 source clientEnv/bin/activate
 ```
 
-5. Check if the Python version is correct inside the virtual environment by running:
+Check if the Python version is correct inside the virtual environment by running:
 
-```
+```shell script
 python --version
 ```
 
-This command should output version 3.7.x
+This command should output version 3.7.x.
 
-6. Install RIF Lumino requirements. Inside the virtual environment run the following command (this could take a few minutes):
+### 4. Install RIF Lumino requirements in your environment
 
-```
+Inside the virtual environment run the following command (this could take a few minutes):
+
+```shell script
 pip install -r requirements.txt -c constraints.txt -e .
-
 ```
 
-7. Run Lumino setup with the following command:
+Run the Lumino setup with the following command:
 
-```
+```shell script
 python setup.py develop
 ```
 
