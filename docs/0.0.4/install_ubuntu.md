@@ -87,7 +87,7 @@ sudo apt-get install libssl-dev build-essential automake pkg-config libtool libf
 
 ### 1. Get the code
 
-Get the code from [the Github page](https://github.com/rsksmart/lumino/). You can either clone the repo or get the compressed code from the [releases page](https://github.com/rsksmart/lumino/releases). 
+Get the code from [the Github page](https://github.com/rsksmart/lumino/). You can either clone the repo or get the compressed version from the [releases page](https://github.com/rsksmart/lumino/releases). 
 
 Let's call your local path in which the code resides `$RIF_LUMINO_PATH`.
 
@@ -111,7 +111,7 @@ which python3
 ```
 
 ### 3. Activate the environment
-Activate the python virtualenv by executing the following command:
+Activate the python virtual environment by executing the following command:
 
 ```shell script
 source clientEnv/bin/activate
@@ -157,8 +157,8 @@ python setup.py develop
         --no-sync-check
         --api-address 127.0.0.1:5001
         --rnsdomain $YOUR_RNS_DOMAIN
-        --discoverable #If this flag is present, then your node will be registered on Lumino Explorer
-        --hub-mode #If this flag is present, then your node will run in HUB mode.
+        --discoverable # if this flag is present, then your node will be registered on Lumino Explorer
+        --hub-mode # if this flag is present, then your node will run in HUB mode
     ```
     
     | FIELD                                     | DESCRIPTION                                                                                                                             |
@@ -171,7 +171,7 @@ python setup.py develop
     | `$SECRET_REGISTRY_CONTRACT_ADDRESS`       | Address for the secret registry contract deployed (view contracts table).                                                               |
     | `$ENDPOINT_REGISTRY_CONTRACT_ADDRESS`     | Address for the endpoint registry contract deployed (view contracts table).                                                             |
     | `no-sync-check`                           | This will allow you to bypass checking that the node is synchronized against etherscan.                                                 |
-    | `$YOUR_RNS_DOMAIN`                        | You can supply the RNS address associated with your RSK node address, e.g.: `--rnsdomain=lumino.rsk.co`                                 |
+    | `$YOUR_RNS_DOMAIN`                        | You can supply the RNS address associated with your RSK node address, e.g. `--rnsdomain=lumino.rsk.co`                                 |
 
     More configuration options can be found by browsing the code.
 
