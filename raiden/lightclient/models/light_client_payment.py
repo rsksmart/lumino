@@ -19,7 +19,6 @@ class LightClientPayment:
 
     def __init__(
         self,
-        light_client_address: AddressHex,
         partner_address: AddressHex,
         is_lc_initiator: int,
         token_network_id: TokenNetworkID,
@@ -27,10 +26,8 @@ class LightClientPayment:
         created_on: string,
         payment_status: LightClientPaymentStatus,
         identifier: string
-
     ):
         self.payment_id = int(identifier)
-        self.light_client_address = to_checksum_address(light_client_address)
         self.partner_address = to_checksum_address(partner_address)
         self.is_lc_initiator = is_lc_initiator
         self.token_network_id = to_checksum_address(token_network_id)
