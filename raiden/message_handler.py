@@ -1,3 +1,5 @@
+import copy
+
 import structlog
 
 from eth_utils import to_checksum_address
@@ -19,7 +21,8 @@ from raiden.messages import (
 from raiden.raiden_service import RaidenService
 from raiden.transfer import views
 from raiden.transfer.architecture import StateChange
-from raiden.transfer.mediated_transfer.state import lockedtransfersigned_from_message
+from raiden.transfer.mediated_transfer.initiator_manager import cancel_current_route
+from raiden.transfer.mediated_transfer.state import lockedtransfersigned_from_message, InitiatorPaymentState
 from raiden.transfer.mediated_transfer.state_change import (
     ReceiveLockExpired,
     ReceiveSecretRequest,
@@ -154,7 +157,8 @@ class MessageHandler:
         role = views.get_transfer_role(
             chain_state=chain_state, secrethash=from_transfer.lock.secrethash
         )
-
+        print("Handle refund transfer refund message")
+        print(message.to_dict())
         state_change: StateChange
         if role == "initiator":
 
@@ -164,10 +168,28 @@ class MessageHandler:
                 sender=from_transfer.balance_proof.sender,  # pylint: disable=no-member
             )
             raiden.handle_and_track_state_change(state_change)
-
             if is_light_client:
                 store_refund = StoreRefundTransferLight(message)
                 raiden.handle_and_track_state_change(store_refund)
+                # #Find original transfer.
+                # original_transfer = None
+                # for task in chain_state.payment_mapping.secrethashes_to_task.values():
+                #     if isinstance(task.manager_state, InitiatorPaymentState):
+                #         initiator_manager_state = task.manager_state
+                #         # iterate over initiator transfers
+                #         for initiator_transfer in initiator_manager_state.initiator_transfers.values():
+                #             if initiator_transfer.transfer.payment_identifier == from_transfer.payment_identifier:
+                #                 original_transfer = initiator_transfer.transfer
+                # current_payment_task = chain_state.payment_mapping.secrethashes_to_task[
+                #     original_transfer.lock.secrethash
+                # ]
+                # chain_state.payment_mapping.secrethashes_to_task.update(
+                #     {from_transfer.lock.secrethash: copy.deepcopy(current_payment_task)}
+                # )
+                #
+                #
+                # refund_payment_task =  chain_state.payment_mapping.secrethashes_to_task[from_transfer.lock.secrethash]
+                # cancel_current_route( refund_payment_task.manager_state,  refund_payment_task.manager_state.initiator_transfers.get(from_transfer.lock.secrethash)
             else:
                 # Currently, the only case where we can be initiators and not
                 # know the secret is if the transfer is part of an atomic swap. In

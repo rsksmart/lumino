@@ -122,13 +122,13 @@ def _redact_secret(data: Union[Dict, List]) -> Union[Dict, List]:
     return data
 
 
-# TODO this method should receive a signed locked transfer type, not a LockedTransfer
 def initiator_init_light(
     raiden: "RaidenService",
     transfer_identifier: PaymentID,
     payment_hash_invoice: PaymentHashInvoice,
     transfer_amount: PaymentAmount,
     transfer_secrethash: SecretHash,
+    transfer_prev_secrethash: SecretHash,
     transfer_fee: FeeAmount,
     token_network_identifier: TokenNetworkID,
     target_address: TargetAddress,
@@ -153,9 +153,10 @@ def initiator_init_light(
         token_network_address=token_network_identifier,
         channel_identifier=channel_identifier)
     current_channel = views.get_channelstate_by_canonical_identifier_and_address(chain_state, canonical_identifier,
-                                                             creator_address)
+                                                                                 creator_address)
 
-    return ActionInitInitiatorLight(transfer_state, current_channel, signed_locked_transfer)
+    return ActionInitInitiatorLight(transfer_state, current_channel, signed_locked_transfer,
+                                    transfer_prev_secrethash is not None)
 
 
 def initiator_init(
@@ -1088,6 +1089,7 @@ class RaidenService(Runnable):
         target: TargetAddress,
         identifier: PaymentID,
         secrethash: SecretHash,
+        transfer_prev_secrethash: SecretHash,
         signed_locked_transfer: LockedTransfer,
         channel_identifier: ChannelID,
         fee: FeeAmount = MEDIATION_FEE,
@@ -1113,6 +1115,7 @@ class RaidenService(Runnable):
             target=target,
             identifier=identifier,
             secrethash=secrethash,
+            transfer_prev_secrethash=transfer_prev_secrethash,
             payment_hash_invoice=payment_hash_invoice,
             signed_locked_transfer=signed_locked_transfer,
             channel_identifier=channel_identifier
@@ -1169,6 +1172,7 @@ class RaidenService(Runnable):
         target: TargetAddress,
         identifier: PaymentID,
         secrethash: SecretHash,
+        transfer_prev_secrethash: SecretHash,
         signed_locked_transfer: LockedTransfer,
         channel_identifier: ChannelID,
         payment_hash_invoice: PaymentHashInvoice = None
@@ -1225,6 +1229,7 @@ class RaidenService(Runnable):
             payment_hash_invoice=payment_hash_invoice,
             transfer_amount=amount,
             transfer_secrethash=secrethash,
+            transfer_prev_secrethash=transfer_prev_secrethash,
             transfer_fee=fee,
             token_network_identifier=token_network_identifier,
             creator_address=creator,

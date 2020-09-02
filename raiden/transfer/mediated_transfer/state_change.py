@@ -81,7 +81,7 @@ class ActionInitInitiatorLight(StateChange):
 
     def __init__(
         self, transfer_description: TransferDescriptionWithoutSecretState, current_channel: NettingChannelState,
-        signed_locked_transfer: LockedTransfer
+        signed_locked_transfer: LockedTransfer, is_retry_route: bool = False
     ) -> None:
         if not isinstance(transfer_description, TransferDescriptionWithoutSecretState):
             raise ValueError("transfer must be an TransferDescriptionWithoutSecretState instance.")
@@ -89,6 +89,7 @@ class ActionInitInitiatorLight(StateChange):
         self.transfer = transfer_description
         self.current_channel = current_channel
         self.signed_locked_transfer = signed_locked_transfer
+        self.is_retry_route = is_retry_route
 
     def __repr__(self) -> str:
         return "<ActionInitInitiatorLight transfer:{}>".format(self.transfer)
@@ -99,18 +100,19 @@ class ActionInitInitiatorLight(StateChange):
             and self.transfer == other.transfer
             and self.current_channel == other.current_channel
             and self.signed_locked_transfer == other.signed_locked_transfer
+            and self.is_retry_route == other.is_retry_route
         )
 
     def __ne__(self, other: Any) -> bool:
         return not self.__eq__(other)
 
     def to_dict(self) -> Dict[str, Any]:
-        return {"transfer": self.transfer, "current_channel": self.current_channel, "signed_locked_transfer": self.signed_locked_transfer}
+        return {"transfer": self.transfer, "current_channel": self.current_channel, "signed_locked_transfer": self.signed_locked_transfer, "is_retry_route": str(self.is_retry_route)}
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "ActionInitInitiatorLight":
         return cls(transfer_description=data["transfer"], current_channel=data["current_channel"],
-                   signed_locked_transfer=data["signed_locked_transfer"])
+                   signed_locked_transfer=data["signed_locked_transfer"], is_retry_route=data["is_retry_route"])
 
 
 class ActionInitMediator(BalanceProofStateChange):

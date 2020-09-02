@@ -1565,6 +1565,7 @@ class RestAPI:
         payment_identifier: typing.PaymentID,
         message_identifier: typing.PaymentID,
         secret_hash: typing.SecretHash,
+        transfer_prev_secrethash: typing.SecretHash,
         payment_hash_invoice: typing.PaymentHashInvoice,
         signed_locked_transfer: LockedTransfer,
         channel_identifier: typing.ChannelID
@@ -1595,6 +1596,7 @@ class RestAPI:
                 amount=amount,
                 identifier=payment_identifier,
                 secrethash=secret_hash,
+                transfer_prev_secrethash=transfer_prev_secrethash,
                 payment_hash_invoice=payment_hash_invoice,
                 signed_locked_transfer=signed_locked_transfer,
                 channel_identifier=channel_identifier
@@ -1610,29 +1612,6 @@ class RestAPI:
             return api_error(errors=str(e), status_code=HTTPStatus.CONFLICT)
         except InsufficientFunds as e:
             return api_error(errors=str(e), status_code=HTTPStatus.PAYMENT_REQUIRED)
-
-        # FIXME mmartinez return correctly and check when the payment schema must be dumped
-        # if payment_status.payment_done.get() is False:
-        #     return api_error(
-        #         errors="Payment couldn't be completed "
-        #                "(insufficient funds, no route to target or target offline).",
-        #         status_code=HTTPStatus.CONFLICT,
-        #     )
-        #
-        # secret = payment_status.payment_done.get()
-        #
-        # payment = {
-        #     "initiator_address": self.raiden_api.address,
-        #     "registry_address": registry_address,
-        #     "token_address": token_address,
-        #     "target_address": target_address,
-        #     "amount": amount,
-        #     "identifier": identifier,
-        #     "secret": secret,
-        #     "secret_hash": sha3(secret),
-        # }
-        # result = self.payment_schema.dump(payment)
-        # return api_response(result=result.data)
         return None
 
     def _deposit_light(
@@ -2166,7 +2145,7 @@ class RestAPI:
             lt = LockedTransfer.from_dict(message)
             self.initiate_payment_light(self.raiden_api.raiden.default_registry.address, lt.token, lt.initiator,
                                         lt.target, lt.locked_amount, lt.payment_identifier, payment_request.payment_id,
-                                        lt.lock.secrethash,
+                                        lt.lock.secrethash, None if lt.channel_identifier == 75 or lt.channel_identifier == "75" else "asdasd",
                                         EMPTY_PAYMENT_HASH_INVOICE, lt, lt.channel_identifier)
         elif message["type"] == "Delivered":
             delivered = Delivered.from_dict(message)

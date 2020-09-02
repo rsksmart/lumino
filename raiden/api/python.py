@@ -1077,6 +1077,7 @@ class RaidenAPI:
         target: Address,
         identifier: PaymentID,
         secrethash: SecretHash,
+        transfer_prev_secrethash: SecretHash,
         signed_locked_transfer: LockedTransfer,
         channel_identifier: ChannelID,
         payment_hash_invoice: PaymentHashInvoice = None
@@ -1133,6 +1134,7 @@ class RaidenAPI:
             target=target,
             identifier=identifier,
             secrethash=secrethash,
+            transfer_prev_secrethash=transfer_prev_secrethash,
             payment_hash_invoice=payment_hash_invoice,
             signed_locked_transfer=signed_locked_transfer,
             channel_identifier=channel_identifier
@@ -1736,8 +1738,8 @@ class RaidenAPI:
                 privkey=self.raiden.privkey,
             )
             if prev_secrethash is not None:
-                transfer_task : Optional[TransferTask] = views.get_transfer_task(chain_state, prev_secrethash)
-
+                print("Prev secret hash")
+                print(prev_secrethash.hex())
                 new_secrethash = secrethash
                 current_payment_task = chain_state.payment_mapping.secrethashes_to_task[
                     prev_secrethash
@@ -1745,13 +1747,9 @@ class RaidenAPI:
                 chain_state.payment_mapping.secrethashes_to_task.update(
                     {new_secrethash: copy.deepcopy(current_payment_task)}
                 )
-
-                if transfer_task is not None:
-                    print(transfer_task.manager_state.cancelled_channels)
-                    possible_routes = routes.filter_acceptable_routes(
-                        route_states=possible_routes, blacklisted_channel_ids=transfer_task.manager_state.cancelled_channels
-                    )
-                    print(possible_routes)
+                possible_routes = routes.filter_acceptable_routes(
+                    route_states=possible_routes, blacklisted_channel_ids=current_payment_task.manager_state.cancelled_channels
+                )
             if len(possible_routes) > 0:
                 # TODO marcosmartinez7 Get the first channel from routes.
                 channel_state = views.get_channelstate_for(

@@ -213,8 +213,11 @@ def subdispatch_to_paymenttask(
     block_number = chain_state.block_number
     block_hash = chain_state.block_hash
     sub_task = chain_state.payment_mapping.secrethashes_to_task.get(secrethash)
-    events: List[Event] = list()
 
+    events: List[Event] = list()
+    if isinstance(state_change, ReceiveSecretRequestLight):
+        print("// payment mapping ")
+        print(chain_state.payment_mapping.secrethashes_to_task.keys())
     if sub_task:
         pseudo_random_generator = chain_state.pseudo_random_generator
         sub_iteration: Union[
@@ -224,6 +227,18 @@ def subdispatch_to_paymenttask(
         ]
 
         if isinstance(sub_task, InitiatorTask):
+            if isinstance(state_change, ReceiveTransferCancelRoute):
+                print("ReceiveTransferCancelRoute subdispatch payment task, PAYMENT STATE")
+                print(sub_task.manager_state.to_dict())
+                print("PAYMENT MAPPING")
+                print(chain_state.payment_mapping.secrethashes_to_task.keys())
+                print(len(chain_state.payment_mapping.secrethashes_to_task.values()))
+
+            if isinstance(state_change, ReceiveSecretRequestLight):
+                print("///// task")
+                print(sub_task)
+                print("////// mapping")
+                print(chain_state.payment_mapping.secrethashes_to_task.keys())
             token_network_identifier = sub_task.token_network_identifier
             token_network_state = get_token_network_by_address(
                 chain_state, token_network_identifier
@@ -374,8 +389,17 @@ def subdispatch_initiatortask(
 
             if iteration.new_state:
                 sub_task = InitiatorTask(token_network_identifier, iteration.new_state)
+                if isinstance(state_change, ActionInitInitiatorLight):
+                    print("INITIATOR TASK NEW STATE")
+                    print(iteration.new_state.to_dict())
+                    print("Creando nuevo subtask. Manager state:")
+                    print(sub_task.manager_state.to_dict() if sub_task.manager_state is not None else "")
+                    print("LO que habia:")
+                    print(chain_state.payment_mapping.secrethashes_to_task[secrethash].manager_state.to_dict() if chain_state.payment_mapping.secrethashes_to_task.get(secrethash) is not None else "")
+                    print("Lo que pongo")
+                    print(sub_task.manager_state.to_dict() if sub_task is not None else "")
                 chain_state.payment_mapping.secrethashes_to_task[secrethash] = sub_task
-            elif secrethash in chain_state.payment_mapping.secrethashes_to_task:
+            elif secrethash in chain_state.payment_mapping.secrethashes_to_task and not isinstance(state_change, ActionInitInitiatorLight):
                 print("Deleted")
                 del chain_state.payment_mapping.secrethashes_to_task[secrethash]
 
@@ -835,6 +859,21 @@ def handle_receive_transfer_refund_cancel_route(
     chain_state.payment_mapping.secrethashes_to_task.update(
         {new_secrethash: copy.deepcopy(current_payment_task)}
     )
+    print("}}}}}}}}}}}}}")
+    print("CURRENT TASK manager state")
+    print(current_payment_task.manager_state.to_dict())
+    print("COPIED NEW TASK manager state")
+    print(chain_state.payment_mapping.secrethashes_to_task[new_secrethash].manager_state.to_dict())
+    print("}}}}}}}}}}}}}")
+
+
+    print("Current task canceled channels")
+    print(current_payment_task.manager_state.cancelled_channels)
+    print("New payment task canceled channels")
+    print(chain_state.payment_mapping.secrethashes_to_task[new_secrethash].manager_state.cancelled_channels)
+    print("new manager state")
+    print(chain_state.payment_mapping.secrethashes_to_task[new_secrethash].manager_state.to_dict())
+
 
     return subdispatch_to_paymenttask(chain_state, state_change, new_secrethash, storage)
 
@@ -842,6 +881,8 @@ def handle_receive_transfer_refund_cancel_route(
 def handle_receive_transfer_cancel_route(
     chain_state: ChainState, state_change: ReceiveTransferCancelRoute
 ) -> TransitionResult[ChainState]:
+    print("Subdispatching to payment task with hash")
+    print(state_change.transfer.lock.secrethash.hex())
     return subdispatch_to_paymenttask(
         chain_state, state_change, state_change.transfer.lock.secrethash
     )
@@ -866,6 +907,8 @@ def handle_receive_secret_request_light(
     chain_state: ChainState, state_change: ReceiveSecretRequestLight
 ) -> TransitionResult[ChainState]:
     secrethash = state_change.secrethash
+    print("/////// RECIBII SECRET HASH")
+    print(secrethash.hex())
     return subdispatch_to_paymenttask(chain_state, state_change, secrethash)
 
 

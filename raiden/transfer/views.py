@@ -588,6 +588,8 @@ def get_transfer_task(chain_state: ChainState, secrethash: SecretHash) -> Option
 def get_all_transfer_tasks(chain_state: ChainState) -> Dict[SecretHash, TransferTask]:
     return chain_state.payment_mapping.secrethashes_to_task
 
+#def get_payments_hashes_by_id(chain_state: ChainState) -> SecretHash:
+
 
 def list_channelstate_for_tokennetwork(
     chain_state: ChainState, payment_network_id: PaymentNetworkID, token_address: TokenAddress
