@@ -186,7 +186,6 @@ class RaidenEventHandler(EventHandler):
             store_message_event.message_type,
             store_message_event.message.to_dict()["type"],
             raiden.wal)
-        print("TRYING TO GET PAYMENT!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
         payment = LightClientService.get_light_client_payment(store_message_event.payment_id, raiden.wal.storage)
         if not existing_message:
             LightClientMessageHandler.store_light_client_protocol_message(store_message_event.message_id,
