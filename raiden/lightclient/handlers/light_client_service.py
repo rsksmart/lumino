@@ -65,5 +65,5 @@ class LightClientService:
         payment = storage.get_light_client_payment(payment_id)
         if payment:
             payment = LightClientPayment(payment[2], payment[3], payment[4], int(payment[5]), payment[6],
-                                         payment[7], payment[0])
+                                         payment[7], payment[0], payment[1])
         return payment

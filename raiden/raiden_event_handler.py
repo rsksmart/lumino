@@ -7,6 +7,7 @@ from eth_utils import to_checksum_address, to_hex
 from raiden.constants import EMPTY_BALANCE_HASH, EMPTY_HASH, EMPTY_MESSAGE_HASH, EMPTY_SIGNATURE
 from raiden.exceptions import ChannelOutdatedError, RaidenUnrecoverableError
 from raiden.lightclient.handlers.light_client_message_handler import LightClientMessageHandler
+from raiden.lightclient.handlers.light_client_service import LightClientService
 from raiden.message_event_convertor import message_from_sendevent
 from raiden.network.proxies.payment_channel import PaymentChannel
 from raiden.network.proxies.token_network import TokenNetwork
@@ -185,7 +186,8 @@ class RaidenEventHandler(EventHandler):
             store_message_event.message_type,
             store_message_event.message.to_dict()["type"],
             raiden.wal)
-        payment = raiden.wal.storage.get_light_client_payment(store_message_event.payment_id)
+        print("TRYING TO GET PAYMENT!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+        payment = LightClientService.get_light_client_payment(store_message_event.payment_id, raiden.wal.storage)
         if not existing_message:
             LightClientMessageHandler.store_light_client_protocol_message(store_message_event.message_id,
                                                                           store_message_event.message,

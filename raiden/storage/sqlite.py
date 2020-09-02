@@ -1379,7 +1379,7 @@ class SQLiteStorage:
             SELECT identifier, message_order, unsigned_message, signed_message,
             light_client_payment_id, message_type, light_client_address
             FROM light_client_protocol_message
-            WHERE identifier  = ?
+            WHERE identifier = ?
             ORDER BY message_order ASC
             """,
             (str(identifier),),

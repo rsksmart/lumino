@@ -34,6 +34,7 @@ def build_light_client_protocol_message(identifier: int, message: Message, signe
         message_type,
         unsigned_msg,
         signed_msg,
+        None,
         light_client_address
     )
 
