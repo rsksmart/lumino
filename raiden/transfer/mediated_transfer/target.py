@@ -207,7 +207,7 @@ def handle_inittarget_light(
         # by not generating an event send secret request
         if safe_to_wait and handle_invoice_result['is_valid']:
             payment = LightClientPayment(
-                state_change.transfer.target, state_change.transfer.initiator,
+                state_change.transfer.initiator,
                 False,
                 channel_state.token_network_identifier,
                 transfer.lock.amount,
@@ -249,7 +249,7 @@ def handle_inittarget_light(
             # If transfer expired, persist the LockedTransfer in order that the LC can get it and respond with Delivered msg
             # Also persist the payment on with expired status
             payment = LightClientPayment(
-                state_change.transfer.target, state_change.transfer.initiator,
+                state_change.transfer.initiator,
                 False,
                 channel_state.token_network_identifier,
                 transfer.lock.amount,

@@ -43,13 +43,12 @@ class LightClientMessageHandler:
 
     @classmethod
     def store_light_client_protocol_message(cls, identifier: int, message: Message, signed: bool, payment_id: int,
-                                            order: int, message_type: LightClientProtocolMessageType,
-                                            wal: WriteAheadLog):
-        payment = wal.storage.get_light_client_payment(payment_id)
+                                            light_client_address: AddressHex, order: int,
+                                            message_type: LightClientProtocolMessageType, wal: WriteAheadLog):
         return wal.storage.write_light_client_protocol_message(
             message,
             build_light_client_protocol_message(identifier, message, signed,
-                                                payment_id, order, message_type, payment.light_client_address)
+                                                payment_id, order, message_type, light_client_address)
         )
 
     @classmethod
@@ -86,12 +85,15 @@ class LightClientMessageHandler:
                                                                                        str(message_type.value), message_protocol_type)
 
         if existing_message:
-            return LightClientProtocolMessage(existing_message[4] is not None,
+            return LightClientProtocolMessage(existing_message[5] is not None,
                                               existing_message[3],
                                               existing_message[2],
                                               existing_message[1],
+                                              existing_message[6],
                                               existing_message[4],
-                                              existing_message[5])
+                                              existing_message[5],
+                                              existing_message[0],
+                                              existing_message[7])
         return existing_message
 
     @classmethod
@@ -103,21 +105,36 @@ class LightClientMessageHandler:
     @classmethod
     def get_light_client_protocol_message_by_identifier(cls, message_identifier: int, wal: WriteAheadLog):
         message = wal.storage.get_light_client_protocol_message_by_identifier(message_identifier)
-        return LightClientProtocolMessage(message[3] is not None, message[1], message[4], message[0], message[5],
+        return LightClientProtocolMessage(message[3] is not None,
+                                          message[1],
+                                          message[4],
+                                          message[0],
+                                          message[5],
                                           message[2],
-                                          message[3])
+                                          message[3],
+                                          None,
+                                          message[6])
 
     @classmethod
     def get_light_client_payment_locked_transfer(cls, payment_identifier: int, wal: WriteAheadLog):
+
         message = wal.storage.get_light_client_payment_locked_transfer(payment_identifier)
         identifier = message[0]
         message_order = message[1]
         unsigned_message = message[3]
         signed_message = message[4]
         payment_id = message[5]
-        return LightClientProtocolMessage(signed_message is not None, message_order, payment_id, identifier,
-                                          LightClientProtocolMessageType.PaymentSuccessful, unsigned_message,
-                                          signed_message)
+        light_client_address = message[6]
+
+        return LightClientProtocolMessage(signed_message is not None,
+                                          message_order,
+                                          payment_id,
+                                          identifier,
+                                          LightClientProtocolMessageType.PaymentSuccessful,
+                                          unsigned_message,
+                                          signed_message,
+                                          None,
+                                          light_client_address)
 
     @staticmethod
     def get_order_for_ack(ack_parent_type: string, ack_type: string, is_delivered_from_initiator: bool = False):
@@ -177,6 +194,7 @@ class LightClientMessageHandler:
                     message,
                     True,
                     protocol_message.light_client_payment_id,
+                    protocol_message.light_client_address,
                     order,
                     message_type,
                     wal
@@ -236,9 +254,9 @@ class LightClientMessageHandler:
                 message_identifier, protocol_message.light_client_payment_id, order, wal)
             if not exists:
                 LightClientMessageHandler.store_light_client_protocol_message(
-                    message_identifier, message, True, protocol_message.light_client_payment_id, order,
-                    message_type,
-                    wal)
+                    message_identifier, message, True, protocol_message.light_client_payment_id,
+                    protocol_message.light_client_address, order,
+                    message_type, wal)
             else:
                 cls.log.info("Message for lc already received, ignoring db storage")
 

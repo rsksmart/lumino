@@ -1729,6 +1729,7 @@ class RaidenAPI:
                 locked_transfer,
                 False,
                 payment.payment_id,
+                creator_address,
                 order,
                 LightClientProtocolMessageType.PaymentSuccessful,
                 self.raiden.wal

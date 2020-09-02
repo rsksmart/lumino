@@ -1376,7 +1376,8 @@ class SQLiteStorage:
         cursor = self.conn.cursor()
         cursor.execute(
             """
-            SELECT identifier, message_order, unsigned_message, signed_message, light_client_payment_id, message_type
+            SELECT identifier, message_order, unsigned_message, signed_message,
+            light_client_payment_id, message_type, light_client_address
             FROM light_client_protocol_message
             WHERE identifier  = ?
             ORDER BY message_order ASC
@@ -1406,7 +1407,8 @@ class SQLiteStorage:
     def get_light_client_payment_locked_transfer(self, payment_identifier):
         cursor = self.conn.cursor()
         cursor.execute(
-            "SELECT identifier, message_order,message_type, unsigned_message, signed_message, light_client_payment_id" +
+            "SELECT identifier, message_order,message_type, unsigned_message, "
+            " signed_message, light_client_payment_id, light_client_address " +
             " FROM light_client_protocol_message A INNER JOIN light_client_payment B" +
             " ON A.light_client_payment_id = B.payment_id" +
             " WHERE A.message_order = 1" +
@@ -1433,7 +1435,6 @@ class SerializedSQLiteStorage(SQLiteStorage):
                 signed = False
                 if message[3] is not None:
                     signed = True
-                if message[3] is not None:
                     serialized_signed_msg = self.serializer.deserialize(message[3])
                 else:
                     serialized_signed_msg = None

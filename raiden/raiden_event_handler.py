@@ -185,11 +185,13 @@ class RaidenEventHandler(EventHandler):
             store_message_event.message_type,
             store_message_event.message.to_dict()["type"],
             raiden.wal)
+        payment = raiden.wal.storage.get_light_client_payment(store_message_event.payment_id)
         if not existing_message:
             LightClientMessageHandler.store_light_client_protocol_message(store_message_event.message_id,
                                                                           store_message_event.message,
                                                                           store_message_event.is_signed,
                                                                           store_message_event.payment_id,
+                                                                          payment.light_client_address,
                                                                           store_message_event.message_order,
                                                                           store_message_event.message_type,
                                                                           raiden.wal)
