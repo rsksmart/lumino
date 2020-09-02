@@ -240,6 +240,10 @@ URLS_HUB_V1 = [
         '/light_clients/',
         LightClientResource
     ),
+    (
+        '/secret_light/',
+        LightClientResource
+    ),
 ]
 
 URLS_COMMON_V1 = [
@@ -876,6 +880,9 @@ class RestAPI:
             self.channel_schema.dump(channel_state).data for channel_state in closed_channels
         ]
         return api_response(result=closed_channels)
+
+    def post_secret_light(self, signed_tx: typing.SignedTransaction):
+        self.raiden_api.register_secret_light(signed_tx)
 
     def get_connection_managers_info(self, registry_address: typing.PaymentNetworkID):
         """Get a dict whose keys are token addresses and whose values are

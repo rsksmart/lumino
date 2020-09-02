@@ -27,7 +27,7 @@ from raiden.api.v1.encoding import (
     LightClientMatrixCredentialsBuildSchema,
     PaymentLightPutSchema,
     CreatePaymentLightPostSchema,
-    WatchtowerPutResource, LightClientMessageGetSchema)
+    WatchtowerPutResource, LightClientMessageGetSchema, SecretLightSchema)
 from raiden.messages import  Unlock
 
 from raiden.utils import typing
@@ -503,6 +503,13 @@ class LightClientMatrixCredentialsBuildResource(BaseResource):
         This method receives a registration request.
         """
         return self.rest_api.get_data_for_registration_request(address)
+
+class SecretLightResource(BaseResource):
+    post_schema = SecretLightSchema()
+
+    @use_kwargs(post_schema, locations=("query",))
+    def post(self, tx: typing.ByteString = None):
+        self.rest_api.register_secret
 
 
 class LightClientResource(BaseResource):

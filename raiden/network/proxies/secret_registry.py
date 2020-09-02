@@ -5,6 +5,7 @@ import structlog
 from eth_utils import encode_hex, event_abi_to_log_topic, is_binary_address, to_normalized_address
 from gevent.event import AsyncResult
 from gevent.lock import Semaphore
+from requests import HTTPError
 
 from raiden.constants import (
     GAS_REQUIRED_PER_SECRET_IN_BATCH,
@@ -15,10 +16,11 @@ from raiden.exceptions import (
     InvalidAddress,
     NoStateForBlockIdentifier,
     RaidenRecoverableError,
-    RaidenUnrecoverableError,
+    RaidenUnrecoverableError, RawTransactionFailed,
 )
 from raiden.network.proxies.utils import compare_contract_versions
 from raiden.network.rpc.client import StatelessFilter, check_address_has_code
+from raiden.network.rpc.transactions import check_transaction_threw
 from raiden.utils import pex, safe_gas_limit, sha3
 from raiden.utils.typing import (
     BlockNumber,
@@ -27,7 +29,7 @@ from raiden.utils.typing import (
     Optional,
     Secret,
     SecretHash,
-    Union,
+    Union, SignedTransaction,
 )
 from raiden_contracts.constants import CONTRACT_SECRET_REGISTRY, EVENT_SECRET_REVEALED
 from raiden_contracts.contract_manager import ContractManager
@@ -70,6 +72,22 @@ class SecretRegistry:
 
     def register_secret(self, secret: Secret):
         self.register_secret_batch([secret])
+
+    def register_secret_light(self, signed_tx: SignedTransaction):
+        try:
+            log.debug("register_secret_light called")
+            transaction_hash = self.proxy.broadcast_signed_transaction(signed_tx)
+            self.client.poll(transaction_hash)
+            receipt_or_none = check_transaction_threw(self.client, transaction_hash)
+            if receipt_or_none:
+                log.critical("register_secret_light failed")
+                raise RaidenRecoverableError("registering secret failed")
+        except HTTPError as e:
+            log.warning("register_secret_light failed: transaction malformed", ex=e)
+            raise RawTransactionFailed("Light Client raw transaction malformed")
+        except Exception as e:
+            log.warning("register_secret_light failed", ex=e)
+            raise
 
     def register_secret_batch(self, secrets: List[Secret]):
         """Register a batch of secrets. Check if they are already registered at

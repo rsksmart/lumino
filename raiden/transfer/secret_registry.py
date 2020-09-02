@@ -27,3 +27,5 @@ def events_for_onchain_secretreveal(
         events.append(reveal_event)
 
     return events
+
+

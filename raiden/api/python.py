@@ -49,12 +49,11 @@ from raiden.lightclient.lightclientmessages.hub_response_message import HubRespo
 from raiden.lightclient.lightclientmessages.payment_hub_message import PaymentHubMessage
 from raiden.lightclient.models.light_client_payment import LightClientPayment, LightClientPaymentStatus
 from raiden.lightclient.models.light_client_protocol_message import LightClientProtocolMessageType
-
 from raiden.messages import RequestMonitoring, LockedTransfer, RevealSecret, Unlock, Delivered, SecretRequest, \
     Processed, LockExpired
 from raiden.settings import DEFAULT_RETRY_TIMEOUT, DEVELOPMENT_CONTRACT_VERSION
 
-from raiden.transfer import architecture, views
+from raiden.transfer import architecture, views, secret_registry
 from raiden.transfer.events import (
     EventPaymentReceivedSuccess,
     EventPaymentSentFailed,
@@ -273,6 +272,9 @@ class RaidenAPI:
         time_elapsed = diff_minutes - 30
         if time_elapsed > 30:
             raise TokenAppExpired("Token app expired")
+
+    def register_secret_light(self, signed_tx: typing.signedtransaction):
+        self.raiden.default_secret_registry.register_secret_light(signed_tx)
 
     def token_network_register(
         self,

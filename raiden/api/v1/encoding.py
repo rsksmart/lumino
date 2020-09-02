@@ -562,6 +562,15 @@ class LightClientMatrixCredentialsBuildSchema(BaseSchema):
         decoding_class = dict
 
 
+class SecretLightSchema(BaseSchema):
+    signed_tx = fields.String(required=True)
+
+    class Meta:
+        strict = True
+        # decoding to a dict is required by the @use_kwargs decorator from webargs
+        decoding_class = dict
+
+
 class ConnectionsConnectSchema(BaseSchema):
     funds = fields.Integer(required=True)
     initial_channel_target = fields.Integer(missing=DEFAULT_INITIAL_CHANNEL_TARGET)
