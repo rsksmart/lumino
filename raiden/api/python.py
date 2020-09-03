@@ -1733,8 +1733,6 @@ class RaidenAPI:
                 privkey=self.raiden.privkey,
             )
             if prev_secrethash is not None:
-                print("Prev secret hash")
-                print(prev_secrethash.hex())
                 new_secrethash = secrethash
                 current_payment_task = chain_state.payment_mapping.secrethashes_to_task[
                     prev_secrethash

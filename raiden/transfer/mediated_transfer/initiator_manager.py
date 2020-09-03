@@ -660,7 +660,7 @@ def state_transition(
             block_number=block_number,
         )
     elif type(state_change) == ActionInitInitiatorLight:
-        print(payment_state.to_dict() if payment_state is not None else "None")
+        assert isinstance(state_change, ActionInitInitiatorLight), MYPY_ANNOTATION
         iteration = handle_init_light(
             payment_state=payment_state,
             state_change=state_change,
