@@ -86,7 +86,7 @@ from raiden.api.v1.resources import (
     LightClientMatrixCredentialsBuildResource,
     LightClientResource,
     PaymentLightResource,
-    CreatePaymentLightResource, WatchtowerResource, LightClientMessageResource)
+    CreatePaymentLightResource, WatchtowerResource, LightClientMessageResource, SecretLightResource)
 
 from raiden.constants import GENESIS_BLOCK_NUMBER, UINT256_MAX, Environment, EMPTY_PAYMENT_HASH_INVOICE
 
@@ -242,7 +242,7 @@ URLS_HUB_V1 = [
     ),
     (
         '/secret_light/',
-        LightClientResource
+        SecretLightResource
     ),
 ]
 

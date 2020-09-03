@@ -504,10 +504,11 @@ class LightClientMatrixCredentialsBuildResource(BaseResource):
         """
         return self.rest_api.get_data_for_registration_request(address)
 
+
 class SecretLightResource(BaseResource):
     post_schema = SecretLightSchema()
 
-    @use_kwargs(post_schema, locations=("query",))
+    @use_kwargs(post_schema)
     def post(self, tx: typing.ByteString = None):
         self.rest_api.register_secret
 
