@@ -272,6 +272,7 @@ def subdispatch_to_paymenttask(
                     pseudo_random_generator=pseudo_random_generator,
                     block_number=block_number,
                     block_hash=block_hash,
+                    storage=storage
                 )
                 events = sub_iteration.events
 
@@ -411,6 +412,7 @@ def subdispatch_mediatortask(
     state_change: StateChange,
     token_network_identifier: TokenNetworkID,
     secrethash: SecretHash,
+    storage=None
 ) -> TransitionResult[ChainState]:
     block_number = chain_state.block_number
     block_hash = chain_state.block_hash
@@ -441,6 +443,7 @@ def subdispatch_mediatortask(
                 pseudo_random_generator=pseudo_random_generator,
                 block_number=block_number,
                 block_hash=block_hash,
+                storage=storage
             )
             events = iteration.events
 
@@ -683,7 +686,7 @@ def handle_new_token_network(
 
 
 def handle_node_change_network_state(
-    chain_state: ChainState, state_change: ActionChangeNodeNetworkState
+    chain_state: ChainState, state_change: ActionChangeNodeNetworkState, storage=None
 ) -> TransitionResult[ChainState]:
     events: List[Event] = list()
 
@@ -700,6 +703,7 @@ def handle_node_change_network_state(
             state_change=state_change,
             secrethash=secrethash,
             token_network_identifier=subtask.token_network_identifier,
+            storage=storage
         )
         events.extend(result.events)
 
@@ -798,14 +802,14 @@ def handle_init_secret_request_light(
 
 
 def handle_init_mediator(
-    chain_state: ChainState, state_change: ActionInitMediator
+    chain_state: ChainState, state_change: ActionInitMediator, storage=None
 ) -> TransitionResult[ChainState]:
     transfer = state_change.from_transfer
     secrethash = transfer.lock.secrethash
     token_network_identifier = transfer.balance_proof.token_network_identifier
 
     return subdispatch_mediatortask(
-        chain_state, state_change, TokenNetworkID(token_network_identifier), secrethash
+        chain_state, state_change, TokenNetworkID(token_network_identifier), secrethash, storage
     )
 
 
@@ -1006,7 +1010,7 @@ def handle_state_change(
         iteration = handle_init_initiator(chain_state, state_change)
     elif type(state_change) == ActionInitMediator:
         assert isinstance(state_change, ActionInitMediator), MYPY_ANNOTATION
-        iteration = handle_init_mediator(chain_state, state_change)
+        iteration = handle_init_mediator(chain_state, state_change, storage)
     elif type(state_change) == ActionInitTarget:
         assert isinstance(state_change, ActionInitTarget), MYPY_ANNOTATION
         iteration = handle_init_target(chain_state, state_change, storage, chain_state.our_address)

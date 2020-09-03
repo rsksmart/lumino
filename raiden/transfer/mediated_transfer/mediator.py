@@ -1089,6 +1089,7 @@ def handle_init(
     nodeaddresses_to_networkstates: NodeNetworkStateMap,
     pseudo_random_generator: random.Random,
     block_number: BlockNumber,
+    storage=None
 ) -> TransitionResult[MediatorTransferState]:
     routes = state_change.routes
 
@@ -1102,7 +1103,7 @@ def handle_init(
 
     mediator_state = MediatorTransferState(secrethash=from_transfer.lock.secrethash, routes=routes)
 
-    is_valid, events, _, _ = channel.handle_receive_lockedtransfer(payer_channel, from_transfer, None)
+    is_valid, events, _, _ = channel.handle_receive_lockedtransfer(payer_channel, from_transfer, storage)
     if not is_valid:
         # If the balance proof is not valid, do *not* create a task. Otherwise it's
         # possible for an attacker to send multiple invalid transfers, and increase
@@ -1459,6 +1460,7 @@ def state_transition(
     pseudo_random_generator: random.Random,
     block_number: BlockNumber,
     block_hash: BlockHash,
+    storage=None
 ) -> TransitionResult[MediatorTransferState]:
     """ State machine for a node mediating a transfer. """
     # pylint: disable=too-many-branches
@@ -1479,6 +1481,7 @@ def state_transition(
                 nodeaddresses_to_networkstates=nodeaddresses_to_networkstates,
                 pseudo_random_generator=pseudo_random_generator,
                 block_number=block_number,
+                storage=storage
             )
 
     elif type(state_change) == Block:
