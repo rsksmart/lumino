@@ -917,7 +917,7 @@ class RaidenAPI:
         if registry_address and not is_binary_address(registry_address):
             raise InvalidAddress('Expected binary address format for registry in get_channel_list')
 
-        token_addresses_split = token_addresses.split(",")
+        token_addresses_split = token_addresses.split(",") if token_addresses and len(token_addresses) > 0 else list()
         if isinstance(token_addresses_split, list):
             for token_address in token_addresses_split:
                 self._check_token_address_format(to_canonical_address(token_address))
