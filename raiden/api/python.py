@@ -1704,12 +1704,7 @@ class RaidenAPI:
         secrethash: typing.SecretHash,
         prev_secrethash: typing.SecretHash = None
     ) -> HubResponseMessage:
-
-        print(secrethash.hex())
-        print(secrethash)
-
         chain_state = views.state_from_raiden(self.raiden)
-
         channel_state = views.get_channelstate_for(
             chain_state,
             registry_address,
@@ -1751,7 +1746,7 @@ class RaidenAPI:
                     route_states=possible_routes, blacklisted_channel_ids=current_payment_task.manager_state.cancelled_channels
                 )
             if len(possible_routes) > 0:
-                # TODO marcosmartinez7 Get the first channel from routes.
+                # TODO marcosmartinez7 This can be improved using next_channel_from_routes in order to filter channels without capacity
                 channel_state = views.get_channelstate_for(
                     views.state_from_raiden(self.raiden),
                     registry_address,
@@ -1796,7 +1791,7 @@ class RaidenAPI:
                                                     message=locked_transfer, is_signed=False)
             return HubResponseMessage(lcpm_id, LightClientProtocolMessageType.PaymentSuccessful, payment_hub_message)
         else:
-            raise ChannelNotFound("Your light client has 0 channels oppened")
+            raise ChannelNotFound("Light client has not any open channel")
 
     def validate_light_client(self, api_key: str):
         """

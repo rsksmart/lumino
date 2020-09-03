@@ -190,7 +190,12 @@ class _RetryQueue(Runnable):
         # TODO marcosmartinez7 status must be taked into account. This is commented because on some lc mediated paytments
         # scenarios, the status is unreachable.
         # status = self.transport._address_mgr.get_address_reachability(self.receiver)
-
+        # if status is not AddressReachability.REACHABLE:
+        #     # if partner is not reachable, return
+        #     self.log.info(
+        #         "Partner not reachable. Skipping.", partner=pex(self.receiver), status=status
+        #     )
+        #     return
         message_texts = [
             data.text
             for data in self._message_queue
@@ -834,7 +839,7 @@ class MatrixTransport(Runnable):
         self._raiden_service.on_message(delivered)
 
     def _receive_message(self, message: Union[SignedRetrieableMessage, Processed]):
-        print("---- Matrix Received Message HUB Transport" + str(message.sender) + str(message))
+        print("---- Matrix Received Message HUB Transport" + str(message))
         assert self._raiden_service is not None
         self.log.info(
             "Message received",
@@ -900,8 +905,8 @@ class MatrixTransport(Runnable):
             return None
         address_hex = to_normalized_address(address)
         _msg = f"address not health checked: me: {self._user_id}, peer: {address_hex}"
-        # FIXME mmartinez
-        #  assert address and self._address_mgr.is_address_known(address), msg
+        # FIXME mmarcosmartinez7 this is flaky
+        # assert address and self._address_mgr.is_address_known(address), msg
 
         # filter_private is done in _get_room_ids_for_address
         room_ids = self._get_room_ids_for_address(address)

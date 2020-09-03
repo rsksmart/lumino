@@ -1,7 +1,6 @@
 import random
 
 from eth_utils import keccak
-from gevent.libev.watcher import stat
 
 from raiden.lightclient.models.light_client_protocol_message import LightClientProtocolMessageType
 
@@ -93,15 +92,7 @@ def cancel_current_route(
 
     payment_state.cancelled_channels.append(initiator_state.channel_identifier)
 
-    canc = payment_state.cancelled_channels
     payment_state.cancelled_channels.append(initiator_state.channel_identifier)
-    print("Cancelling route of this payment state:")
-    print(payment_state.to_dict())
-    print("Prev cancelled channels")
-    print(canc)
-    print("new Canceled channels")
-    print(payment_state.cancelled_channels)
-
     return events_for_cancel_current_route(transfer_description)
 
 
@@ -166,7 +157,7 @@ def subdispatch_to_initiatortransfer(
     )
 
     if sub_iteration.new_state is None:
-        print("cai aca 7")
+        print("No new state, payment trask for initiator ends")
         del payment_state.initiator_transfers[initiator_state.transfer.lock.secrethash]
 
     return sub_iteration
@@ -229,7 +220,7 @@ def handle_init(
 
     events = sub_iteration.events
     if sub_iteration.new_state:
-        # TODO marcosmartinez here the routes are always all routes, because the ActionInitInitiator doesnt take into account cancelled routes.
+        # TODO marcosmartinez7 here the routes are always all routes, because the ActionInitInitiator doesnt take into account cancelled routes.
         # Cancelled routes are added when a refund message comes.
         payment_state = InitiatorPaymentState(
             routes=state_change.routes,
@@ -257,7 +248,8 @@ def handle_init_light(
     events = sub_iteration.events
     if sub_iteration.new_state:
         if not state_change.is_retry_route:
-            # TODO marcosmartinez7 routes?
+            # TODO marcosmartinez7 routes here can be handled better as they can be part of the state change.
+            # For now the routes are all the possible routes - the cancelled ones at the moment of ....
             payment_state = InitiatorPaymentState(
                 routes=[],
                 initiator_transfers={
@@ -276,7 +268,7 @@ def handle_cancelpayment(
 ) -> TransitionResult[InitiatorPaymentState]:
     """ Cancel the payment and all related transfers. """
     # Cannot cancel a transfer after the secret is revealed
-    events = list()cl
+    events = list()
     for initiator_state in payment_state.initiator_transfers.values():
         channel_identifier = initiator_state.channel_identifier
         channel_state = channelidentifiers_to_channels.get(channel_identifier)
@@ -309,8 +301,6 @@ def handle_failroute(
 ) -> TransitionResult[InitiatorPaymentState]:
 
     events: List[Event] = list()
-    print("payment state fail route")
-    print(payment_state.to_dict())
     initiator_state = payment_state.initiator_transfers.get(state_change.transfer.lock.secrethash)
     if initiator_state is not None and can_cancel(initiator_state):
         cancel_events = cancel_current_route(payment_state, initiator_state)
@@ -662,9 +652,6 @@ def state_transition(
         )
     elif type(state_change) == ActionInitInitiator:
         assert isinstance(state_change, ActionInitInitiator), MYPY_ANNOTATION
-        print("ActionInitInitiator payment state")
-
-        print(payment_state.to_dict() if payment_state is not None else "None")
         iteration = handle_init(
             payment_state=payment_state,
             state_change=state_change,
@@ -673,8 +660,6 @@ def state_transition(
             block_number=block_number,
         )
     elif type(state_change) == ActionInitInitiatorLight:
-        assert isinstance(state_change, ActionInitInitiatorLight), MYPY_ANNOTATION
-        print("ActionInitInitiatorLight payment state")
         print(payment_state.to_dict() if payment_state is not None else "None")
         iteration = handle_init_light(
             payment_state=payment_state,
@@ -718,8 +703,6 @@ def state_transition(
         assert isinstance(state_change, ActionTransferReroute), MYPY_ANNOTATION
         msg = "ActionTransferReroute should be accompanied by a valid payment state"
         assert payment_state, msg
-        print("ActionTransferReroute payment state")
-        print(payment_state.to_dict())
         iteration = handle_transferreroute(
             payment_state=payment_state,
             state_change=state_change,

@@ -38,7 +38,7 @@ from raiden.transfer.mediated_transfer.state_change import (
     ActionInitInitiatorLight, ReceiveSecretRequestLight, ActionSendSecretRevealLight, ReceiveSecretRevealLight,
     ActionSendUnlockLight, ActionInitTargetLight, ActionSendSecretRequestLight, ActionSendLockExpiredLight,
     ReceiveLockExpiredLight, ReceiveTransferCancelRoute,
-    StoreRefundTransferLight, ReceiveTransferCancelRouteLight)
+    StoreRefundTransferLight)
 from raiden.transfer.state import (
     ChainState,
     InitiatorTask,
@@ -215,9 +215,6 @@ def subdispatch_to_paymenttask(
     sub_task = chain_state.payment_mapping.secrethashes_to_task.get(secrethash)
 
     events: List[Event] = list()
-    if isinstance(state_change, ReceiveSecretRequestLight):
-        print("// payment mapping ")
-        print(chain_state.payment_mapping.secrethashes_to_task.keys())
     if sub_task:
         pseudo_random_generator = chain_state.pseudo_random_generator
         sub_iteration: Union[
@@ -227,18 +224,6 @@ def subdispatch_to_paymenttask(
         ]
 
         if isinstance(sub_task, InitiatorTask):
-            if isinstance(state_change, ReceiveTransferCancelRoute):
-                print("ReceiveTransferCancelRoute subdispatch payment task, PAYMENT STATE")
-                print(sub_task.manager_state.to_dict())
-                print("PAYMENT MAPPING")
-                print(chain_state.payment_mapping.secrethashes_to_task.keys())
-                print(len(chain_state.payment_mapping.secrethashes_to_task.values()))
-
-            if isinstance(state_change, ReceiveSecretRequestLight):
-                print("///// task")
-                print(sub_task)
-                print("////// mapping")
-                print(chain_state.payment_mapping.secrethashes_to_task.keys())
             token_network_identifier = sub_task.token_network_identifier
             token_network_state = get_token_network_by_address(
                 chain_state, token_network_identifier
@@ -390,18 +375,11 @@ def subdispatch_initiatortask(
 
             if iteration.new_state:
                 sub_task = InitiatorTask(token_network_identifier, iteration.new_state)
-                if isinstance(state_change, ActionInitInitiatorLight):
-                    print("INITIATOR TASK NEW STATE")
-                    print(iteration.new_state.to_dict())
-                    print("Creando nuevo subtask. Manager state:")
-                    print(sub_task.manager_state.to_dict() if sub_task.manager_state is not None else "")
-                    print("LO que habia:")
-                    print(chain_state.payment_mapping.secrethashes_to_task[secrethash].manager_state.to_dict() if chain_state.payment_mapping.secrethashes_to_task.get(secrethash) is not None else "")
-                    print("Lo que pongo")
-                    print(sub_task.manager_state.to_dict() if sub_task is not None else "")
                 chain_state.payment_mapping.secrethashes_to_task[secrethash] = sub_task
             elif secrethash in chain_state.payment_mapping.secrethashes_to_task and not isinstance(state_change, ActionInitInitiatorLight):
-                print("Deleted")
+                ## We dont delete the payment task when is a light payment, thats because we need the previous payment task for refunds.
+                ## TODO marcosmartinez7, are the p2p payments being removed?
+                print("Deleted payment task "+ secrethash.hex())
                 del chain_state.payment_mapping.secrethashes_to_task[secrethash]
 
     return TransitionResult(chain_state, events)
@@ -863,37 +841,11 @@ def handle_receive_transfer_refund_cancel_route(
     chain_state.payment_mapping.secrethashes_to_task.update(
         {new_secrethash: copy.deepcopy(current_payment_task)}
     )
-    print("}}}}}}}}}}}}}")
-    print("CURRENT TASK manager state")
-    print(current_payment_task.manager_state.to_dict())
-    print("COPIED NEW TASK manager state")
-    print(chain_state.payment_mapping.secrethashes_to_task[new_secrethash].manager_state.to_dict())
-    print("}}}}}}}}}}}}}")
-
-
-    print("Current task canceled channels")
-    print(current_payment_task.manager_state.cancelled_channels)
-    print("New payment task canceled channels")
-    print(chain_state.payment_mapping.secrethashes_to_task[new_secrethash].manager_state.cancelled_channels)
-    print("new manager state")
-    print(chain_state.payment_mapping.secrethashes_to_task[new_secrethash].manager_state.to_dict())
-
-
     return subdispatch_to_paymenttask(chain_state, state_change, new_secrethash, storage)
 
 
 def handle_receive_transfer_cancel_route(
     chain_state: ChainState, state_change: ReceiveTransferCancelRoute
-) -> TransitionResult[ChainState]:
-    print("Subdispatching to payment task with hash")
-    print(state_change.transfer.lock.secrethash.hex())
-    return subdispatch_to_paymenttask(
-        chain_state, state_change, state_change.transfer.lock.secrethash
-    )
-
-
-def handle_receive_transfer_cancel_route_light(
-    chain_state: ChainState, state_change: ReceiveTransferCancelRouteLight
 ) -> TransitionResult[ChainState]:
     return subdispatch_to_paymenttask(
         chain_state, state_change, state_change.transfer.lock.secrethash
@@ -911,8 +863,6 @@ def handle_receive_secret_request_light(
     chain_state: ChainState, state_change: ReceiveSecretRequestLight
 ) -> TransitionResult[ChainState]:
     secrethash = state_change.secrethash
-    print("/////// RECIBII SECRET HASH")
-    print(secrethash.hex())
     return subdispatch_to_paymenttask(chain_state, state_change, secrethash)
 
 
@@ -1023,10 +973,6 @@ def handle_state_change(
     elif type(state_change) == ReceiveTransferCancelRoute:
         assert isinstance(state_change, ReceiveTransferCancelRoute), MYPY_ANNOTATION
         iteration = handle_receive_transfer_cancel_route(chain_state, state_change)
-    elif type(state_change) == ReceiveTransferCancelRouteLight:
-        # TODO Rodrigo Change this name
-        assert isinstance(state_change, ReceiveTransferCancelRouteLight), MYPY_ANNOTATION
-        iteration = handle_receive_transfer_cancel_route_light(chain_state, state_change)
     elif type(state_change) == ContractReceiveNewPaymentNetwork:
         assert isinstance(state_change, ContractReceiveNewPaymentNetwork), MYPY_ANNOTATION
         iteration = handle_new_payment_network(chain_state, state_change)
