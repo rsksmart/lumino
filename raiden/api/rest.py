@@ -2121,7 +2121,8 @@ class RestAPI:
                                               sender: typing.AddressHex,
                                               receiver: typing.AddressHex,
                                               message: Dict,
-                                              message_type_value: str
+                                              message_type_value: str,
+                                              additional_metadata: Dict = None
                                               ):
         # TODO mmartinez7 pending msg validations
         # TODO call from dict will work but we need to validate each parameter in order to know if there are no extra or missing params.
@@ -2145,7 +2146,7 @@ class RestAPI:
             lt = LockedTransfer.from_dict(message)
             self.initiate_payment_light(self.raiden_api.raiden.default_registry.address, lt.token, lt.initiator,
                                         lt.target, lt.locked_amount, lt.payment_identifier, payment_request.payment_id,
-                                        lt.lock.secrethash, None if lt.channel_identifier == 75 or lt.channel_identifier == "75" else "asdasd",
+                                        lt.lock.secrethash, additional_metadata.previous_hash,
                                         EMPTY_PAYMENT_HASH_INVOICE, lt, lt.channel_identifier)
         elif message["type"] == "Delivered":
             delivered = Delivered.from_dict(message)
