@@ -304,8 +304,8 @@ def try_new_route_light(
                                                 1,
                                                 signed_locked_transfer,
                                                 True,
-                                                LightClientProtocolMessageType.PaymentSuccessful)
-
+                                                LightClientProtocolMessageType.PaymentSuccessful,
+                                                signed_locked_transfer.sender)
             events.append(lockedtransfer_event)
             events.append(store_signed_lt)
 
@@ -524,7 +524,8 @@ def handle_secretrequest_light(
                                         state_change.payment_identifier, 5,
                                         state_change.secret_request_message,
                                         True,
-                                        LightClientProtocolMessageType.PaymentSuccessful)
+                                        LightClientProtocolMessageType.PaymentSuccessful,
+                                        initiator_state.transfer.initiator)
         initiator_state.received_secret_request = True
         iteration = TransitionResult(initiator_state, [store_event])
 
@@ -564,7 +565,8 @@ def handle_send_secret_reveal_light(
     initiator_state.received_secret_request = True
     store_message_event = StoreMessageEvent(message_identifier, transfer_description.payment_identifier, 7,
                                             state_change.reveal_secret, True,
-                                            LightClientProtocolMessageType.PaymentSuccessful)
+                                            LightClientProtocolMessageType.PaymentSuccessful,
+                                            transfer_description.initiator)
     iteration = TransitionResult(initiator_state, [revealsecret, store_message_event])
     return iteration
 
@@ -615,11 +617,12 @@ def handle_offchain_secretreveal_light(
                                                                9,
                                                                state_change.secret_reveal_message,
                                                                True,
-                                                               LightClientProtocolMessageType.PaymentSuccessful)
+                                                               LightClientProtocolMessageType.PaymentSuccessful,
+                                                               transfer_description.initiator)
         store_created_unlock_event = StoreMessageEvent(message_identifier, transfer_description.payment_identifier, 11,
                                                        unlock_msg, False,
-                                                       LightClientProtocolMessageType.PaymentSuccessful)
-
+                                                       LightClientProtocolMessageType.PaymentSuccessful,
+                                                       transfer_description.initiator)
         events = list()
         events.append(store_received_secret_reveal_event)
         events.append(store_created_unlock_event)
