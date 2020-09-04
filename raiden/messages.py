@@ -1831,6 +1831,21 @@ class RequestMonitoring(SignedMessage):
             and recover(reward_proof_data, self.reward_proof_signature) == requesting_address
         )
 
+class UnlockRequest(Message):
+    def __init__(self, channel_identifier: ChannelID, sender: Address, receiver: Address, **kwargs):
+        super().__init__(**kwargs)
+        self.channel_identifier = channel_identifier
+        self.sender = sender
+        self.receiver = receiver
+
+    def to_dict(self):
+        return {
+            "type": self.__class__.__name__,
+            "channel_identifier": self.channel_identifier,
+            "receiver": to_normalized_address(self.receiver),
+            "sender": to_normalized_address(self.sender)
+        }
+
 
 CMDID_TO_CLASS: Dict[int, Type[Message]] = {
     messages.DELIVERED: Delivered,

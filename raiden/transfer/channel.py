@@ -26,7 +26,7 @@ from raiden.transfer.events import (
     EventInvalidReceivedTransferRefund,
     EventInvalidReceivedUnlock,
     SendProcessed,
-    ContractSendChannelUpdateTransferLight)
+    ContractSendChannelUpdateTransferLight, ContractSendChannelBatchUnlockLight)
 from raiden.transfer.identifiers import CanonicalIdentifier
 from raiden.transfer.mediated_transfer.events import (
     CHANNEL_IDENTIFIER_GLOBAL_QUEUE,
@@ -1956,12 +1956,19 @@ def handle_channel_settled(
 
         channel_state.our_state.onchain_locksroot = our_locksroot
         channel_state.partner_state.onchain_locksroot = partner_locksroot
-
-        onchain_unlock = ContractSendChannelBatchUnlock(
-            canonical_identifier=channel_state.canonical_identifier,
-            participant=channel_state.partner_state.address,
-            triggered_by_block_hash=state_change.block_hash,
-        )
+        if channel_state.is_light_channel:
+            onchain_unlock = ContractSendChannelBatchUnlockLight(
+                canonical_identifier=channel_state.canonical_identifier,
+                client=channel_state.our_state.address,
+                participant=channel_state.partner_state.address,
+                triggered_by_block_hash=state_change.block_hash,
+            )
+        else:
+            onchain_unlock = ContractSendChannelBatchUnlock(
+                canonical_identifier=channel_state.canonical_identifier,
+                participant=channel_state.partner_state.address,
+                triggered_by_block_hash=state_change.block_hash,
+            )
         events.append(onchain_unlock)
 
     return TransitionResult(channel_state, events)
