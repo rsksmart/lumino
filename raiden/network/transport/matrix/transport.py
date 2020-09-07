@@ -74,6 +74,7 @@ from raiden.utils.typing import (
     Union,
     cast,
 )
+from transport.layer import TransportLayer
 
 log = structlog.get_logger(__name__)
 
@@ -266,7 +267,7 @@ class _RetryQueue(Runnable):
         return f"<{self.__class__.__name__} for {to_normalized_address(self.receiver)}>"
 
 
-class MatrixTransport(Runnable):
+class MatrixTransport(TransportLayer, Runnable):
     _room_prefix = "raiden"
     _room_sep = "_"
     log = log
