@@ -1456,7 +1456,8 @@ def events_for_expired_lock(
                                                    1,
                                                    LockExpired.from_event(send_lock_expired),
                                                    False,
-                                                   LightClientProtocolMessageType.PaymentExpired)
+                                                   LightClientProtocolMessageType.PaymentExpired,
+                                                   send_lock_expired.sender)
             events.append(store_lock_expired)
         events.append(send_lock_expired)
 
@@ -1670,7 +1671,8 @@ def handle_receive_lock_expired_light(
             1,
             state_change.lock_expired,
             True,
-            LightClientProtocolMessageType.PaymentExpired
+            LightClientProtocolMessageType.PaymentExpired,
+            state_change.lock_expired.recipient
         )
         events = [store_lock_expired]
     else:

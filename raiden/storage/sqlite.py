@@ -158,16 +158,14 @@ class SQLiteStorage:
             cursor = self.conn.execute(
                 "INSERT INTO light_client_payment("
                 "payment_id, "
-                "light_client_address, "
                 "partner_address, "
                 "is_lc_initiator, "
                 "token_network_id, "
                 "amount, "
                 "created_on, "
                 "payment_status "
-                ") VALUES(?, ?, ?, ?, ?,  ?, ?, ?)",
+                ") VALUES(?, ?, ?, ?,  ?, ?, ?)",
                 (str(light_client_payment.payment_id),
-                 to_checksum_address(light_client_payment.light_client_address),
                  light_client_payment.partner_address,
                  light_client_payment.is_lc_initiator,
                  light_client_payment.token_network_id,
@@ -196,15 +194,17 @@ class SQLiteStorage:
                 "message_type, "
                 "unsigned_message, "
                 "signed_message, "
-                "light_client_payment_id "
+                "light_client_payment_id, "
+                "light_client_address "
                 ")"
-                "VALUES(?, ?, ?, ?, ?, ?)",
+                "VALUES(?, ?, ?, ?, ?, ?, ?)",
                 (str(msg_dto.identifier),
                  msg_dto.message_order,
                  str(msg_dto.message_type.value),
                  msg_dto.unsigned_message,
                  msg_dto.signed_message,
-                 str(msg_dto.light_client_payment_id) if msg_dto.light_client_payment_id else None
+                 str(msg_dto.light_client_payment_id) if msg_dto.light_client_payment_id else None,
+                 to_checksum_address(msg_dto.light_client_address),
                  ),
             )
             last_id = cursor.lastrowid
@@ -1346,10 +1346,13 @@ class SQLiteStorage:
         cursor = self.conn.cursor()
         cursor.execute(
             """
-            SELECT payment_id, light_client_address, partner_address, is_lc_initiator,
-            token_network_id, amount, created_on, payment_status
-            FROM light_client_payment
-            WHERE payment_id = ?
+            SELECT lcp.payment_id as payment_id, lcpm.light_client_address as light_client_address,
+            lcp.partner_address as partner_address, lcp.is_lc_initiator as is_lc_initiator,
+            lcp.token_network_id as token_network_id, lcp.amount as amount, lcp.created_on as created_on,
+            lcp.payment_status as payment_status
+            FROM light_client_payment lcp
+            INNER JOIN light_client_protocol_message lcpm ON lcpm.light_client_payment_id = lcp.payment_id
+            WHERE lcp.payment_id = ?
             """,
             (str(payment_id),),
         )
@@ -1362,7 +1365,7 @@ class SQLiteStorage:
             " FROM light_client_protocol_message A INNER JOIN light_client_payment B" +
             " ON A.light_client_payment_id = B.payment_id" +
             " WHERE A.internal_msg_identifier >= ?" +
-            " AND B.light_client_address = ?" +
+            " AND A.light_client_address = ?" +
             "ORDER BY light_client_payment_id, message_order ASC",
             (from_message, light_client),
 
@@ -1373,9 +1376,10 @@ class SQLiteStorage:
         cursor = self.conn.cursor()
         cursor.execute(
             """
-            SELECT identifier, message_order, unsigned_message, signed_message, light_client_payment_id, message_type
+            SELECT identifier, message_order, unsigned_message, signed_message,
+            light_client_payment_id, message_type, light_client_address
             FROM light_client_protocol_message
-            WHERE identifier  = ?
+            WHERE identifier = ?
             ORDER BY message_order ASC
             """,
             (str(identifier),),
@@ -1403,7 +1407,8 @@ class SQLiteStorage:
     def get_light_client_payment_locked_transfer(self, payment_identifier):
         cursor = self.conn.cursor()
         cursor.execute(
-            "SELECT identifier, message_order,message_type, unsigned_message, signed_message, light_client_payment_id" +
+            "SELECT identifier, message_order,message_type, unsigned_message, "
+            " signed_message, light_client_payment_id, light_client_address " +
             " FROM light_client_protocol_message A INNER JOIN light_client_payment B" +
             " ON A.light_client_payment_id = B.payment_id" +
             " WHERE A.message_order = 1" +
@@ -1430,7 +1435,6 @@ class SerializedSQLiteStorage(SQLiteStorage):
                 signed = False
                 if message[3] is not None:
                     signed = True
-                if message[3] is not None:
                     serialized_signed_msg = self.serializer.deserialize(message[3])
                 else:
                     serialized_signed_msg = None
