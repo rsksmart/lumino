@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from typing import Any
 
 from raiden.message_handler import MessageHandler
 from raiden.messages import Message
@@ -14,6 +15,18 @@ class TransportLayer(ABC):
 
     def address(self):
         return self._address
+
+    @abstractmethod
+    def start(self, raiden_service: RaidenService, message_handler: MessageHandler, prev_auth_data: str):
+        """
+        Start the transport layer.
+        """
+
+    @abstractmethod
+    def stop(self):
+        """
+        Stop the transport layer.
+        """
 
     @abstractmethod
     def send_async(self, queue_identifier: QueueIdentifier, message: Message):
@@ -38,7 +51,13 @@ class TransportLayer(ABC):
         """
 
     @abstractmethod
-    def start(self, raiden_service: RaidenService, message_handler: MessageHandler, prev_auth_data: str):
+    def link_exception(self, callback: Any):
         """
-        Start the transport layer.
+        Add a callback function to be executed once the transport layer is halted due to an exception.
+        """
+
+    @abstractmethod
+    def join(self, timeout=None):
+        """
+        Wait until the transport layer finishes its pending tasks or the given timeout passes.
         """
