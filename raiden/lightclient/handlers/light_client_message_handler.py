@@ -13,7 +13,7 @@ from raiden.messages import Message, LockedTransfer, SecretRequest, RevealSecret
     LockExpired
 from raiden.storage.sqlite import SerializedSQLiteStorage
 from raiden.storage.wal import WriteAheadLog
-from raiden.utils.typing import AddressHex
+from raiden.utils.typing import AddressHex, MessageID, SignedTransaction
 
 
 def build_light_client_protocol_message(identifier: int, message: Message, signed: bool, payment_id: int,
@@ -62,6 +62,12 @@ class LightClientMessageHandler:
     ):
         return wal.storage.update_light_client_protocol_message_set_signed_data(payment_id, order, message,
                                                                                 str(message_type.value))
+
+    @classmethod
+    def update_stored_msg_set_signed_tx_by_message_id(
+        cls, message_id: MessageID, signed_tx: SignedTransaction, wal: WriteAheadLog
+    ):
+        return wal.storage.update_stored_msg_set_signed_tx_by_message_id(signed_tx, message_id)
 
     @classmethod
     def store_light_client_payment(cls, payment: LightClientPayment, storage: SerializedSQLiteStorage):

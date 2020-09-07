@@ -11,7 +11,8 @@ from raiden.lightclient.models.client_model import ClientType
 from raiden.storage.serialize import SerializationBase
 from raiden.storage.utils import DB_SCRIPT_CREATE_TABLES, TimestampedEvent
 from raiden.utils import get_system_spec
-from raiden.utils.typing import Any, Dict, Iterator, List, NamedTuple, Optional, Tuple, Union
+from raiden.utils.typing import Any, Dict, Iterator, List, NamedTuple, Optional, Tuple, Union, MessageID, \
+    SignedTransaction
 from dateutil.relativedelta import relativedelta
 
 
@@ -1455,6 +1456,19 @@ class SerializedSQLiteStorage(SQLiteStorage):
                 UPDATE  light_client_protocol_message set signed_message = ? WHERE light_client_payment_id = ? and message_order = ? and message_type = ?;
                 """,
                 (self.serializer.serialize(signed_message), str(payment_id), msg_order, message_type)
+            )
+
+            last_id = cursor.lastrowid
+        return last_id
+
+    def update_stored_msg_set_signed_tx_by_message_id(self, signed_tx: SignedTransaction, message_id: MessageID):
+        with self.write_lock, self.conn:
+            cursor = self.conn.cursor()
+            cursor.execute(
+                """
+                UPDATE  light_client_protocol_message set signed_message = ? WHERE identifier = ?;
+                """,
+                (str(signed_tx), str(message_id))
             )
 
             last_id = cursor.lastrowid

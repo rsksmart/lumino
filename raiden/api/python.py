@@ -41,14 +41,15 @@ from raiden.exceptions import (
     RaidenRecoverableError,
     UnknownTokenAddress,
     InvoiceCoding,
-    UnhandledLightClient)
+    UnhandledLightClient, InvalidPaymentIdentifier)
 from raiden.lightclient.handlers.light_client_message_handler import LightClientMessageHandler
 from raiden.lightclient.handlers.light_client_service import LightClientService
 from raiden.lightclient.handlers.light_client_utils import LightClientUtils
 from raiden.lightclient.lightclientmessages.hub_response_message import HubResponseMessage
 from raiden.lightclient.lightclientmessages.payment_hub_message import PaymentHubMessage
 from raiden.lightclient.models.light_client_payment import LightClientPayment, LightClientPaymentStatus
-from raiden.lightclient.models.light_client_protocol_message import LightClientProtocolMessageType
+from raiden.lightclient.models.light_client_protocol_message import LightClientProtocolMessageType, \
+    LightClientProtocolMessage
 from raiden.messages import RequestMonitoring, LockedTransfer, RevealSecret, Unlock, Delivered, SecretRequest, \
     Processed, LockExpired
 from raiden.settings import DEFAULT_RETRY_TIMEOUT, DEVELOPMENT_CONTRACT_VERSION
@@ -273,9 +274,17 @@ class RaidenAPI:
         if time_elapsed > 30:
             raise TokenAppExpired("Token app expired")
 
-    def register_secret_light(self, signed_tx: SignedTransaction):
+    def register_secret_light(self,
+             signed_tx: typing.SignedTransaction,
+             message_id: typing.MessageID,
+             message_order: int,
+             payment_id: typing.PaymentID,
+    ):
+        message_exists = LightClientMessageHandler.is_light_client_protocol_message_already_stored_message_id(message_id, payment_id, message_order)
+        if not message_exists:
+            raise InvalidPaymentIdentifier()
         self.raiden.default_secret_registry.register_secret_light(signed_tx)
-
+        LightClientMessageHandler.update_stored_msg_set_signed_tx_by_message_id(message_id)
     def token_network_register(
         self,
         registry_address: PaymentNetworkID,

@@ -881,10 +881,15 @@ class RestAPI:
         ]
         return api_response(result=closed_channels)
 
-    def post_register_secret_light(self, signed_tx: typing.SignedTransaction):
+    def post_register_secret_light(self,
+             signed_tx: typing.SignedTransaction,
+             message_id: typing.MessageID,
+             message_order: int,
+             payment_id: typing.PaymentID,
+    ):
         try:
-            self.raiden_api.register_secret_light(signed_tx)
-        except RawTransactionFailed as e:
+            self.raiden_api.register_secret_light(signed_tx, message_id, message_order, payment_id)
+        except (RawTransactionFailed, InvalidPaymentIdentifier) as e:
             return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.BAD_REQUEST, log=log)
         except Exception as e:
             return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.INTERNAL_SERVER_ERROR, log=log)
