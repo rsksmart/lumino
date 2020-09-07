@@ -1763,3 +1763,6 @@ class NodeTransport:
     def __init__(self, hub_transport: TransportLayer, light_client_transports: List[TransportLayer]):
         self.hub_transport = hub_transport
         self.light_client_transports = light_client_transports
+
+    def add_light_client_transport(self, light_client_transport: TransportLayer):
+        self.light_client_transports.append(light_client_transport)

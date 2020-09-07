@@ -2082,7 +2082,7 @@ class RestAPI:
                                                               chain_state=views.state_from_raiden(
                                                                   self.raiden_api.raiden))
 
-            self.raiden_api.raiden.transport.light_client_transports.append(matrix_light_client_transport_instance)
+            self.raiden_api.raiden.transport.add_light_client_transport(matrix_light_client_transport_instance)
 
         return api_response(light_client)
 
