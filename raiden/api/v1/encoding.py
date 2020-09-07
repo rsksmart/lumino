@@ -562,7 +562,7 @@ class LightClientMatrixCredentialsBuildSchema(BaseSchema):
         decoding_class = dict
 
 
-class SecretLightSchema(BaseSchema):
+class RegisterSecretLightResource(BaseSchema):
     signed_tx = fields.String(required=True)
 
     class Meta:

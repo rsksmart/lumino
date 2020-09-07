@@ -86,7 +86,7 @@ from raiden.api.v1.resources import (
     LightClientMatrixCredentialsBuildResource,
     LightClientResource,
     PaymentLightResource,
-    CreatePaymentLightResource, WatchtowerResource, LightClientMessageResource, SecretLightResource)
+    CreatePaymentLightResource, WatchtowerResource, LightClientMessageResource, RegisterSecretLightResource)
 
 from raiden.constants import GENESIS_BLOCK_NUMBER, UINT256_MAX, Environment, EMPTY_PAYMENT_HASH_INVOICE
 
@@ -242,7 +242,7 @@ URLS_HUB_V1 = [
     ),
     (
         '/secret_light/',
-        SecretLightResource
+        RegisterSecretLightResource
     ),
 ]
 
@@ -881,8 +881,14 @@ class RestAPI:
         ]
         return api_response(result=closed_channels)
 
-    def post_secret_light(self, signed_tx: typing.SignedTransaction):
-        self.raiden_api.register_secret_light(signed_tx)
+    def post_register_secret_light(self, signed_tx: typing.SignedTransaction):
+        try:
+            self.raiden_api.register_secret_light(signed_tx)
+        except RawTransactionFailed as e:
+            return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.BAD_REQUEST, log=log)
+        except Exception as e:
+            return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.INTERNAL_SERVER_ERROR, log=log)
+
 
     def get_connection_managers_info(self, registry_address: typing.PaymentNetworkID):
         """Get a dict whose keys are token addresses and whose values are

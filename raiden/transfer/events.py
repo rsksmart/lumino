@@ -363,14 +363,13 @@ class ContractSendSecretReveal(ContractSendExpirableEvent):
     """ Event emitted when the lock must be claimed on-chain. """
 
     def __init__(
-        self, expiration: BlockExpiration, secret: Secret, triggered_by_block_hash: BlockHash, our_address: Address
+        self, expiration: BlockExpiration, secret: Secret, triggered_by_block_hash: BlockHash
     ) -> None:
         if not isinstance(secret, T_Secret):
             raise ValueError("secret must be a Secret instance")
 
         super().__init__(triggered_by_block_hash, expiration)
         self.secret = secret
-        self.our_address = our_address
 
     def __repr__(self) -> str:
         secrethash: SecretHash = SecretHash(sha3(self.secret))
