@@ -17,16 +17,22 @@ class TransportLayer(ABC):
 
     @abstractmethod
     def send_async(self, queue_identifier: QueueIdentifier, message: Message):
-        """Queue the message for sending to recipient in the queue_identifier."""
-        """It may be called before transport is started, to initialize message queues."""
-        """The actual sending will be started only when the transport is started."""
+        """
+        Queue the message for sending to recipient in the queue_identifier.
+        It may be called before transport is started, to initialize message queues.
+        The actual sending will be started only when the transport is started.
+        """
 
     @abstractmethod
     def start_health_check(self, address: Address):
-        """Start healthcheck (status monitoring) for a peer."""
-        """It also whitelists the address to answer invites and listen for messages."""
+        """
+        Start health-check (status monitoring) for a peer.
+        It also whitelists the address to answer invites and listen for messages.
+        """
 
     @abstractmethod
     def whitelist(self, address: Address):
-        """Whitelist peer address from which to receive communications."""
-        """This may be called before transport is started, to ensure events generated during start are handled."""
+        """
+        Whitelist peer address from which to receive communications.
+        This may be called before transport is started, to ensure events generated during start are handled properly.
+        """
