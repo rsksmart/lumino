@@ -265,6 +265,7 @@ def run_app(
     print("Private key: " + encode_hex(privatekey_bin))
     print("Public key: " + encode_hex(pubkey_bin))
 
+    config["address"] = address
     config["pubkey"] = pubkey_bin
     config["privatekey"] = privatekey_bin
     config["transport"]["udp"]["host"] = listen_host
@@ -281,6 +282,7 @@ def run_app(
         config["transport"]["udp"]["external_port"] = mapped_socket.external_port
     config["transport_type"] = transport
     config["transport"]["matrix"]["server"] = matrix_server
+    config["transport"]["matrix"]["address"] = address  # temp, all transport layers should eventually use line 268
     config["transport"]["udp"]["nat_keepalive_retries"] = DEFAULT_NAT_KEEPALIVE_RETRIES
     timeout = max_unresponsive_time / DEFAULT_NAT_KEEPALIVE_RETRIES
     config["transport"]["udp"]["nat_keepalive_timeout"] = timeout

@@ -273,7 +273,8 @@ class MatrixTransport(TransportLayer, Runnable):
     log = log
 
     def __init__(self, config: dict, current_server_name: str = None):
-        super().__init__()
+        Runnable.__init__(self)
+        TransportLayer.__init__(self, config["address"])
         self._config = config
         self._raiden_service: Optional[RaidenService] = None
 

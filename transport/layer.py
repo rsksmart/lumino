@@ -8,7 +8,6 @@ from raiden.utils import Address
 class TransportLayer(ABC):
 
     def __init__(self, address: Address):
-        super().__init__()
         self._address = address  # source for messages transmitted over this layer
 
     def address(self):
