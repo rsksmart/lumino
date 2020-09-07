@@ -68,6 +68,7 @@ def events_for_onchain_secretreveal(
     channel_state: NettingChannelState,
     block_number: BlockNumber,
     block_hash: BlockHash,
+    pseudo_random_generator: random.Random
 ) -> List[Event]:
     """ Emits the event for revealing the secret on-chain if the transfer
     can not be settled off-chain.
@@ -90,6 +91,8 @@ def events_for_onchain_secretreveal(
             secret=secret,
             expiration=expiration,
             block_hash=block_hash,
+            target_state=target_state,
+            pseudo_random_generator=pseudo_random_generator
         )
 
     return list()
@@ -583,6 +586,7 @@ def handle_block(
     channel_state: NettingChannelState,
     block_number: BlockNumber,
     block_hash: BlockHash,
+    pseudo_random_generator: random.Random
 ) -> TransitionResult[TargetTransferState]:
     """ After Raiden learns about a new block this function must be called to
     handle expiration of the hash time lock.
@@ -613,6 +617,7 @@ def handle_block(
             channel_state=channel_state,
             block_number=block_number,
             block_hash=block_hash,
+            pseudo_random_generator=pseudo_random_generator
         )
 
     return TransitionResult(target_state, events)
@@ -719,6 +724,7 @@ def state_transition(
             channel_state=channel_state,
             block_number=state_change.block_number,
             block_hash=state_change.block_hash,
+            pseudo_random_generator=pseudo_random_generator
         )
     elif type(state_change) == ReceiveSecretReveal:
         assert isinstance(state_change, ReceiveSecretReveal), MYPY_ANNOTATION

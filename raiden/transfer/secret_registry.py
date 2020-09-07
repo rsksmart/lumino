@@ -1,3 +1,4 @@
+import random
 from typing import Optional
 
 from raiden.lightclient.handlers.light_client_service import LightClientService
@@ -11,7 +12,7 @@ from raiden.transfer.mediated_transfer.state import TargetTransferState
 from raiden.transfer.state import (
     CHANNEL_STATE_CLOSED,
     CHANNEL_STATES_PRIOR_TO_CLOSED,
-    NettingChannelState,
+    NettingChannelState, message_identifier_from_prng,
 )
 from raiden.utils.typing import BlockExpiration, BlockHash, List, Secret, T_Secret, MessageID
 
@@ -21,7 +22,8 @@ def events_for_onchain_secretreveal(
     secret: Secret,
     expiration: BlockExpiration,
     block_hash: BlockHash,
-    target_state: Optional[TargetTransferState]
+    target_state: TargetTransferState = None,
+    pseudo_random_generator: random.Random = None
 ) -> List[Event]:
     events: List[Event] = list()
 
@@ -35,14 +37,14 @@ def events_for_onchain_secretreveal(
                     expiration=expiration,
                     secret=secret,
                     triggered_by_block_hash=block_hash,
-                    our_address=channel_state.our_state.address
                 )
             ]
         elif target_state is not None:
             return [
                 StoreMessageEvent(
-                    message_id=target_state.transfer.message_identifier,
+                    message_id=message_identifier_from_prng(pseudo_random_generator),
                     payment_id=target_state.transfer.payment_identifier,
+                    light_client_address=channel_state.our_state.address,
                     message_order=0,
                     message=RequestRegisterSecret(),
                     is_signed=False,
