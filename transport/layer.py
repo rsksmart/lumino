@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 
+from raiden.message_handler import MessageHandler
 from raiden.messages import Message
+from raiden.raiden_service import RaidenService
 from raiden.transfer.identifiers import QueueIdentifier
 from raiden.utils import Address
 
@@ -33,4 +35,10 @@ class TransportLayer(ABC):
         """
         Whitelist peer address from which to receive communications.
         This may be called before transport is started, to ensure events generated during start are handled properly.
+        """
+
+    @abstractmethod
+    def start(self, raiden_service: RaidenService, message_handler: MessageHandler, prev_auth_data: str):
+        """
+        Start the transport layer.
         """
