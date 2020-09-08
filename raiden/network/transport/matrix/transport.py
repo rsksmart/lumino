@@ -527,7 +527,7 @@ class MatrixTransport(TransportLayer, Runnable):
             )
 
         self.log.info(
-            "Send async",
+            "Send message",
             receiver_address=pex(receiver_address),
             message=message,
             queue_identifier=queue_identifier,
