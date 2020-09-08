@@ -112,16 +112,16 @@ def _setup_matrix(config):
                     continue
 
             light_client_transport = get_matrix_light_client_instance(
+                light_client['address'],
                 config["transport"]["matrix"],
                 light_client['password'],
                 light_client['display_name'],
                 light_client['seed_retry'],
-                light_client['address'],
                 current_server_name)
 
             light_client_transports.append(light_client_transport)
 
-        hub_transport = MatrixTransport(config["transport"]["matrix"])
+        hub_transport = MatrixTransport(config["address"], config["transport"]["matrix"])
 
         node_transport = NodeTransport(hub_transport, light_client_transports)
 
@@ -133,19 +133,19 @@ def _setup_matrix(config):
 
 
 def get_matrix_light_client_instance(
+    address,
     config,
     password,
     display_name,
     seed_retry,
-    address,
     current_server_name: str = None
 ):
     light_client_transport = MatrixLightClientTransport(
+        address,
         config,
         password,
         display_name,
         seed_retry,
-        address,
         current_server_name
     )
     return light_client_transport
@@ -282,7 +282,6 @@ def run_app(
         config["transport"]["udp"]["external_port"] = mapped_socket.external_port
     config["transport_type"] = transport
     config["transport"]["matrix"]["server"] = matrix_server
-    config["transport"]["matrix"]["address"] = address  # temp, all transport layers should eventually use line 268
     config["transport"]["udp"]["nat_keepalive_retries"] = DEFAULT_NAT_KEEPALIVE_RETRIES
     timeout = max_unresponsive_time / DEFAULT_NAT_KEEPALIVE_RETRIES
     config["transport"]["udp"]["nat_keepalive_timeout"] = timeout

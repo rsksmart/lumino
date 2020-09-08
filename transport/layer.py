@@ -13,6 +13,7 @@ class TransportLayer(ABC):
     def __init__(self, address: Address):
         self._address = address  # source for messages transmitted over this layer
 
+    @property
     def address(self):
         return self._address
 

@@ -609,7 +609,7 @@ class RaidenService(Runnable):
             if chain_state.last_node_transport_state_authdata is not None:
                 for client_last_transport_authdata in \
                     chain_state.last_node_transport_state_authdata.clients_last_transport_authdata:
-                    if client_last_transport_authdata.address == to_canonical_address(light_client_transport._address):
+                    if client_last_transport_authdata.address == to_canonical_address(light_client_transport.address):
                         selected_prev_auth_data = client_last_transport_authdata.auth_data
 
             light_client_transport.start(
@@ -624,7 +624,7 @@ class RaidenService(Runnable):
 
     def _start_health_check_for_light_client_neighbour(self, chain_state: ChainState):
         for light_client in self.transport.light_client_transports:
-            for neighbour in views.all_neighbour_nodes(chain_state, light_client._address):
+            for neighbour in views.all_neighbour_nodes(chain_state, light_client.address):
                 self._start_health_check_for_neighbour(neighbour)
 
     def _start_health_check_for_hub_nighbours(self, chain_state: ChainState):
@@ -766,7 +766,7 @@ class RaidenService(Runnable):
             if creator_address is not None:
                 if self.transport.light_client_transports is not None:
                     for light_client_transport in self.transport.light_client_transports:
-                        if to_checksum_address(creator_address) == light_client_transport.get_address():
+                        if to_checksum_address(creator_address) == light_client_transport.address:
                             light_client_transport.start_health_check(node_address)
             else:
                 self.transport.hub_transport.start_health_check(node_address)
@@ -979,7 +979,7 @@ class RaidenService(Runnable):
     def get_light_client_transport(self, address):
         light_client_transport_result = None
         for light_client_transport in self.transport.light_client_transports:
-            if address == light_client_transport._address:
+            if address == light_client_transport.address:
                 light_client_transport_result = light_client_transport
 
         return light_client_transport_result
@@ -1020,7 +1020,7 @@ class RaidenService(Runnable):
                 if isinstance(event, SendLockedTransferLight):
                     transfer = event.signed_locked_transfer
                     for light_client_transport in light_client_transports:
-                        if transfer.initiator == to_canonical_address(light_client_transport._address):
+                        if transfer.initiator == to_canonical_address(light_client_transport.address):
                             light_client_transport.whitelist(address=transfer.target)
 
     def sign(self, message: Message):

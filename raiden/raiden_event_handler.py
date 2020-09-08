@@ -237,7 +237,7 @@ class RaidenEventHandler(EventHandler):
         mediated_transfer_message = send_locked_transfer_light.signed_locked_transfer
         light_client_address = to_checksum_address(send_locked_transfer_light.signed_locked_transfer.initiator)
         for light_client_transport in raiden.transport.light_client_transports:
-            if light_client_address == light_client_transport._address:
+            if light_client_address == light_client_transport.address:
                 light_client_transport.send_async(send_locked_transfer_light.queue_identifier,
                                                   mediated_transfer_message)
 
