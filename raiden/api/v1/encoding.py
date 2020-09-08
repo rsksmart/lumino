@@ -403,6 +403,16 @@ class PaymentLightPutSchema(BaseSchema):
         decoding_class = dict
 
 
+class SettlementLightSchema(BaseSchema):
+    message = fields.Dict(required=True)
+    signed_tx = fields.String(required=True)
+
+    class Meta:
+        strict = True
+        # decoding to a dict is required by the @use_kwargs decorator from webargs:
+        decoding_class = dict
+
+
 class WatchtowerPutResource(BaseSchema):
     sender = AddressField(required=True)
     light_client_payment_id = fields.Integer(required=True)

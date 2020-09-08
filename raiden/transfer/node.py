@@ -1,6 +1,7 @@
 import copy
 
 from raiden.lightclient.models.light_client_protocol_message import LightClientProtocolMessageType
+from raiden.messages import SettlementRequest
 from raiden.transfer import channel, token_network, views
 from raiden.transfer.architecture import (
     ContractReceiveStateChange,
@@ -46,7 +47,7 @@ from raiden.transfer.state import (
     TargetTask,
     TokenNetworkState,
     LightClientTransportState,
-    NodeTransportState)
+    NodeTransportState, message_identifier_from_prng)
 from raiden.transfer.state_change import (
     ActionChangeNodeNetworkState,
     ActionChannelClose,
@@ -70,7 +71,8 @@ from raiden.transfer.state_change import (
     ReceiveDelivered,
     ReceiveProcessed,
     ReceiveUnlock,
-    ReceiveUnlockLight, ContractReceiveChannelClosedLight, ContractReceiveChannelSettledLight)
+    ReceiveUnlockLight, ContractReceiveChannelClosedLight, ContractReceiveChannelSettledLight,
+    ActionStoreSettlementMessage)
 
 from raiden.utils.typing import (
     MYPY_ANNOTATION,
@@ -329,6 +331,32 @@ def handle_init_send_lock_expired_light(
                                                  LightClientProtocolMessageType.PaymentExpired,
                                                  signed_lock_expired.sender)
     events = [send_lock_expired_light, store_lock_expired_light]
+    return TransitionResult(chain_state, events)
+
+
+def handle_store_settlement_message_light(chain_state: ChainState,
+                                          state_change: ActionStoreSettlementMessage) -> TransitionResult[ChainState]:
+    message_identifier = message_identifier_from_prng(chain_state.pseudo_random_generator)
+    message = SettlementRequest(
+        channel_network_identifier=state_change.channel_network_identifier,
+        channel_identifier=state_change.channel_identifier,
+        participant1=state_change.participant1,
+        participant1_transferred_amount=state_change.participant1_transferred_amount,
+        participant1_locked_amount=state_change.participant1_locked_amount,
+        participant1_locksroot=state_change.participant1_locksroot,
+        participant2=state_change.participant2,
+        participant2_transferred_amount=state_change.participant2_transferred_amount,
+        participant2_locked_amount=state_change.participant2_locked_amount,
+        participant2_locksroot=state_change.participant2_locksroot,
+    )
+    store_message_event = StoreMessageEvent(message_identifier,
+                                            None,
+                                            0,
+                                            message,
+                                            False,
+                                            LightClientProtocolMessageType.SettlementRequired,
+                                            state_change.lc_address)
+    events = [store_message_event]
     return TransitionResult(chain_state, events)
 
 
@@ -1050,6 +1078,9 @@ def handle_state_change(
     elif type(state_change) == ActionSendLockExpiredLight:
         assert isinstance(state_change, ActionSendLockExpiredLight), MYPY_ANNOTATION
         iteration = handle_init_send_lock_expired_light(chain_state, state_change)
+    elif type(state_change) == ActionStoreSettlementMessage:
+        assert isinstance(state_change, ActionStoreSettlementMessage), MYPY_ANNOTATION
+        iteration = handle_store_settlement_message_light(chain_state, state_change)
     assert chain_state is not None, "chain_state must be set"
     return iteration
 

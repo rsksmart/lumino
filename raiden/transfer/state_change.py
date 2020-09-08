@@ -1537,3 +1537,100 @@ class ReceiveProcessed(AuthenticatedSenderStateChange):
             sender=to_canonical_address(data["sender"]),
             message_identifier=MessageID(int(data["message_identifier"])),
         )
+
+
+class ActionStoreSettlementMessage(StateChange):
+    """ A settlement required message has to be stored for the LC """
+
+    def __init__(self,
+                 lc_address: Address,
+                 channel_network_identifier: TokenNetworkAddress,
+                 channel_identifier: ChannelID,
+                 participant1: Address,
+                 participant1_transferred_amount: TokenAmount,
+                 participant1_locked_amount: TokenAmount,
+                 participant1_locksroot: Locksroot,
+                 participant2: Address,
+                 participant2_transferred_amount: TokenAmount,
+                 participant2_locked_amount: TokenAmount,
+                 participant2_locksroot: Locksroot) -> None:
+
+        if not isinstance(participant1, T_Address):
+            raise ValueError("participant1 must be an address instance")
+        if not isinstance(participant2, T_Address):
+            raise ValueError("participant2 must be an address instance")
+
+        self.lc_address = lc_address
+        self.channel_network_identifier = channel_network_identifier
+        self.channel_identifier = channel_identifier,
+        self.participant1 = participant1,
+        self.participant1_transferred_amount = participant1_transferred_amount,
+        self.participant1_locked_amount = participant1_locked_amount,
+        self.participant1_locksroot = participant1_locksroot,
+        self.participant2 = participant2,
+        self.participant2_transferred_amount = participant2_transferred_amount,
+        self.participant2_locked_amount = participant2_locked_amount,
+        self.participant2_locksroot = participant2_locksroot
+
+    def __repr__(self) -> str:
+        return "<ActionStoreSettlementMessage lc_address:{} channel_network_identifier:{}" \
+               " channel_identifier:{} participant1:{} " \
+               "participant1_transferred_amount:{} participant1_locked_amount:{} " \
+               "participant1_locksroot:{} participant2:{} participant2_transferred_amount:{} " \
+               "participant2_locked_amount:{} participant2_locksroot: {}>"\
+            .format(self.lc_address, self.channel_network_identifier, self.channel_identifier,
+                    pex(self.participant1[0]), self.participant1_transferred_amount,
+                    self.participant1_locked_amount, self.participant1_locksroot,
+                    pex(self.participant2[0]), self.participant2_transferred_amount,
+                    self.participant2_locked_amount, self.participant2_locksroot)
+
+    def __eq__(self, other: Any) -> bool:
+        return (
+            isinstance(other, ActionStoreSettlementMessage)
+            and self.lc_address == other.lc_address
+            and self.channel_network_identifier == other.channel_network_identifier
+            and self.channel_identifier == other.channel_identifier
+            and self.participant1 == other.participant1
+            and self.participant1_transferred_amount == other.participant1_transferred_amount
+            and self.participant1_locked_amount == other.participant1_locked_amount
+            and self.participant1_locksroot == other.participant1_locksroot
+            and self.participant2 == other.participant2
+            and self.participant2_transferred_amount == other.participant2_transferred_amount
+            and self.participant2_locked_amount == other.participant2_locked_amount
+            and self.participant2_locksroot == other.participant2_locksroot
+        )
+
+    def __ne__(self, other: Any) -> bool:
+        return not self.__eq__(other)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "lc_address": to_checksum_address(self.lc_address),
+            "channel_network_identifier": to_checksum_address(self.channel_network_identifier),
+            "channel_identifier": self.channel_identifier,
+            "participant1": to_checksum_address(self.participant1[0]),
+            "participant1_transferred_amount": self.participant1_transferred_amount,
+            "participant1_locked_amount": self.participant1_locked_amount,
+            "participant1_locksroot": serialize_bytes(self.participant1_locksroot[0]),
+            "participant2": to_checksum_address(self.participant2[0]),
+            "participant2_transferred_amount": self.participant2_transferred_amount,
+            "participant2_locked_amount": self.participant2_locked_amount,
+            "participant2_locksroot": serialize_bytes(self.participant2_locksroot)
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "ActionStoreSettlementMessage":
+        print("DATA", data)
+        return cls(
+            lc_address=to_canonical_address(data["lc_address"]),
+            channel_network_identifier=to_canonical_address(data["channel_network_identifier"]),
+            channel_identifier=ChannelID(int(data["channel_identifier"])),
+            participant1=to_canonical_address(data["participant1"]),
+            participant1_transferred_amount=TokenAmount(int(data["participant1_transferred_amount"])),
+            participant1_locked_amount=TokenAmount(int(data["participant1_locked_amount"])),
+            participant1_locksroot=Locksroot(deserialize_bytes(data["participant1_locksroot"])),
+            participant2=to_canonical_address(data["participant2"]),
+            participant2_transferred_amount=TokenAmount(int(data["participant2_transferred_amount"])),
+            participant2_locked_amount=TokenAmount(int(data["participant2_locked_amount"])),
+            participant2_locksroot=Locksroot(deserialize_bytes(data["participant2_locksroot"])),
+        )

@@ -51,7 +51,7 @@ from raiden.lightclient.models.light_client_payment import LightClientPayment, L
 from raiden.lightclient.models.light_client_protocol_message import LightClientProtocolMessageType
 
 from raiden.messages import RequestMonitoring, LockedTransfer, RevealSecret, Unlock, Delivered, SecretRequest, \
-    Processed, LockExpired
+    Processed, LockExpired, SettlementRequest
 from raiden.settings import DEFAULT_RETRY_TIMEOUT, DEVELOPMENT_CONTRACT_VERSION
 
 from raiden.transfer import architecture, views
@@ -455,6 +455,11 @@ class RaidenAPI:
         )
         assert channel_state, f"channel {channel_state} is gone"
         return channel_state.identifier
+
+    def send_settlement_light(self, message: Dict, signed_tx: typing.SignedTransaction):
+        request = SettlementRequest.from_dict(message)
+        token_network = self.raiden.chain.token_network(request.channel_network_identifier)
+        token_network.send_settlement_light(signed_tx)
 
     def channel_open(
         self,

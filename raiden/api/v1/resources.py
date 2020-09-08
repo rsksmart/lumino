@@ -27,7 +27,7 @@ from raiden.api.v1.encoding import (
     LightClientMatrixCredentialsBuildSchema,
     PaymentLightPutSchema,
     CreatePaymentLightPostSchema,
-    WatchtowerPutResource, LightClientMessageGetSchema)
+    WatchtowerPutResource, LightClientMessageGetSchema, SettlementLightSchema)
 from raiden.messages import  Unlock
 
 from raiden.utils import typing
@@ -301,6 +301,19 @@ class CreatePaymentLightResource(BaseResource):
             amount=amount,
             secrethash=secrethash
         )
+
+
+class SettlementLightResource(BaseResource):
+    put_schema = SettlementLightSchema
+
+    @use_kwargs(put_schema, locations=("json",))
+    def put(self,
+            message: Dict,
+            signed_tx: str):
+        """
+        put a settlement signed tx to be send by the hub
+        """
+        return self.rest_api.receive_light_client_signed_settlement(message, signed_tx)
 
 
 class LightClientMessageResource(BaseResource):

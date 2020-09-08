@@ -86,7 +86,7 @@ from raiden.api.v1.resources import (
     LightClientMatrixCredentialsBuildResource,
     LightClientResource,
     PaymentLightResource,
-    CreatePaymentLightResource, WatchtowerResource, LightClientMessageResource)
+    CreatePaymentLightResource, WatchtowerResource, LightClientMessageResource, SettlementLightResource)
 
 from raiden.constants import GENESIS_BLOCK_NUMBER, UINT256_MAX, Environment, EMPTY_PAYMENT_HASH_INVOICE
 
@@ -231,6 +231,9 @@ URLS_HUB_V1 = [
     ("/payments_light", PaymentLightResource),
     ("/light_client_messages", LightClientMessageResource, "Message polling"),
     ("/payments_light/create", CreatePaymentLightResource, "create_payment"),
+    (
+        '/payments_light/settlement', SettlementLightResource,
+    ),
     ("/watchtower", WatchtowerResource),
     (
         '/light_clients/matrix/credentials',
@@ -2218,3 +2221,17 @@ class RestAPI:
             return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.NOT_FOUND, log=log)
         except UnhandledLightClient as e:
             return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.FORBIDDEN, log=log)
+
+    def receive_light_client_signed_settlement(self, message: Dict, signed_tx: typing.SignedTransaction):
+        headers = request.headers
+        api_key = headers.get("x-api-key")
+        if not api_key:
+            return ApiErrorBuilder.build_and_log_error(errors="Missing api_key auth header",
+                                                       status_code=HTTPStatus.BAD_REQUEST, log=log)
+        light_client = LightClientService.get_by_api_key(api_key, self.raiden_api.raiden.wal)
+        if not light_client:
+            return ApiErrorBuilder.build_and_log_error(
+                errors="There is no light client associated with the api key provided",
+                status_code=HTTPStatus.FORBIDDEN, log=log)
+
+        self.raiden_api.send_settlement_light(message, signed_tx)

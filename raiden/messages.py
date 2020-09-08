@@ -6,7 +6,7 @@ from eth_utils import (
     decode_hex,
     encode_hex,
     to_canonical_address,
-    to_normalized_address,
+    to_normalized_address, to_checksum_address,
 )
 
 from raiden.constants import UINT64_MAX, UINT256_MAX, EMPTY_PAYMENT_HASH_INVOICE
@@ -1831,6 +1831,89 @@ class RequestMonitoring(SignedMessage):
             and recover(reward_proof_data, self.reward_proof_signature) == requesting_address
         )
 
+
+class SettlementRequest(Message):
+    """ A Message to process by the light client when we have a incoming settlement event.
+        We use this as a payload to be signed by the lc and sent by the node.
+    """
+
+    def __init__(self,
+                 channel_network_identifier: TokenNetworkAddress,
+                 channel_identifier: ChannelID,
+                 participant1: Address,
+                 participant1_transferred_amount: TokenAmount,
+                 participant1_locked_amount: TokenAmount,
+                 participant1_locksroot: Locksroot,
+                 participant2: Address,
+                 participant2_transferred_amount: TokenAmount,
+                 participant2_locked_amount: TokenAmount,
+                 participant2_locksroot: Locksroot):
+        self.channel_network_identifier = channel_network_identifier
+        self.channel_identifier = channel_identifier
+        self.participant1 = participant1
+        self.participant1_transferred_amount = participant1_transferred_amount,
+        self.participant1_locked_amount = participant1_locked_amount,
+        self.participant1_locksroot = participant1_locksroot,
+        self.participant2 = participant2,
+        self.participant2_transferred_amount = participant2_transferred_amount,
+        self.participant2_locked_amount = participant2_locked_amount,
+        self.participant2_locksroot = participant2_locksroot
+
+    @classmethod
+    def unpack(cls, packed) -> "SettlementRequest":
+        return cls(
+            channel_network_identifier=packed.channel_network_identifier,
+            channel_identifier=packed.channel_identifier,
+            participant1=packed.participant1,
+            participant1_transferred_amount=packed.participant1_transferred_amount,
+            participant1_locked_amount=packed.participant1_locked_amount,
+            participant1_locksroot=packed.participant1_locksroot,
+            participant2=packed.participant2,
+            participant2_transferred_amount=packed.participant2_transferred_amount,
+            participant2_locked_amount=packed.participant2_locked_amount,
+            participant2_locksroot=packed.participant2_locksroot
+        )
+
+    def pack(self, packed) -> None:
+        self.channel_network_identifier = packed.channel_network_identifier
+        self.channel_identifier = packed.channel_identifier
+        self.participant1 = packed.participant1
+        self.participant1_transferred_amount = packed.participant1_transferred_amount,
+        self.participant1_locked_amount = packed.participant1_locked_amount,
+        self.participant1_locksroot = packed.participant1_locksroot,
+        self.participant2 = packed.participant2,
+        self.participant2_transferred_amount = packed.participant2_transferred_amount,
+        self.participant2_locked_amount = packed.participant2_locked_amount,
+        self.participant2_locksroot = packed.participant2_locksroot
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "channel_network_identifier": to_checksum_address(self.channel_network_identifier),
+            "channel_identifier": self.channel_identifier,
+            "participant1": to_checksum_address(self.participant1),
+            "participant1_transferred_amount": self.participant1_transferred_amount,
+            "participant1_locked_amount": self.participant1_locked_amount,
+            "participant1_locksroot": self.participant1_locksroot,
+            "participant2": to_checksum_address(self.participant2),
+            "participant2_transferred_amount": self.participant2_transferred_amount,
+            "participant2_locked_amount": self.participant2_locked_amount,
+            "participant2_locksroot": self.participant2_locksroot
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "SettlementRequest":
+        return cls(
+            channel_network_identifier=to_canonical_address(data["channel_network_identifier"]),
+            channel_identifier=int(data["channel_identifier"]),
+            participant1=to_canonical_address(data["participant1"]),
+            participant1_transferred_amount=TokenAmount(data["participant1_transferred_amount"]),
+            participant1_locked_amount=TokenAmount(data["participant1_locked_amount"]),
+            participant1_locksroot=Locksroot(data["participant1_locksroot"]),
+            participant2=to_canonical_address(data["participant2"]),
+            participant2_transferred_amount=TokenAmount(data["participant2_transferred_amount"]),
+            participant2_locked_amount=TokenAmount(data["participant2_locked_amount"]),
+            participant2_locksroot=Locksroot(data["participant2_locksroot"]),
+        )
 
 CMDID_TO_CLASS: Dict[int, Type[Message]] = {
     messages.DELIVERED: Delivered,

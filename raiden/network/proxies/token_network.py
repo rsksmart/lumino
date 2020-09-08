@@ -37,7 +37,9 @@ from raiden.network.proxies.utils import compare_contract_versions
 from raiden.network.rpc.client import StatelessFilter, check_address_has_code
 from raiden.network.rpc.transactions import check_transaction_threw
 from raiden.transfer.balance_proof import pack_balance_proof, pack_balance_proof_update
+from raiden.transfer.events import ContractSendChannelSettle
 from raiden.transfer.identifiers import CanonicalIdentifier
+from raiden.transfer.state_change import ActionStoreSettlementMessage
 from raiden.utils import pex, safe_gas_limit
 from raiden.utils.signer import recover
 from raiden.utils.typing import (
@@ -247,6 +249,21 @@ class TokenNetwork:
         log_details["channel_identifier"] = str(channel_identifier)
         log.info("new_netting_channel_light successful", **log_details)
         return channel_identifier
+
+    def send_settlement_light(self, signed_tx):
+        try:
+            log.debug("Settlement Light called")
+            transaction_hash = self.proxy.broadcast_signed_transaction(signed_tx)
+            self.client.poll(transaction_hash)
+            receipt_or_none = check_transaction_threw(self.client, transaction_hash)
+            if receipt_or_none:
+                raise RaidenRecoverableError("trying to settle channel failed")
+        except HTTPError as e:
+            log.warning("settle channel failed: transaction malformed", ex=e)
+            raise RawTransactionFailed("Light Client raw transaction malformed")
+        except Exception as e:
+            log.warning("settle channel failed", ex=e)
+            raise
 
     def new_netting_channel(
         self, partner: Address, settle_timeout: int, given_block_identifier: BlockSpecification
@@ -2145,10 +2162,11 @@ class TokenNetwork:
         #     block_identifier=block_identifier,
         #     channel_identifier=channel_identifier,
         # )
-
+    # TODO: fix tests on settle
     def settle(
         self,
-        channel_identifier: ChannelID,
+        raiden: "RaidenService",
+        channel_settle_event: ContractSendChannelSettle,
         transferred_amount: TokenAmount,
         locked_amount: TokenAmount,
         locksroot: Locksroot,
@@ -2158,6 +2176,9 @@ class TokenNetwork:
         partner_locksroot: Locksroot,
         given_block_identifier: BlockSpecification,
     ):
+
+        channel_identifier = channel_settle_event.channel_identifier
+        channel_network_identifier = channel_settle_event.token_network_identifier
         """ Settle the channel. """
         log_details = {
             "channel_identifier": channel_identifier,
@@ -2180,20 +2201,25 @@ class TokenNetwork:
 
         # The second participant transferred + locked amount must be higher
         our_bp_is_larger = our_maximum > partner_maximum
+
+        self_or_lc_address = channel_settle_event.channel_state.our_state.address if \
+            channel_settle_event.channel_state.our_state.address != partner else \
+            channel_settle_event.channel_state.partner_state.address
+
         if our_bp_is_larger:
             kwargs = {
                 "participant1": partner,
                 "participant1_transferred_amount": partner_transferred_amount,
                 "participant1_locked_amount": partner_locked_amount,
                 "participant1_locksroot": partner_locksroot,
-                "participant2": self.node_address,
+                "participant2": self_or_lc_address,
                 "participant2_transferred_amount": transferred_amount,
                 "participant2_locked_amount": locked_amount,
                 "participant2_locksroot": locksroot,
             }
         else:
             kwargs = {
-                "participant1": self.node_address,
+                "participant1": self_or_lc_address,
                 "participant1_transferred_amount": transferred_amount,
                 "participant1_locked_amount": locked_amount,
                 "participant1_locksroot": locksroot,
@@ -2213,47 +2239,67 @@ class TokenNetwork:
             # gas will stop us from sending a transaction that will fail
             pass
 
-        with self.channel_operations_lock[partner]:
-            error_prefix = "Call to settle will fail"
-            gas_limit = self.proxy.estimate_gas(
-                checking_block, "settleChannel", channel_identifier=channel_identifier, **kwargs
-            )
-
-            if gas_limit:
-                error_prefix = "settle call failed"
-                gas_limit = safe_gas_limit(gas_limit, GAS_REQUIRED_FOR_SETTLE_CHANNEL)
-
-                transaction_hash = self.proxy.transact(
-                    "settleChannel", gas_limit, channel_identifier=channel_identifier, **kwargs
+        if self_or_lc_address == self.node_address:
+            # is not lc
+            with self.channel_operations_lock[partner]:
+                error_prefix = "Call to settle will fail"
+                gas_limit = self.proxy.estimate_gas(
+                    checking_block, "settleChannel", channel_identifier=channel_identifier, **kwargs
                 )
-                self.client.poll(transaction_hash)
-                receipt_or_none = check_transaction_threw(self.client, transaction_hash)
 
-        transaction_executed = gas_limit is not None
-        if not transaction_executed or receipt_or_none:
-            if transaction_executed:
-                block = receipt_or_none["blockNumber"]
-            else:
-                block = checking_block
+                if gas_limit:
+                    error_prefix = "settle call failed"
+                    gas_limit = safe_gas_limit(gas_limit, GAS_REQUIRED_FOR_SETTLE_CHANNEL)
 
-            self.proxy.jsonrpc_client.check_for_insufficient_eth(
-                transaction_name="settleChannel",
-                address=self.node_address,
-                transaction_executed=transaction_executed,
-                required_gas=GAS_REQUIRED_FOR_SETTLE_CHANNEL,
-                block_identifier=block,
-            )
-            msg = self._check_channel_state_after_settle(
-                participant1=self.node_address,
-                participant2=partner,
-                block_identifier=block,
+                    transaction_hash = self.proxy.transact(
+                        "settleChannel", gas_limit, channel_identifier=channel_identifier, **kwargs
+                    )
+                    self.client.poll(transaction_hash)
+                    receipt_or_none = check_transaction_threw(self.client, transaction_hash)
+
+            transaction_executed = gas_limit is not None
+            if not transaction_executed or receipt_or_none:
+                if transaction_executed:
+                    block = receipt_or_none["blockNumber"]
+                else:
+                    block = checking_block
+
+                self.proxy.jsonrpc_client.check_for_insufficient_eth(
+                    transaction_name="settleChannel",
+                    address=self.node_address,
+                    transaction_executed=transaction_executed,
+                    required_gas=GAS_REQUIRED_FOR_SETTLE_CHANNEL,
+                    block_identifier=block,
+                )
+                msg = self._check_channel_state_after_settle(
+                    participant1=self.node_address,
+                    participant2=partner,
+                    block_identifier=block,
+                    channel_identifier=channel_identifier,
+                )
+                error_msg = f"{error_prefix}. {msg}"
+                log.critical(error_msg, **log_details)
+                raise RaidenUnrecoverableError(error_msg)
+
+            log.info("settle successful", **log_details)
+        else:
+            log.info("Is light client, storing new state to handle message for settlement.", **log_details)
+            # is LC, we create a new state to store a message for the LC
+            print("ARGS", kwargs)
+            store_settlement_message = ActionStoreSettlementMessage(
+                lc_address=self_or_lc_address,
+                channel_network_identifier=channel_network_identifier,
                 channel_identifier=channel_identifier,
+                participant1=kwargs["participant1"],
+                participant1_transferred_amount=kwargs["participant1_transferred_amount"],
+                participant1_locked_amount=kwargs["participant1_locked_amount"],
+                participant1_locksroot=kwargs["participant1_locksroot"],
+                participant2=kwargs["participant2"],
+                participant2_transferred_amount=kwargs["participant2_transferred_amount"],
+                participant2_locked_amount=kwargs["participant2_locked_amount"],
+                participant2_locksroot=kwargs["participant2_locksroot"]
             )
-            error_msg = f"{error_prefix}. {msg}"
-            log.critical(error_msg, **log_details)
-            raise RaidenUnrecoverableError(error_msg)
-
-        log.info("settle successful", **log_details)
+            raiden.handle_and_track_state_change(store_settlement_message)
 
     def events_filter(
         self,

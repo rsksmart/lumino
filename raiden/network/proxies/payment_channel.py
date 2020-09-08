@@ -5,6 +5,7 @@ from web3.utils.filters import Filter
 
 from raiden.constants import GENESIS_BLOCK_NUMBER, UINT256_MAX
 from raiden.network.proxies.token_network import ChannelDetails, TokenNetwork
+from raiden.transfer.events import ContractSendChannelSettle
 from raiden.utils.filters import decode_event, get_filter_args_for_specific_event_from_channel
 from raiden.utils.typing import (
     AdditionalHash,
@@ -283,6 +284,8 @@ class PaymentChannel:
 
     def settle(
         self,
+        raiden: "RaidenService",
+        channel_settle_event: ContractSendChannelSettle,
         transferred_amount: TokenAmount,
         locked_amount: TokenAmount,
         locksroot: Locksroot,
@@ -293,7 +296,8 @@ class PaymentChannel:
     ):
         """ Settles the channel. """
         self.token_network.settle(
-            channel_identifier=self.channel_identifier,
+            raiden=raiden,
+            channel_settle_event=channel_settle_event,
             transferred_amount=transferred_amount,
             locked_amount=locked_amount,
             locksroot=locksroot,
