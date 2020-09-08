@@ -14,6 +14,7 @@ from dateutil.relativedelta import relativedelta
 from eth_utils import is_binary_address, to_checksum_address, to_canonical_address, to_normalized_address, encode_hex
 
 from ecies import encrypt
+from requests import HTTPError
 
 import raiden.blockchain.events as blockchain_events
 from raiden import waiting
@@ -41,7 +42,7 @@ from raiden.exceptions import (
     RaidenRecoverableError,
     UnknownTokenAddress,
     InvoiceCoding,
-    UnhandledLightClient)
+    UnhandledLightClient, RawTransactionFailed)
 from raiden.lightclient.handlers.light_client_message_handler import LightClientMessageHandler
 from raiden.lightclient.handlers.light_client_service import LightClientService
 from raiden.lightclient.handlers.light_client_utils import LightClientUtils
@@ -52,6 +53,7 @@ from raiden.lightclient.models.light_client_protocol_message import LightClientP
 
 from raiden.messages import RequestMonitoring, LockedTransfer, RevealSecret, Unlock, Delivered, SecretRequest, \
     Processed, LockExpired
+from raiden.network.proxies import TokenNetworkRegistry, TokenNetwork
 from raiden.settings import DEFAULT_RETRY_TIMEOUT, DEVELOPMENT_CONTRACT_VERSION
 
 from raiden.transfer import architecture, views
@@ -1769,3 +1771,8 @@ class RaidenAPI:
                 status_code=HTTPStatus.FORBIDDEN,
                 log=log
             )
+
+    def unlock_payment_light(self, signed_tx: typing.SignedTransaction, token_address: typing.TokenAddress):
+        registry: TokenNetworkRegistry = self.raiden.default_registry
+        token_network: TokenNetwork = self.raiden.chain.token_network(registry.get_token_network(token_address))
+        token_network.proxy.broadcast_signed_transaction_and_wait(signed_tx)

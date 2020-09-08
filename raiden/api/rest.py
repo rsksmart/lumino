@@ -86,7 +86,8 @@ from raiden.api.v1.resources import (
     LightClientMatrixCredentialsBuildResource,
     LightClientResource,
     PaymentLightResource,
-    CreatePaymentLightResource, WatchtowerResource, LightClientMessageResource)
+    CreatePaymentLightResource, WatchtowerResource, LightClientMessageResource, UnlockedPaymentLightResource,
+    UnlockedPaymentLightResource)
 
 from raiden.constants import GENESIS_BLOCK_NUMBER, UINT256_MAX, Environment, EMPTY_PAYMENT_HASH_INVOICE
 
@@ -227,6 +228,10 @@ URLS_HUB_V1 = [
     (
         "/light_channels/<hexaddress:token_address>/<hexaddress:creator_address>/<hexaddress:partner_address>",
         LightChannelsResourceByTokenAndPartnerAddress
+    ),
+    (
+        "/unlocked_payments/<hexaddress:token_address>",
+        UnlockedPaymentLightResource
     ),
     ("/payments_light", PaymentLightResource),
     ("/light_client_messages", LightClientMessageResource, "Message polling"),
@@ -2218,3 +2223,11 @@ class RestAPI:
             return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.NOT_FOUND, log=log)
         except UnhandledLightClient as e:
             return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.FORBIDDEN, log=log)
+
+    def post_unlocked_payment_light(self, signed_tx: typing.SignedTransaction, token_address: typing.TokenAddress):
+        try:
+            return self.raiden_api.unlock_payment_light(signed_tx, token_address)
+        except RawTransactionFailed as e:
+            return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.BAD_REQUEST)
+        except RaidenRecoverableError as e:
+            return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
