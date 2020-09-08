@@ -272,8 +272,8 @@ class MatrixTransport(TransportLayer, Runnable):
     _room_sep = "_"
     log = log
 
-    def __init__(self, config: dict, current_server_name: str = None):
-        TransportLayer.__init__(self, config["address"])
+    def __init__(self, address: Address, config: dict, current_server_name: str = None):
+        TransportLayer.__init__(self, address)
         Runnable.__init__(self)
         self._config = config
         self._raiden_service: Optional[RaidenService] = None
@@ -1362,17 +1362,16 @@ class MatrixTransport(TransportLayer, Runnable):
 class MatrixLightClientTransport(MatrixTransport):
 
     def __init__(self,
+                 address: Address,
                  config: dict,
                  _encrypted_light_client_password_signature: str,
                  _encrypted_light_client_display_name_signature: str,
                  _encrypted_light_client_seed_for_retry_signature: str,
-                 _address: str,
                  current_server_name: str = None):
-        MatrixTransport.__init__(self, config, current_server_name)
+        MatrixTransport.__init__(self, address, config, current_server_name)
         self._encrypted_light_client_password_signature = _encrypted_light_client_password_signature
         self._encrypted_light_client_display_name_signature = _encrypted_light_client_display_name_signature
         self._encrypted_light_client_seed_for_retry_signature = _encrypted_light_client_seed_for_retry_signature
-        self._address = _address
 
     def start(  # type: ignore
         self,
@@ -1402,7 +1401,7 @@ class MatrixLightClientTransport(MatrixTransport):
             encrypted_light_client_display_name_signature=self._encrypted_light_client_display_name_signature,
             encrypted_light_client_seed_for_retry_signature=self._encrypted_light_client_seed_for_retry_signature,
             private_key_hub=self._raiden_service.config["privatekey"].hex(),
-            light_client_address=self._address
+            light_client_address=self.address
         )
 
         self.log = log.bind(current_user=self._user_id, node=pex(self._raiden_service.address))
@@ -1446,8 +1445,8 @@ class MatrixLightClientTransport(MatrixTransport):
     def _run(self):
         """ Runnable main method, perform wait on long-running subtasks """
         # dispatch auth data on first scheduling after start
-        state_change = ActionUpdateTransportAuthData(f"{self._user_id}/{self._client.api.token}", self._address)
-        self.greenlet.name = f"MatrixLightClientTransport._run light_client:{to_canonical_address(self._address)}"
+        state_change = ActionUpdateTransportAuthData(f"{self._user_id}/{self._client.api.token}", self.address)
+        self.greenlet.name = f"MatrixLightClientTransport._run light_client:{to_canonical_address(self.address)}"
         self._raiden_service.handle_and_track_state_change(state_change)
         try:
             # waits on _stop_event.ready()
@@ -1499,7 +1498,7 @@ class MatrixLightClientTransport(MatrixTransport):
 
         assert self._raiden_service is not None
         address_pair = sorted(
-            [to_normalized_address(address) for address in [address, to_canonical_address(self._address)]]
+            [to_normalized_address(address) for address in [address, to_canonical_address(self.address)]]
         )
 
         room_name = make_room_alias(self.network_id, *address_pair)
@@ -1620,9 +1619,6 @@ class MatrixLightClientTransport(MatrixTransport):
             )
 
         return room
-
-    def get_address(self):
-        return self._address
 
     def _handle_message(self, room, event) -> bool:
         """ Handle text messages sent to listening rooms """

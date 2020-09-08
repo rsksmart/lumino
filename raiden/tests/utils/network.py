@@ -297,6 +297,7 @@ def create_apps(
         database_path = database_from_privatekey(base_dir=database_basedir, app_number=idx)
 
         config = {
+            "address": address,
             "chain_id": chain_id,
             "environment_type": environment_type,
             "unrecoverable_error_should_crash": unrecoverable_error_should_crash,
