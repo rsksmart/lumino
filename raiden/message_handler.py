@@ -1,5 +1,3 @@
-import copy
-
 import structlog
 
 from eth_utils import to_checksum_address
@@ -21,8 +19,7 @@ from raiden.messages import (
 from raiden.raiden_service import RaidenService
 from raiden.transfer import views
 from raiden.transfer.architecture import StateChange
-from raiden.transfer.mediated_transfer.initiator_manager import cancel_current_route
-from raiden.transfer.mediated_transfer.state import lockedtransfersigned_from_message, InitiatorPaymentState
+from raiden.transfer.mediated_transfer.state import lockedtransfersigned_from_message,
 from raiden.transfer.mediated_transfer.state_change import (
     ReceiveLockExpired,
     ReceiveSecretRequest,
