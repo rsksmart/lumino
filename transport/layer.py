@@ -30,7 +30,7 @@ class TransportLayer(ABC):
         """
 
     @abstractmethod
-    def send_async(self, queue_identifier: QueueIdentifier, message: Message):
+    def send_message(self, queue_identifier: QueueIdentifier, message: Message):
         """
         Queue the message for sending to recipient in the queue_identifier.
         It may be called before transport is started, to initialize message queues.

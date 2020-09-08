@@ -507,7 +507,7 @@ class MatrixTransport(TransportLayer, Runnable):
             # representing the target node
             self._address_mgr.refresh_address_presence(node_address)
 
-    def send_async(self, queue_identifier: QueueIdentifier, message: Message):
+    def send_message(self, queue_identifier: QueueIdentifier, message: Message):
         """Queue the message for sending to recipient in the queue_identifier
 
         It may be called before transport is started, to initialize message queues
@@ -523,7 +523,7 @@ class MatrixTransport(TransportLayer, Runnable):
         # These are not protocol messages, but transport specific messages
         if isinstance(message, (Delivered, Ping, Pong)):
             raise ValueError(
-                "Do not use send_async for {} messages".format(message.__class__.__name__)
+                "Do not use send_message for {} messages".format(message.__class__.__name__)
             )
 
         self.log.info(
