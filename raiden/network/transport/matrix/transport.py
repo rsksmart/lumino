@@ -330,9 +330,8 @@ class MatrixTransport(TransportLayer, Runnable):
 
         self._message_handler: Optional[MessageHandler] = None
 
-
     def start_greenlet_for_light_client(self):
-        super().start()
+        Runnable.start(self)
 
     def __repr__(self):
         if self._raiden_service is not None:
@@ -400,7 +399,7 @@ class MatrixTransport(TransportLayer, Runnable):
                 retrier.start()
 
         self.log.debug("Matrix started", config=self._config)
-        super().start()  # start greenlet
+        Runnable.start(self)  # start greenlet
         self._started = True
 
     def _run(self):
@@ -1353,6 +1352,12 @@ class MatrixTransport(TransportLayer, Runnable):
 
         return True
 
+    def link_exception(self, callback: Any):
+        Runnable.link_exception(self, callback)
+
+    def join(self, timeout=None):
+        Runnable.join(self, timeout)
+
 
 class MatrixLightClientTransport(MatrixTransport):
 
@@ -1363,7 +1368,7 @@ class MatrixLightClientTransport(MatrixTransport):
                  _encrypted_light_client_seed_for_retry_signature: str,
                  _address: str,
                  current_server_name: str = None):
-        super().__init__(config, current_server_name)
+        MatrixTransport.__init__(self, config, current_server_name)
         self._encrypted_light_client_password_signature = _encrypted_light_client_password_signature
         self._encrypted_light_client_display_name_signature = _encrypted_light_client_display_name_signature
         self._encrypted_light_client_seed_for_retry_signature = _encrypted_light_client_seed_for_retry_signature
@@ -1435,7 +1440,7 @@ class MatrixLightClientTransport(MatrixTransport):
                 retrier.start()
 
         self.log.debug("Matrix started", config=self._config)
-        super().start_greenlet_for_light_client()
+        MatrixTransport.start_greenlet_for_light_client(self)
         self._started = True
 
     def _run(self):
@@ -1455,7 +1460,6 @@ class MatrixLightClientTransport(MatrixTransport):
         except Exception:
             self.stop()  # ensure cleanup and wait on subtasks
             raise
-
 
     def _send_raw(self, receiver_address: Address, data: str):
         with self._getroom_lock:
