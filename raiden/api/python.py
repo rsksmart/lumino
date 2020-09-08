@@ -1715,7 +1715,7 @@ class RaidenAPI:
 
             # Create the light_client_payment
             is_lc_initiator = 1
-            payment = LightClientPayment(creator_address, partner_address,
+            payment = LightClientPayment(partner_address,
                                          is_lc_initiator, channel_state.token_network_identifier,
                                          amount,
                                          str(date.today()),
@@ -1729,6 +1729,7 @@ class RaidenAPI:
                 locked_transfer,
                 False,
                 payment.payment_id,
+                creator_address,
                 order,
                 LightClientProtocolMessageType.PaymentSuccessful,
                 self.raiden.wal
