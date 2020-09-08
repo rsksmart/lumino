@@ -397,7 +397,7 @@ class ContractSendChannelBatchUnlockLight(ContractSendEvent):
     def __eq__(self, other: Any) -> bool:
         return (
             super().__eq__(other)
-            and isinstance(other, ContractSendChannelBatchUnlock)
+            and isinstance(other, ContractSendChannelBatchUnlockLight)
             and self.canonical_identifier == other.canonical_identifier
             and self.participant == other.participant
         )
@@ -415,7 +415,7 @@ class ContractSendChannelBatchUnlockLight(ContractSendEvent):
         return result
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "ContractSendChannelBatchUnlock":
+    def from_dict(cls, data: Dict[str, Any]) -> "ContractSendChannelBatchUnlockLight":
         restored = cls(
             canonical_identifier=CanonicalIdentifier.from_dict(data["canonical_identifier"]),
             participant=to_canonical_address(data["participant"]),

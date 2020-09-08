@@ -1831,7 +1831,7 @@ class RequestMonitoring(SignedMessage):
             and recover(reward_proof_data, self.reward_proof_signature) == requesting_address
         )
 
-class UnlockRequest(Message):
+class UnlockLightRequest(Message):
     def __init__(self, channel_identifier: ChannelID, sender: Address, receiver: Address, **kwargs):
         super().__init__(**kwargs)
         self.channel_identifier = channel_identifier

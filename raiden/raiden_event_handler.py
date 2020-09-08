@@ -9,7 +9,7 @@ from raiden.exceptions import ChannelOutdatedError, RaidenUnrecoverableError
 from raiden.lightclient.handlers.light_client_message_handler import LightClientMessageHandler
 from raiden.lightclient.models.light_client_protocol_message import LightClientProtocolMessageType
 from raiden.message_event_convertor import message_from_sendevent
-from raiden.messages import UnlockRequest
+from raiden.messages import UnlockLightRequest
 from raiden.network.proxies.payment_channel import PaymentChannel
 from raiden.network.proxies.token_network import TokenNetwork
 from raiden.network.resolver.client import reveal_secret_with_resolver
@@ -700,7 +700,7 @@ class RaidenEventHandler(EventHandler):
                     order=0,
                     message_type=LightClientProtocolMessageType.UnlockRequired,
                     wal=raiden.wal,
-                    message=UnlockRequest(channel_identifier, receiver=our_address, sender=partner_address)
+                    message=UnlockLightRequest(channel_identifier, receiver=our_address, sender=partner_address)
                 )
         if search_events:
             event_record = get_event_with_balance_proof_by_locksroot(
@@ -743,7 +743,7 @@ class RaidenEventHandler(EventHandler):
                     order=0,
                     message_type=LightClientProtocolMessageType.UnlockRequired,
                     wal=raiden.wal,
-                    message=UnlockRequest(channel_identifier, receiver=partner_address, sender=our_address)
+                    message=UnlockLightRequest(channel_identifier, receiver=partner_address, sender=our_address)
                 )
 
     @staticmethod
