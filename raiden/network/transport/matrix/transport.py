@@ -1770,3 +1770,6 @@ class NodeTransport:
 
     def add_light_client_transport(self, light_client_transport: TransportLayer):
         self.light_client_transports.append(light_client_transport)
+
+    def remove_light_client_transport(self, light_client_transport: TransportLayer):
+        self.light_client_transports.remove(light_client_transport)
