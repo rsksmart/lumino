@@ -2285,7 +2285,6 @@ class TokenNetwork:
         else:
             log.info("Is light client, storing new state to handle message for settlement.", **log_details)
             # is LC, we create a new state to store a message for the LC
-            print("ARGS", kwargs)
             store_settlement_message = ActionStoreSettlementMessage(
                 lc_address=self_or_lc_address,
                 channel_network_identifier=channel_network_identifier,

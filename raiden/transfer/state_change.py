@@ -1620,7 +1620,6 @@ class ActionStoreSettlementMessage(StateChange):
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "ActionStoreSettlementMessage":
-        print("DATA", data)
         return cls(
             lc_address=to_canonical_address(data["lc_address"]),
             channel_network_identifier=to_canonical_address(data["channel_network_identifier"]),
