@@ -19,7 +19,8 @@ from raiden.api.objects import Address, AddressList, PartnersPerToken, PartnersP
 from raiden.constants import SECRET_LENGTH, SECRETHASH_LENGTH
 from raiden.settings import DEFAULT_INITIAL_CHANNEL_TARGET, DEFAULT_JOINABLE_FUNDS_TARGET
 from raiden.transfer import channel
-from raiden.transfer.state import CHANNEL_STATE_CLOSED, CHANNEL_STATE_OPENED, CHANNEL_STATE_SETTLED
+from raiden.transfer.state import CHANNEL_STATE_CLOSED, CHANNEL_STATE_OPENED, CHANNEL_STATE_SETTLED, \
+    CHANNEL_STATE_SETTLING
 from raiden.utils import data_decoder, data_encoder
 
 
@@ -471,7 +472,7 @@ class ChannelLightPatchSchema(BaseSchema):
         default=None,
         missing=None,
         validate=validate.OneOf(
-            [CHANNEL_STATE_CLOSED, CHANNEL_STATE_OPENED, CHANNEL_STATE_SETTLED]
+            [CHANNEL_STATE_CLOSED, CHANNEL_STATE_OPENED, CHANNEL_STATE_SETTLED, CHANNEL_STATE_SETTLING]
         ),
     )
     signed_approval_tx = fields.String(required=True)

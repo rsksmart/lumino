@@ -70,7 +70,7 @@ from raiden.transfer.state import (
     TransferTask,
     ChainState)
 
-from raiden.transfer.state_change import ActionChannelClose
+from raiden.transfer.state_change import ActionChannelClose, ActionChannelSettle
 from raiden.utils import pex, typing
 from raiden.utils.gas_reserve import has_enough_gas_reserve
 from raiden.utils.typing import (
@@ -574,6 +574,55 @@ class RaidenAPI:
             )
             raise InsufficientFunds(msg)
 
+    def settle_light(
+        self,
+        registry_address: PaymentNetworkID,
+        token_address: TokenAddress,
+        creator_address: Address,
+        partner_address: Address,
+        signed_settle_tx: typing.SignedTransaction = None,
+    ):
+        """Settle a channel opened with `partner_address` for the given
+        `token_address`.
+        Race condition, this can fail if channel was settled externally.
+        """
+
+        channels_to_settle = ChannelValidator.can_settle_channel(
+            token_address=token_address,
+            partner_addresses=[partner_address],
+            registry_address=registry_address,
+            raiden=self.raiden)
+
+        channel_ids = [channel_state.identifier for channel_state in channels_to_settle]
+
+        chain_state = views.state_from_raiden(self.raiden)
+
+        channel_state = views.get_channelstate_for(
+            chain_state=chain_state,
+            payment_network_id=registry_address,
+            token_address=token_address,
+            creator_address=creator_address,
+            partner_address=partner_address,
+        )
+
+        channel_proxy = self.raiden.chain.payment_channel(
+            canonical_identifier=channel_state.canonical_identifier
+        )
+
+        channel_proxy.settle_channel_light(
+            block_identifier=views.state_from_raiden(self.raiden).block_hash,
+            signed_settle_tx=signed_settle_tx
+        )
+
+        waiting.wait_for_settle(
+            raiden=self.raiden,
+            payment_network_id=registry_address,
+            token_address=token_address,
+            channel_ids=channel_ids,
+            retry_timeout=DEFAULT_RETRY_TIMEOUT,
+            partner_addresses=[partner_address]
+        )
+
     def set_total_channel_deposit_light(
         self,
         registry_address: PaymentNetworkID,
@@ -745,6 +794,27 @@ class RaidenAPI:
             partner_addresses=[partner_address],
             retry_timeout=retry_timeout,
             signed_close_tx=signed_close_tx
+        )
+
+    def channel_settle_light(
+        self,
+        registry_address: PaymentNetworkID,
+        token_address: TokenAddress,
+        creator_address: Address,
+        partner_address: Address,
+        signed_settle_tx: typing.SignedTransaction = None
+    ):
+        """
+            Settle a channel opened with `partner_address` for the given
+            `token_address`.
+            Race condition, this can fail if channel was settled externally.
+        """
+        self.settle_light(
+            registry_address=registry_address,
+            token_address=token_address,
+            creator_address=creator_address,
+            partner_address=partner_address,
+            signed_settle_tx=signed_settle_tx
         )
 
     def channel_batch_close_light(
@@ -1728,11 +1798,11 @@ class RaidenAPI:
                 locked_transfer.message_identifier,
                 locked_transfer,
                 False,
-                payment.payment_id,
                 creator_address,
                 order,
                 LightClientProtocolMessageType.PaymentSuccessful,
-                self.raiden.wal
+                self.raiden.wal,
+                payment.payment_id
             )
             payment_hub_message = PaymentHubMessage(payment_id=payment.payment_id,
                                                     message_order=order,

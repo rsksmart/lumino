@@ -118,3 +118,31 @@ class ChannelValidator:
         )
 
         return channels_to_close
+
+    @staticmethod
+    def can_settle_channel(token_address,
+                           partner_addresses,
+                           registry_address,
+                           raiden):
+
+        if not is_binary_address(token_address):
+            raise InvalidAddress("Expected binary address format for token in channel settle")
+
+        if not all(map(is_binary_address, partner_addresses)):
+            raise InvalidAddress("Expected binary address format for partner in channel settle")
+
+        valid_tokens = views.get_token_identifiers(
+            chain_state=views.state_from_raiden(raiden), payment_network_id=registry_address
+        )
+        if token_address not in valid_tokens:
+            raise UnknownTokenAddress("Token address is not known in channel settle.")
+
+        chain_state = views.state_from_raiden(raiden)
+        channels_to_settle = views.filter_channels_to_settle_by_partner_address(
+            chain_state=chain_state,
+            payment_network_id=registry_address,
+            token_address=token_address,
+            partner_addresses=partner_addresses,
+        )
+
+        return channels_to_settle

@@ -120,7 +120,8 @@ from raiden.transfer.events import (
     EventPaymentSentFailed,
     EventPaymentSentSuccess,
 )
-from raiden.transfer.state import CHANNEL_STATE_CLOSED, CHANNEL_STATE_OPENED, NettingChannelState
+from raiden.transfer.state import CHANNEL_STATE_CLOSED, CHANNEL_STATE_OPENED, NettingChannelState, \
+    CHANNEL_STATE_SETTLING
 from raiden.utils import (
     create_default_identifier,
     optional_address_to_string,
@@ -1633,6 +1634,37 @@ class RestAPI:
         # return api_response(result=result.data)
         return None
 
+    def _settle_light(self,
+                      registry_address: typing.PaymentNetworkID,
+                      channel_state: NettingChannelState,
+                      signed_settle_tx: typing.SignedTransaction):
+        """ This operation validates and send the settlement signed transaction for a LC """
+        log.debug(
+            "Settling light channel",
+            node=pex(self.raiden_api.address),
+            registry_address=to_checksum_address(registry_address),
+            channel_identifier=channel_state.identifier
+        )
+
+        self.validate_channel_status_for_settle(channel_state)
+
+        try:
+            self.raiden_api.channel_settle_light(
+                registry_address=registry_address,
+                token_address=channel_state.token_address,
+                creator_address=channel_state.our_state.address,
+                partner_address=channel_state.partner_state.address,
+                signed_settle_tx=signed_settle_tx
+            )
+        except InsufficientFunds as e:
+            return api_error(errors=str(e), status_code=HTTPStatus.PAYMENT_REQUIRED)
+        except RawTransactionFailed as e:
+            return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.BAD_REQUEST, log=log)
+        except RaidenRecoverableError as e:
+            return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.BAD_REQUEST, log=log)
+
+        return self.update_channel_state(registry_address, channel_state)
+
     def _deposit_light(
         self,
         registry_address: typing.PaymentNetworkID,
@@ -1778,6 +1810,15 @@ class RestAPI:
         return self.update_channel_state(registry_address, channel_state)
 
     @staticmethod
+    def validate_channel_status_for_settle(channel_state):
+        if channel.get_status(channel_state) != CHANNEL_STATE_SETTLING:
+            return api_error(
+                errors="Attempted to settle a channel that is not in waiting_for_settle state",
+                status_code=HTTPStatus.CONFLICT,
+            )
+        return None
+
+    @staticmethod
     def validate_channel_status(channel_state):
         if channel.get_status(channel_state) != CHANNEL_STATE_OPENED:
             return api_error(
@@ -1807,9 +1848,9 @@ class RestAPI:
         signed_approval_tx: typing.SignedTransaction,
         signed_deposit_tx: typing.SignedTransaction,
         signed_close_tx: typing.SignedTransaction,
+        signed_settle_tx: typing.SignedTransaction,
         total_deposit: typing.TokenAmount = None,
-        state: str = None,
-
+        state: str = None
     ):
         log.debug(
             "Patching light channel",
@@ -1865,6 +1906,8 @@ class RestAPI:
 
         elif state == CHANNEL_STATE_CLOSED:
             result = self._close_light(registry_address, channel_state, signed_close_tx)
+        elif state == CHANNEL_STATE_SETTLING:
+            result = self._settle_light(registry_address, channel_state, signed_settle_tx)
         else:  # should never happen, channel_state is validated in the schema
             result = api_error(
                 errors="Provided invalid channel state {}".format(state),

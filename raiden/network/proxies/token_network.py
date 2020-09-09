@@ -2255,6 +2255,66 @@ class TokenNetwork:
 
         log.info("settle successful", **log_details)
 
+    def settle_light(
+        self,
+        given_block_identifier: BlockSpecification,
+        channel_identifier: ChannelID,
+        creator: Address,
+        partner: Address,
+        signed_settle_tx: SignedTransaction
+    ):
+        """ Send a signed settle transaction for a specific channel """
+        log_details = {
+            "given_block_identifier": given_block_identifier.hex(),
+            "channel_identifier": channel_identifier,
+            "creator": pex(creator),
+            "partner": pex(partner),
+        }
+        log.debug("settle light called", **log_details)
+
+        checking_block = self.client.get_checking_block()
+        try:
+            self._settle_preconditions(
+                channel_identifier=channel_identifier,
+                partner=partner,
+                block_identifier=given_block_identifier,
+            )
+        except NoStateForBlockIdentifier:
+            # If preconditions end up being on pruned state skip them. Estimate
+            # gas will stop us from sending a transaction that will fail
+            pass
+
+        with self.channel_operations_lock[partner]:
+            error_prefix = "settle call failed"
+            transaction_hash = self.proxy.broadcast_signed_transaction(signed_settle_tx)
+            self.client.poll(transaction_hash)
+            transaction_error = check_transaction_threw(self.client, transaction_hash)
+
+        if transaction_error:
+            if transaction_error["blockNumber"]:
+                block = transaction_error["blockNumber"]
+            else:
+                block = checking_block
+
+            self.proxy.jsonrpc_client.check_for_insufficient_eth(
+                transaction_name="settleChannel",
+                address=self.node_address,
+                transaction_executed=transaction_error["blockNumber"] is not None,
+                required_gas=GAS_REQUIRED_FOR_SETTLE_CHANNEL,
+                block_identifier=block,
+            )
+            msg = self._check_channel_state_after_settle(
+                participant1=self.node_address,
+                participant2=partner,
+                block_identifier=block,
+                channel_identifier=channel_identifier,
+            )
+            error_msg = f"{error_prefix}. {msg}"
+            log.critical(error_msg, **log_details)
+            raise RaidenUnrecoverableError(error_msg)
+
+        log.info("settle light successful", **log_details)
+
     def events_filter(
         self,
         topics: List[str] = None,
