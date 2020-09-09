@@ -324,7 +324,7 @@ class PaymentLightResource(BaseResource):
             receiver: typing.AddressHex,
             message: Dict,
             message_type_value: str,
-            additional_metadata: Dict):
+            additional_metadata: Dict = None):
         """
         put a signed message associated with a payment of a light client
         """
