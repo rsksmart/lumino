@@ -2143,6 +2143,7 @@ class RestAPI:
         message_type = LightClientProtocolMessageType[message_type_value]
 
         if message["type"] == "LockedTransfer":
+            previous_hash = additional_metadata.previous_hash if additional_metadata is not None else None
             lt = LockedTransfer.from_dict(message)
             self.initiate_payment_light(self.raiden_api.raiden.default_registry.address, lt.token, lt.initiator,
                                         lt.target, lt.locked_amount, lt.payment_identifier, payment_request.payment_id,
