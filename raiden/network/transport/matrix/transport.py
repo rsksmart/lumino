@@ -521,7 +521,7 @@ class MatrixTransport(TransportLayer, Runnable):
             raise ValueError("Invalid address {}".format(pex(receiver_address)))
 
         # These are not protocol messages, but transport specific messages
-        if isinstance(message, (Delivered, Ping, Pong)):
+        if isinstance(message, (Ping, Pong)):
             raise ValueError(
                 "Do not use send_async for {} messages".format(message.__class__.__name__)
             )
