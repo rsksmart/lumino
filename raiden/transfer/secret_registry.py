@@ -1,7 +1,5 @@
 import random
-from typing import Optional
 
-from raiden.lightclient.handlers.light_client_service import LightClientService
 from raiden.lightclient.models.light_client_protocol_message import LightClientProtocolMessageType
 from raiden.messages import RequestRegisterSecret
 from raiden.transfer.architecture import Event

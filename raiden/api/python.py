@@ -54,7 +54,7 @@ from raiden.messages import RequestMonitoring, LockedTransfer, RevealSecret, Unl
     Processed, LockExpired
 from raiden.settings import DEFAULT_RETRY_TIMEOUT, DEVELOPMENT_CONTRACT_VERSION
 
-from raiden.transfer import architecture, views, secret_registry
+from raiden.transfer import architecture, views
 from raiden.transfer.events import (
     EventPaymentReceivedSuccess,
     EventPaymentSentFailed,
