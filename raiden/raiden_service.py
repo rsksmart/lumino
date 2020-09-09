@@ -1333,6 +1333,7 @@ class RaidenService(Runnable):
                 delivered,
                 True,
                 payment_id,
+                sender_address,
                 msg_order,
                 message_type,
                 self.wal
@@ -1349,6 +1350,7 @@ class RaidenService(Runnable):
                 processed,
                 True,
                 payment_id,
+                sender_address,
                 msg_order,
                 message_type,
                 self.wal

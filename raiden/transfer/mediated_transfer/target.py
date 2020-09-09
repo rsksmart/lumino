@@ -207,7 +207,7 @@ def handle_inittarget_light(
         # by not generating an event send secret request
         if safe_to_wait and handle_invoice_result['is_valid']:
             payment = LightClientPayment(
-                state_change.transfer.target, state_change.transfer.initiator,
+                state_change.transfer.initiator,
                 False,
                 channel_state.token_network_identifier,
                 transfer.lock.amount,
@@ -234,7 +234,8 @@ def handle_inittarget_light(
 
             store_locked_transfer_event = StoreMessageEvent(transfer.message_identifier, transfer.payment_identifier, 1,
                                                             state_change.signed_lockedtransfer, True,
-                                                            LightClientProtocolMessageType.PaymentSuccessful)
+                                                            LightClientProtocolMessageType.PaymentSuccessful,
+                                                            transfer.target)
 
             secret_request_message = SecretRequest.from_event(secret_request)
             store_secret_request_event = StoreMessageEvent(message_identifier,
@@ -242,14 +243,15 @@ def handle_inittarget_light(
                                                            5,
                                                            secret_request_message,
                                                            False,
-                                                           LightClientProtocolMessageType.PaymentSuccessful)
+                                                           LightClientProtocolMessageType.PaymentSuccessful,
+                                                           transfer.target)
             channel_events.append(store_secret_request_event)
             channel_events.append(store_locked_transfer_event)
         elif not safe_to_wait:
             # If transfer expired, persist the LockedTransfer in order that the LC can get it and respond with Delivered msg
             # Also persist the payment on with expired status
             payment = LightClientPayment(
-                state_change.transfer.target, state_change.transfer.initiator,
+                state_change.transfer.initiator,
                 False,
                 channel_state.token_network_identifier,
                 transfer.lock.amount,
@@ -260,7 +262,8 @@ def handle_inittarget_light(
             LightClientMessageHandler.store_light_client_payment(payment, storage)
             store_expired_locked_transfer_event = StoreMessageEvent(transfer.message_identifier, transfer.payment_identifier, 1,
                                                             state_change.signed_lockedtransfer, True,
-                                                            LightClientProtocolMessageType.PaymentExpired)
+                                                            LightClientProtocolMessageType.PaymentExpired,
+                                                                    transfer.target)
             channel_events.append(store_expired_locked_transfer_event)
         iteration = TransitionResult(target_state, channel_events)
     else:
@@ -297,7 +300,8 @@ def handle_send_secret_reveal_light(
     )
     store_reveal_secret_event = StoreMessageEvent(message_identifier, transfer.payment_identifier, 9,
                                                   state_change.reveal_secret, True,
-                                                  LightClientProtocolMessageType.PaymentSuccessful)
+                                                  LightClientProtocolMessageType.PaymentSuccessful,
+                                                  transfer.target)
     iteration = TransitionResult(target_state, [revealsecret, store_reveal_secret_event])
     return iteration
 
@@ -346,7 +350,8 @@ def handle_send_secret_request_light(
                                                        5,
                                                        state_change.secret_request,
                                                        True,
-                                                       LightClientProtocolMessageType.PaymentSuccessful)
+                                                       LightClientProtocolMessageType.PaymentSuccessful,
+                                                       transfer.target)
         events.append(secret_request_light)
         events.append(store_secret_request_event)
 
@@ -448,16 +453,17 @@ def handle_offchain_secretreveal_light(
             7,
             received_reveal_secret,
             True,
-            LightClientProtocolMessageType.PaymentSuccessful
+            LightClientProtocolMessageType.PaymentSuccessful,
+            target_state.transfer.target
         )
-
         store_reveal_to_send = StoreMessageEvent(
             message_identifier,
             target_state.transfer.payment_identifier,
             9,
             reveal_secret_to_send_msg,
             False,
-            LightClientProtocolMessageType.PaymentSuccessful
+            LightClientProtocolMessageType.PaymentSuccessful,
+            target_state.transfer.target
         )
 
         iteration = TransitionResult(target_state, [store_received_reveal, store_reveal_to_send])
@@ -525,7 +531,8 @@ def handle_unlock_light(
             11,
             state_change.signed_unlock,
             True,
-            LightClientProtocolMessageType.PaymentSuccessful
+            LightClientProtocolMessageType.PaymentSuccessful,
+            transfer.target
         )
 
         events.extend([payment_received_success, unlock_success, store_unlock_message])

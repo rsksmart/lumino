@@ -312,7 +312,8 @@ def handle_init_unlock_light(
         balance_proof = channel.create_send_balance_proof_light(channel_state, state_change.unlock,
                                                                 state_change.sender, state_change.receiver)
         store_signed_bp = StoreMessageEvent(balance_proof.message_identifier, balance_proof.payment_identifier, 11,
-                                            state_change.unlock, True, LightClientProtocolMessageType.PaymentSuccessful)
+                                            state_change.unlock, True, LightClientProtocolMessageType.PaymentSuccessful,
+                                            balance_proof.sender)
         events.append(balance_proof)
         events.append(store_signed_bp)
     return TransitionResult(chain_state, events)
@@ -327,8 +328,8 @@ def handle_init_send_lock_expired_light(
                                                    state_change.payment_id)
     store_lock_expired_light = StoreMessageEvent(signed_lock_expired.message_identifier, state_change.payment_id,
                                                  1, signed_lock_expired, True,
-                                                 LightClientProtocolMessageType.PaymentExpired)
-
+                                                 LightClientProtocolMessageType.PaymentExpired,
+                                                 signed_lock_expired.sender)
     events = [send_lock_expired_light, store_lock_expired_light]
     return TransitionResult(chain_state, events)
 
