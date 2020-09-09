@@ -15,6 +15,8 @@ from flask import Flask, make_response, send_from_directory, url_for, request
 from flask_restful import Api, abort
 from gevent.pywsgi import WSGIServer
 from hexbytes import HexBytes
+
+from raiden.api.validations.valid_light_client import light_client_only
 from raiden.lightclient.handlers.light_client_message_handler import LightClientMessageHandler
 from raiden_webui import RAIDEN_WEBUI_PATH
 
@@ -241,7 +243,7 @@ URLS_HUB_V1 = [
         LightClientResource
     ),
     (
-        '/secret_light/',
+        '/secrets_light/',
         RegisterSecretLightResource
     ),
 ]
@@ -881,6 +883,7 @@ class RestAPI:
         ]
         return api_response(result=closed_channels)
 
+    @light_client_only
     def post_register_secret_light(self,
              signed_tx: typing.SignedTransaction,
              message_id: typing.MessageID,

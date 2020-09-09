@@ -515,7 +515,7 @@ class RegisterSecretLightResource(BaseResource):
              message_order: int,
              payment_id: typing.PaymentID,
     ):
-        self.rest_api.post_register_secret_light(signed_tx, message_id, message_order, payment_id)
+        return self.rest_api.post_register_secret_light(signed_tx, message_id, message_order, payment_id)
 
 
 class LightClientResource(BaseResource):
