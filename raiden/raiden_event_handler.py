@@ -4,10 +4,13 @@ from typing import TYPE_CHECKING
 import structlog
 from eth_utils import to_checksum_address, to_hex
 
+from raiden.api.objects import SettlementParameters
 from raiden.constants import EMPTY_BALANCE_HASH, EMPTY_HASH, EMPTY_MESSAGE_HASH, EMPTY_SIGNATURE
 from raiden.exceptions import ChannelOutdatedError, RaidenUnrecoverableError
 from raiden.lightclient.handlers.light_client_message_handler import LightClientMessageHandler
+from raiden.lightclient.models.light_client_protocol_message import LightClientProtocolMessageType
 from raiden.message_event_convertor import message_from_sendevent
+from raiden.messages import SettlementRequiredLightMessage
 from raiden.network.proxies.payment_channel import PaymentChannel
 from raiden.network.proxies.token_network import TokenNetwork
 from raiden.network.resolver.client import reveal_secret_with_resolver
@@ -29,7 +32,7 @@ from raiden.transfer.events import (
     EventPaymentSentFailed,
     EventPaymentSentSuccess,
     SendProcessed,
-    ContractSendChannelUpdateTransferLight)
+    ContractSendChannelUpdateTransferLight, ContractSendChannelSettleLight)
 from raiden.transfer.identifiers import CanonicalIdentifier
 from raiden.transfer.mediated_transfer.events import (
     EventUnlockClaimFailed,
@@ -44,7 +47,7 @@ from raiden.transfer.mediated_transfer.events import (
     SendSecretReveal,
     SendLockedTransferLight, StoreMessageEvent, SendSecretRevealLight, SendBalanceProofLight, SendSecretRequestLight,
     SendLockExpiredLight)
-from raiden.transfer.state import ChainState, NettingChannelEndState
+from raiden.transfer.state import ChainState, NettingChannelEndState, message_identifier_from_prng
 from raiden.transfer.utils import (
     get_event_with_balance_proof_by_balance_hash,
     get_event_with_balance_proof_by_locksroot,
@@ -53,9 +56,11 @@ from raiden.transfer.utils import (
 )
 from raiden.transfer.views import get_channelstate_by_token_network_and_partner
 from raiden.utils import pex
-from raiden.utils.typing import MYPY_ANNOTATION, Address, Nonce, TokenNetworkID, AddressHex
+from raiden.utils.typing import MYPY_ANNOTATION, Address, Nonce, TokenNetworkID, AddressHex, ChannelID, BlockHash
 
 from raiden.billing.invoices.handlers.invoice_handler import handle_receive_events_with_payments
+
+import random
 
 if TYPE_CHECKING:
     # pylint: disable=unused-import
@@ -169,6 +174,9 @@ class RaidenEventHandler(EventHandler):
         elif type(event) == ContractSendChannelSettle:
             assert isinstance(event, ContractSendChannelSettle), MYPY_ANNOTATION
             self.handle_contract_send_channelsettle(raiden, event)
+        elif type(event) == ContractSendChannelSettleLight:
+            assert isinstance(event, ContractSendChannelSettleLight), MYPY_ANNOTATION
+            self.handle_contract_send_channel_settle_light(raiden, event)
         elif type(event) == StoreMessageEvent:
             assert isinstance(event, StoreMessageEvent), MYPY_ANNOTATION
             self.handle_store_message(raiden, event)
@@ -189,11 +197,11 @@ class RaidenEventHandler(EventHandler):
             LightClientMessageHandler.store_light_client_protocol_message(store_message_event.message_id,
                                                                           store_message_event.message,
                                                                           store_message_event.is_signed,
-                                                                          store_message_event.payment_id,
                                                                           store_message_event.light_client_address,
                                                                           store_message_event.message_order,
                                                                           store_message_event.message_type,
-                                                                          raiden.wal)
+                                                                          raiden.wal,
+                                                                          store_message_event.payment_id)
         else:
             stored_but_unsigned = existing_message.signed_message is None
             if stored_but_unsigned and store_message_event.is_signed:
@@ -603,104 +611,196 @@ class RaidenEventHandler(EventHandler):
     def handle_contract_send_channelsettle(
         raiden: "RaidenService", channel_settle_event: ContractSendChannelSettle
     ):
-        # only make settlements if our node is a participant, dont do it for lc
-        if channel_settle_event.channel_state.our_state.address == raiden.address or channel_settle_event.channel_state.partner_state.address == raiden.address:
-            assert raiden.wal, "The Raiden Service must be initialize to handle events"
-            canonical_identifier = CanonicalIdentifier(
-                chain_identifier=raiden.chain.network_id,
-                token_network_address=channel_settle_event.token_network_identifier,
-                channel_identifier=channel_settle_event.channel_identifier,
-            )
-            triggered_by_block_hash = channel_settle_event.triggered_by_block_hash
-            payment_channel: PaymentChannel = raiden.chain.payment_channel(
-                canonical_identifier=canonical_identifier
-            )
-            token_network_proxy: TokenNetwork = payment_channel.token_network
-            if not token_network_proxy.client.can_query_state_for_block(triggered_by_block_hash):
-                # The only time this can happen is during restarts after a long time
-                # when the triggered block ends up getting pruned
-                # In that case it's safe to just use the latest view of the chain to
-                # query the on-chain participant/channel details
-                triggered_by_block_hash = token_network_proxy.client.blockhash_from_blocknumber(
-                    "latest"
-                )
-            participants_details = token_network_proxy.detail_participants(
-                participant1=payment_channel.participant1,
-                participant2=payment_channel.participant2,
-                block_identifier=triggered_by_block_hash,
-                channel_identifier=channel_settle_event.channel_identifier,
-            )
-            our_details = participants_details.our_details
-            partner_details = participants_details.partner_details
-            log_details = {
-                "chain_id": canonical_identifier.chain_identifier,
-                "token_network_identifier": canonical_identifier.token_network_address,
-                "channel_identifier": canonical_identifier.channel_identifier,
-                "node": pex(raiden.address),
-                "partner": to_checksum_address(partner_details.address),
-                "our_deposit": our_details.deposit,
-                "our_withdrawn": our_details.withdrawn,
-                "our_is_closer": our_details.is_closer,
-                "our_balance_hash": to_hex(our_details.balance_hash),
-                "our_nonce": our_details.nonce,
-                "our_locksroot": to_hex(our_details.locksroot),
-                "our_locked_amount": our_details.locked_amount,
-                "partner_deposit": partner_details.deposit,
-                "partner_withdrawn": partner_details.withdrawn,
-                "partner_is_closer": partner_details.is_closer,
-                "partner_balance_hash": to_hex(partner_details.balance_hash),
-                "partner_nonce": partner_details.nonce,
-                "partner_locksroot": to_hex(partner_details.locksroot),
-                "partner_locked_amount": partner_details.locked_amount,
-            }
-            if our_details.balance_hash != EMPTY_HASH:
-                event_record = get_event_with_balance_proof_by_balance_hash(
-                    storage=raiden.wal.storage,
-                    canonical_identifier=canonical_identifier,
-                    balance_hash=our_details.balance_hash,
-                )
-                if event_record.data is None:
-                    log.critical("our balance proof not found", **log_details)
-                    raise RaidenUnrecoverableError(
-                        "Our balance proof could not be found in the database"
-                    )
-                our_balance_proof = event_record.data.balance_proof
-                our_transferred_amount = our_balance_proof.transferred_amount
-                our_locked_amount = our_balance_proof.locked_amount
-                our_locksroot = our_balance_proof.locksroot
-            else:
-                our_transferred_amount = 0
-                our_locked_amount = 0
-                our_locksroot = EMPTY_HASH
-            if partner_details.balance_hash != EMPTY_HASH:
-                state_change_record = get_state_change_with_balance_proof_by_balance_hash(
-                    storage=raiden.wal.storage,
-                    canonical_identifier=canonical_identifier,
-                    balance_hash=partner_details.balance_hash,
-                    sender=participants_details.partner_details.address,
-                )
-                if state_change_record.data is None:
-                    log.critical("partner balance proof not found", **log_details)
-                    raise RaidenUnrecoverableError(
-                        "Partner balance proof could not be found in the database"
-                    )
-                partner_balance_proof = state_change_record.data.balance_proof
-                partner_transferred_amount = partner_balance_proof.transferred_amount
-                partner_locked_amount = partner_balance_proof.locked_amount
-                partner_locksroot = partner_balance_proof.locksroot
-            else:
-                partner_transferred_amount = 0
-                partner_locked_amount = 0
-                partner_locksroot = EMPTY_HASH
+        """ Handles settlement for normal node. """
 
-            payment_channel.settle(
-                transferred_amount=our_transferred_amount,
-                locked_amount=our_locked_amount,
-                locksroot=our_locksroot,
-                partner_transferred_amount=partner_transferred_amount,
-                partner_locked_amount=partner_locked_amount,
-                partner_locksroot=partner_locksroot,
-                block_identifier=triggered_by_block_hash,
-            )
+        settlement_parameters = RaidenEventHandler.process_data_and_get_settlement_parameters(
+            raiden,
+            channel_settle_event.token_network_identifier,
+            channel_settle_event.channel_identifier,
+            channel_settle_event.triggered_by_block_hash)
+
+        canonical_identifier = CanonicalIdentifier(
+            chain_identifier=raiden.chain.network_id,
+            token_network_address=channel_settle_event.token_network_identifier,
+            channel_identifier=channel_settle_event.channel_identifier,
+        )
+        payment_channel: PaymentChannel = raiden.chain.payment_channel(
+            canonical_identifier=canonical_identifier
+        )
+
+        payment_channel.settle(
+            transferred_amount=settlement_parameters.transferred_amount,
+            locked_amount=settlement_parameters.locked_amount,
+            locksroot=settlement_parameters.locksroot,
+            partner_transferred_amount=settlement_parameters.partner_transferred_amount,
+            partner_locked_amount=settlement_parameters.partner_locked_amount,
+            partner_locksroot=settlement_parameters.partner_locksroot,
+            block_identifier=settlement_parameters.block_identifier,
+        )
+
+    @staticmethod
+    def handle_contract_send_channel_settle_light(raiden: "RaidenService",
+                                                  channel_settle_light_event: ContractSendChannelSettleLight):
+        """ Store a message for the LC with SettlementRequired type to handle settlement for LC on hub mode. """
+
+        settlement_parameters = RaidenEventHandler.process_data_and_get_settlement_parameters(
+            raiden,
+            channel_settle_light_event.token_network_identifier,
+            channel_settle_light_event.channel_identifier,
+            channel_settle_light_event.triggered_by_block_hash)
+
+        canonical_identifier = CanonicalIdentifier(
+            chain_identifier=raiden.chain.network_id,
+            token_network_address=channel_settle_light_event.token_network_identifier,
+            channel_identifier=channel_settle_light_event.channel_identifier,
+        )
+        payment_channel: PaymentChannel = raiden.chain.payment_channel(
+            canonical_identifier=canonical_identifier
+        )
+
+        pseudo_random_generator = random.Random()
+
+        message_identifier = message_identifier_from_prng(pseudo_random_generator)
+
+        # and now find out
+        our_maximum = settlement_parameters.transferred_amount + settlement_parameters.locked_amount
+        partner_maximum = settlement_parameters.partner_transferred_amount + settlement_parameters.partner_locked_amount
+
+        # The second participant transferred + locked amount must be higher
+        our_bp_is_larger = our_maximum > partner_maximum
+        if our_bp_is_larger:
+            message = SettlementRequiredLightMessage (
+                channel_identifier=channel_settle_light_event.channel_identifier,
+                channel_network_identifier=channel_settle_light_event.token_network_identifier,
+                participant1=payment_channel.participant2,
+                participant1_transferred_amount=settlement_parameters.partner_transferred_amount,
+                participant1_locked_amount=settlement_parameters.partner_locked_amount,
+                participant1_locksroot=settlement_parameters.partner_locksroot,
+                participant2=payment_channel.participant1,
+                participant2_transferred_amount=settlement_parameters.transferred_amount,
+                participant2_locked_amount=settlement_parameters.locked_amount,
+                participant2_locksroot=settlement_parameters.locksroot)
         else:
-            log.info("Ignoring settlement cause is a light client")
+            message = SettlementRequiredLightMessage(
+                channel_identifier=channel_settle_light_event.channel_identifier,
+                channel_network_identifier=channel_settle_light_event.token_network_identifier,
+                participant1=payment_channel.participant1,
+                participant1_transferred_amount=settlement_parameters.transferred_amount,
+                participant1_locked_amount=settlement_parameters.locked_amount,
+                participant1_locksroot=settlement_parameters.locksroot,
+                participant2=payment_channel.participant2,
+                participant2_transferred_amount=settlement_parameters.partner_transferred_amount,
+                participant2_locked_amount=settlement_parameters.partner_locked_amount,
+                participant2_locksroot=settlement_parameters.partner_locksroot)
+
+        LightClientMessageHandler\
+            .store_light_client_protocol_message(identifier=message_identifier,
+                                                 message=message,
+                                                 signed=False,
+                                                 payment_id=None,
+                                                 light_client_address=payment_channel.participant1,
+                                                 order=0,
+                                                 message_type=LightClientProtocolMessageType.SettlementRequired,
+                                                 wal=raiden.wal)
+
+    @staticmethod
+    def process_data_and_get_settlement_parameters(raiden: "RaidenService",
+                                                   token_network_identifier: TokenNetworkID,
+                                                   channel_identifier: ChannelID,
+                                                   triggered_by_block_hash: BlockHash) -> SettlementParameters:
+        assert raiden.wal, "The Raiden Service must be initialize to handle events"
+        canonical_identifier = CanonicalIdentifier(
+            chain_identifier=raiden.chain.network_id,
+            token_network_address=token_network_identifier,
+            channel_identifier=channel_identifier,
+        )
+        triggered_by_block_hash = triggered_by_block_hash
+        payment_channel: PaymentChannel = raiden.chain.payment_channel(
+            canonical_identifier=canonical_identifier
+        )
+        token_network_proxy: TokenNetwork = payment_channel.token_network
+        if not token_network_proxy.client.can_query_state_for_block(triggered_by_block_hash):
+            # The only time this can happen is during restarts after a long time
+            # when the triggered block ends up getting pruned
+            # In that case it's safe to just use the latest view of the chain to
+            # query the on-chain participant/channel details
+            triggered_by_block_hash = token_network_proxy.client.blockhash_from_blocknumber(
+                "latest"
+            )
+        participants_details = token_network_proxy.detail_participants(
+            participant1=payment_channel.participant1,
+            participant2=payment_channel.participant2,
+            block_identifier=triggered_by_block_hash,
+            channel_identifier=channel_identifier,
+        )
+        our_details = participants_details.our_details
+        partner_details = participants_details.partner_details
+        log_details = {
+            "chain_id": canonical_identifier.chain_identifier,
+            "token_network_identifier": canonical_identifier.token_network_address,
+            "channel_identifier": canonical_identifier.channel_identifier,
+            "node": pex(raiden.address),
+            "partner": to_checksum_address(partner_details.address),
+            "our_deposit": our_details.deposit,
+            "our_withdrawn": our_details.withdrawn,
+            "our_is_closer": our_details.is_closer,
+            "our_balance_hash": to_hex(our_details.balance_hash),
+            "our_nonce": our_details.nonce,
+            "our_locksroot": to_hex(our_details.locksroot),
+            "our_locked_amount": our_details.locked_amount,
+            "partner_deposit": partner_details.deposit,
+            "partner_withdrawn": partner_details.withdrawn,
+            "partner_is_closer": partner_details.is_closer,
+            "partner_balance_hash": to_hex(partner_details.balance_hash),
+            "partner_nonce": partner_details.nonce,
+            "partner_locksroot": to_hex(partner_details.locksroot),
+            "partner_locked_amount": partner_details.locked_amount,
+        }
+        if our_details.balance_hash != EMPTY_HASH:
+            event_record = get_event_with_balance_proof_by_balance_hash(
+                storage=raiden.wal.storage,
+                canonical_identifier=canonical_identifier,
+                balance_hash=our_details.balance_hash,
+            )
+            if event_record.data is None:
+                log.critical("our balance proof not found", **log_details)
+                raise RaidenUnrecoverableError(
+                    "Our balance proof could not be found in the database"
+                )
+            our_balance_proof = event_record.data.balance_proof
+            our_transferred_amount = our_balance_proof.transferred_amount
+            our_locked_amount = our_balance_proof.locked_amount
+            our_locksroot = our_balance_proof.locksroot
+        else:
+            our_transferred_amount = 0
+            our_locked_amount = 0
+            our_locksroot = EMPTY_HASH
+        if partner_details.balance_hash != EMPTY_HASH:
+            state_change_record = get_state_change_with_balance_proof_by_balance_hash(
+                storage=raiden.wal.storage,
+                canonical_identifier=canonical_identifier,
+                balance_hash=partner_details.balance_hash,
+                sender=participants_details.partner_details.address,
+            )
+            if state_change_record.data is None:
+                log.critical("partner balance proof not found", **log_details)
+                raise RaidenUnrecoverableError(
+                    "Partner balance proof could not be found in the database"
+                )
+            partner_balance_proof = state_change_record.data.balance_proof
+            partner_transferred_amount = partner_balance_proof.transferred_amount
+            partner_locked_amount = partner_balance_proof.locked_amount
+            partner_locksroot = partner_balance_proof.locksroot
+        else:
+            partner_transferred_amount = 0
+            partner_locked_amount = 0
+            partner_locksroot = EMPTY_HASH
+
+        return SettlementParameters(
+            transferred_amount=our_transferred_amount,
+            locked_amount=our_locked_amount,
+            locksroot=our_locksroot,
+            partner_transferred_amount=partner_transferred_amount,
+            partner_locked_amount=partner_locked_amount,
+            partner_locksroot=partner_locksroot,
+            block_identifier=triggered_by_block_hash)

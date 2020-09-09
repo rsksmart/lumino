@@ -1,3 +1,6 @@
+from raiden.utils.typing import TokenAmount, Locksroot, BlockHash
+
+
 class FlatList(list):
     """
     This class inherits from list and has the same interface as a list-type.
@@ -56,3 +59,22 @@ class DashboardGeneralItem:
     quantity = 0
     event_type_code = 0
     event_type_class_name = ""
+
+
+class SettlementParameters:
+    """" Object to store settlement parameters for internal use """
+    def __init__(self,
+                 transferred_amount: TokenAmount,
+                 locked_amount: TokenAmount,
+                 locksroot: Locksroot,
+                 partner_transferred_amount: TokenAmount,
+                 partner_locked_amount: TokenAmount,
+                 partner_locksroot: Locksroot,
+                 block_identifier: BlockHash):
+        self.transferred_amount = transferred_amount,
+        self.locked_amount = locked_amount,
+        self.locksroot = locksroot,
+        self.partner_transferred_amount = partner_transferred_amount,
+        self.partner_locked_amount = partner_locked_amount,
+        self.partner_locksroot = partner_locksroot,
+        self.block_identifier = block_identifier
