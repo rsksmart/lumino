@@ -605,6 +605,9 @@ class RaidenAPI:
             partner_address=partner_address,
         )
 
+        if channel_state.identifier not in channel_ids:
+            raise RaidenRecoverableError("Failed trying to settle a channel that's not in waiting_for_settle state")
+
         channel_proxy = self.raiden.chain.payment_channel(
             canonical_identifier=channel_state.canonical_identifier
         )
