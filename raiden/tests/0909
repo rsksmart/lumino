@@ -49,4 +49,4 @@ integration/transfer/test_mediatedtransfer.py ....sss                    [ 29%]
 integration/transfer/test_mediatedtransfer_events.py .                   [ 29%]
 integration/transfer/test_mediatedtransfer_invalid.py ......             [ 30%]
 integration/transfer/test_refund_invalid.py .                            [ 30%]
-integration/transfer/test_refundtransfer.py .
+integration/transfer/test_refundtransfer.py ...
