@@ -92,7 +92,6 @@ def cancel_current_route(
 
     payment_state.cancelled_channels.append(initiator_state.channel_identifier)
 
-    payment_state.cancelled_channels.append(initiator_state.channel_identifier)
     return events_for_cancel_current_route(transfer_description)
 
 

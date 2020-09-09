@@ -19,7 +19,7 @@ from raiden.messages import (
 from raiden.raiden_service import RaidenService
 from raiden.transfer import views
 from raiden.transfer.architecture import StateChange
-from raiden.transfer.mediated_transfer.state import lockedtransfersigned_from_message,
+from raiden.transfer.mediated_transfer.state import lockedtransfersigned_from_message
 from raiden.transfer.mediated_transfer.state_change import (
     ReceiveLockExpired,
     ReceiveSecretRequest,
