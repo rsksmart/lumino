@@ -156,15 +156,6 @@ class _RetryQueue(Runnable):
             )
         self.notify()
 
-    def enqueue_global(self, message: Message):
-        """ Helper to enqueue a message in the global queue (e.g. Delivered) """
-        self.enqueue(
-            queue_identifier=QueueIdentifier(
-                recipient=self.receiver, channel_identifier=CHANNEL_IDENTIFIER_GLOBAL_QUEUE
-            ),
-            message=message,
-        )
-
     def notify(self):
         """ Notify main loop to check if anything needs to be sent """
         with self._lock:
