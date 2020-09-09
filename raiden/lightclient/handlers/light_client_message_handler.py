@@ -43,9 +43,10 @@ class LightClientMessageHandler:
     log = structlog.get_logger(__name__)  # pylint: disable=invalid-name
 
     @classmethod
-    def store_light_client_protocol_message(cls, identifier: int, message: Message, signed: bool, payment_id: int,
+    def store_light_client_protocol_message(cls, identifier: int, message: Message, signed: bool,
                                             light_client_address: AddressHex, order: int,
-                                            message_type: LightClientProtocolMessageType, wal: WriteAheadLog):
+                                            message_type: LightClientProtocolMessageType, wal: WriteAheadLog,
+                                            payment_id: int = None):
         return wal.storage.write_light_client_protocol_message(
             message,
             build_light_client_protocol_message(identifier, message, signed,
@@ -194,11 +195,11 @@ class LightClientMessageHandler:
                     message_identifier,
                     message,
                     True,
-                    protocol_message.light_client_payment_id,
                     protocol_message.light_client_address,
                     order,
                     message_type,
-                    wal
+                    wal,
+                    protocol_message.light_client_payment_id
                 )
             else:
                 cls.log.info("Message for lc already received, ignoring db storage")
@@ -255,9 +256,9 @@ class LightClientMessageHandler:
                 message_identifier, protocol_message.light_client_payment_id, order, wal)
             if not exists:
                 LightClientMessageHandler.store_light_client_protocol_message(
-                    message_identifier, message, True, protocol_message.light_client_payment_id,
+                    message_identifier, message, True,
                     protocol_message.light_client_address, order,
-                    message_type, wal)
+                    message_type, wal, protocol_message.light_client_payment_id)
             else:
                 cls.log.info("Message for lc already received, ignoring db storage")
 
