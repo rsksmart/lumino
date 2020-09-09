@@ -857,8 +857,11 @@ class MatrixTransport(TransportLayer, Runnable):
             #       See: https://matrix.org/docs/spec/client_server/r0.3.0.html#id57
             delivered_message = Delivered(delivered_message_identifier=message.message_identifier)
             self._raiden_service.sign(delivered_message)
-            retrier = self._get_retrier(message.sender)
-            retrier.enqueue_global(delivered_message)
+
+            queue_identifier = QueueIdentifier(
+                recipient=message.sender, channel_identifier=CHANNEL_IDENTIFIER_GLOBAL_QUEUE
+            )
+            self.send_async(queue_identifier, delivered_message)
             self._raiden_service.on_message(message)
 
         except (InvalidAddress, UnknownAddress, UnknownTokenAddress):
@@ -1752,11 +1755,6 @@ class MatrixLightClientTransport(MatrixTransport):
         except (InvalidAddress, UnknownAddress, UnknownTokenAddress):
             self.log.warning("Exception while processing message", exc_info=True)
             return
-
-    def send_for_light_client_with_retry(self, receiver: Address, message: Message):
-        retrier = self._get_retrier(receiver)
-        retrier.enqueue_global(message)
-
 
 class NodeTransport:
 
