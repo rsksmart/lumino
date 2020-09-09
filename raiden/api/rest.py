@@ -2147,7 +2147,7 @@ class RestAPI:
             lt = LockedTransfer.from_dict(message)
             self.initiate_payment_light(self.raiden_api.raiden.default_registry.address, lt.token, lt.initiator,
                                         lt.target, lt.locked_amount, lt.payment_identifier, payment_request.payment_id,
-                                        lt.lock.secrethash, additional_metadata.previous_hash,
+                                        lt.lock.secrethash, previous_hash,
                                         EMPTY_PAYMENT_HASH_INVOICE, lt, lt.channel_identifier)
         elif message["type"] == "Delivered":
             delivered = Delivered.from_dict(message)
