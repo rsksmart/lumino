@@ -48,8 +48,7 @@ from raiden.lightclient.handlers.light_client_utils import LightClientUtils
 from raiden.lightclient.lightclientmessages.hub_response_message import HubResponseMessage
 from raiden.lightclient.lightclientmessages.payment_hub_message import PaymentHubMessage
 from raiden.lightclient.models.light_client_payment import LightClientPayment, LightClientPaymentStatus
-from raiden.lightclient.models.light_client_protocol_message import LightClientProtocolMessageType, \
-    LightClientProtocolMessage
+from raiden.lightclient.models.light_client_protocol_message import LightClientProtocolMessageType
 from raiden.messages import RequestMonitoring, LockedTransfer, RevealSecret, Unlock, Delivered, SecretRequest, \
     Processed, LockExpired
 from raiden.settings import DEFAULT_RETRY_TIMEOUT, DEVELOPMENT_CONTRACT_VERSION
@@ -280,7 +279,7 @@ class RaidenAPI:
              message_order: int,
              payment_id: typing.PaymentID,
     ):
-        message_exists = LightClientMessageHandler.is_light_client_protocol_message_already_stored_message_id(message_id, payment_id, message_order)
+        message_exists = LightClientMessageHandler.is_light_client_protocol_message_already_stored_message_id(message_id, payment_id, message_order, self.raiden.wal)
         if not message_exists:
             raise InvalidPaymentIdentifier()
         self.raiden.default_secret_registry.register_secret_light(signed_tx)

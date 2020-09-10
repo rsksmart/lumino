@@ -12,7 +12,7 @@ from raiden.transfer.state import (
     CHANNEL_STATES_PRIOR_TO_CLOSED,
     NettingChannelState, message_identifier_from_prng,
 )
-from raiden.utils.typing import BlockExpiration, BlockHash, List, Secret, T_Secret, MessageID
+from raiden.utils.typing import BlockExpiration, BlockHash, List, Secret, T_Secret
 
 
 def events_for_onchain_secretreveal(
