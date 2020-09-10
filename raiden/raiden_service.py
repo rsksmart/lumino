@@ -922,17 +922,6 @@ class RaidenService(Runnable):
         for queue_identifier, _event_queue in events_queues.items():
             self.start_health_check_for(queue_identifier.recipient)
 
-            # for event in event_queue:
-            #     message = message_from_sendevent(event)
-            #     if hasattr(message, 'signature'):
-            #         light_client_address = to_checksum_address(encode_hex(message.initiator))
-            #         if LightClientService.is_handled_lc(light_client_address, self.wal):
-            #             light_client_transport = self.get_light_client_transport(light_client_address)
-            #             light_client_transport.send_async(queue_identifier, message)
-            #     else:h
-            #         self.sign(message)
-            #         self.transport.hub_transport.send_async(queue_identifier, message)
-
     def _initialize_monitoring_services_queue(self, chain_state: ChainState):
         """Send the monitoring requests for all current balance proofs.
 
@@ -1335,7 +1324,7 @@ class RaidenService(Runnable):
             queue_identifier = QueueIdentifier(
                 recipient=receiver_address, channel_identifier=CHANNEL_IDENTIFIER_GLOBAL_QUEUE
             )
-            lc_transport.send_async(queue_identifier, delivered)
+            lc_transport.send_message(queue_identifier, delivered)
 
     def initiate_send_processed_light(self, sender_address: Address, receiver_address: Address,
                                       processed: Processed, msg_order: int, payment_id: int,
@@ -1354,7 +1343,7 @@ class RaidenService(Runnable):
             queue_identifier = QueueIdentifier(
                 recipient=receiver_address, channel_identifier=CHANNEL_IDENTIFIER_GLOBAL_QUEUE
             )
-            lc_transport.send_async(queue_identifier, processed)
+            lc_transport.send_message(queue_identifier, processed)
 
     def initiate_send_secret_reveal_light(
         self,

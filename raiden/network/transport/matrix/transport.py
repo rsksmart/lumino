@@ -852,7 +852,7 @@ class MatrixTransport(TransportLayer, Runnable):
             queue_identifier = QueueIdentifier(
                 recipient=message.sender, channel_identifier=CHANNEL_IDENTIFIER_GLOBAL_QUEUE
             )
-            self.send_async(queue_identifier, delivered_message)
+            self.send_message(queue_identifier, delivered_message)
             self._raiden_service.on_message(message)
 
         except (InvalidAddress, UnknownAddress, UnknownTokenAddress):
