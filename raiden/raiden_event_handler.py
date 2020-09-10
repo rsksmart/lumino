@@ -46,7 +46,7 @@ from raiden.transfer.mediated_transfer.events import (
     SendSecretReveal,
     SendLockedTransferLight, StoreMessageEvent, SendSecretRevealLight, SendBalanceProofLight, SendSecretRequestLight,
     SendLockExpiredLight)
-from raiden.transfer.state import ChainState, NettingChannelEndState, message_identifier_from_prng
+from raiden.transfer.state import ChainState, message_identifier_from_prng
 from raiden.transfer.utils import (
     get_event_with_balance_proof_by_balance_hash,
     get_event_with_balance_proof_by_locksroot,
@@ -248,6 +248,7 @@ def unlock_light(raiden: "RaidenService",
         order=0,
         message_type=LightClientProtocolMessageType.UnlockRequired,
         wal=raiden.wal,
+        light_client_address=channel_unlock_event.client,
         message=UnlockLightRequest(
             token_address=token_network.token_address(),
             channel_identifier=canonical_identifier.channel_identifier,
