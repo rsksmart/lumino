@@ -156,15 +156,6 @@ class _RetryQueue(Runnable):
             )
         self.notify()
 
-    def enqueue_global(self, message: Message):
-        """ Helper to enqueue a message in the global queue (e.g. Delivered) """
-        self.enqueue(
-            queue_identifier=QueueIdentifier(
-                recipient=self.receiver, channel_identifier=CHANNEL_IDENTIFIER_GLOBAL_QUEUE
-            ),
-            message=message,
-        )
-
     def notify(self):
         """ Notify main loop to check if anything needs to be sent """
         with self._lock:
@@ -521,7 +512,7 @@ class MatrixTransport(TransportLayer, Runnable):
             raise ValueError("Invalid address {}".format(pex(receiver_address)))
 
         # These are not protocol messages, but transport specific messages
-        if isinstance(message, (Delivered, Ping, Pong)):
+        if isinstance(message, (Ping, Pong)):
             raise ValueError(
                 "Do not use send_message for {} messages".format(message.__class__.__name__)
             )
@@ -857,8 +848,11 @@ class MatrixTransport(TransportLayer, Runnable):
             #       See: https://matrix.org/docs/spec/client_server/r0.3.0.html#id57
             delivered_message = Delivered(delivered_message_identifier=message.message_identifier)
             self._raiden_service.sign(delivered_message)
-            retrier = self._get_retrier(message.sender)
-            retrier.enqueue_global(delivered_message)
+
+            queue_identifier = QueueIdentifier(
+                recipient=message.sender, channel_identifier=CHANNEL_IDENTIFIER_GLOBAL_QUEUE
+            )
+            self.send_async(queue_identifier, delivered_message)
             self._raiden_service.on_message(message)
 
         except (InvalidAddress, UnknownAddress, UnknownTokenAddress):
@@ -1752,11 +1746,6 @@ class MatrixLightClientTransport(MatrixTransport):
         except (InvalidAddress, UnknownAddress, UnknownTokenAddress):
             self.log.warning("Exception while processing message", exc_info=True)
             return
-
-    def send_for_light_client_with_retry(self, receiver: Address, message: Message):
-        retrier = self._get_retrier(receiver)
-        retrier.enqueue_global(message)
-
 
 class NodeTransport:
 
