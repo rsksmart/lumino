@@ -11,7 +11,7 @@ from raiden.lightclient.models.client_model import ClientType
 from raiden.storage.serialize import SerializationBase
 from raiden.storage.utils import DB_SCRIPT_CREATE_TABLES, TimestampedEvent
 from raiden.utils import get_system_spec
-from raiden.utils.typing import Any, Dict, Iterator, List, NamedTuple, Optional, Tuple, Union
+from raiden.utils.typing import Any, Dict, Iterator, List, NamedTuple, Optional, Tuple, Union, AddressHex
 from dateutil.relativedelta import relativedelta
 
 
@@ -209,6 +209,20 @@ class SQLiteStorage:
             )
             last_id = cursor.lastrowid
         return last_id
+
+    def is_message_already_stored(self, light_client_address, message_type, unsigned_message):
+        cursor = self.conn.cursor()
+        cursor.execute(
+            """
+            SELECT *
+                FROM light_client_protocol_message lcpm
+                WHERE lcpm.light_client_address == ?
+                AND lcpm.message_type == ?
+                AND lcpm.unsigned_message == ?
+            """,
+            (to_checksum_address(light_client_address), str(message_type), str(unsigned_message)))
+
+        return cursor.fetchone()
 
     def is_light_client_protocol_message_already_stored(self, payment_id: int, order: int,
                                                         message_type: str, message_protocol_type:str):
@@ -1474,6 +1488,10 @@ class SerializedSQLiteStorage(SQLiteStorage):
         else:
             msg_dto.unsigned_message = serialized_data
         return super().write_light_client_protocol_message(msg_dto)
+
+    def is_message_already_stored(self, light_client_address, message_type, unsigned_message):
+        unsigned_message_string = self.serializer.serialize(unsigned_message)
+        return super().is_message_already_stored(light_client_address, message_type, unsigned_message_string)
 
     def write_state_change(self, state_change, log_time):
         serialized_data = self.serializer.serialize(state_change)

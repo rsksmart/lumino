@@ -478,7 +478,11 @@ class ChannelLightPatchSchema(BaseSchema):
     signed_approval_tx = fields.String(required=True)
     signed_deposit_tx = fields.String(required=True)
     signed_close_tx = fields.String(required=True)
-    signed_settle_tx = fields.String(required=False)
+    signed_settle_tx = fields.String(
+        default=None,
+        missing=None,
+        required=False
+    )
 
     class Meta:
         strict = True

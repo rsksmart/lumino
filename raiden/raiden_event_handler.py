@@ -697,15 +697,28 @@ class RaidenEventHandler(EventHandler):
 
         log.debug("Storing light client message to require settle")
 
-        LightClientMessageHandler\
-            .store_light_client_protocol_message(identifier=message_identifier,
-                                                 message=message,
-                                                 signed=False,
-                                                 payment_id=None,
-                                                 light_client_address=payment_channel.participant1,
-                                                 order=0,
-                                                 message_type=LightClientProtocolMessageType.SettlementRequired,
-                                                 wal=raiden.wal)
+        message_already_stored = LightClientMessageHandler.is_message_already_stored(
+            light_client_address=payment_channel.participant1,
+            message_type=LightClientProtocolMessageType.SettlementRequired,
+            unsigned_message=message,
+            wal=raiden.wal)
+
+        if message_already_stored:
+            log.debug(
+                "Skipping storing light client settle message "
+                "for {} with type {} since already exists in database".format(
+                    payment_channel.participant1.hex(),
+                    str(LightClientProtocolMessageType.SettlementRequired)))
+        else:
+            LightClientMessageHandler \
+                .store_light_client_protocol_message(identifier=message_identifier,
+                                                     message=message,
+                                                     signed=False,
+                                                     payment_id=None,
+                                                     light_client_address=payment_channel.participant1,
+                                                     order=0,
+                                                     message_type=LightClientProtocolMessageType.SettlementRequired,
+                                                     wal=raiden.wal)
 
     @staticmethod
     def process_data_and_get_settlement_parameters(raiden: "RaidenService",
