@@ -2226,7 +2226,8 @@ class RestAPI:
 
     def post_unlocked_payment_light(self, signed_tx: typing.SignedTransaction, token_address: typing.TokenAddress):
         try:
-            return self.raiden_api.unlock_payment_light(signed_tx, token_address)
+            self.raiden_api.unlock_payment_light(signed_tx, token_address)
+            return api_response(result=dict(), status_code=HTTPStatus.NO_CONTENT)
         except RawTransactionFailed as e:
             return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.BAD_REQUEST, log=log)
         except RaidenRecoverableError as e:
