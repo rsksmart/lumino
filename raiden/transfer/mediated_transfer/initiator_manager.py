@@ -140,7 +140,7 @@ def subdispatch_to_initiatortransfer(
     channelidentifiers_to_channels: ChannelMap,
     pseudo_random_generator: random.Random,
 ) -> TransitionResult[InitiatorTransferState]:
-    print("Block initiator manager subdispatch_to_all_initiatortransfer 1")
+    print("initiator_manager subdispatch_to_initiatortransfer")
 
     channel_identifier = initiator_state.channel_identifier
     channel_state = channelidentifiers_to_channels[initiator_state.transfer_description.initiator].get(
@@ -156,7 +156,7 @@ def subdispatch_to_initiatortransfer(
     )
 
     if sub_iteration.new_state is None:
-        print("No new state, payment trask for initiator ends")
+        print("No new state, payment task for initiator ends")
         del payment_state.initiator_transfers[initiator_state.transfer.lock.secrethash]
 
     return sub_iteration
@@ -237,6 +237,7 @@ def handle_init_light(
     channelidentifiers_to_channels: ChannelMap,
 ) -> TransitionResult[InitiatorPaymentState]:
     events: List[Event] = list()
+    print("llamo a try new route")
     sub_iteration = initiator.try_new_route_light(
         channelidentifiers_to_channels=channelidentifiers_to_channels,
         channel_state=state_change.current_channel,
@@ -626,7 +627,7 @@ def handle_store_refund_transfer_light(payment_state: InitiatorPaymentState,
                                               order,
                                               refund_transfer,
                                               True,
-                                              LightClientProtocolMessageType.PaymentRefund)
+                                              LightClientProtocolMessageType.PaymentRefund, refund_transfer.recipient)
     return TransitionResult(payment_state, [store_refund_transfer])
 
 
