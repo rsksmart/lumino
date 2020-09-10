@@ -1832,11 +1832,12 @@ class RequestMonitoring(SignedMessage):
         )
 
 class UnlockLightRequest(Message):
-    def __init__(self, channel_identifier: ChannelID, sender: Address, receiver: Address, **kwargs):
+    def __init__(self, token_address: Address, channel_identifier: ChannelID, sender: Address, receiver: Address, **kwargs):
         super().__init__(**kwargs)
         self.channel_identifier = channel_identifier
         self.sender = sender
         self.receiver = receiver
+        self.token_address = token_address
 
     def __eq__(self, other):
         return (
@@ -1845,11 +1846,13 @@ class UnlockLightRequest(Message):
             and self.channel_identifier == other.channel_identifier
             and self.sender == other.sender
             and self.receiver == other.receiver
+            and self.token_address == other.token_address
         )
 
     def to_dict(self):
         return {
             "type": self.__class__.__name__,
+            "token_address": to_normalized_address(self.token_address),
             "channel_identifier": self.channel_identifier,
             "receiver": to_normalized_address(self.receiver),
             "sender": to_normalized_address(self.sender)

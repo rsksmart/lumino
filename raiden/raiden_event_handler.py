@@ -237,7 +237,10 @@ def unlock_light(raiden: "RaidenService",
                  channel_unlock_event,
                  participant: Address,
                  partner: Address):
-    channel_identifier = channel_unlock_event.canonical_identifier.channel_identifier
+    canonical_identifier: CanonicalIdentifier = channel_unlock_event.canonical_identifier
+
+    token_network: TokenNetwork = views.get_token_network_by_identifier(chain_state, canonical_identifier.token_network_address)
+
     LightClientMessageHandler.store_light_client_protocol_message(
         identifier=message_identifier_from_prng(chain_state.pseudo_random_generator),
         signed=False,
@@ -245,7 +248,12 @@ def unlock_light(raiden: "RaidenService",
         order=0,
         message_type=LightClientProtocolMessageType.UnlockRequired,
         wal=raiden.wal,
-        message=UnlockLightRequest(channel_identifier, receiver=participant, sender=partner)
+        message=UnlockLightRequest(
+            token_address=token_network.token_address(),
+            channel_identifier=canonical_identifier.channel_identifier,
+            receiver=participant,
+            sender=partner
+        )
     )
 
 class EventHandler(ABC):
