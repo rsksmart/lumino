@@ -14,7 +14,6 @@ from dateutil.relativedelta import relativedelta
 from eth_utils import is_binary_address, to_checksum_address, to_canonical_address, to_normalized_address, encode_hex
 
 from ecies import encrypt
-from requests import HTTPError
 
 import raiden.blockchain.events as blockchain_events
 from raiden import waiting
@@ -42,7 +41,7 @@ from raiden.exceptions import (
     RaidenRecoverableError,
     UnknownTokenAddress,
     InvoiceCoding,
-    UnhandledLightClient, RawTransactionFailed)
+    UnhandledLightClient)
 from raiden.lightclient.handlers.light_client_message_handler import LightClientMessageHandler
 from raiden.lightclient.handlers.light_client_service import LightClientService
 from raiden.lightclient.handlers.light_client_utils import LightClientUtils

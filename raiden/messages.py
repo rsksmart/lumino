@@ -1838,6 +1838,15 @@ class UnlockLightRequest(Message):
         self.sender = sender
         self.receiver = receiver
 
+    def __eq__(self, other):
+        return (
+            super().__eq__(other)
+            and isinstance(other, UnlockLightRequest)
+            and self.channel_identifier == other.channel_identifier
+            and self.sender == other.sender
+            and self.receiver == other.receiver
+        )
+
     def to_dict(self):
         return {
             "type": self.__class__.__name__,
@@ -1845,6 +1854,7 @@ class UnlockLightRequest(Message):
             "receiver": to_normalized_address(self.receiver),
             "sender": to_normalized_address(self.sender)
         }
+
 
 
 CMDID_TO_CLASS: Dict[int, Type[Message]] = {
