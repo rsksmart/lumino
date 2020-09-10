@@ -47,7 +47,9 @@ from raiden.storage import serialize, sqlite, wal
 from raiden.tasks import AlarmTask
 from raiden.transfer import node, views
 from raiden.transfer.architecture import Event as RaidenEvent, StateChange
-from raiden.transfer.mediated_transfer.events import SendLockedTransfer, SendLockedTransferLight
+from raiden.transfer.identifiers import QueueIdentifier
+from raiden.transfer.mediated_transfer.events import SendLockedTransfer, SendLockedTransferLight, \
+    CHANNEL_IDENTIFIER_GLOBAL_QUEUE
 
 from raiden.transfer.mediated_transfer.state import (
     TransferDescriptionWithSecretState,
@@ -1330,7 +1332,10 @@ class RaidenService(Runnable):
                 message_type,
                 self.wal
             )
-            lc_transport.send_for_light_client_with_retry(receiver_address, delivered)
+            queue_identifier = QueueIdentifier(
+                recipient=receiver_address, channel_identifier=CHANNEL_IDENTIFIER_GLOBAL_QUEUE
+            )
+            lc_transport.send_async(queue_identifier, delivered)
 
     def initiate_send_processed_light(self, sender_address: Address, receiver_address: Address,
                                       processed: Processed, msg_order: int, payment_id: int,
@@ -1346,7 +1351,10 @@ class RaidenService(Runnable):
                 message_type,
                 self.wal
             )
-            lc_transport.send_for_light_client_with_retry(receiver_address, processed)
+            queue_identifier = QueueIdentifier(
+                recipient=receiver_address, channel_identifier=CHANNEL_IDENTIFIER_GLOBAL_QUEUE
+            )
+            lc_transport.send_async(queue_identifier, processed)
 
     def initiate_send_secret_reveal_light(
         self,
