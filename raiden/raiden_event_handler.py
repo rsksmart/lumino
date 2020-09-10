@@ -643,6 +643,8 @@ class RaidenEventHandler(EventHandler):
                                                   channel_settle_light_event: ContractSendChannelSettleLight):
         """ Store a message for the LC with SettlementRequired type to handle settlement for LC on hub mode. """
 
+        log.debug("Handling channel settle light")
+
         settlement_parameters = RaidenEventHandler.process_data_and_get_settlement_parameters(
             raiden,
             channel_settle_light_event.token_network_identifier,
@@ -693,6 +695,8 @@ class RaidenEventHandler(EventHandler):
                 participant2_locked_amount=settlement_parameters.partner_locked_amount,
                 participant2_locksroot=settlement_parameters.partner_locksroot)
 
+        log.debug("Storing light client message to require settle")
+
         LightClientMessageHandler\
             .store_light_client_protocol_message(identifier=message_identifier,
                                                  message=message,
@@ -708,6 +712,9 @@ class RaidenEventHandler(EventHandler):
                                                    token_network_identifier: TokenNetworkID,
                                                    channel_identifier: ChannelID,
                                                    triggered_by_block_hash: BlockHash) -> SettlementParameters:
+
+        log.debug("Processing settlement data")
+
         assert raiden.wal, "The Raiden Service must be initialize to handle events"
         canonical_identifier = CanonicalIdentifier(
             chain_identifier=raiden.chain.network_id,

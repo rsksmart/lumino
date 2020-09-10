@@ -1907,7 +1907,13 @@ class RestAPI:
         elif state == CHANNEL_STATE_CLOSED:
             result = self._close_light(registry_address, channel_state, signed_close_tx)
         elif state == CHANNEL_STATE_SETTLING:
-            result = self._settle_light(registry_address, channel_state, signed_settle_tx)
+            if signed_settle_tx:
+                result = self._settle_light(registry_address, channel_state, signed_settle_tx)
+            else:
+                result = api_error(
+                    errors="Signed settle transaction is required for state {}".format(state),
+                    status_code=HTTPStatus.BAD_REQUEST,
+                )
         else:  # should never happen, channel_state is validated in the schema
             result = api_error(
                 errors="Provided invalid channel state {}".format(state),

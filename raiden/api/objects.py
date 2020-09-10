@@ -71,10 +71,10 @@ class SettlementParameters:
                  partner_locked_amount: TokenAmount,
                  partner_locksroot: Locksroot,
                  block_identifier: BlockHash):
-        self.transferred_amount = transferred_amount,
-        self.locked_amount = locked_amount,
-        self.locksroot = locksroot,
-        self.partner_transferred_amount = partner_transferred_amount,
-        self.partner_locked_amount = partner_locked_amount,
-        self.partner_locksroot = partner_locksroot,
+        self.transferred_amount = transferred_amount
+        self.locked_amount = locked_amount
+        self.locksroot = locksroot
+        self.partner_transferred_amount = partner_transferred_amount
+        self.partner_locked_amount = partner_locked_amount
+        self.partner_locksroot = partner_locksroot
         self.block_identifier = block_identifier
