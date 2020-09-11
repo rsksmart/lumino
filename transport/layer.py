@@ -2,10 +2,9 @@ from abc import ABC, abstractmethod
 from typing import Any
 
 from raiden.message_handler import MessageHandler
-from raiden.messages import Message
 from raiden.raiden_service import RaidenService
-from raiden.transfer.identifiers import QueueIdentifier
 from raiden.utils import Address
+from transport.components import Message
 
 
 class TransportLayer(ABC):
@@ -13,6 +12,7 @@ class TransportLayer(ABC):
     TransportLayer is an abstraction which lays between the Lumino business logic layer and the
     lower layers of the system that take care of sending and receiving messages.
     """
+
     def __init__(self, address: Address):
         self._address = address
         """
@@ -36,25 +36,25 @@ class TransportLayer(ABC):
         """
 
     @abstractmethod
-    def send_message(self, queue_identifier: QueueIdentifier, message: Message):
+    def send_message(self, message: Message, recipient: Address):
         """
-        Queue the message for sending to recipient in the queue_identifier.
-        It may be called before transport is started, to initialize message queues.
-        The actual sending will be started only when the transport is started.
+        Send a message to the recipient.
+        This method may be called before the transport layer is started, but the actual message sending
+        should only be attempted when the transport layer is started.
         """
 
     @abstractmethod
     def start_health_check(self, address: Address):
         """
-        Start health-check (status monitoring) for a peer.
-        It also whitelists the address to answer invites and listen for messages.
+        Start health-check (status monitoring) for an address.
+        It also whitelists the address to listen for messages, invites or handshakes.
         """
 
     @abstractmethod
     def whitelist(self, address: Address):
         """
         Whitelist peer address from which to receive communications.
-        This may be called before transport is started, to ensure events generated during start are handled properly.
+        This may be called before transport layer is started.
         """
 
     @abstractmethod
