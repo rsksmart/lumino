@@ -26,7 +26,7 @@ class Message:
         self.params = params
 
     @classmethod
-    def wrap_message(cls, queue_identifier: QueueIdentifier, raiden_message: RaidenMessage) -> ("Message", Address):
+    def wrap(cls, queue_identifier: QueueIdentifier, raiden_message: RaidenMessage) -> ("Message", Address):
         """
         Takes a queue identifier, a raiden message and wraps these fields in a transport message and extracts the
         recipient, with the purpose of sending these through a transport layer.

@@ -322,7 +322,7 @@ class MatrixTransport(TransportLayer, Runnable):
         self._message_handler: Optional[MessageHandler] = None
 
     @classmethod
-    def unwrap_message(cls, transport_message: TransportMessage) -> (Message, QueueIdentifier):
+    def unwrap(cls, transport_message: TransportMessage) -> (Message, QueueIdentifier):
         """
         Takes a transport layer message and extracts the embedded Raiden message and its corresponding
         queue identifier from its parameters, with the purpose of processing it in the Matrix transport layer.
@@ -512,7 +512,7 @@ class MatrixTransport(TransportLayer, Runnable):
         It may be called before transport is started, to initialize message queues
         The actual sending is started only when the transport is started
         """
-        raiden_message, queue_identifier = MatrixTransport.unwrap_message(message)
+        raiden_message, queue_identifier = MatrixTransport.unwrap(message)
 
         # even if transport is not started, can run to enqueue messages to send when it starts
         if not is_binary_address(recipient):
@@ -859,7 +859,7 @@ class MatrixTransport(TransportLayer, Runnable):
             queue_identifier = QueueIdentifier(
                 recipient=message.sender, channel_identifier=CHANNEL_IDENTIFIER_GLOBAL_QUEUE
             )
-            self.send_message(TransportMessage.wrap_message(queue_identifier, delivered_message))
+            self.send_message(TransportMessage.wrap(queue_identifier, delivered_message))
             self._raiden_service.on_message(message)
 
         except (InvalidAddress, UnknownAddress, UnknownTokenAddress):
