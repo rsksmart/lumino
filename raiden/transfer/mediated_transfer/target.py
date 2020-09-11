@@ -288,8 +288,8 @@ def handle_send_secret_reveal_light(
 ) -> TransitionResult[TargetTransferState]:
     message_identifier = state_change.reveal_secret.message_identifier
     transfer = target_state.transfer
-    # The recipiant is the initiator of the payment cause the light client is the target of the payment
-    recipient = transfer.initiator
+    # The recipient is the initiator of the payment cause the light client is the target of the payment
+    recipient = state_change.receiver
     revealsecret = SendSecretRevealLight(
         sender=Address(state_change.sender),
         recipient=Address(recipient),

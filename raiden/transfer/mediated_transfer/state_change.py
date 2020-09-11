@@ -1,7 +1,7 @@
 # pylint: disable=too-few-public-methods,too-many-arguments,too-many-instance-attributes
 
 from eth_utils import to_canonical_address, to_checksum_address
-from raiden.messages import RevealSecret, Unlock, LockedTransfer, SecretRequest, LockExpired
+from raiden.messages import RevealSecret, Unlock, LockedTransfer, SecretRequest, LockExpired, RefundTransfer
 
 from raiden.transfer.architecture import (
     AuthenticatedSenderStateChange,
@@ -12,7 +12,7 @@ from raiden.transfer.mediated_transfer.state import (
     LockedTransferSignedState,
     TransferDescriptionWithSecretState,
     TransferDescriptionWithoutSecretState)
-from raiden.transfer.state import BalanceProofSignedState, RouteState
+from raiden.transfer.state import BalanceProofSignedState, RouteState, NettingChannelState
 from raiden.utils import pex, sha3
 from raiden.utils.serialization import deserialize_bytes, serialize_bytes
 from raiden.utils.typing import (
@@ -80,15 +80,16 @@ class ActionInitInitiatorLight(StateChange):
     """
 
     def __init__(
-        self, transfer_description: TransferDescriptionWithoutSecretState, routes: List[RouteState],
-        signed_locked_transfer: LockedTransfer
+        self, transfer_description: TransferDescriptionWithoutSecretState, current_channel: NettingChannelState,
+        signed_locked_transfer: LockedTransfer, is_retry_route: bool = False
     ) -> None:
         if not isinstance(transfer_description, TransferDescriptionWithoutSecretState):
             raise ValueError("transfer must be an TransferDescriptionWithoutSecretState instance.")
 
         self.transfer = transfer_description
-        self.routes = routes
+        self.current_channel = current_channel
         self.signed_locked_transfer = signed_locked_transfer
+        self.is_retry_route = is_retry_route
 
     def __repr__(self) -> str:
         return "<ActionInitInitiatorLight transfer:{}>".format(self.transfer)
@@ -97,20 +98,21 @@ class ActionInitInitiatorLight(StateChange):
         return (
             isinstance(other, ActionInitInitiatorLight)
             and self.transfer == other.transfer
-            and self.routes == other.routes
+            and self.current_channel == other.current_channel
             and self.signed_locked_transfer == other.signed_locked_transfer
+            and self.is_retry_route == other.is_retry_route
         )
 
     def __ne__(self, other: Any) -> bool:
         return not self.__eq__(other)
 
     def to_dict(self) -> Dict[str, Any]:
-        return {"transfer": self.transfer, "routes": self.routes, "signed_locked_transfer": self.signed_locked_transfer}
+        return {"transfer": self.transfer, "current_channel": self.current_channel, "signed_locked_transfer": self.signed_locked_transfer, "is_retry_route": str(self.is_retry_route)}
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "ActionInitInitiatorLight":
-        return cls(transfer_description=data["transfer"], routes=data["routes"],
-                   signed_locked_transfer=data["signed_locked_transfer"])
+        return cls(transfer_description=data["transfer"], current_channel=data["current_channel"],
+                   signed_locked_transfer=data["signed_locked_transfer"], is_retry_route=data["is_retry_route"])
 
 
 class ActionInitMediator(BalanceProofStateChange):
@@ -618,7 +620,7 @@ class ActionTransferReroute(BalanceProofStateChange):
     """
 
     def __init__(
-        self, routes: List[RouteState], transfer: LockedTransferSignedState, secret: Secret
+        self, transfer: LockedTransferSignedState, secret: Secret
     ) -> None:
         if not isinstance(transfer, LockedTransferSignedState):
             raise ValueError("transfer must be an instance of LockedTransferSignedState")
@@ -627,7 +629,6 @@ class ActionTransferReroute(BalanceProofStateChange):
 
         super().__init__(transfer.balance_proof)
         self.transfer = transfer
-        self.routes = routes
         self.secrethash = secrethash
         self.secret = secret
 
@@ -641,7 +642,6 @@ class ActionTransferReroute(BalanceProofStateChange):
             isinstance(other, ActionTransferReroute)
             and self.sender == other.sender
             and self.transfer == other.transfer
-            and self.routes == other.routes
             and self.secret == other.secret
             and self.secrethash == other.secrethash
             and super().__eq__(other)
@@ -653,7 +653,6 @@ class ActionTransferReroute(BalanceProofStateChange):
     def to_dict(self) -> Dict[str, Any]:
         return {
             "secret": serialize_bytes(self.secret),
-            "routes": self.routes,
             "transfer": self.transfer,
             "balance_proof": self.balance_proof,
         }
@@ -661,23 +660,22 @@ class ActionTransferReroute(BalanceProofStateChange):
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "ActionTransferReroute":
         instance = cls(
-            routes=data["routes"],
             transfer=data["transfer"],
             secret=Secret(deserialize_bytes(data["secret"])),
         )
         return instance
 
 
+
 class ReceiveTransferRefund(BalanceProofStateChange):
     """ A RefundTransfer message received. """
 
-    def __init__(self, transfer: LockedTransferSignedState, routes: List[RouteState]) -> None:
+    def __init__(self, transfer: LockedTransferSignedState) -> None:
         if not isinstance(transfer, LockedTransferSignedState):
             raise ValueError("transfer must be an instance of LockedTransferSignedState")
 
         super().__init__(transfer.balance_proof)
         self.transfer = transfer
-        self.routes = routes
 
     def __repr__(self) -> str:
         return "<ReceiveTransferRefund sender:{} transfer:{}>".format(
@@ -688,7 +686,6 @@ class ReceiveTransferRefund(BalanceProofStateChange):
         return (
             isinstance(other, ReceiveTransferRefund)
             and self.transfer == other.transfer
-            and self.routes == other.routes
             and super().__eq__(other)
         )
 
@@ -697,14 +694,13 @@ class ReceiveTransferRefund(BalanceProofStateChange):
 
     def to_dict(self) -> Dict[str, Any]:
         return {
-            "routes": self.routes,
             "transfer": self.transfer,
             "balance_proof": self.balance_proof,
         }
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "ReceiveTransferRefund":
-        instance = cls(routes=data["routes"], transfer=data["transfer"])
+        instance = cls(transfer=data["transfer"])
         return instance
 
 
@@ -870,3 +866,39 @@ class ActionSendUnlockLight(AuthenticatedSenderStateChange):
             receiver=to_canonical_address(data["receiver"])
         )
         return instance
+
+
+class StoreRefundTransferLight(StateChange):
+    """ Initial state of a refund transfer reception.
+
+    Args:
+        transfer: a message object that represents the refund transfer sent to a light client
+    """
+
+    def __init__(
+        self, transfer: RefundTransfer
+    ) -> None:
+        if not isinstance(transfer, RefundTransfer):
+            raise ValueError("transfer must be an RefundTransfer instance.")
+
+        self.transfer = transfer
+
+    def __repr__(self) -> str:
+        return "<StoreRefundTransferLight transfer:{}>".format(self.transfer)
+
+    def __eq__(self, other: Any) -> bool:
+        return (
+            isinstance(other, StoreRefundTransferLight)
+            and self.transfer == other.transfer
+        )
+
+    def __ne__(self, other: Any) -> bool:
+        return not self.__eq__(other)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {"transfer": self.transfer.to_dict()}
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "StoreRefundTransferLight":
+        return cls(transfer=RefundTransfer.from_dict(data["transfer"]))
+

@@ -2,13 +2,19 @@ import random
 
 from eth_utils import keccak
 
-from raiden.transfer import channel
+from raiden.lightclient.models.light_client_protocol_message import LightClientProtocolMessageType
+
+from raiden.messages import RefundTransfer
+
+from raiden.transfer import channel, routes
 from raiden.transfer.architecture import Event, StateChange, TransitionResult
 from raiden.transfer.events import EventPaymentSentFailed
 from raiden.transfer.mediated_transfer import initiator
 from raiden.transfer.mediated_transfer.events import (
     EventUnlockClaimFailed,
-    EventUnlockFailed)
+    EventUnlockFailed,
+    StoreMessageEvent
+)
 from raiden.transfer.mediated_transfer.state import (
     InitiatorPaymentState,
     InitiatorTransferState,
@@ -21,7 +27,7 @@ from raiden.transfer.mediated_transfer.state_change import (
     ReceiveSecretReveal,
     ActionTransferReroute,
     ActionInitInitiatorLight, ReceiveSecretRequestLight, ActionSendSecretRevealLight, ReceiveSecretRevealLight,
-    ReceiveTransferCancelRoute)
+    ReceiveTransferCancelRoute, StoreRefundTransferLight)
 from raiden.transfer.state import RouteState
 from raiden.transfer.state_change import ActionCancelPayment, Block, ContractReceiveSecretReveal
 from raiden.utils.typing import (
@@ -136,7 +142,7 @@ def subdispatch_to_initiatortransfer(
     channelidentifiers_to_channels: ChannelMap,
     pseudo_random_generator: random.Random,
 ) -> TransitionResult[InitiatorTransferState]:
-    print("Block initiator manager subdispatch_to_all_initiatortransfer 1")
+    print("initiator_manager subdispatch_to_initiatortransfer")
 
     channel_identifier = initiator_state.channel_identifier
     channel_state = channelidentifiers_to_channels[initiator_state.transfer_description.initiator].get(
@@ -152,6 +158,7 @@ def subdispatch_to_initiatortransfer(
     )
 
     if sub_iteration.new_state is None:
+        print("No new state, payment task for initiator ends")
         del payment_state.initiator_transfers[initiator_state.transfer.lock.secrethash]
 
     return sub_iteration
@@ -203,25 +210,25 @@ def handle_init(
     pseudo_random_generator: random.Random,
     block_number: BlockNumber,
 ) -> TransitionResult[InitiatorPaymentState]:
-    events: List[Event] = list()
-    if payment_state is None:
-        sub_iteration = initiator.try_new_route(
-            channelidentifiers_to_channels=channelidentifiers_to_channels,
-            available_routes=state_change.routes,
-            transfer_description=state_change.transfer,
-            pseudo_random_generator=pseudo_random_generator,
-            block_number=block_number,
+    sub_iteration = initiator.try_new_route(
+        channelidentifiers_to_channels=channelidentifiers_to_channels,
+        available_routes=state_change.routes,
+        transfer_description=state_change.transfer,
+        pseudo_random_generator=pseudo_random_generator,
+        block_number=block_number,
+    )
+
+    if sub_iteration.new_state:
+        # TODO marcosmartinez7 here the routes are always all routes, because the ActionInitInitiator doesnt take into account cancelled routes.
+        # Cancelled routes are added when a refund message comes.
+        payment_state = InitiatorPaymentState(
+            routes=state_change.routes,
+            initiator_transfers={
+                sub_iteration.new_state.transfer.lock.secrethash: sub_iteration.new_state
+            }
         )
 
-        events = sub_iteration.events
-        if sub_iteration.new_state:
-            payment_state = InitiatorPaymentState(
-                initiator_transfers={
-                    sub_iteration.new_state.transfer.lock.secrethash: sub_iteration.new_state
-                }
-            )
-
-    return TransitionResult(payment_state, events)
+    return TransitionResult(payment_state,  sub_iteration.events)
 
 
 def handle_init_light(
@@ -230,21 +237,27 @@ def handle_init_light(
     channelidentifiers_to_channels: ChannelMap,
 ) -> TransitionResult[InitiatorPaymentState]:
     events: List[Event] = list()
-    if payment_state is None:
-        sub_iteration = initiator.try_new_route_light(
-            channelidentifiers_to_channels=channelidentifiers_to_channels,
-            available_routes=state_change.routes,
-            transfer_description=state_change.transfer,
-            signed_locked_transfer=state_change.signed_locked_transfer
-        )
+    sub_iteration = initiator.try_new_route_light(
+        channelidentifiers_to_channels=channelidentifiers_to_channels,
+        channel_state=state_change.current_channel,
+        transfer_description=state_change.transfer,
+        signed_locked_transfer=state_change.signed_locked_transfer
+    )
 
-        events = sub_iteration.events
-        if sub_iteration.new_state:
+    events = sub_iteration.events
+    if sub_iteration.new_state:
+        if not state_change.is_retry_route:
+            # TODO marcosmartinez7 routes here can be handled better as they can be part of the state change.
+            # For now the routes are all the possible routes - the routes that were marked as cancelled on payment refund
             payment_state = InitiatorPaymentState(
+                routes=[],
                 initiator_transfers={
                     sub_iteration.new_state.transfer.lock.secrethash: sub_iteration.new_state
                 }
             )
+        else:
+            new_transfer = sub_iteration.new_state.transfer
+            payment_state.initiator_transfers[new_transfer.lock.secrethash] = sub_iteration.new_state
 
     return TransitionResult(payment_state, events)
 
@@ -287,7 +300,6 @@ def handle_failroute(
 ) -> TransitionResult[InitiatorPaymentState]:
 
     events: List[Event] = list()
-
     initiator_state = payment_state.initiator_transfers.get(state_change.transfer.lock.secrethash)
     if initiator_state is not None and can_cancel(initiator_state):
         cancel_events = cancel_current_route(payment_state, initiator_state)
@@ -331,6 +343,10 @@ def handle_transferreroute(
     events: List[Event] = []
     events.extend(channel_events)
 
+    filtered_route_states = routes.filter_acceptable_routes(
+        route_states=payment_state.routes, blacklisted_channel_ids=payment_state.cancelled_channels
+    )
+
     old_description = initiator_state.transfer_description
     transfer_description = TransferDescriptionWithSecretState(
         payment_network_identifier=old_description.payment_network_identifier,
@@ -348,7 +364,7 @@ def handle_transferreroute(
         payment_state=payment_state,
         initiator_state=initiator_state,
         transfer_description=transfer_description,
-        available_routes=state_change.routes,
+        available_routes=filtered_route_states,
         channelidentifiers_to_channels=channelidentifiers_to_channels,
         pseudo_random_generator=pseudo_random_generator,
         block_number=block_number,
@@ -601,6 +617,20 @@ def handle_secretreveal_light(
     return TransitionResult(payment_state, sub_iteration.events)
 
 
+def handle_store_refund_transfer_light(payment_state: InitiatorPaymentState,
+                                       refund_transfer: RefundTransfer
+                                       ) -> TransitionResult[InitiatorPaymentState]:
+    order = 1
+    store_refund_transfer = StoreMessageEvent(refund_transfer.message_identifier,
+                                              refund_transfer.payment_identifier,
+                                              order,
+                                              refund_transfer,
+                                              True,
+                                              LightClientProtocolMessageType.PaymentRefund, refund_transfer.recipient)
+    return TransitionResult(payment_state, [store_refund_transfer])
+
+
+
 def state_transition(
     payment_state: Optional[InitiatorPaymentState],
     state_change: StateChange,
@@ -724,6 +754,10 @@ def state_transition(
             channelidentifiers_to_channels=channelidentifiers_to_channels,
             pseudo_random_generator=pseudo_random_generator,
         )
+    elif type(state_change) == StoreRefundTransferLight:
+        assert isinstance(state_change, StoreRefundTransferLight), MYPY_ANNOTATION
+        assert payment_state, "StoreRefundTransferLight should be accompanied by a valid payment state"
+        iteration = handle_store_refund_transfer_light(payment_state=payment_state, refund_transfer=state_change.transfer)
     else:
         iteration = TransitionResult(payment_state, list())
 

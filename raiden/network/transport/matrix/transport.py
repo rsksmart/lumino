@@ -187,14 +187,7 @@ class _RetryQueue(Runnable):
             self.transport._global_send_queue.join()
 
         self.log.debug("Retrying message", receiver=to_normalized_address(self.receiver))
-        status = self.transport._address_mgr.get_address_reachability(self.receiver)
 
-        if status is not AddressReachability.REACHABLE:
-            # if partner is not reachable, return
-            self.log.info(
-                "Partner not reachable. Skipping.", partner=pex(self.receiver), status=status
-            )
-            return
         message_texts = [
             data.text
             for data in self._message_queue
@@ -327,7 +320,6 @@ class MatrixTransport(Runnable):
         self._account_data_lock = Semaphore()
 
         self._message_handler: Optional[MessageHandler] = None
-
 
     def start_greenlet_for_light_client(self):
         super().start()
@@ -904,9 +896,6 @@ class MatrixTransport(Runnable):
         if self._stop_event.ready():
             return None
         address_hex = to_normalized_address(address)
-        _msg = f"address not health checked: me: {self._user_id}, peer: {address_hex}"
-        #FIXME mmartinez
-      #  assert address and self._address_mgr.is_address_known(address), msg
 
         # filter_private is done in _get_room_ids_for_address
         room_ids = self._get_room_ids_for_address(address)
@@ -1454,7 +1443,6 @@ class MatrixLightClientTransport(MatrixTransport):
             self.stop()  # ensure cleanup and wait on subtasks
             raise
 
-
     def _send_raw(self, receiver_address: Address, data: str):
         with self._getroom_lock:
             room = self._get_room_for_address(receiver_address)
@@ -1474,8 +1462,7 @@ class MatrixLightClientTransport(MatrixTransport):
         if self._stop_event.ready():
             return None
         address_hex = to_normalized_address(address)
-        msg = f"address not health checked: me: {self._user_id}, peer: {address_hex}"
-        assert address and self._address_mgr.is_address_known(address), msg
+        assert address
 
         # filter_private is done in _get_room_ids_for_address
         room_ids = self._get_room_ids_for_address(address)
