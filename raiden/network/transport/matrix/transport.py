@@ -5,7 +5,6 @@ from urllib.parse import urlparse
 
 import gevent
 import structlog
-import transport
 from eth_utils import is_binary_address, to_checksum_address, to_normalized_address, to_canonical_address
 from gevent.event import Event
 from gevent.lock import Semaphore
@@ -903,8 +902,8 @@ class MatrixTransport(TransportLayer, Runnable):
             return None
         address_hex = to_normalized_address(address)
         _msg = f"address not health checked: me: {self._user_id}, peer: {address_hex}"
-        #FIXME mmartinez
-      #  assert address and self._address_mgr.is_address_known(address), msg
+        # FIXME mmartinez
+        #  assert address and self._address_mgr.is_address_known(address), msg
 
         # filter_private is done in _get_room_ids_for_address
         room_ids = self._get_room_ids_for_address(address)
@@ -1749,6 +1748,7 @@ class MatrixLightClientTransport(MatrixTransport):
         except (InvalidAddress, UnknownAddress, UnknownTokenAddress):
             self.log.warning("Exception while processing message", exc_info=True)
             return
+
 
 class NodeTransport:
 
