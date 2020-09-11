@@ -120,10 +120,10 @@ class ChannelValidator:
         return channels_to_close
 
     @staticmethod
-    def can_settle_channel(token_address,
-                           partner_addresses,
-                           registry_address,
-                           raiden):
+    def validate_and_get_channels_to_settle(token_address,
+                                            partner_addresses,
+                                            registry_address,
+                                            raiden):
 
         if not is_binary_address(token_address):
             raise InvalidAddress("Expected binary address format for token in channel settle")

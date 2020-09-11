@@ -2227,31 +2227,16 @@ class TokenNetwork:
                     "settleChannel", gas_limit, channel_identifier=channel_identifier, **kwargs
                 )
                 self.client.poll(transaction_hash)
-                receipt_or_none = check_transaction_threw(self.client, transaction_hash)
+                transaction_error = check_transaction_threw(self.client, transaction_hash)
 
-        transaction_executed = gas_limit is not None
-        if not transaction_executed or receipt_or_none:
-            if transaction_executed:
-                block = receipt_or_none["blockNumber"]
-            else:
-                block = checking_block
-
-            self.proxy.jsonrpc_client.check_for_insufficient_eth(
-                transaction_name="settleChannel",
-                address=self.node_address,
-                transaction_executed=transaction_executed,
-                required_gas=GAS_REQUIRED_FOR_SETTLE_CHANNEL,
-                block_identifier=block,
-            )
-            msg = self._check_channel_state_after_settle(
-                participant1=self.node_address,
-                participant2=partner,
-                block_identifier=block,
-                channel_identifier=channel_identifier,
-            )
-            error_msg = f"{error_prefix}. {msg}"
-            log.critical(error_msg, **log_details)
-            raise RaidenUnrecoverableError(error_msg)
+        self.validate_settlement_transaction_error(channel_identifier,
+                                                   checking_block,
+                                                   error_prefix,
+                                                   log_details,
+                                                   partner,
+                                                   transaction_error,
+                                                   False,
+                                                   gas_limit)
 
         log.info("settle successful", **log_details)
 
@@ -2285,12 +2270,31 @@ class TokenNetwork:
             pass
 
         with self.channel_operations_lock[partner]:
-            error_prefix = "settle call failed"
             transaction_hash = self.proxy.broadcast_signed_transaction(signed_settle_tx)
             self.client.poll(transaction_hash)
             transaction_error = check_transaction_threw(self.client, transaction_hash)
 
-        if transaction_error:
+        self.validate_settlement_transaction_error(channel_identifier,
+                                                   checking_block,
+                                                   "settle call failed",
+                                                   log_details,
+                                                   partner,
+                                                   transaction_error,
+                                                   True)
+
+        log.info("settle light successful", **log_details)
+
+    def validate_settlement_transaction_error(self,
+                                              channel_identifier,
+                                              checking_block,
+                                              error_prefix,
+                                              log_details,
+                                              partner,
+                                              transaction_error,
+                                              is_light,
+                                              gas_limit=None):
+        transaction_executed = is_light or gas_limit is not None
+        if not transaction_executed or transaction_error:
             if transaction_error["blockNumber"]:
                 block = transaction_error["blockNumber"]
             else:
@@ -2312,8 +2316,6 @@ class TokenNetwork:
             error_msg = f"{error_prefix}. {msg}"
             log.critical(error_msg, **log_details)
             raise RaidenUnrecoverableError(error_msg)
-
-        log.info("settle light successful", **log_details)
 
     def events_filter(
         self,

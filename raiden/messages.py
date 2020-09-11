@@ -1878,6 +1878,7 @@ class SettlementRequiredLightMessage(Message):
 
     def to_dict(self) -> Dict[str, Any]:
         return {
+            "type": self.__class__.__name__,
             "channel_identifier": self.channel_identifier,
             "channel_network_identifier": to_normalized_address(self.channel_network_identifier),
             "participant1": to_normalized_address(self.participant1),
@@ -1892,6 +1893,8 @@ class SettlementRequiredLightMessage(Message):
 
     @classmethod
     def from_dict(cls, data) -> "SettlementRequiredLightMessage":
+        error_message = f'Cannot decode data. Provided type is {data["type"]}, expected {cls.__name__}'
+        assert data["type"] == cls.__name__, error_message
         return cls(channel_identifier=ChannelID(data["channel_identifier"]),
                    channel_network_identifier=TokenNetworkAddress(decode_hex(data["channel_network_identifier"])),
                    participant1=Address(decode_hex(data["participant1"])),

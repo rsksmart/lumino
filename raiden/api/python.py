@@ -587,7 +587,7 @@ class RaidenAPI:
         Race condition, this can fail if channel was settled externally.
         """
 
-        channels_to_settle = ChannelValidator.can_settle_channel(
+        channels_to_settle = ChannelValidator.validate_and_get_channels_to_settle(
             token_address=token_address,
             partner_addresses=[partner_address],
             registry_address=registry_address,
