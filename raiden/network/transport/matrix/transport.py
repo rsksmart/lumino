@@ -5,6 +5,7 @@ from urllib.parse import urlparse
 
 import gevent
 import structlog
+import transport
 from eth_utils import is_binary_address, to_checksum_address, to_normalized_address, to_canonical_address
 from gevent.event import Event
 from gevent.lock import Semaphore
@@ -75,6 +76,7 @@ from raiden.utils.typing import (
     cast,
 )
 from transport.layer import TransportLayer
+from transport.components import Message
 
 log = structlog.get_logger(__name__)
 
@@ -498,33 +500,33 @@ class MatrixTransport(TransportLayer, Runnable):
             # representing the target node
             self._address_mgr.refresh_address_presence(node_address)
 
-    def send_message(self, queue_identifier: QueueIdentifier, message: Message):
+    def send_message(self, message: transport.components.Message, recipient: Address):
         """Queue the message for sending to recipient in the queue_identifier
 
         It may be called before transport is started, to initialize message queues
         The actual sending is started only when the transport is started
         """
+        raiden_message = message.raiden_message
+        queue_identifier = message.params.queue_identifier
 
         # even if transport is not started, can run to enqueue messages to send when it starts
-        receiver_address = queue_identifier.recipient
-
-        if not is_binary_address(receiver_address):
-            raise ValueError("Invalid address {}".format(pex(receiver_address)))
+        if not is_binary_address(recipient):
+            raise ValueError("Invalid address {}".format(pex(recipient)))
 
         # These are not protocol messages, but transport specific messages
-        if isinstance(message, (Ping, Pong)):
+        if isinstance(raiden_message, (Ping, Pong)):
             raise ValueError(
-                "Do not use send_message for {} messages".format(message.__class__.__name__)
+                "Do not use send_message for {} messages".format(raiden_message.__class__.__name__)
             )
 
         self.log.info(
             "Send message",
-            receiver_address=pex(receiver_address),
-            message=message,
+            receiver_address=pex(recipient),
+            message=raiden_message,
             queue_identifier=queue_identifier,
         )
 
-        self._send_with_retry(queue_identifier, message)
+        self._send_with_retry(queue_identifier, raiden_message)
 
     def send_global(self, room: str, message: Message) -> None:
         """Sends a message to one of the global rooms
@@ -852,7 +854,8 @@ class MatrixTransport(TransportLayer, Runnable):
             queue_identifier = QueueIdentifier(
                 recipient=message.sender, channel_identifier=CHANNEL_IDENTIFIER_GLOBAL_QUEUE
             )
-            self.send_message(queue_identifier, delivered_message)
+            params = transport.components.Params(queue_identifier=queue_identifier)
+            self.send_message(transport.components.Message(delivered_message, params), message.sender)
             self._raiden_service.on_message(message)
 
         except (InvalidAddress, UnknownAddress, UnknownTokenAddress):

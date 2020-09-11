@@ -20,6 +20,6 @@ class Message:
     Message is a wrapper class which embeds a Raiden Message, plus any optional transport layer params.
     """
 
-    def __init__(self, raiden_message: Message, transport_params: Params = None):
+    def __init__(self, raiden_message: Message, params: Params = None):
         self.raiden_message: raiden_message
-        self.transport_params: transport_params
+        self.params: params
