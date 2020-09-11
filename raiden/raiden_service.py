@@ -99,6 +99,8 @@ from raiden.utils.upgrades import UpgradeManager
 from raiden_contracts.contract_manager import ContractManager
 from eth_utils import to_canonical_address, to_checksum_address
 
+from transport.components import Message as TransportMessage, Params as TransportParams
+
 log = structlog.get_logger(__name__)  # pylint: disable=invalid-name
 StatusesDict = Dict[TargetAddress, Dict[PaymentID, "PaymentStatus"]]
 ConnectionManagerDict = Dict[TokenNetworkID, ConnectionManager]
@@ -1324,7 +1326,8 @@ class RaidenService(Runnable):
             queue_identifier = QueueIdentifier(
                 recipient=receiver_address, channel_identifier=CHANNEL_IDENTIFIER_GLOBAL_QUEUE
             )
-            lc_transport.send_message(queue_identifier, delivered)
+            transport_params = TransportParams(queue_identifier)
+            lc_transport.send_message(TransportMessage(delivered, transport_params), receiver_address)
 
     def initiate_send_processed_light(self, sender_address: Address, receiver_address: Address,
                                       processed: Processed, msg_order: int, payment_id: int,
@@ -1343,7 +1346,8 @@ class RaidenService(Runnable):
             queue_identifier = QueueIdentifier(
                 recipient=receiver_address, channel_identifier=CHANNEL_IDENTIFIER_GLOBAL_QUEUE
             )
-            lc_transport.send_message(queue_identifier, processed)
+            transport_params = TransportParams(queue_identifier)
+            lc_transport.send_message(TransportMessage(processed, transport_params), receiver_address)
 
     def initiate_send_secret_reveal_light(
         self,
