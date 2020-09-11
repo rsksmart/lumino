@@ -76,7 +76,7 @@ from raiden.utils.typing import (
     cast,
 )
 from transport.abstraction import Layer as TransportLayer
-from transport.components import Message as TransportMessage
+from transport.components import Message as TransportMessage, Params as TransportParams
 
 log = structlog.get_logger(__name__)
 
@@ -854,8 +854,8 @@ class MatrixTransport(TransportLayer, Runnable):
             queue_identifier = QueueIdentifier(
                 recipient=message.sender, channel_identifier=CHANNEL_IDENTIFIER_GLOBAL_QUEUE
             )
-            params = transport.components.Params(queue_identifier=queue_identifier)
-            self.send_message(transport.components.Message(delivered_message, params), message.sender)
+            transport_params = TransportParams(queue_identifier=queue_identifier)
+            self.send_message(TransportMessage(delivered_message, transport_params), message.sender)
             self._raiden_service.on_message(message)
 
         except (InvalidAddress, UnknownAddress, UnknownTokenAddress):
