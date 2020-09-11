@@ -8,9 +8,9 @@ import filelock
 import gevent
 import structlog
 from eth_utils import is_binary_address
+from eth_utils import to_canonical_address, to_checksum_address
 from gevent import Greenlet
 from gevent.event import AsyncResult, Event
-
 from raiden import constants, routing
 from raiden.blockchain.events import BlockchainEvents
 from raiden.blockchain_events_handler import on_blockchain_event
@@ -50,7 +50,6 @@ from raiden.transfer.architecture import Event as RaidenEvent, StateChange
 from raiden.transfer.identifiers import QueueIdentifier
 from raiden.transfer.mediated_transfer.events import SendLockedTransfer, SendLockedTransferLight, \
     CHANNEL_IDENTIFIER_GLOBAL_QUEUE
-
 from raiden.transfer.mediated_transfer.state import (
     TransferDescriptionWithSecretState,
     lockedtransfersigned_from_message,
@@ -94,11 +93,8 @@ from raiden.utils.typing import (
     TokenNetworkAddress,
     TokenNetworkID,
     PaymentHashInvoice)
-
 from raiden.utils.upgrades import UpgradeManager
 from raiden_contracts.contract_manager import ContractManager
-from eth_utils import to_canonical_address, to_checksum_address
-
 from transport.components import Message as TransportMessage, Params as TransportParams
 
 log = structlog.get_logger(__name__)  # pylint: disable=invalid-name
