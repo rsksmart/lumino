@@ -240,22 +240,28 @@ def unlock_light(raiden: "RaidenService",
     canonical_identifier: CanonicalIdentifier = channel_unlock_event.canonical_identifier
 
     token_network: TokenNetwork = views.get_token_network_by_identifier(chain_state, canonical_identifier.token_network_address)
-
-    LightClientMessageHandler.store_light_client_protocol_message(
-        identifier=message_identifier_from_prng(chain_state.pseudo_random_generator),
-        signed=False,
-        payment_id=0,
-        order=0,
-        message_type=LightClientProtocolMessageType.UnlockRequired,
-        wal=raiden.wal,
-        light_client_address=channel_unlock_event.client,
-        message=UnlockLightRequest(
-            token_address=token_network.token_address(),
-            channel_identifier=canonical_identifier.channel_identifier,
-            receiver=participant,
-            sender=partner
-        )
+    message = UnlockLightRequest(
+        token_address=token_network.token_address(),
+        channel_identifier=canonical_identifier.channel_identifier,
+        receiver=participant,
+        sender=partner
     )
+    if not LightClientMessageHandler.is_message_already_stored(
+        light_client_address=channel_unlock_event.client,
+        message_type=LightClientProtocolMessageType.UnlockRequired,
+        unsigned_message=message,
+        wal=raiden.wal
+    ):
+        LightClientMessageHandler.store_light_client_protocol_message(
+            identifier=message_identifier_from_prng(chain_state.pseudo_random_generator),
+            signed=False,
+            payment_id=0,
+            order=0,
+            message_type=LightClientProtocolMessageType.UnlockRequired,
+            wal=raiden.wal,
+            light_client_address=channel_unlock_event.client,
+            message=message
+        )
 
 class EventHandler(ABC):
     @abstractmethod

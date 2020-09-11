@@ -210,6 +210,20 @@ class SQLiteStorage:
             last_id = cursor.lastrowid
         return last_id
 
+    def is_message_already_stored(self, light_client_address, message_type, unsigned_message):
+        cursor = self.conn.cursor()
+        cursor.execute(
+            """
+            SELECT *
+                FROM light_client_protocol_message lcpm
+                WHERE lcpm.light_client_address == ?
+                AND lcpm.message_type == ?
+                AND lcpm.unsigned_message == ?
+            """,
+            (to_checksum_address(light_client_address), str(message_type), str(unsigned_message)))
+
+        return cursor.fetchone()
+
     def is_light_client_protocol_message_already_stored(self, payment_id: int, order: int,
                                                         message_type: str, message_protocol_type:str):
         cursor = self.conn.cursor()
