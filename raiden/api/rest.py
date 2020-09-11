@@ -892,6 +892,8 @@ class RestAPI:
     ):
         try:
             self.raiden_api.register_secret_light(signed_tx, message_id, message_order, payment_id)
+        except InsufficientFunds as e:
+            return api_error(errors=str(e), status_code=HTTPStatus.PAYMENT_REQUIRED)
         except (RawTransactionFailed, InvalidPaymentIdentifier) as e:
             return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.BAD_REQUEST, log=log)
         except Exception as e:

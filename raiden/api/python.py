@@ -283,7 +283,7 @@ class RaidenAPI:
         if not message_exists:
             raise InvalidPaymentIdentifier()
         self.raiden.default_secret_registry.register_secret_light(signed_tx)
-        LightClientMessageHandler.update_stored_msg_set_signed_tx_by_message_id(message_id)
+        LightClientMessageHandler.update_stored_msg_set_signed_tx_by_message_id(message_id, signed_tx, self.raiden.wal)
     def token_network_register(
         self,
         registry_address: PaymentNetworkID,
