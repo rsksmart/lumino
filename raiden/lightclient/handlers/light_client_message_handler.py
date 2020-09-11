@@ -275,7 +275,6 @@ class LightClientMessageHandler:
                     protocol_message.light_client_address, order,
                     message_type, wal)
             else:
-                print(order)
                 cls.log.info("Message for lc already received, ignoring db storage")
 
     @classmethod

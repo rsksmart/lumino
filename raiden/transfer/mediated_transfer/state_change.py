@@ -900,5 +900,5 @@ class StoreRefundTransferLight(StateChange):
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "StoreRefundTransferLight":
-        return cls(transfer=data["transfer"])
+        return cls(transfer=RefundTransfer.from_dict(data["transfer"]))
 

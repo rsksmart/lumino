@@ -96,7 +96,8 @@ from raiden.utils.typing import (
     TokenNetworkAddress,
     TokenNetworkID,
     Tuple,
-    SignedTransaction, InitiatorAddress)
+    SignedTransaction,
+    InitiatorAddress)
 
 from raiden.rns_constants import RNS_ADDRESS_ZERO
 from raiden.utils.rns import is_rns_address
@@ -1720,7 +1721,6 @@ class RaidenAPI:
             token_network_id = views.get_token_network_by_token_address(
                 views.state_from_raiden(self.raiden), registry_address, token_address
             )
-
             possible_routes, _ = routing.get_best_routes(
                 chain_state=views.state_from_raiden(self.raiden),
                 token_network_id=token_network_id.address,
@@ -1732,18 +1732,15 @@ class RaidenAPI:
                 config=self.raiden.config,
                 privkey=self.raiden.privkey,
             )
-            if prev_secrethash is not None:
-                new_secrethash = secrethash
-                current_payment_task = chain_state.payment_mapping.secrethashes_to_task[
-                    prev_secrethash
-                ]
+            if prev_secrethash:
+                current_payment_task = chain_state.payment_mapping.secrethashes_to_task[prev_secrethash]
                 chain_state.payment_mapping.secrethashes_to_task.update(
-                    {new_secrethash: copy.deepcopy(current_payment_task)}
+                    {secrethash: copy.deepcopy(current_payment_task)}
                 )
                 possible_routes = routes.filter_acceptable_routes(
                     route_states=possible_routes, blacklisted_channel_ids=current_payment_task.manager_state.cancelled_channels
                 )
-            if len(possible_routes) > 0:
+            if possible_routes:
                 # TODO marcosmartinez7 This can be improved using next_channel_from_routes in order to filter channels without capacity
                 channel_state = views.get_channelstate_for(
                     views.state_from_raiden(self.raiden),
@@ -1790,7 +1787,7 @@ class RaidenAPI:
                                                     message=locked_transfer, is_signed=False)
             return HubResponseMessage(lcpm_id, LightClientProtocolMessageType.PaymentSuccessful, payment_hub_message)
         else:
-            raise ChannelNotFound("Light client has not any open channel")
+            raise ChannelNotFound("Light client does not have any open channel")
 
     def validate_light_client(self, api_key: str):
         """

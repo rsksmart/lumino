@@ -12,12 +12,14 @@ from raiden.transfer.events import EventPaymentSentFailed
 from raiden.transfer.mediated_transfer import initiator
 from raiden.transfer.mediated_transfer.events import (
     EventUnlockClaimFailed,
-    EventUnlockFailed, StoreMessageEvent)
+    EventUnlockFailed,
+    StoreMessageEvent
+)
 from raiden.transfer.mediated_transfer.state import (
     InitiatorPaymentState,
     InitiatorTransferState,
     TransferDescriptionWithSecretState,
-    )
+)
 from raiden.transfer.mediated_transfer.state_change import (
     ActionInitInitiator,
     ReceiveLockExpired,
@@ -208,7 +210,6 @@ def handle_init(
     pseudo_random_generator: random.Random,
     block_number: BlockNumber,
 ) -> TransitionResult[InitiatorPaymentState]:
-    events: List[Event] = list()
     sub_iteration = initiator.try_new_route(
         channelidentifiers_to_channels=channelidentifiers_to_channels,
         available_routes=state_change.routes,
@@ -217,7 +218,6 @@ def handle_init(
         block_number=block_number,
     )
 
-    events = sub_iteration.events
     if sub_iteration.new_state:
         # TODO marcosmartinez7 here the routes are always all routes, because the ActionInitInitiator doesnt take into account cancelled routes.
         # Cancelled routes are added when a refund message comes.
@@ -228,7 +228,7 @@ def handle_init(
             }
         )
 
-    return TransitionResult(payment_state, events)
+    return TransitionResult(payment_state,  sub_iteration.events)
 
 
 def handle_init_light(
@@ -237,7 +237,6 @@ def handle_init_light(
     channelidentifiers_to_channels: ChannelMap,
 ) -> TransitionResult[InitiatorPaymentState]:
     events: List[Event] = list()
-    print("llamo a try new route")
     sub_iteration = initiator.try_new_route_light(
         channelidentifiers_to_channels=channelidentifiers_to_channels,
         channel_state=state_change.current_channel,
@@ -249,7 +248,7 @@ def handle_init_light(
     if sub_iteration.new_state:
         if not state_change.is_retry_route:
             # TODO marcosmartinez7 routes here can be handled better as they can be part of the state change.
-            # For now the routes are all the possible routes - the cancelled ones at the moment of ....
+            # For now the routes are all the possible routes - the routes that were marked as cancelled on payment refund
             payment_state = InitiatorPaymentState(
                 routes=[],
                 initiator_transfers={
@@ -757,8 +756,7 @@ def state_transition(
         )
     elif type(state_change) == StoreRefundTransferLight:
         assert isinstance(state_change, StoreRefundTransferLight), MYPY_ANNOTATION
-        msg = "StoreRefundTransferLight should be accompanied by a valid payment state"
-        assert payment_state, msg
+        assert payment_state, "StoreRefundTransferLight should be accompanied by a valid payment state"
         iteration = handle_store_refund_transfer_light(payment_state=payment_state, refund_transfer=state_change.transfer)
     else:
         iteration = TransitionResult(payment_state, list())
