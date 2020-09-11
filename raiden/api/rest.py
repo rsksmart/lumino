@@ -86,8 +86,11 @@ from raiden.api.v1.resources import (
     LightClientMatrixCredentialsBuildResource,
     LightClientResource,
     PaymentLightResource,
-    CreatePaymentLightResource, WatchtowerResource, LightClientMessageResource, UnlockedPaymentLightResource,
-    UnlockedPaymentLightResource)
+    CreatePaymentLightResource,
+    WatchtowerResource,
+    LightClientMessageResource,
+    UnlockedPaymentLightResource
+)
 
 from raiden.constants import GENESIS_BLOCK_NUMBER, UINT256_MAX, Environment, EMPTY_PAYMENT_HASH_INVOICE
 
@@ -114,7 +117,11 @@ from raiden.exceptions import (
     TokenNotRegistered,
     TransactionThrew,
     UnknownTokenAddress,
-    RawTransactionFailed, UnhandledLightClient, RaidenRecoverableError, InvalidPaymentIdentifier)
+    RawTransactionFailed,
+    UnhandledLightClient,
+    RaidenRecoverableError,
+    InvalidPaymentIdentifier
+)
 from raiden.transfer import channel, views
 from raiden.transfer.events import (
     EventPaymentReceivedSuccess,
@@ -230,7 +237,7 @@ URLS_HUB_V1 = [
         LightChannelsResourceByTokenAndPartnerAddress
     ),
     (
-        "/unlocked_payments/<hexaddress:token_address>",
+        "/payments_light/unlocked/<hexaddress:token_address>",
         UnlockedPaymentLightResource
     ),
     ("/payments_light", PaymentLightResource),

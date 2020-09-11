@@ -12,7 +12,8 @@ from raiden.constants import EthClient
 from raiden.exceptions import (
     InsufficientFunds,
     ReplacementTransactionUnderpriced,
-    TransactionAlreadyPending, RaidenRecoverableError, RawTransactionFailed,
+    TransactionAlreadyPending,
+    RawTransactionFailed,
 )
 from raiden.network.rpc.transactions import check_transaction_threw
 from raiden.utils import typing
