@@ -33,3 +33,11 @@ class Message:
         """
         params = Params(queue_identifier=queue_identifier)
         return Message(raiden_message, params), queue_identifier.recipient
+
+    @classmethod
+    def unwrap(cls, transport_message: "Message") -> (RaidenMessage, QueueIdentifier):
+        """
+        Takes a transport layer message and extracts the embedded Raiden message and its corresponding
+        queue identifier from its parameters, with the purpose of processing it in a transport layer.
+        """
+        return transport_message.raiden_message, transport_message.params.queue_identifier

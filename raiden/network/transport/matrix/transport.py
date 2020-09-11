@@ -321,14 +321,6 @@ class MatrixTransport(TransportLayer, Runnable):
 
         self._message_handler: Optional[MessageHandler] = None
 
-    @classmethod
-    def unwrap(cls, transport_message: TransportMessage) -> (Message, QueueIdentifier):
-        """
-        Takes a transport layer message and extracts the embedded Raiden message and its corresponding
-        queue identifier from its parameters, with the purpose of processing it in the Matrix transport layer.
-        """
-        return transport_message.raiden_message, transport_message.params.queue_identifier
-
     def start_greenlet_for_light_client(self):
         Runnable.start(self)
 
@@ -512,7 +504,7 @@ class MatrixTransport(TransportLayer, Runnable):
         It may be called before transport is started, to initialize message queues
         The actual sending is started only when the transport is started
         """
-        raiden_message, queue_identifier = MatrixTransport.unwrap(message)
+        raiden_message, queue_identifier = TransportMessage.unwrap(message)
 
         # even if transport is not started, can run to enqueue messages to send when it starts
         if not is_binary_address(recipient):
