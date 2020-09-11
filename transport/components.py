@@ -3,7 +3,7 @@ from raiden.transfer.identifiers import QueueIdentifier
 from raiden.utils import Address
 
 
-class Params:
+class MessageParams:
     """
     Params contains any necessary additional parameters for Raiden Messages to be successfully sent
     through whatever transport layer implementation picks them up.
@@ -21,7 +21,7 @@ class Message:
     Message is a wrapper class which embeds a Raiden Message, plus any optional transport layer params.
     """
 
-    def __init__(self, raiden_message: RaidenMessage, params: Params = None):
+    def __init__(self, raiden_message: RaidenMessage, params: MessageParams = None):
         self.raiden_message = raiden_message
         self.params = params
 
@@ -31,7 +31,7 @@ class Message:
         Takes a queue identifier, a raiden message and wraps these fields in a transport message and extracts the
         recipient, with the purpose of sending these through a transport layer.
         """
-        params = Params(queue_identifier=queue_identifier)
+        params = MessageParams(queue_identifier=queue_identifier)
         return Message(raiden_message, params), queue_identifier.recipient
 
     @classmethod
