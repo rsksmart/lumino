@@ -10,7 +10,6 @@ from gevent.event import Event
 from gevent.lock import Semaphore
 from gevent.queue import JoinableQueue
 from matrix_client.errors import MatrixRequestError
-
 from raiden.constants import DISCOVERY_DEFAULT_ROOM
 from raiden.exceptions import InvalidAddress, UnknownAddress, UnknownTokenAddress
 from raiden.message_handler import MessageHandler
@@ -321,6 +320,15 @@ class MatrixTransport(TransportLayer, Runnable):
         self._account_data_lock = Semaphore()
 
         self._message_handler: Optional[MessageHandler] = None
+
+    @classmethod
+    def wrap_transport_message(cls, queue_identifier: QueueIdentifier, raiden_message: Message) -> TransportMessage:
+        transport_params = TransportParams(queue_identifier=queue_identifier)
+        return TransportMessage(raiden_message, transport_params)
+
+    @classmethod
+    def unwrap_transport_message(cls, transport_message: TransportMessage) -> (Message, QueueIdentifier):
+        return transport_message.raiden_message, transport_message.params.queue_identifier
 
     def start_greenlet_for_light_client(self):
         Runnable.start(self)

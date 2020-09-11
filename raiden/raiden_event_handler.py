@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING
 
 import structlog
 from eth_utils import to_checksum_address, to_hex
-
+from raiden.billing.invoices.handlers.invoice_handler import handle_receive_events_with_payments
 from raiden.constants import EMPTY_BALANCE_HASH, EMPTY_HASH, EMPTY_MESSAGE_HASH, EMPTY_SIGNATURE
 from raiden.exceptions import ChannelOutdatedError, RaidenUnrecoverableError
 from raiden.lightclient.handlers.light_client_message_handler import LightClientMessageHandler
@@ -54,8 +54,7 @@ from raiden.transfer.utils import (
 from raiden.transfer.views import get_channelstate_by_token_network_and_partner
 from raiden.utils import pex
 from raiden.utils.typing import MYPY_ANNOTATION, Address, Nonce, TokenNetworkID, AddressHex
-
-from raiden.billing.invoices.handlers.invoice_handler import handle_receive_events_with_payments
+from transport.components import Message as TransportMessage, Params as TransportParams
 
 if TYPE_CHECKING:
     # pylint: disable=unused-import
@@ -339,9 +338,9 @@ class RaidenEventHandler(EventHandler):
                                                 'raiden.transfer.events.EventPaymentSentFailed',
                                                 payment_identifier)
 
-        # In the case of a refund transfer the payment fails earlier
-        # but the lock expiration will generate a second
-        # EventPaymentSentFailed message which we can ignore here
+            # In the case of a refund transfer the payment fails earlier
+            # but the lock expiration will generate a second
+            # EventPaymentSentFailed message which we can ignore here
 
             payment_status.payment_done.set(False)
 
@@ -439,7 +438,8 @@ class RaidenEventHandler(EventHandler):
         balance_proof = channel_update_event.balance_proof
 
         # checking that this balance proof exists on the database
-        db_balance_proof = raiden.wal.storage.get_latest_light_client_non_closing_balance_proof(channel_id=balance_proof.channel_identifier)
+        db_balance_proof = raiden.wal.storage.get_latest_light_client_non_closing_balance_proof(
+            channel_id=balance_proof.channel_identifier)
 
         if db_balance_proof:
             canonical_identifier = balance_proof.canonical_identifier
