@@ -518,7 +518,7 @@ class MatrixTransport(TransportLayer, Runnable):
 
         self.log.info(
             "Send message",
-            receiver_address=pex(recipient),
+            recipient=pex(recipient),
             message=raiden_message,
             queue_identifier=queue_identifier,
         )
