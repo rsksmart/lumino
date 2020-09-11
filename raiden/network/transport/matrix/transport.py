@@ -16,6 +16,7 @@ from raiden.constants import DISCOVERY_DEFAULT_ROOM
 from raiden.exceptions import InvalidAddress, UnknownAddress, UnknownTokenAddress
 from raiden.message_handler import MessageHandler
 from raiden.messages import (
+    Message,
     Delivered,
     Ping,
     Pong,
@@ -74,8 +75,8 @@ from raiden.utils.typing import (
     Union,
     cast,
 )
-from transport.layer import TransportLayer
-from transport.components import Message
+from transport.abstraction import Layer as TransportLayer
+from transport.components import Message as TransportMessage
 
 log = structlog.get_logger(__name__)
 
@@ -499,7 +500,7 @@ class MatrixTransport(TransportLayer, Runnable):
             # representing the target node
             self._address_mgr.refresh_address_presence(node_address)
 
-    def send_message(self, message: transport.components.Message, recipient: Address):
+    def send_message(self, message: TransportMessage, recipient: Address):
         """Queue the message for sending to recipient in the queue_identifier
 
         It may be called before transport is started, to initialize message queues

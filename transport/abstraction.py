@@ -7,9 +7,9 @@ from raiden.utils import Address
 from transport.components import Message
 
 
-class TransportLayer(ABC):
+class Layer(ABC):
     """
-    TransportLayer is an abstraction which lays between the Lumino business logic layer and the
+    Layer is an abstraction which lays between the Lumino business logic layer and the
     lower layers of the system that take care of sending and receiving messages.
     """
 

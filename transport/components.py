@@ -21,5 +21,5 @@ class Message:
     """
 
     def __init__(self, raiden_message: Message, params: Params = None):
-        self.raiden_message: raiden_message
-        self.params: params
+        self.raiden_message = raiden_message
+        self.params = params
