@@ -1906,6 +1906,21 @@ class SettlementRequiredLightMessage(Message):
                    participant2_locked_amount=TokenAmount(int(data["participant2_locked_amount"])),
                    participant2_locksroot=Locksroot(decode_hex(data["participant2_locksroot"])))
 
+    def __eq__(self, other: Any) -> bool:
+        return (
+            isinstance(other, SettlementRequiredLightMessage)
+            and self.channel_identifier == other.channel_identifier
+            and self.channel_network_identifier == other.channel_network_identifier
+            and self.participant1 == other.participant1
+            and self.participant1_transferred_amount == other.participant1_transferred_amount
+            and self.participant1_locked_amount == other.participant1_locked_amount
+            and self.participant1_locksroot == other.participant1_locksroot
+            and self.participant2 == other.participant2
+            and self.participant2_transferred_amount == other.participant2_transferred_amount
+            and self.participant2_locked_amount == other.participant2_locked_amount
+            and self.participant2_locksroot == other.participant2_locksroot
+        )
+
 
 CMDID_TO_CLASS: Dict[int, Type[Message]] = {
     messages.DELIVERED: Delivered,

@@ -11,7 +11,7 @@ from raiden.lightclient.models.client_model import ClientType
 from raiden.storage.serialize import SerializationBase
 from raiden.storage.utils import DB_SCRIPT_CREATE_TABLES, TimestampedEvent
 from raiden.utils import get_system_spec
-from raiden.utils.typing import Any, Dict, Iterator, List, NamedTuple, Optional, Tuple, Union, AddressHex
+from raiden.utils.typing import Any, Dict, Iterator, List, NamedTuple, Optional, Tuple, Union
 from dateutil.relativedelta import relativedelta
 
 

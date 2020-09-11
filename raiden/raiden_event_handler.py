@@ -734,7 +734,6 @@ class RaidenEventHandler(EventHandler):
             token_network_address=token_network_identifier,
             channel_identifier=channel_identifier,
         )
-        triggered_by_block_hash = triggered_by_block_hash
         payment_channel: PaymentChannel = raiden.chain.payment_channel(
             canonical_identifier=canonical_identifier
         )
