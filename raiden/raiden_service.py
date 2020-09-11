@@ -95,7 +95,7 @@ from raiden.utils.typing import (
     PaymentHashInvoice)
 from raiden.utils.upgrades import UpgradeManager
 from raiden_contracts.contract_manager import ContractManager
-from transport.components import Message as TransportMessage, Params as TransportParams
+from transport.components import Message as TransportMessage
 
 log = structlog.get_logger(__name__)  # pylint: disable=invalid-name
 StatusesDict = Dict[TargetAddress, Dict[PaymentID, "PaymentStatus"]]
