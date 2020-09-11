@@ -239,7 +239,9 @@ def try_new_route_light(
     transfer_description: TransferDescriptionWithoutSecretState,
     signed_locked_transfer: LockedTransfer
 ) -> TransitionResult[InitiatorTransferState]:
-    channel_state = channelidentifiers_to_channels[signed_locked_transfer.initiator].get(signed_locked_transfer.channel_identifier)
+    initiator = signed_locked_transfer.initiator
+    channel_identifier = signed_locked_transfer.channel_identifier
+    channel_state = channelidentifiers_to_channels[initiator].get(channel_identifier)
     events: List[Event] = list()
     if channel_state is None:
         # TODO mmartinez handle persistance with status failure?

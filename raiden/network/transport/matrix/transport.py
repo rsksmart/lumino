@@ -187,15 +187,7 @@ class _RetryQueue(Runnable):
             self.transport._global_send_queue.join()
 
         self.log.debug("Retrying message", receiver=to_normalized_address(self.receiver))
-        # TODO marcosmartinez7 status must be taked into account. This is commented because on some lc mediated paytments
-        # scenarios, the status is unreachable.
-        # status = self.transport._address_mgr.get_address_reachability(self.receiver)
-        # if status is not AddressReachability.REACHABLE:
-        #     # if partner is not reachable, return
-        #     self.log.info(
-        #         "Partner not reachable. Skipping.", partner=pex(self.receiver), status=status
-        #     )
-        #     return
+
         message_texts = [
             data.text
             for data in self._message_queue
@@ -904,9 +896,6 @@ class MatrixTransport(Runnable):
         if self._stop_event.ready():
             return None
         address_hex = to_normalized_address(address)
-        _msg = f"address not health checked: me: {self._user_id}, peer: {address_hex}"
-        # FIXME mmarcosmartinez7 this is flaky
-        # assert address and self._address_mgr.is_address_known(address), msg
 
         # filter_private is done in _get_room_ids_for_address
         room_ids = self._get_room_ids_for_address(address)
@@ -1474,11 +1463,6 @@ class MatrixLightClientTransport(MatrixTransport):
             return None
         address_hex = to_normalized_address(address)
         assert address
-        # TODO marcosmartinez7 Precondition must be assert address and self._address_mgr.is_address_known(address), msg, but
-        # address is not healtchecked for mediated receptions
-
-        #  msg = f"address not health checked: me: {self._user_id}, peer: {address_hex}"
-        # assert address and self._address_mgr.is_address_known(address), msg
 
         # filter_private is done in _get_room_ids_for_address
         room_ids = self._get_room_ids_for_address(address)

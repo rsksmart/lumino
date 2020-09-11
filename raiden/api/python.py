@@ -1719,10 +1719,10 @@ class RaidenAPI:
             # if a prev_secrethash is set, then we need to filter the previous canceled routes.
 
             token_network_id = views.get_token_network_by_token_address(
-                views.state_from_raiden(self.raiden), registry_address, token_address
+                chain_state, registry_address, token_address
             )
             possible_routes, _ = routing.get_best_routes(
-                chain_state=views.state_from_raiden(self.raiden),
+                chain_state=chain_state,
                 token_network_id=token_network_id.address,
                 one_to_n_address=self.raiden.default_one_to_n_address,
                 from_address=InitiatorAddress(creator_address),
@@ -1743,7 +1743,7 @@ class RaidenAPI:
             if possible_routes:
                 # TODO marcosmartinez7 This can be improved using next_channel_from_routes in order to filter channels without capacity
                 channel_state = views.get_channelstate_for(
-                    views.state_from_raiden(self.raiden),
+                    chain_state,
                     registry_address,
                     token_address,
                     creator_address,
