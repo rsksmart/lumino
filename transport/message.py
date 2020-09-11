@@ -11,7 +11,7 @@ class Params:
     def __init__(self, queue_identifier: QueueIdentifier):
         self.queue_identifier = queue_identifier
         """
-        The QueueIdentifier coming from the (upper) Raiden business logic layer.
+        The QueueIdentifier coming from the (upper) Lumino business logic layer.
         """
 
 

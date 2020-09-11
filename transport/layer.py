@@ -9,9 +9,15 @@ from raiden.utils import Address
 
 
 class TransportLayer(ABC):
-
+    """
+    TransportLayer is an abstraction which lays between the Lumino business logic layer and the
+    lower layers of the system that take care of sending and receiving messages.
+    """
     def __init__(self, address: Address):
-        self._address = address  # source for messages transmitted over this layer
+        self._address = address
+        """
+        Source for messages transmitted over this layer.
+        """
 
     @property
     def address(self):
