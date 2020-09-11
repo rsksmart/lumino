@@ -5,7 +5,7 @@ from raiden.utils import Address
 
 class MessageParams:
     """
-    Params contains any necessary additional parameters for Raiden Messages to be successfully sent
+    MessageParams contains any necessary additional parameters for Raiden Messages to be successfully sent
     through whatever transport layer implementation picks them up.
     """
 
