@@ -17,7 +17,6 @@ from raiden.exceptions import InvalidAddress, UnknownAddress, UnknownTokenAddres
 from raiden.message_handler import MessageHandler
 from raiden.messages import (
     Delivered,
-    Message,
     Ping,
     Pong,
     Processed,
