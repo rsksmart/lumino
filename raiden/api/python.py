@@ -273,17 +273,10 @@ class RaidenAPI:
         if time_elapsed > 30:
             raise TokenAppExpired("Token app expired")
 
-    def register_secret_light(self,
-             signed_tx: typing.SignedTransaction,
-             message_id: typing.MessageID,
-             message_order: int,
-             payment_id: typing.PaymentID,
-    ):
-        message_exists = LightClientMessageHandler.is_light_client_protocol_message_already_stored_message_id(message_id, payment_id, message_order, self.raiden.wal)
-        if not message_exists:
-            raise InvalidPaymentIdentifier()
-        self.raiden.default_secret_registry.register_secret_light(signed_tx)
+    def register_secret_light(self, signed_tx: typing.SignedTransaction, message_id: typing.MessageID):
+        self.raiden.default_secret_registry.register_secret_light(signed_tx, message_id)
         LightClientMessageHandler.update_stored_msg_set_signed_tx_by_message_id(message_id, signed_tx, self.raiden.wal)
+
     def token_network_register(
         self,
         registry_address: PaymentNetworkID,

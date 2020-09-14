@@ -9,7 +9,7 @@ from raiden.lightclient.handlers.light_client_service import LightClientService
 log = structlog.get_logger(__name__)
 
 
-def light_client_only(func):
+def requires_api_key(func):
     """
         Check if the endpoint handled by func was called with a valid 'x-api-key' header.
         This decorator requires the class where func is defined to have a property raiden_api,

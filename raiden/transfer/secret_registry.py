@@ -23,8 +23,6 @@ def events_for_onchain_secretreveal(
     target_state: TargetTransferState = None,
     pseudo_random_generator: random.Random = None
 ) -> List[Event]:
-    events: List[Event] = list()
-
     if not isinstance(secret, T_Secret):
         raise ValueError("secret must be a Secret instance")
 
@@ -37,7 +35,7 @@ def events_for_onchain_secretreveal(
                     triggered_by_block_hash=block_hash,
                 )
             ]
-        elif target_state is not None:
+        if target_state is not None:
             return [
                 StoreMessageEvent(
                     message_id=message_identifier_from_prng(pseudo_random_generator),

@@ -16,7 +16,7 @@ from flask_restful import Api, abort
 from gevent.pywsgi import WSGIServer
 from hexbytes import HexBytes
 
-from raiden.api.validations.valid_light_client import light_client_only
+from raiden.api.validations.valid_light_client import requires_api_key
 from raiden.lightclient.handlers.light_client_message_handler import LightClientMessageHandler
 from raiden_webui import RAIDEN_WEBUI_PATH
 
@@ -243,7 +243,7 @@ URLS_HUB_V1 = [
         LightClientResource
     ),
     (
-        '/secrets_light/',
+        '/payments_light/register_onchain_secret/',
         RegisterSecretLightResource
     ),
 ]
@@ -883,15 +883,10 @@ class RestAPI:
         ]
         return api_response(result=closed_channels)
 
-    @light_client_only
-    def post_register_secret_light(self,
-             signed_tx: typing.SignedTransaction,
-             message_id: typing.MessageID,
-             message_order: int,
-             payment_id: typing.PaymentID,
-    ):
+    @requires_api_key
+    def post_register_secret_light(self, signed_tx: typing.SignedTransaction, message_id: typing.MessageID):
         try:
-            self.raiden_api.register_secret_light(signed_tx, message_id, message_order, payment_id)
+            self.raiden_api.register_secret_light(signed_tx, message_id)
         except InsufficientFunds as e:
             return api_error(errors=str(e), status_code=HTTPStatus.PAYMENT_REQUIRED)
         except (RawTransactionFailed, InvalidPaymentIdentifier) as e:

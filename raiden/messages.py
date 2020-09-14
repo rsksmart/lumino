@@ -1831,6 +1831,7 @@ class RequestMonitoring(SignedMessage):
             and recover(reward_proof_data, self.reward_proof_signature) == requesting_address
         )
 
+
 class RequestRegisterSecret(Message):
     def to_dict(self):
         return {

@@ -16,7 +16,8 @@ from raiden.exceptions import (
     InvalidAddress,
     NoStateForBlockIdentifier,
     RaidenRecoverableError,
-    RaidenUnrecoverableError, RawTransactionFailed,
+    RaidenUnrecoverableError,
+    RawTransactionFailed,
 )
 from raiden.network.proxies.utils import compare_contract_versions
 from raiden.network.rpc.client import StatelessFilter, check_address_has_code
@@ -29,7 +30,8 @@ from raiden.utils.typing import (
     Optional,
     Secret,
     SecretHash,
-    Union, SignedTransaction,
+    Union,
+    SignedTransaction,
 )
 from raiden_contracts.constants import CONTRACT_SECRET_REGISTRY, EVENT_SECRET_REVEALED
 from raiden_contracts.contract_manager import ContractManager
