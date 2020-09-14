@@ -725,7 +725,7 @@ class PaymentMappingState(State):
     __slots__ = ("secrethashes_to_task",)
 
     def __init__(self) -> None:
-        self.secrethashes_to_task: Dict[SecretHash, TransferTask] = dict()
+        self.secrethashes_to_task: Dict[True[AddressHex,SecretHash], TransferTask] = dict()
 
     def __repr__(self) -> str:
         return "<PaymentMappingState qtd_transfers:{}>".format(len(self.secrethashes_to_task))
