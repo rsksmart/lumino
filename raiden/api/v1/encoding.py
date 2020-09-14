@@ -19,8 +19,7 @@ from raiden.api.objects import Address, AddressList, PartnersPerToken, PartnersP
 from raiden.constants import SECRET_LENGTH, SECRETHASH_LENGTH
 from raiden.settings import DEFAULT_INITIAL_CHANNEL_TARGET, DEFAULT_JOINABLE_FUNDS_TARGET
 from raiden.transfer import channel
-from raiden.transfer.state import CHANNEL_STATE_CLOSED, CHANNEL_STATE_OPENED, CHANNEL_STATE_SETTLED, \
-    CHANNEL_STATE_SETTLING
+from raiden.transfer.state import CHANNEL_STATE_CLOSED, CHANNEL_STATE_OPENED, CHANNEL_STATE_SETTLED
 from raiden.utils import data_decoder, data_encoder
 
 
@@ -474,17 +473,12 @@ class ChannelLightPatchSchema(BaseSchema):
         default=None,
         missing=None,
         validate=validate.OneOf(
-            [CHANNEL_STATE_CLOSED, CHANNEL_STATE_OPENED, CHANNEL_STATE_SETTLED, CHANNEL_STATE_SETTLING]
+            [CHANNEL_STATE_CLOSED, CHANNEL_STATE_OPENED, CHANNEL_STATE_SETTLED]
         ),
     )
     signed_approval_tx = fields.String(required=True)
     signed_deposit_tx = fields.String(required=True)
     signed_close_tx = fields.String(required=True)
-    signed_settle_tx = fields.String(
-        default=None,
-        missing=None,
-        required=False
-    )
 
     class Meta:
         strict = True
@@ -494,6 +488,7 @@ class ChannelLightPatchSchema(BaseSchema):
 
 class SettlementLightSchema(BaseSchema):
     signed_settle_tx = fields.String(required=True)
+    channel_identifier = fields.Integer(required=True)
 
     class Meta:
         strict = True

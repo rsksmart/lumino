@@ -582,6 +582,7 @@ class RaidenAPI:
         token_address: TokenAddress,
         creator_address: Address,
         partner_address: Address,
+        channel_identifier: typing.ChannelID,
         signed_settle_tx: typing.SignedTransaction = None,
     ):
         """Settle a channel opened with `partner_address` for the given
@@ -591,24 +592,24 @@ class RaidenAPI:
 
         channels_to_settle = ChannelValidator.validate_and_get_channels_to_settle(
             token_address=token_address,
+            creator_address=creator_address,
             partner_address=partner_address,
             registry_address=registry_address,
             raiden=self.raiden)
 
-        channel_ids = [channel_state.identifier for channel_state in channels_to_settle]
+        # get the channel to settle
+        channel_iterator = filter(lambda channel:
+                                  channel.our_state.address == creator_address
+                                  and channel.partner_state.address == partner_address
+                                  and channel.token_address == token_address
+                                  and channel.identifier == channel_identifier, channels_to_settle)
 
-        chain_state = views.state_from_raiden(self.raiden)
+        channel_list = list(channel_iterator)
 
-        channel_state = views.get_channelstate_for(
-            chain_state=chain_state,
-            payment_network_id=registry_address,
-            token_address=token_address,
-            creator_address=creator_address,
-            partner_address=partner_address,
-        )
-
-        if channel_state.identifier not in channel_ids:
+        if len(channel_list) <= 0:
             raise RaidenRecoverableError("Failed trying to settle a channel that's not in waiting_for_settle state")
+
+        channel_state = channel_list[0]
 
         channel_proxy = self.raiden.chain.payment_channel(
             canonical_identifier=channel_state.canonical_identifier
@@ -623,7 +624,7 @@ class RaidenAPI:
             raiden=self.raiden,
             payment_network_id=registry_address,
             token_address=token_address,
-            channel_ids=channel_ids,
+            channel_ids=[channel_state.identifier],
             retry_timeout=DEFAULT_RETRY_TIMEOUT,
             partner_addresses=[partner_address]
         )
@@ -809,6 +810,7 @@ class RaidenAPI:
         token_address: TokenAddress,
         creator_address: Address,
         partner_address: Address,
+        channel_identifier: typing.ChannelID,
         signed_settle_tx: typing.SignedTransaction = None
     ):
         """
@@ -821,6 +823,7 @@ class RaidenAPI:
             token_address=token_address,
             creator_address=creator_address,
             partner_address=partner_address,
+            channel_identifier=channel_identifier,
             signed_settle_tx=signed_settle_tx
         )
 

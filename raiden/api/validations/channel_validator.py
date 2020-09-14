@@ -122,6 +122,7 @@ class ChannelValidator:
 
     @staticmethod
     def validate_and_get_channels_to_settle(token_address,
+                                            creator_address,
                                             partner_address,
                                             registry_address,
                                             raiden):
@@ -142,7 +143,8 @@ class ChannelValidator:
         channels = views.get_channelstate_settling(
             chain_state=chain_state,
             payment_network_id=registry_address,
-            token_address=token_address
+            token_address=token_address,
+            creator_address=creator_address
         )
 
         channels_to_settle: List[NettingChannelState] = []

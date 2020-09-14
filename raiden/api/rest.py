@@ -1625,6 +1625,7 @@ class RestAPI:
                          token_address: typing.TokenAddress,
                          creator_address: typing.Address,
                          partner_address: typing.Address,
+                         channel_identifier: typing.ChannelID,
                          signed_settle_tx: typing.SignedTransaction):
         """ This operation validates and send the settlement signed transaction for a LC """
         log.debug(
@@ -1633,12 +1634,19 @@ class RestAPI:
             registry_address=to_checksum_address(registry_address),
             token_address=to_checksum_address(token_address),
             creator_address=to_checksum_address(creator_address),
-            partner_address=to_checksum_address(partner_address)
+            partner_address=to_checksum_address(partner_address),
+            channel_identifier=channel_identifier
         )
 
         if not signed_settle_tx:
             result = api_error(
                 errors="Signed settle transaction is required",
+                status_code=HTTPStatus.BAD_REQUEST,
+            )
+            return result
+        if not channel_identifier:
+            result = api_error(
+                errors="Channel identifier is required",
                 status_code=HTTPStatus.BAD_REQUEST,
             )
             return result
@@ -1649,13 +1657,10 @@ class RestAPI:
                 token_address=token_address,
                 creator_address=creator_address,
                 partner_address=partner_address,
+                channel_identifier=channel_identifier,
                 signed_settle_tx=signed_settle_tx
             )
-        except InsufficientFunds as e:
-            return api_error(errors=str(e), status_code=HTTPStatus.PAYMENT_REQUIRED)
-        except RawTransactionFailed as e:
-            return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.BAD_REQUEST, log=log)
-        except RaidenRecoverableError as e:
+        except Exception as e:
             return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.BAD_REQUEST, log=log)
 
         return self.update_channel_state(registry_address, channel_state)
@@ -1834,7 +1839,6 @@ class RestAPI:
         signed_approval_tx: typing.SignedTransaction,
         signed_deposit_tx: typing.SignedTransaction,
         signed_close_tx: typing.SignedTransaction,
-        signed_settle_tx: typing.SignedTransaction,
         total_deposit: typing.TokenAmount = None,
         state: str = None
     ):
@@ -1892,14 +1896,6 @@ class RestAPI:
 
         elif state == CHANNEL_STATE_CLOSED:
             result = self._close_light(registry_address, channel_state, signed_close_tx)
-        elif state == CHANNEL_STATE_SETTLING:
-            if signed_settle_tx:
-                result = self._settle_light(registry_address, channel_state, signed_settle_tx)
-            else:
-                result = api_error(
-                    errors="Signed settle transaction is required for state {}".format(state),
-                    status_code=HTTPStatus.BAD_REQUEST,
-                )
         else:  # should never happen, channel_state is validated in the schema
             result = api_error(
                 errors="Provided invalid channel state {}".format(state),
