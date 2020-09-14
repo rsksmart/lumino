@@ -167,10 +167,9 @@ def test_get_state_change_with_balance_proof():
         balance_proof=make_signed_balance_proof_from_counter(counter),
     )
     transfer_refund = ReceiveTransferRefund(
-        transfer=make_signed_transfer_from_counter(counter), routes=list()
+        transfer=make_signed_transfer_from_counter(counter)
     )
     transfer_refund_cancel_route = ActionTransferReroute(
-        routes=list(),
         transfer=make_signed_transfer_from_counter(counter),
         secret=sha3(factories.make_secret(next(counter))),
     )

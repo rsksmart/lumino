@@ -460,7 +460,6 @@ def test_matrix_message_retry(
         partner=pex(partner_address),
         status=AddressReachability.UNREACHABLE,
     )
-
     # Retrier did not call send_raw given that the receiver is still offline
     assert transport._send_raw.call_count == 1
 
