@@ -1,3 +1,4 @@
+import copy
 from http import HTTPStatus
 
 import gevent
@@ -16,7 +17,7 @@ from eth_utils import is_binary_address, to_checksum_address, to_canonical_addre
 from ecies import encrypt
 
 import raiden.blockchain.events as blockchain_events
-from raiden import waiting
+from raiden import waiting, routing
 from raiden.api.validations.api_error_builder import ApiErrorBuilder
 from raiden.api.validations.channel_validator import ChannelValidator
 from raiden.constants import (
@@ -54,7 +55,7 @@ from raiden.messages import RequestMonitoring, LockedTransfer, RevealSecret, Unl
     Processed, LockExpired
 from raiden.settings import DEFAULT_RETRY_TIMEOUT, DEVELOPMENT_CONTRACT_VERSION
 
-from raiden.transfer import architecture, views
+from raiden.transfer import architecture, views, routes
 from raiden.transfer.events import (
     EventPaymentReceivedSuccess,
     EventPaymentSentFailed,
@@ -95,7 +96,8 @@ from raiden.utils.typing import (
     TokenNetworkAddress,
     TokenNetworkID,
     Tuple,
-    SignedTransaction)
+    SignedTransaction,
+    InitiatorAddress)
 
 from raiden.rns_constants import RNS_ADDRESS_ZERO
 from raiden.utils.rns import is_rns_address
@@ -1076,7 +1078,9 @@ class RaidenAPI:
         target: Address,
         identifier: PaymentID,
         secrethash: SecretHash,
+        transfer_prev_secrethash: SecretHash,
         signed_locked_transfer: LockedTransfer,
+        channel_identifier: ChannelID,
         payment_hash_invoice: PaymentHashInvoice = None
     ):
         current_state = views.state_from_raiden(self.raiden)
@@ -1131,8 +1135,10 @@ class RaidenAPI:
             target=target,
             identifier=identifier,
             secrethash=secrethash,
+            transfer_prev_secrethash=transfer_prev_secrethash,
             payment_hash_invoice=payment_hash_invoice,
-            signed_locked_transfer=signed_locked_transfer
+            signed_locked_transfer=signed_locked_transfer,
+            channel_identifier=channel_identifier
         )
         return None
 
@@ -1145,12 +1151,16 @@ class RaidenAPI:
         self.raiden.initiate_send_balance_proof(sender_address, receiver_address, unlock)
 
     def initiate_send_delivered_light(self, sender_address: typing.Address, receiver_address: typing.Address,
-                                      delivered: Delivered, msg_order: int, payment_id: int, message_type: LightClientProtocolMessageType):
-        self.raiden.initiate_send_delivered_light(sender_address, receiver_address, delivered, msg_order, payment_id, message_type)
+                                      delivered: Delivered, msg_order: int, payment_id: int,
+                                      message_type: LightClientProtocolMessageType):
+        self.raiden.initiate_send_delivered_light(sender_address, receiver_address, delivered, msg_order, payment_id,
+                                                  message_type)
 
     def initiate_send_processed_light(self, sender_address: typing.Address, receiver_address: typing.Address,
-                                      processed: Processed, msg_order: int, payment_id: int, message_type: LightClientProtocolMessageType):
-        self.raiden.initiate_send_processed_light(sender_address, receiver_address, processed, msg_order, payment_id, message_type)
+                                      processed: Processed, msg_order: int, payment_id: int,
+                                      message_type: LightClientProtocolMessageType):
+        self.raiden.initiate_send_processed_light(sender_address, receiver_address, processed, msg_order, payment_id,
+                                                  message_type)
 
     def initiate_send_secret_request_light(self, sender_address: typing.Address, receiver_address: typing.Address,
                                            secret_request: SecretRequest):
@@ -1652,7 +1662,7 @@ class RaidenAPI:
 
             api_key = hexlify(os.urandom(20))
             api_key = api_key.decode("utf-8")
-            #Check for limit light client
+            # Check for limit light client
             result = self.raiden.wal.storage.save_light_client(
                 api_key=api_key,
                 address=address,
@@ -1692,17 +1702,55 @@ class RaidenAPI:
         partner_address: typing.AddressHex,
         token_address: typing.TokenAddress,
         amount: typing.TokenAmount,
-        secrethash: typing.SecretHash
+        secrethash: typing.SecretHash,
+        prev_secrethash: typing.SecretHash = None
     ) -> HubResponseMessage:
+        chain_state = views.state_from_raiden(self.raiden)
         channel_state = views.get_channelstate_for(
-            views.state_from_raiden(self.raiden),
+            chain_state,
             registry_address,
             token_address,
             creator_address,
             partner_address,
         )
+        # If we dont have a channel with the partner we need to get a channel to try a mediated transfer
+        if not channel_state:
+            # Here we can discriminate between a re-route and the first try to route a payment
+            # if a prev_secrethash is set, then we need to filter the previous canceled routes.
+
+            token_network_id = views.get_token_network_by_token_address(
+                chain_state, registry_address, token_address
+            )
+            possible_routes, _ = routing.get_best_routes(
+                chain_state=chain_state,
+                token_network_id=token_network_id.address,
+                one_to_n_address=self.raiden.default_one_to_n_address,
+                from_address=InitiatorAddress(creator_address),
+                to_address=partner_address,
+                amount=amount,
+                previous_address=None,
+                config=self.raiden.config,
+                privkey=self.raiden.privkey,
+            )
+            if prev_secrethash:
+                current_payment_task = chain_state.payment_mapping.secrethashes_to_task[prev_secrethash]
+                chain_state.payment_mapping.secrethashes_to_task.update(
+                    {secrethash: copy.deepcopy(current_payment_task)}
+                )
+                possible_routes = routes.filter_acceptable_routes(
+                    route_states=possible_routes, blacklisted_channel_ids=current_payment_task.manager_state.cancelled_channels
+                )
+            if possible_routes:
+                # TODO marcosmartinez7 This can be improved using next_channel_from_routes in order to filter channels without capacity
+                channel_state = views.get_channelstate_for(
+                    chain_state,
+                    registry_address,
+                    token_address,
+                    creator_address,
+                    possible_routes[0].node_address,
+                )
+
         if channel_state:
-            chain_state = views.state_from_raiden(self.raiden)
 
             locked_transfer = LightClientUtils.create_locked_transfer(
                 chain_state=chain_state,
@@ -1715,7 +1763,7 @@ class RaidenAPI:
 
             # Create the light_client_payment
             is_lc_initiator = 1
-            payment = LightClientPayment(creator_address, partner_address,
+            payment = LightClientPayment(partner_address,
                                          is_lc_initiator, channel_state.token_network_identifier,
                                          amount,
                                          str(date.today()),
@@ -1729,6 +1777,7 @@ class RaidenAPI:
                 locked_transfer,
                 False,
                 payment.payment_id,
+                creator_address,
                 order,
                 LightClientProtocolMessageType.PaymentSuccessful,
                 self.raiden.wal
@@ -1738,7 +1787,7 @@ class RaidenAPI:
                                                     message=locked_transfer, is_signed=False)
             return HubResponseMessage(lcpm_id, LightClientProtocolMessageType.PaymentSuccessful, payment_hub_message)
         else:
-            raise ChannelNotFound("Channel with given partner address doesnt exists")
+            raise ChannelNotFound("Light client does not have any open channel")
 
     def validate_light_client(self, api_key: str):
         """

@@ -10,6 +10,7 @@ import structlog
 from eth_utils import is_binary_address
 from gevent import Greenlet
 from gevent.event import AsyncResult, Event
+from raiden.transfer.identifiers import CanonicalIdentifier
 
 from raiden import constants, routing
 from raiden.blockchain.events import BlockchainEvents
@@ -93,7 +94,7 @@ from raiden.utils.typing import (
     TargetAddress,
     TokenNetworkAddress,
     TokenNetworkID,
-    PaymentHashInvoice)
+    PaymentHashInvoice, ChannelID)
 
 from raiden.utils.upgrades import UpgradeManager
 from raiden_contracts.contract_manager import ContractManager
@@ -123,18 +124,19 @@ def _redact_secret(data: Union[Dict, List]) -> Union[Dict, List]:
     return data
 
 
-# TODO this method should receive a signed locked transfer type, not a LockedTransfer
 def initiator_init_light(
     raiden: "RaidenService",
     transfer_identifier: PaymentID,
     payment_hash_invoice: PaymentHashInvoice,
     transfer_amount: PaymentAmount,
     transfer_secrethash: SecretHash,
+    transfer_prev_secrethash: SecretHash,
     transfer_fee: FeeAmount,
     token_network_identifier: TokenNetworkID,
     target_address: TargetAddress,
     creator_address: InitiatorAddress,
-    signed_locked_transfer: LockedTransfer
+    signed_locked_transfer: LockedTransfer,
+    channel_identifier: ChannelID
 ) -> ActionInitInitiatorLight:
     transfer_state = TransferDescriptionWithoutSecretState(
         payment_network_identifier=raiden.default_registry.address,
@@ -147,19 +149,16 @@ def initiator_init_light(
         target=target_address,
         secrethash=transfer_secrethash,
     )
-    previous_address = None
-    routes, _ = routing.get_best_routes(
-        chain_state=views.state_from_raiden(raiden),
-        token_network_id=token_network_identifier,
-        one_to_n_address=raiden.default_one_to_n_address,
-        from_address=InitiatorAddress(creator_address),
-        to_address=target_address,
-        amount=transfer_amount,
-        previous_address=previous_address,
-        config=raiden.config,
-        privkey=raiden.privkey,
-    )
-    return ActionInitInitiatorLight(transfer_state, routes, signed_locked_transfer)
+    chain_state = views.state_from_raiden(raiden)
+    canonical_identifier = CanonicalIdentifier(
+        chain_identifier=chain_state.chain_id,
+        token_network_address=token_network_identifier,
+        channel_identifier=channel_identifier)
+    current_channel = views.get_channelstate_by_canonical_identifier_and_address(chain_state, canonical_identifier,
+                                                                                 creator_address)
+
+    return ActionInitInitiatorLight(transfer_state, current_channel, signed_locked_transfer,
+                                    transfer_prev_secrethash is not None)
 
 
 def initiator_init(
@@ -1092,7 +1091,9 @@ class RaidenService(Runnable):
         target: TargetAddress,
         identifier: PaymentID,
         secrethash: SecretHash,
+        transfer_prev_secrethash: SecretHash,
         signed_locked_transfer: LockedTransfer,
+        channel_identifier: ChannelID,
         fee: FeeAmount = MEDIATION_FEE,
         payment_hash_invoice: PaymentHashInvoice = None
     ) -> PaymentStatus:
@@ -1116,8 +1117,10 @@ class RaidenService(Runnable):
             target=target,
             identifier=identifier,
             secrethash=secrethash,
+            transfer_prev_secrethash=transfer_prev_secrethash,
             payment_hash_invoice=payment_hash_invoice,
-            signed_locked_transfer=signed_locked_transfer
+            signed_locked_transfer=signed_locked_transfer,
+            channel_identifier=channel_identifier
         )
         # FIXME mmartinez7 return accordly
         return None
@@ -1171,7 +1174,9 @@ class RaidenService(Runnable):
         target: TargetAddress,
         identifier: PaymentID,
         secrethash: SecretHash,
+        transfer_prev_secrethash: SecretHash,
         signed_locked_transfer: LockedTransfer,
+        channel_identifier: ChannelID,
         payment_hash_invoice: PaymentHashInvoice = None
 
     ) -> PaymentStatus:
@@ -1226,11 +1231,13 @@ class RaidenService(Runnable):
             payment_hash_invoice=payment_hash_invoice,
             transfer_amount=amount,
             transfer_secrethash=secrethash,
+            transfer_prev_secrethash=transfer_prev_secrethash,
             transfer_fee=fee,
             token_network_identifier=token_network_identifier,
             creator_address=creator,
             target_address=target,
-            signed_locked_transfer=signed_locked_transfer
+            signed_locked_transfer=signed_locked_transfer,
+            channel_identifier=channel_identifier
         )
 
         # Dispatch the state change even if there are no routes to create the
@@ -1328,6 +1335,7 @@ class RaidenService(Runnable):
                 delivered,
                 True,
                 payment_id,
+                sender_address,
                 msg_order,
                 message_type,
                 self.wal
@@ -1347,6 +1355,7 @@ class RaidenService(Runnable):
                 processed,
                 True,
                 payment_id,
+                sender_address,
                 msg_order,
                 message_type,
                 self.wal
@@ -1383,8 +1392,6 @@ class RaidenService(Runnable):
     ):
         init_state = ActionSendLockExpiredLight(lock_expired, sender, receiver, payment_id)
         self.handle_and_track_state_change(init_state)
-
-
 
     def initiate_send_balance_proof(
         self,
