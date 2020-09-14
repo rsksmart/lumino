@@ -27,7 +27,7 @@ from raiden.api.v1.encoding import (
     LightClientMatrixCredentialsBuildSchema,
     PaymentLightPutSchema,
     CreatePaymentLightPostSchema,
-    WatchtowerPutResource, LightClientMessageGetSchema)
+    WatchtowerPutResource, LightClientMessageGetSchema, SettlementLightSchema)
 from raiden.messages import  Unlock
 
 from raiden.utils import typing
@@ -152,7 +152,7 @@ class LightChannelsResourceByTokenAndPartnerAddress(BaseResource):
 
 
 class SettlementLightResourceByTokenAndPartnerAddress(BaseResource):
-    schema = ChannelLightPatchSchema
+    schema = SettlementLightSchema
 
     @use_kwargs(schema, locations=("json",))
     def post(self, **kwargs):
