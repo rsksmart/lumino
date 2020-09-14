@@ -151,6 +151,16 @@ class LightChannelsResourceByTokenAndPartnerAddress(BaseResource):
         )
 
 
+class SettlementLightResourceByTokenAndPartnerAddress(BaseResource):
+    schema = ChannelLightPatchSchema
+
+    @use_kwargs(schema, locations=("json",))
+    def post(self, **kwargs):
+        return self.rest_api.settlement_light(
+            registry_address=self.rest_api.raiden_api.raiden.default_registry.address, **kwargs
+        )
+
+
 class TokensResource(BaseResource):
     def get(self):
         """

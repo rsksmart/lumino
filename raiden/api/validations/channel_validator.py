@@ -9,9 +9,10 @@ from raiden.exceptions import AddressWithoutCode, InvalidSettleTimeout, InvalidA
 from raiden.network.blockchain_service import BlockChainService
 from raiden.network.proxies import Token, TokenNetworkRegistry, TokenNetwork
 from raiden.transfer import views
+from raiden.transfer.state import NettingChannelState
 from raiden.utils import typing, pex
 from raiden.utils.gas_reserve import has_enough_gas_reserve
-from raiden.utils.typing import PaymentNetworkID, TokenAddress, Address, BlockTimeout
+from raiden.utils.typing import PaymentNetworkID, TokenAddress, Address, BlockTimeout, List
 
 
 class ChannelValidator:
@@ -121,15 +122,15 @@ class ChannelValidator:
 
     @staticmethod
     def validate_and_get_channels_to_settle(token_address,
-                                            partner_addresses,
+                                            partner_address,
                                             registry_address,
                                             raiden):
 
         if not is_binary_address(token_address):
             raise InvalidAddress("Expected binary address format for token in channel settle")
 
-        if not all(map(is_binary_address, partner_addresses)):
-            raise InvalidAddress("Expected binary address format for partner in channel settle")
+        if not is_binary_address(partner_address):
+            raise InvalidAddress("Expected binary address format for partner address in channel settle")
 
         valid_tokens = views.get_token_identifiers(
             chain_state=views.state_from_raiden(raiden), payment_network_id=registry_address
@@ -138,11 +139,16 @@ class ChannelValidator:
             raise UnknownTokenAddress("Token address is not known in channel settle.")
 
         chain_state = views.state_from_raiden(raiden)
-        channels_to_settle = views.filter_channels_to_settle_by_partner_address(
+        channels = views.get_channelstate_settling(
             chain_state=chain_state,
             payment_network_id=registry_address,
-            token_address=token_address,
-            partner_addresses=partner_addresses,
+            token_address=token_address
         )
 
-        return channels_to_settle
+        channels_to_settle: List[NettingChannelState] = []
+
+        for channel in channels:
+            if channel.partner_state.address == partner_address:
+                channels_to_settle.append(channel)
+
+        return channels

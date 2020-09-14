@@ -638,41 +638,6 @@ def filter_channels_by_partneraddress(
     return result
 
 
-def filter_channels_to_settle_by_partner_address(
-    chain_state: ChainState,
-    payment_network_id: PaymentNetworkID,
-    token_address: TokenAddress,
-    partner_addresses: List[Address],
-) -> List[NettingChannelState]:
-    token_network = get_token_network_by_token_address(
-        chain_state, payment_network_id, token_address
-    )
-
-    result: List[NettingChannelState] = []
-    if not token_network:
-        return result
-
-    channelsResult = []
-    # for partner in partner_addresses:
-
-    for node_address in token_network.partneraddresses_to_channelidentifiers.keys():
-        if node_address in token_network.channelidentifiers_to_channels:
-            channels = token_network.channelidentifiers_to_channels[node_address]
-            if channels is not None:
-                for _channelId, channel in channels.items():
-                    for partner_address in partner_addresses:
-                        if channel.partner_state.address == partner_address:
-                            if channel.close_transaction and channel.close_transaction.result == 'success':
-                                channelsResult.append(channel)
-
-    states = filter_channels_by_status(channelsResult, [CHANNEL_STATE_SETTLING])
-    # If multiple channel states are found, return the last one.
-    if states:
-        result.append(states[-1])
-
-    return result
-
-
 def filter_channels_by_status(
     channel_states: List[NettingChannelState], exclude_states: Optional[List[str]] = None
 ) -> List[NettingChannelState]:

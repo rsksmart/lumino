@@ -589,7 +589,7 @@ class RaidenAPI:
 
         channels_to_settle = ChannelValidator.validate_and_get_channels_to_settle(
             token_address=token_address,
-            partner_addresses=[partner_address],
+            partner_address=partner_address,
             registry_address=registry_address,
             raiden=self.raiden)
 
@@ -625,6 +625,8 @@ class RaidenAPI:
             retry_timeout=DEFAULT_RETRY_TIMEOUT,
             partner_addresses=[partner_address]
         )
+
+        return channel_state
 
     def set_total_channel_deposit_light(
         self,
@@ -812,7 +814,7 @@ class RaidenAPI:
             `token_address`.
             Race condition, this can fail if channel was settled externally.
         """
-        self.settle_light(
+        return self.settle_light(
             registry_address=registry_address,
             token_address=token_address,
             creator_address=creator_address,

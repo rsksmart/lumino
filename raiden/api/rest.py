@@ -86,7 +86,8 @@ from raiden.api.v1.resources import (
     LightClientMatrixCredentialsBuildResource,
     LightClientResource,
     PaymentLightResource,
-    CreatePaymentLightResource, WatchtowerResource, LightClientMessageResource)
+    CreatePaymentLightResource, WatchtowerResource, LightClientMessageResource,
+    SettlementLightResourceByTokenAndPartnerAddress)
 
 from raiden.constants import GENESIS_BLOCK_NUMBER, UINT256_MAX, Environment, EMPTY_PAYMENT_HASH_INVOICE
 
@@ -228,6 +229,10 @@ URLS_HUB_V1 = [
     (
         "/light_channels/<hexaddress:token_address>/<hexaddress:creator_address>/<hexaddress:partner_address>",
         LightChannelsResourceByTokenAndPartnerAddress
+    ),
+    (
+        "/light_channels/<hexaddress:token_address>/<hexaddress:creator_address>/<hexaddress:partner_address>/settle",
+        SettlementLightResourceByTokenAndPartnerAddress
     ),
     ("/payments_light", PaymentLightResource),
     ("/light_client_messages", LightClientMessageResource, "Message polling"),
@@ -1634,26 +1639,35 @@ class RestAPI:
         # return api_response(result=result.data)
         return None
 
-    def _settle_light(self,
-                      registry_address: typing.PaymentNetworkID,
-                      channel_state: NettingChannelState,
-                      signed_settle_tx: typing.SignedTransaction):
+    def settlement_light(self,
+                         registry_address: typing.PaymentNetworkID,
+                         token_address: typing.TokenAddress,
+                         creator_address: typing.Address,
+                         partner_address: typing.Address,
+                         signed_settle_tx: typing.SignedTransaction):
         """ This operation validates and send the settlement signed transaction for a LC """
         log.debug(
-            "Settling light channel",
-            node=pex(self.raiden_api.address),
+            "Settling channel light",
+            node=pex(creator_address),
             registry_address=to_checksum_address(registry_address),
-            channel_identifier=channel_state.identifier
+            token_address=to_checksum_address(token_address),
+            creator_address=to_checksum_address(creator_address),
+            partner_address=to_checksum_address(partner_address)
         )
 
-        self.validate_channel_status_for_settle(channel_state)
+        if not signed_settle_tx:
+            result = api_error(
+                errors="Signed settle transaction is required",
+                status_code=HTTPStatus.BAD_REQUEST,
+            )
+            return result
 
         try:
-            self.raiden_api.channel_settle_light(
+            channel_state = self.raiden_api.channel_settle_light(
                 registry_address=registry_address,
-                token_address=channel_state.token_address,
-                creator_address=channel_state.our_state.address,
-                partner_address=channel_state.partner_state.address,
+                token_address=token_address,
+                creator_address=creator_address,
+                partner_address=partner_address,
                 signed_settle_tx=signed_settle_tx
             )
         except InsufficientFunds as e:
@@ -1808,15 +1822,6 @@ class RestAPI:
             return api_error(errors=str(e), status_code=HTTPStatus.PAYMENT_REQUIRED)
 
         return self.update_channel_state(registry_address, channel_state)
-
-    @staticmethod
-    def validate_channel_status_for_settle(channel_state):
-        if channel.get_status(channel_state) != CHANNEL_STATE_SETTLING:
-            return api_error(
-                errors="Attempted to settle a channel that is not in waiting_for_settle state",
-                status_code=HTTPStatus.CONFLICT,
-            )
-        return None
 
     @staticmethod
     def validate_channel_status(channel_state):
