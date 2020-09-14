@@ -235,30 +235,22 @@ def next_channel_from_routes(
 
 def try_new_route_light(
     channelidentifiers_to_channels: ChannelMap,
-    available_routes: List[RouteState],
+    channel_state: NettingChannelState,
     transfer_description: TransferDescriptionWithoutSecretState,
     signed_locked_transfer: LockedTransfer
 ) -> TransitionResult[InitiatorTransferState]:
-    channel_state = next_channel_from_routes(
-        available_routes=available_routes,
-        channelidentifiers_to_channels=channelidentifiers_to_channels,
-        transfer_amount=transfer_description.amount,
-        initiator=to_canonical_address(transfer_description.initiator)
-    )
-
+    initiator = signed_locked_transfer.initiator
+    channel_identifier = signed_locked_transfer.channel_identifier
+    channel_state = channelidentifiers_to_channels[initiator].get(channel_identifier)
     events: List[Event] = list()
     if channel_state is None:
-        if not available_routes:
-            reason = "there is no route available"
-        else:
-            reason = "none of the available routes could be used"
         # TODO mmartinez handle persistance with status failure?
         transfer_failed = EventPaymentSentFailed(
             payment_network_identifier=transfer_description.payment_network_identifier,
             token_network_identifier=transfer_description.token_network_identifier,
             identifier=transfer_description.payment_identifier,
             target=transfer_description.target,
-            reason=reason,
+            reason="none of the available routes could be used",
         )
         events.append(transfer_failed)
 

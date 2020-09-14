@@ -79,7 +79,7 @@ class ChannelsResourceLight(BaseResource):
         this translates to 'get all light channels the node is connected with'
         """
         return self.rest_api.get_channel_list(
-            self.rest_api.raiden_api.raiden.default_registry.addressF
+            self.rest_api.raiden_api.raiden.default_registry.address
         )
 
     @use_kwargs(put_schema, locations=("json",))
@@ -299,7 +299,8 @@ class CreatePaymentLightResource(BaseResource):
         partner_address: typing.Address,
         token_address: typing.TokenAddress,
         amount: typing.TokenAmount,
-        secrethash: typing.SecretHash
+        secrethash: typing.SecretHash,
+        prev_secrethash: typing.SecretHash = None
     ):
         return self.rest_api.create_light_client_payment(
             registry_address=self.rest_api.raiden_api.raiden.default_registry.address,
@@ -307,7 +308,8 @@ class CreatePaymentLightResource(BaseResource):
             partner_address=partner_address,
             token_address=token_address,
             amount=amount,
-            secrethash=secrethash
+            secrethash=secrethash,
+            prev_secrethash=prev_secrethash
         )
 
 
@@ -329,11 +331,13 @@ class PaymentLightResource(BaseResource):
             sender: typing.AddressHex,
             receiver: typing.AddressHex,
             message: Dict,
-            message_type_value: str):
+            message_type_value: str,
+            additional_metadata: Dict = None):
         """
         put a signed message associated with a payment of a light client
         """
-        return self.rest_api.receive_light_client_protocol_message(payment_id, message_order, sender, receiver, message, message_type_value)
+        return self.rest_api.receive_light_client_protocol_message(payment_id, message_order, sender, receiver, message,
+                                                                   message_type_value, additional_metadata)
 
 
 class PaymentResource(BaseResource):

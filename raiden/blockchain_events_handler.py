@@ -76,6 +76,7 @@ def handle_tokennetwork_new(raiden: "RaidenService", event: Event):
     except AddressWithoutCode:
         log.info("TokenAddress without code, Address: %s", to_checksum_address(token_address))
 
+
 def handle_channel_new(raiden: "RaidenService", event: Event):
     data = event.event_data
     block_number = data["block_number"]
@@ -113,14 +114,19 @@ def handle_channel_new(raiden: "RaidenService", event: Event):
             is_light_channel=is_light_channel
         )
 
-        # Swap our_state and partner_state in order to have the LC from our_side of the channel
         if is_participant1_handled_lc or is_participant2_handled_lc:
             if is_participant1_handled_lc:
                 if participant1 != channel_state.our_state.address:
+                    # Swap our_state and partner_state in order to have the LC from our_side of the channel
                     channel_state.our_state, channel_state.partner_state = channel_state.partner_state, channel_state.our_state
+                # swap channel proxy to ensure proxy.participant1 is the light client
+                channel_proxy.swap_participants(participant1)
             else:
                 if participant2 != channel_state.our_state.address:
+                    # Swap our_state and partner_state in order to have the LC from our_side of the channel
                     channel_state.our_state, channel_state.partner_state = channel_state.partner_state, channel_state.our_state
+                # swap channel proxy to ensure proxy.participant1 is the light client
+                channel_proxy.swap_participants(participant2)
 
         new_channel = ContractReceiveChannelNew(
             transaction_hash=transaction_hash,
