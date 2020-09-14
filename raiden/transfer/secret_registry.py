@@ -4,7 +4,7 @@ from raiden.lightclient.models.light_client_protocol_message import LightClientP
 from raiden.messages import RequestRegisterSecret
 from raiden.transfer.architecture import Event
 from raiden.transfer.channel import get_status
-from raiden.transfer.events import ContractSendSecretReveal
+from raiden.transfer.events import ContractSendSecretReveal, ContractSendSecretRevealLight
 from raiden.transfer.mediated_transfer.events import StoreMessageEvent
 from raiden.transfer.mediated_transfer.state import TargetTransferState
 from raiden.transfer.state import (
@@ -37,14 +37,10 @@ def events_for_onchain_secretreveal(
             ]
         if target_state is not None:
             return [
-                StoreMessageEvent(
+                ContractSendSecretRevealLight(
                     message_id=message_identifier_from_prng(pseudo_random_generator),
-                    payment_id=target_state.transfer.payment_identifier,
-                    light_client_address=channel_state.our_state.address,
-                    message_order=0,
-                    message=RequestRegisterSecret(),
-                    is_signed=False,
-                    message_type=LightClientProtocolMessageType.RequestRegisterSecret
+                    payment_identifier=target_state.transfer.payment_identifier,
+                    light_client_address=channel_state.our_state.address
                 )
             ]
 

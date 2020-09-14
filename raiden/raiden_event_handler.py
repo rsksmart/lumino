@@ -7,7 +7,9 @@ from eth_utils import to_checksum_address, to_hex
 from raiden.constants import EMPTY_BALANCE_HASH, EMPTY_HASH, EMPTY_MESSAGE_HASH, EMPTY_SIGNATURE
 from raiden.exceptions import ChannelOutdatedError, RaidenUnrecoverableError
 from raiden.lightclient.handlers.light_client_message_handler import LightClientMessageHandler
+from raiden.lightclient.models.light_client_protocol_message import LightClientProtocolMessageType
 from raiden.message_event_convertor import message_from_sendevent
+from raiden.messages import RequestRegisterSecret
 from raiden.network.proxies.payment_channel import PaymentChannel
 from raiden.network.proxies.token_network import TokenNetwork
 from raiden.network.resolver.client import reveal_secret_with_resolver
@@ -22,6 +24,7 @@ from raiden.transfer.events import (
     ContractSendChannelSettle,
     ContractSendChannelUpdateTransfer,
     ContractSendSecretReveal,
+    ContractSendSecretRevealLight,
     EventInvalidReceivedLockedTransfer,
     EventInvalidReceivedLockExpired,
     EventInvalidReceivedTransferRefund,
@@ -44,7 +47,7 @@ from raiden.transfer.mediated_transfer.events import (
     SendSecretReveal,
     SendLockedTransferLight, StoreMessageEvent, SendSecretRevealLight, SendBalanceProofLight, SendSecretRequestLight,
     SendLockExpiredLight)
-from raiden.transfer.state import ChainState, NettingChannelEndState
+from raiden.transfer.state import ChainState, NettingChannelEndState, message_identifier_from_prng
 from raiden.transfer.utils import (
     get_event_with_balance_proof_by_balance_hash,
     get_event_with_balance_proof_by_locksroot,
@@ -154,6 +157,9 @@ class RaidenEventHandler(EventHandler):
         elif type(event) == ContractSendSecretReveal:
             assert isinstance(event, ContractSendSecretReveal), MYPY_ANNOTATION
             self.handle_contract_send_secretreveal(raiden, event)
+        elif type(event) == ContractSendSecretRevealLight:
+            assert isinstance(event, ContractSendSecretRevealLight), MYPY_ANNOTATION
+            self.handle_contract_send_secretreveal_light(raiden, event)
         elif type(event) == ContractSendChannelClose:
             assert isinstance(event, ContractSendChannelClose), MYPY_ANNOTATION
             self.handle_contract_send_channelclose(raiden, chain_state, event)
@@ -361,6 +367,28 @@ class RaidenEventHandler(EventHandler):
         raiden: "RaidenService", channel_reveal_secret_event: ContractSendSecretReveal
     ):
         raiden.default_secret_registry.register_secret(secret=channel_reveal_secret_event.secret)
+
+    @staticmethod
+    def handle_contract_send_secretreveal_light(
+        raiden: "RaidenService", channel_reveal_secret_event: ContractSendSecretRevealLight
+    ):
+        message = RequestRegisterSecret(raiden.default_secret_registry.address)
+        existing_message = LightClientMessageHandler.is_light_client_protocol_message_already_stored(
+            channel_reveal_secret_event.payment_identifier,
+            0,
+            LightClientProtocolMessageType.RequestRegisterSecret,
+            message.to_dict()["type"],
+            raiden.wal)
+        # Do not store the RegisterSecretRequest twice for same payment
+        if not existing_message:
+            LightClientMessageHandler.store_light_client_protocol_message(channel_reveal_secret_event.message_id,
+                                                                          message,
+                                                                          False,
+                                                                          channel_reveal_secret_event.payment_identifier,
+                                                                          channel_reveal_secret_event.light_client_address,
+                                                                          0,
+                                                                          LightClientProtocolMessageType.RequestRegisterSecret,
+                                                                          raiden.wal)
 
     @staticmethod
     def handle_contract_send_channelclose(

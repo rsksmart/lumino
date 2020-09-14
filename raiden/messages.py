@@ -1833,9 +1833,26 @@ class RequestMonitoring(SignedMessage):
 
 
 class RequestRegisterSecret(Message):
+
+    def __init__(self, secret_registry_address: Address, **kwargs):
+        super().__init__(**kwargs)
+        self.secret_registry_address = secret_registry_address
+
+    @classmethod
+    def unpack(cls, packed):
+        return cls(packed.secret_registry_address)
+
+    def pack(self, packed) -> None:
+        packed.secret_registry_address = self.secret_registry_address
+
+    @classmethod
+    def from_dict(cls, data):
+        return cls(data["secret_registry_address"])
+
     def to_dict(self):
         return {
-            "type": self.__class__.__name__
+            "type": self.__class__.__name__,
+            "secret_registry_address": to_normalized_address(self.secret_registry_address)
         }
 
 

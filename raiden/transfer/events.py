@@ -407,6 +407,48 @@ class ContractSendSecretReveal(ContractSendExpirableEvent):
         return restored
 
 
+class ContractSendSecretRevealLight(Event):
+    """ Event emitted when the lock must be claimed on-chain by a light client. """
+
+    def __init__(
+        self, payment_identifier: int, message_id: int, light_client_address: Address
+    ) -> None:
+        self.payment_identifier = payment_identifier
+        self.message_id = message_id
+        self.light_client_address = light_client_address
+
+    def __repr__(self) -> str:
+        return f"<ContractSendSecretRevealLight triggered for payment {self.payment_identifier} " \
+               f"and light_client_address {self.light_client_address}>"
+
+    def __eq__(self, other: Any) -> bool:
+        return (
+            isinstance(other, ContractSendSecretRevealLight)
+            and self.payment_identifier == other.payment_identifier
+            and self.message_id == other.message_id
+            and self.light_client_address == other.light_client_address
+            and super().__eq__(other)
+        )
+
+    def __ne__(self, other: Any) -> bool:
+        return not self.__eq__(other)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "payment_identifier": str(self.payment_identifier),
+            "message_id": str(self.message_id),
+            "light_client_address": str(self.light_client_address),
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "ContractSendSecretRevealLight":
+        return cls(
+            payment_identifier=data["payment_identifier"],
+            message_id=data["message_id"],
+            light_client_address=data["light_client_address"]
+        )
+
+
 class EventPaymentSentSuccess(Event):
     """ Event emitted by the initiator when a transfer is considered successful.
 
