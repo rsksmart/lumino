@@ -37,7 +37,8 @@ from raiden.transfer.mediated_transfer.state_change import (
     ActionTransferReroute,
     ActionInitInitiatorLight, ReceiveSecretRequestLight, ActionSendSecretRevealLight, ReceiveSecretRevealLight,
     ActionSendUnlockLight, ActionInitTargetLight, ActionSendSecretRequestLight, ActionSendLockExpiredLight,
-    ReceiveLockExpiredLight, ReceiveTransferCancelRoute)
+    ReceiveLockExpiredLight, ReceiveTransferCancelRoute,
+    StoreRefundTransferLight)
 from raiden.transfer.state import (
     ChainState,
     InitiatorTask,
@@ -212,8 +213,8 @@ def subdispatch_to_paymenttask(
     block_number = chain_state.block_number
     block_hash = chain_state.block_hash
     sub_task = chain_state.payment_mapping.secrethashes_to_task.get(secrethash)
-    events: List[Event] = list()
 
+    events: List[Event] = list()
     if sub_task:
         pseudo_random_generator = chain_state.pseudo_random_generator
         sub_iteration: Union[
@@ -256,6 +257,7 @@ def subdispatch_to_paymenttask(
                     pseudo_random_generator=pseudo_random_generator,
                     block_number=block_number,
                     block_hash=block_hash,
+                    storage=storage
                 )
                 events = sub_iteration.events
 
@@ -310,7 +312,8 @@ def handle_init_unlock_light(
         balance_proof = channel.create_send_balance_proof_light(channel_state, state_change.unlock,
                                                                 state_change.sender, state_change.receiver)
         store_signed_bp = StoreMessageEvent(balance_proof.message_identifier, balance_proof.payment_identifier, 11,
-                                            state_change.unlock, True, LightClientProtocolMessageType.PaymentSuccessful)
+                                            state_change.unlock, True, LightClientProtocolMessageType.PaymentSuccessful,
+                                            balance_proof.sender)
         events.append(balance_proof)
         events.append(store_signed_bp)
     return TransitionResult(chain_state, events)
@@ -325,10 +328,15 @@ def handle_init_send_lock_expired_light(
                                                    state_change.payment_id)
     store_lock_expired_light = StoreMessageEvent(signed_lock_expired.message_identifier, state_change.payment_id,
                                                  1, signed_lock_expired, True,
-                                                 LightClientProtocolMessageType.PaymentExpired)
-
+                                                 LightClientProtocolMessageType.PaymentExpired,
+                                                 signed_lock_expired.sender)
     events = [send_lock_expired_light, store_lock_expired_light]
     return TransitionResult(chain_state, events)
+
+
+def handle_store_refund_transfer_light( chain_state: ChainState, state_change: StoreRefundTransferLight
+                                        ) -> TransitionResult[ChainState]:
+    return subdispatch_to_paymenttask(chain_state, state_change, state_change.transfer.lock.secrethash)
 
 
 def subdispatch_initiatortask(
@@ -369,8 +377,10 @@ def subdispatch_initiatortask(
             if iteration.new_state:
                 sub_task = InitiatorTask(token_network_identifier, iteration.new_state)
                 chain_state.payment_mapping.secrethashes_to_task[secrethash] = sub_task
-            elif secrethash in chain_state.payment_mapping.secrethashes_to_task:
-                print("Deleted")
+            elif secrethash in chain_state.payment_mapping.secrethashes_to_task and not isinstance(state_change, ActionInitInitiatorLight):
+                ## We dont delete the payment task when is a light payment, thats because we need the previous payment task for refunds.
+                ## TODO marcosmartinez7, are the p2p payments being removed?
+                print("Deleted payment task "+ secrethash.hex())
                 del chain_state.payment_mapping.secrethashes_to_task[secrethash]
 
     return TransitionResult(chain_state, events)
@@ -381,6 +391,7 @@ def subdispatch_mediatortask(
     state_change: StateChange,
     token_network_identifier: TokenNetworkID,
     secrethash: SecretHash,
+    storage=None
 ) -> TransitionResult[ChainState]:
     block_number = chain_state.block_number
     block_hash = chain_state.block_hash
@@ -411,6 +422,7 @@ def subdispatch_mediatortask(
                 pseudo_random_generator=pseudo_random_generator,
                 block_number=block_number,
                 block_hash=block_hash,
+                storage=storage
             )
             events = iteration.events
 
@@ -653,7 +665,7 @@ def handle_new_token_network(
 
 
 def handle_node_change_network_state(
-    chain_state: ChainState, state_change: ActionChangeNodeNetworkState
+    chain_state: ChainState, state_change: ActionChangeNodeNetworkState, storage=None
 ) -> TransitionResult[ChainState]:
     events: List[Event] = list()
 
@@ -670,6 +682,7 @@ def handle_node_change_network_state(
             state_change=state_change,
             secrethash=secrethash,
             token_network_identifier=subtask.token_network_identifier,
+            storage=storage
         )
         events.extend(result.events)
 
@@ -768,14 +781,14 @@ def handle_init_secret_request_light(
 
 
 def handle_init_mediator(
-    chain_state: ChainState, state_change: ActionInitMediator
+    chain_state: ChainState, state_change: ActionInitMediator, storage=None
 ) -> TransitionResult[ChainState]:
     transfer = state_change.from_transfer
     secrethash = transfer.lock.secrethash
     token_network_identifier = transfer.balance_proof.token_network_identifier
 
     return subdispatch_mediatortask(
-        chain_state, state_change, TokenNetworkID(token_network_identifier), secrethash
+        chain_state, state_change, TokenNetworkID(token_network_identifier), secrethash, storage
     )
 
 
@@ -829,7 +842,6 @@ def handle_receive_transfer_refund_cancel_route(
     chain_state.payment_mapping.secrethashes_to_task.update(
         {new_secrethash: copy.deepcopy(current_payment_task)}
     )
-
     return subdispatch_to_paymenttask(chain_state, state_change, new_secrethash, storage)
 
 
@@ -949,13 +961,13 @@ def handle_state_change(
         iteration = handle_init_initiator(chain_state, state_change)
     elif type(state_change) == ActionInitMediator:
         assert isinstance(state_change, ActionInitMediator), MYPY_ANNOTATION
-        iteration = handle_init_mediator(chain_state, state_change)
+        iteration = handle_init_mediator(chain_state, state_change, storage)
     elif type(state_change) == ActionInitTarget:
         assert isinstance(state_change, ActionInitTarget), MYPY_ANNOTATION
         iteration = handle_init_target(chain_state, state_change, storage, chain_state.our_address)
     elif type(state_change) == ActionInitTargetLight:
         assert isinstance(state_change, ActionInitTargetLight), MYPY_ANNOTATION
-        iteration = handle_init_target(chain_state, state_change, storage, state_change.transfer.initiator)
+        iteration = handle_init_target(chain_state, state_change, storage, state_change.transfer.target)
     elif type(state_change) == ActionUpdateTransportAuthData:
         assert isinstance(state_change, ActionUpdateTransportAuthData), MYPY_ANNOTATION
         iteration = handle_update_transport_authdata(chain_state, state_change)
@@ -1049,6 +1061,9 @@ def handle_state_change(
     elif type(state_change) == ActionSendLockExpiredLight:
         assert isinstance(state_change, ActionSendLockExpiredLight), MYPY_ANNOTATION
         iteration = handle_init_send_lock_expired_light(chain_state, state_change)
+    elif type(state_change) == StoreRefundTransferLight:
+        assert isinstance(state_change, StoreRefundTransferLight), MYPY_ANNOTATION
+        iteration = handle_store_refund_transfer_light(chain_state, state_change)
     assert chain_state is not None, "chain_state must be set"
     return iteration
 

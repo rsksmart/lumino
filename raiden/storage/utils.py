@@ -101,14 +101,12 @@ CREATE TABLE IF NOT EXISTS client (
 DB_CREATE_LIGHT_CLIENT_PAYMENT = """
 CREATE TABLE IF NOT EXISTS light_client_payment(
     payment_id TEXT PRIMARY KEY,
-    light_client_address TEXT NOT NULL,
     partner_address TEXT NOT NULL,
     is_lc_initiator INTEGER DEFAULT 1,
     token_network_id TEXT NOT NULL,
     amount TEXT NOT NULL,
     created_on TEXT NOT NULL,
-    payment_status  TEXT CHECK  (payment_status in ('InProgress', 'Expired', 'Failed', 'Done', 'Pending', 'Deleted' ) ) NOT NULL DEFAULT 'Pending',
-    FOREIGN KEY(light_client_address) REFERENCES client(address) ON DELETE CASCADE ON UPDATE CASCADE
+    payment_status  TEXT CHECK  (payment_status in ('InProgress', 'Expired', 'Failed', 'Done', 'Pending', 'Deleted' ) ) NOT NULL DEFAULT 'Pending'
 );
 """
 
@@ -120,7 +118,9 @@ CREATE TABLE IF NOT EXISTS light_client_protocol_message (
     message_order INTEGER,
     unsigned_message JSON,
     signed_message JSON,
-    message_type TEXT CHECK (message_type in ('PaymentSuccessful', 'PaymentFailure', 'PaymentExpired', 'SettlementRequired')) NOT NULL
+    message_type TEXT CHECK (message_type in ('PaymentSuccessful', 'PaymentFailure', 'PaymentExpired', 'SettlementRequired', 'PaymentRefund')) NOT NULL,
+    light_client_address TEXT NOT NULL,
+    FOREIGN KEY(light_client_address) REFERENCES client(address) ON DELETE CASCADE ON UPDATE CASCADE
 );
 """
 

@@ -439,7 +439,7 @@ def test_refund_transfer_next_route():
 
 
     state_change = ActionTransferReroute(
-        routes=channel_set.get_routes(), transfer=refund_transfer, secret=random_secret()
+        transfer=refund_transfer, secret=random_secret()
     )
 
     iteration = initiator_manager.state_transition(
@@ -490,7 +490,7 @@ def test_refund_transfer_no_more_routes():
     )
 
     state_change = ActionTransferReroute(
-        routes=setup.available_routes, transfer=refund_transfer, secret=random_secret()
+        transfer=refund_transfer, secret=random_secret()
     )
 
     iteration = initiator_manager.state_transition(
@@ -1143,7 +1143,7 @@ def test_secret_reveal_cancel_other_transfers():
     assert channel_set.get_sub_channel(0).partner_state.address == refund_address
 
     state_change = ActionTransferReroute(
-        routes=channel_set.get_routes(), transfer=refund_transfer, secret=random_secret()
+        transfer=refund_transfer, secret=random_secret()
     )
 
     iteration = initiator_manager.state_transition(
@@ -1249,7 +1249,7 @@ def test_refund_after_secret_request():
     )
 
     state_change = ActionTransferReroute(
-        routes=setup.available_routes, transfer=refund_transfer, secret=random_secret()
+        transfer=refund_transfer, secret=random_secret()
     )
 
     iteration = initiator_manager.state_transition(
@@ -1308,7 +1308,7 @@ def test_clearing_payment_state_on_lock_expires_with_refunded_transfers():
     )
 
     state_change = ActionTransferReroute(
-        routes=channel_set.get_routes(), transfer=refund_transfer, secret=random_secret()
+        transfer=refund_transfer, secret=random_secret()
     )
 
     iteration = initiator_manager.state_transition(
@@ -1434,14 +1434,14 @@ def test_initiator_manager_drops_invalid_state_changes():
     channel_set = factories.make_channel_set_from_amounts(amounts=[10], token_address=factories.UNIT_TRANSFER_DESCRIPTION.initiator)
     transfer = factories.create(factories.LockedTransferSignedStateProperties())
     secret = factories.UNIT_SECRET
-    cancel_route = ActionTransferReroute(channel_set.get_routes(), transfer, secret)
+    cancel_route = ActionTransferReroute(transfer, secret)
 
     balance_proof = factories.create(factories.BalanceProofSignedStateProperties())
     lock_expired = ReceiveLockExpired(balance_proof, factories.UNIT_SECRETHASH, 1)
 
     prng = random.Random()
     for state_change in (cancel_route, lock_expired):
-        state = InitiatorPaymentState(initiator_transfers=dict())
+        state = InitiatorPaymentState(routes=[], initiator_transfers=dict())
         iteration = initiator_manager.state_transition(
             payment_state=state,
             state_change=lock_expired,
@@ -1458,7 +1458,7 @@ def test_initiator_manager_drops_invalid_state_changes():
             revealsecret=None,
         )
         state = InitiatorPaymentState(
-            initiator_transfers={factories.UNIT_SECRETHASH: initiator_state}
+            routes=[], initiator_transfers={factories.UNIT_SECRETHASH: initiator_state}
         )
         iteration = initiator_manager.state_transition(
             payment_state=state,
@@ -1470,7 +1470,7 @@ def test_initiator_manager_drops_invalid_state_changes():
         assert_dropped(iteration, state, "unknown channel identifier")
 
     transfer2 = factories.create(factories.LockedTransferSignedStateProperties(amount=2))
-    cancel_route2 = ActionTransferReroute(channel_set.get_routes(), transfer2, secret)
+    cancel_route2 = ActionTransferReroute(transfer2, secret)
     iteration = initiator_manager.state_transition(
         state, cancel_route2, channel_set.channel_map, prng, 1
     )
@@ -1519,7 +1519,7 @@ def test_regression_payment_unlock_failed_event_must_be_emitted_only_once():
     )
 
     state_change = ActionTransferReroute(
-        routes=channel_set.get_routes(), transfer=refund_transfer, secret=random_secret()
+        transfer=refund_transfer, secret=random_secret()
     )
 
     iteration = initiator_manager.state_transition(

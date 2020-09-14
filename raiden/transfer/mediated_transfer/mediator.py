@@ -116,6 +116,7 @@ def is_safe_to_wait(
     )
     return False, msg
 
+
 def is_channel_usable(
     candidate_channel_state: NettingChannelState,
     transfer_amount: PaymentWithFeeAmount,
@@ -1088,6 +1089,7 @@ def handle_init(
     nodeaddresses_to_networkstates: NodeNetworkStateMap,
     pseudo_random_generator: random.Random,
     block_number: BlockNumber,
+    storage=None
 ) -> TransitionResult[MediatorTransferState]:
     routes = state_change.routes
 
@@ -1101,7 +1103,7 @@ def handle_init(
 
     mediator_state = MediatorTransferState(secrethash=from_transfer.lock.secrethash, routes=routes)
 
-    is_valid, events, _, _ = channel.handle_receive_lockedtransfer(payer_channel, from_transfer, None)
+    is_valid, events, _, _ = channel.handle_receive_lockedtransfer(payer_channel, from_transfer, storage)
     if not is_valid:
         # If the balance proof is not valid, do *not* create a task. Otherwise it's
         # possible for an attacker to send multiple invalid transfers, and increase
@@ -1210,7 +1212,7 @@ def handle_refundtransfer(
 
         iteration = mediate_transfer(
             mediator_state,
-            mediator_state_change.routes,
+            mediator_state.routes,
             payer_channel,
             channelidentifiers_to_channels,
             nodeaddresses_to_networkstates,
@@ -1240,7 +1242,6 @@ def handle_offchain_secretreveal(
         transfer_secrethash=mediator_state.secrethash,
         secret=mediator_state_change.secret,
     )
-    is_secret_unknown = mediator_state.secret is None
 
     # a SecretReveal should be rejected if the payer transfer
     # has expired. To check for this, we use the last
@@ -1258,7 +1259,8 @@ def handle_offchain_secretreveal(
         block_number=block_number,
     )
 
-    if is_secret_unknown and is_valid_reveal and not has_payer_transfer_expired:
+    # TODO marcosmartinez7 this condicton must include is_secret_unknown, that is mediator_state.secret is None
+    if is_valid_reveal and not has_payer_transfer_expired:
         iteration = secret_learned(
             state=mediator_state,
             channelidentifiers_to_channels=channelidentifiers_to_channels,
@@ -1456,6 +1458,7 @@ def state_transition(
     pseudo_random_generator: random.Random,
     block_number: BlockNumber,
     block_hash: BlockHash,
+    storage=None
 ) -> TransitionResult[MediatorTransferState]:
     """ State machine for a node mediating a transfer. """
     # pylint: disable=too-many-branches
@@ -1476,6 +1479,7 @@ def state_transition(
                 nodeaddresses_to_networkstates=nodeaddresses_to_networkstates,
                 pseudo_random_generator=pseudo_random_generator,
                 block_number=block_number,
+                storage=storage
             )
 
     elif type(state_change) == Block:

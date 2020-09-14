@@ -158,7 +158,7 @@ def test_regression_send_refund():
     # All three channels have been used
     routes = []
 
-    refund_state_change = ReceiveTransferRefund(transfer=received_transfer, routes=routes)
+    refund_state_change = ReceiveTransferRefund(transfer=received_transfer)
 
     iteration = mediator.handle_refundtransfer(
         mediator_state=mediator_state,
@@ -335,6 +335,8 @@ def test_regression_mediator_task_no_routes():
         token_network_identifier=channel_set.get_sub_channel(0).token_network_identifier,
         channel_identifier=channel_set.get_sub_channel(0).identifier,
         recipient=channel_set.get_sub_channel(0).our_state.address,
+        payment_identifier=payer_transfer.payment_identifier,
+        is_light_channel=False
     )
     assert send_lock_expired
     lock_expired_message = message_from_sendevent(send_lock_expired)
