@@ -53,7 +53,6 @@ from raiden.lightclient.models.light_client_protocol_message import LightClientP
 
 from raiden.messages import RequestMonitoring, LockedTransfer, RevealSecret, Unlock, Delivered, SecretRequest, \
     Processed, LockExpired
-from raiden.network.proxies import TokenNetworkRegistry, TokenNetwork
 from raiden.settings import DEFAULT_RETRY_TIMEOUT, DEVELOPMENT_CONTRACT_VERSION
 
 from raiden.transfer import architecture, views, routes
@@ -1820,6 +1819,6 @@ class RaidenAPI:
             )
 
     def unlock_payment_light(self, signed_tx: typing.SignedTransaction, token_address: typing.TokenAddress):
-        registry: TokenNetworkRegistry = self.raiden.default_registry
-        token_network: TokenNetwork = self.raiden.chain.token_network(registry.get_token_network(token_address))
+        registry = self.raiden.default_registry
+        token_network = self.raiden.chain.token_network(registry.get_token_network(token_address))
         token_network.proxy.broadcast_signed_transaction_and_wait(signed_tx)

@@ -51,7 +51,7 @@ class LightClientMessageHandler:
         return message_type and light_client_address and unsigned_message \
                and wal.storage.is_message_already_stored(light_client_address,
                                                          message_type.value,
-                                                         unsigned_message) is not None
+                                                         unsigned_message)
     @classmethod
     def store_light_client_protocol_message(cls, identifier: int, message: Message, signed: bool, payment_id: int,
                                             light_client_address: AddressHex, order: int,

@@ -89,7 +89,7 @@ from raiden.api.v1.resources import (
     CreatePaymentLightResource,
     WatchtowerResource,
     LightClientMessageResource,
-    UnlockedPaymentLightResource
+    UnlockPaymentLightResource
 )
 
 from raiden.constants import GENESIS_BLOCK_NUMBER, UINT256_MAX, Environment, EMPTY_PAYMENT_HASH_INVOICE
@@ -230,29 +230,6 @@ URLS_FN_V1 = [
     ),
 ]
 
-URLS_HUB_V1 = [
-    ("/light_channels", ChannelsResourceLight),
-    (
-        "/light_channels/<hexaddress:token_address>/<hexaddress:creator_address>/<hexaddress:partner_address>",
-        LightChannelsResourceByTokenAndPartnerAddress
-    ),
-    (
-        "/payments_light/unlocked/<hexaddress:token_address>",
-        UnlockedPaymentLightResource
-    ),
-    ("/payments_light", PaymentLightResource),
-    ("/light_client_messages", LightClientMessageResource, "Message polling"),
-    ("/payments_light/create", CreatePaymentLightResource, "create_payment"),
-    ("/watchtower", WatchtowerResource),
-    (
-        '/light_clients/matrix/credentials',
-        LightClientMatrixCredentialsBuildResource,
-    ),
-    (
-        '/light_clients/',
-        LightClientResource
-    ),
-]
 
 URLS_COMMON_V1 = [
     ("/tokens", TokensResource),
@@ -261,6 +238,20 @@ URLS_COMMON_V1 = [
     ("/address", AddressResource),
 ]
 
+URLS_HUB_V1 = [
+    ("/light_channels", ChannelsResourceLight),
+    (
+        "/light_channels/<hexaddress:token_address>/<hexaddress:creator_address>/<hexaddress:partner_address>",
+        LightChannelsResourceByTokenAndPartnerAddress
+    ),
+    ("/payments_light", PaymentLightResource),
+    ("/payments_light/create", CreatePaymentLightResource, "create_payment"),
+    ("/payments_light/unlock/<hexaddress:token_address>", UnlockPaymentLightResource),
+    ('/light_clients/', LightClientResource),
+    ('/light_clients/matrix/credentials', LightClientMatrixCredentialsBuildResource,),
+    ("/light_client_messages", LightClientMessageResource, "Message polling"),
+    ("/watchtower", WatchtowerResource),
+]
 
 def api_response(result, status_code=HTTPStatus.OK):
     if status_code == HTTPStatus.NO_CONTENT:
@@ -2215,7 +2206,7 @@ class RestAPI:
         except UnhandledLightClient as e:
             return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.FORBIDDEN, log=log)
 
-    def post_unlocked_payment_light(self, signed_tx: typing.SignedTransaction, token_address: typing.TokenAddress):
+    def post_unlock_payment_light(self, signed_tx: typing.SignedTransaction, token_address: typing.TokenAddress):
         try:
             self.raiden_api.unlock_payment_light(signed_tx, token_address)
             return api_response(result=dict(), status_code=HTTPStatus.NO_CONTENT)
