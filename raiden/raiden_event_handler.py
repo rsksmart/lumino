@@ -32,7 +32,8 @@ from raiden.transfer.events import (
     EventPaymentSentFailed,
     EventPaymentSentSuccess,
     SendProcessed,
-    ContractSendChannelUpdateTransferLight, ContractSendChannelSettleLight)
+    ContractSendChannelUpdateTransferLight,
+    ContractSendChannelSettleLight)
 from raiden.transfer.identifiers import CanonicalIdentifier
 from raiden.transfer.mediated_transfer.events import (
     EventUnlockClaimFailed,
@@ -617,13 +618,15 @@ class RaidenEventHandler(EventHandler):
             raiden,
             channel_settle_event.token_network_identifier,
             channel_settle_event.channel_identifier,
-            channel_settle_event.triggered_by_block_hash)
+            channel_settle_event.triggered_by_block_hash
+        )
 
         canonical_identifier = CanonicalIdentifier(
             chain_identifier=raiden.chain.network_id,
             token_network_address=channel_settle_event.token_network_identifier,
             channel_identifier=channel_settle_event.channel_identifier,
         )
+
         payment_channel: PaymentChannel = raiden.chain.payment_channel(
             canonical_identifier=canonical_identifier
         )
