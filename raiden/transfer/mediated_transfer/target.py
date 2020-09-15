@@ -426,12 +426,12 @@ def handle_offchain_secretreveal_light(
     )
 
     if valid_secret and not has_transfer_expired:
-        # TODO mmarcosmartinez7 this cannot be done without LC interaction
-        # channel.register_offchain_secret(
-        #     channel_state=channel_state,
-        #     secret=state_change.secret,
-        #     secrethash=state_change.secrethash,
-        # )
+        # TODO the secret should be encrypted with LC's public key
+        channel.register_offchain_secret(
+            channel_state=channel_state,
+            secret=state_change.secret,
+            secrethash=state_change.secrethash,
+        )
 
         route = target_state.route
         message_identifier = message_identifier_from_prng(pseudo_random_generator)
