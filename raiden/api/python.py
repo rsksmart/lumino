@@ -41,7 +41,8 @@ from raiden.exceptions import (
     RaidenRecoverableError,
     UnknownTokenAddress,
     InvoiceCoding,
-    UnhandledLightClient, InvalidPaymentIdentifier)
+    UnhandledLightClient
+)
 from raiden.lightclient.handlers.light_client_message_handler import LightClientMessageHandler
 from raiden.lightclient.handlers.light_client_service import LightClientService
 from raiden.lightclient.handlers.light_client_utils import LightClientUtils
