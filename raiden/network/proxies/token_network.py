@@ -2229,13 +2229,13 @@ class TokenNetwork:
                 self.client.poll(transaction_hash)
                 transaction_error = check_transaction_threw(self.client, transaction_hash)
 
-        self.handle_transaction_result(channel_identifier=channel_identifier,
-                                       checking_block=checking_block,
-                                       error_prefix=error_prefix,
-                                       log_details=log_details,
-                                       partner=partner,
-                                       transaction_error=transaction_error,
-                                       is_gas_limit_error=gas_limit is None)
+        if not gas_limit or transaction_error:
+            self.handle_transaction_error_for_settlement(channel_identifier=channel_identifier,
+                                                         checking_block=checking_block,
+                                                         error_prefix=error_prefix,
+                                                         log_details=log_details,
+                                                         partner=partner,
+                                                         transaction_error=transaction_error)
 
         log.info("settle successful", **log_details)
 
@@ -2273,49 +2273,47 @@ class TokenNetwork:
             self.client.poll(transaction_hash)
             transaction_error = check_transaction_threw(self.client, transaction_hash)
 
-        self.handle_transaction_result(channel_identifier=channel_identifier,
-                                       checking_block=checking_block,
-                                       error_prefix="settle call failed",
-                                       log_details=log_details,
-                                       partner=partner,
-                                       transaction_error=transaction_error)
+        if transaction_error:
+            self.handle_transaction_error_for_settlement(channel_identifier=channel_identifier,
+                                                         checking_block=checking_block,
+                                                         error_prefix="settle call failed",
+                                                         log_details=log_details,
+                                                         partner=partner,
+                                                         transaction_error=transaction_error)
 
         log.info("settle light successful", **log_details)
 
-    def handle_transaction_result(self,
-                                  channel_identifier: ChannelID,
-                                  checking_block: BlockNumber,
-                                  error_prefix: str,
-                                  log_details: Dict,
-                                  partner: Address,
-                                  transaction_error,
-                                  is_gas_limit_error: bool = False):
+    def handle_transaction_error_for_settlement(self,
+                                                channel_identifier: ChannelID,
+                                                checking_block: BlockNumber,
+                                                error_prefix: str,
+                                                log_details: Dict,
+                                                partner: Address,
+                                                transaction_error):
         """
-            This function checks if the transaction has an error and in that case it handle that error
-            by raising an exception with details about the error, otherwise it doesn't do anything
+            This function throws an exception with details about the error
         """
-        if transaction_error or is_gas_limit_error:
-            if transaction_error["blockNumber"]:
-                block = transaction_error["blockNumber"]
-            else:
-                block = checking_block
+        if transaction_error["blockNumber"]:
+            block = transaction_error["blockNumber"]
+        else:
+            block = checking_block
 
-            self.proxy.jsonrpc_client.check_for_insufficient_eth(
-                transaction_name="settleChannel",
-                address=self.node_address,
-                transaction_executed=transaction_error["blockNumber"] is not None,
-                required_gas=GAS_REQUIRED_FOR_SETTLE_CHANNEL,
-                block_identifier=block,
-            )
-            msg = self._check_channel_state_after_settle(
-                participant1=self.node_address,
-                participant2=partner,
-                block_identifier=block,
-                channel_identifier=channel_identifier,
-            )
-            error_msg = f"{error_prefix}. {msg}"
-            log.critical(error_msg, **log_details)
-            raise RaidenUnrecoverableError(error_msg)
+        self.proxy.jsonrpc_client.check_for_insufficient_eth(
+            transaction_name="settleChannel",
+            address=self.node_address,
+            transaction_executed=transaction_error["blockNumber"] is not None,
+            required_gas=GAS_REQUIRED_FOR_SETTLE_CHANNEL,
+            block_identifier=block,
+        )
+        msg = self._check_channel_state_after_settle(
+            participant1=self.node_address,
+            participant2=partner,
+            block_identifier=block,
+            channel_identifier=channel_identifier,
+        )
+        error_msg = f"{error_prefix}. {msg}"
+        log.critical(error_msg, **log_details)
+        raise RaidenUnrecoverableError(error_msg)
 
     def events_filter(
         self,
