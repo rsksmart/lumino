@@ -2229,14 +2229,14 @@ class TokenNetwork:
                 self.client.poll(transaction_hash)
                 transaction_error = check_transaction_threw(self.client, transaction_hash)
 
-        self.validate_settlement_transaction_error(channel_identifier,
-                                                   checking_block,
-                                                   error_prefix,
-                                                   log_details,
-                                                   partner,
-                                                   transaction_error,
-                                                   False,
-                                                   gas_limit)
+        self.validate_settlement_transaction_error(channel_identifier=channel_identifier,
+                                                   checking_block=checking_block,
+                                                   error_prefix=error_prefix,
+                                                   log_details=log_details,
+                                                   partner=partner,
+                                                   transaction_error=transaction_error,
+                                                   is_light=False,
+                                                   gas_limit=gas_limit)
 
         log.info("settle successful", **log_details)
 
@@ -2274,13 +2274,13 @@ class TokenNetwork:
             self.client.poll(transaction_hash)
             transaction_error = check_transaction_threw(self.client, transaction_hash)
 
-        self.validate_settlement_transaction_error(channel_identifier,
-                                                   checking_block,
-                                                   "settle call failed",
-                                                   log_details,
-                                                   partner,
-                                                   transaction_error,
-                                                   True)
+        self.validate_settlement_transaction_error(channel_identifier=channel_identifier,
+                                                   checking_block=checking_block,
+                                                   error_prefix="settle call failed",
+                                                   log_details=log_details,
+                                                   partner=partner,
+                                                   transaction_error=transaction_error,
+                                                   is_light=True)
 
         log.info("settle light successful", **log_details)
 
