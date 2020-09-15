@@ -125,7 +125,7 @@ class ChannelValidator:
                                             creator_address: Address,
                                             partner_address: Address,
                                             registry_address: Address,
-                                            chain_state: ChainState):
+                                            chain_state: ChainState) -> List[NettingChannelState]:
 
         if not is_binary_address(token_address):
             raise InvalidAddress("Expected binary address format for token in channel settle")

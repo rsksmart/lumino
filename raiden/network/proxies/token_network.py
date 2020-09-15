@@ -2229,14 +2229,13 @@ class TokenNetwork:
                 self.client.poll(transaction_hash)
                 transaction_error = check_transaction_threw(self.client, transaction_hash)
 
-        self.validate_settlement_transaction_error(channel_identifier=channel_identifier,
-                                                   checking_block=checking_block,
-                                                   error_prefix=error_prefix,
-                                                   log_details=log_details,
-                                                   partner=partner,
-                                                   transaction_error=transaction_error,
-                                                   is_light=False,
-                                                   gas_limit=gas_limit)
+        self.handle_transaction_result(channel_identifier=channel_identifier,
+                                       checking_block=checking_block,
+                                       error_prefix=error_prefix,
+                                       log_details=log_details,
+                                       partner=partner,
+                                       transaction_error=transaction_error,
+                                       is_gas_limit_error=gas_limit is None)
 
         log.info("settle successful", **log_details)
 
@@ -2274,27 +2273,28 @@ class TokenNetwork:
             self.client.poll(transaction_hash)
             transaction_error = check_transaction_threw(self.client, transaction_hash)
 
-        self.validate_settlement_transaction_error(channel_identifier=channel_identifier,
-                                                   checking_block=checking_block,
-                                                   error_prefix="settle call failed",
-                                                   log_details=log_details,
-                                                   partner=partner,
-                                                   transaction_error=transaction_error,
-                                                   is_light=True)
+        self.handle_transaction_result(channel_identifier=channel_identifier,
+                                       checking_block=checking_block,
+                                       error_prefix="settle call failed",
+                                       log_details=log_details,
+                                       partner=partner,
+                                       transaction_error=transaction_error)
 
         log.info("settle light successful", **log_details)
 
-    def validate_settlement_transaction_error(self,
-                                              channel_identifier: ChannelID,
-                                              checking_block: BlockNumber,
-                                              error_prefix: str,
-                                              log_details: Dict,
-                                              partner: Address,
-                                              transaction_error,
-                                              is_light: bool,
-                                              gas_limit: int = None):
-        transaction_executed = is_light or gas_limit is not None
-        if not transaction_executed or transaction_error:
+    def handle_transaction_result(self,
+                                  channel_identifier: ChannelID,
+                                  checking_block: BlockNumber,
+                                  error_prefix: str,
+                                  log_details: Dict,
+                                  partner: Address,
+                                  transaction_error,
+                                  is_gas_limit_error: bool = False):
+        """
+            This function checks if the transaction has an error and in that case it handle that error
+            by raising an exception with details about the error, otherwise it doesn't do anything
+        """
+        if transaction_error or is_gas_limit_error:
             if transaction_error["blockNumber"]:
                 block = transaction_error["blockNumber"]
             else:
