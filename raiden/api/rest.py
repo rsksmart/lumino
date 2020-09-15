@@ -16,7 +16,7 @@ from flask_restful import Api, abort
 from gevent.pywsgi import WSGIServer
 from hexbytes import HexBytes
 
-from raiden.api.validations.valid_light_client import requires_api_key
+from raiden.api.validations.light_client_authorization import requires_api_key
 from raiden.lightclient.handlers.light_client_message_handler import LightClientMessageHandler
 from raiden_webui import RAIDEN_WEBUI_PATH
 
@@ -884,7 +884,7 @@ class RestAPI:
         return api_response(result=closed_channels)
 
     @requires_api_key
-    def post_register_secret_light(self, signed_tx: typing.SignedTransaction, message_id: typing.MessageID):
+    def register_secret_light(self, signed_tx: typing.SignedTransaction, message_id: typing.MessageID):
         try:
             self.raiden_api.register_secret_light(signed_tx, message_id)
         except InsufficientFunds as e:
