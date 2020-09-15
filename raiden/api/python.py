@@ -608,7 +608,7 @@ class RaidenAPI:
 
         channel_list = list(channel_iterator)
 
-        if len(channel_list) <= 0:
+        if not channel_list:
             raise RaidenRecoverableError("Failed trying to settle a channel that's not in waiting_for_settle state")
 
         channel_state = channel_list[0]

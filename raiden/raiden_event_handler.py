@@ -667,11 +667,11 @@ class RaidenEventHandler(EventHandler):
 
         message_identifier = message_identifier_from_prng(pseudo_random_generator)
 
-        # and now find out
+        # and now find out our maximum and the partner maximum to compare and figure out which is higher
         our_maximum = settlement_parameters.transferred_amount + settlement_parameters.locked_amount
         partner_maximum = settlement_parameters.partner_transferred_amount + settlement_parameters.partner_locked_amount
 
-        # The second participant transferred + locked amount must be higher
+        # The second participant transferred + locked amount must be higher by contract requirement
         our_bp_is_larger = our_maximum > partner_maximum
         if our_bp_is_larger:
             message = SettlementRequiredLightMessage (
