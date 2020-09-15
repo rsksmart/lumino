@@ -728,7 +728,7 @@ class RaidenEventHandler(EventHandler):
 
         log.debug("Processing settlement data")
 
-        assert raiden.wal, "The Raiden Service must be initialize to handle events"
+        assert raiden.wal, "The Raiden Service must be initialized to handle events"
         canonical_identifier = CanonicalIdentifier(
             chain_identifier=raiden.chain.network_id,
             token_network_address=token_network_identifier,
