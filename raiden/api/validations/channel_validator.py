@@ -152,4 +152,4 @@ class ChannelValidator:
             if channel.partner_state.address == partner_address:
                 channels_to_settle.append(channel)
 
-        return channels
+        return channels_to_settle
