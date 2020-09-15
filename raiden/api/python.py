@@ -618,7 +618,7 @@ class RaidenAPI:
         )
 
         channel_proxy.settle_channel_light(
-            block_identifier=views.state_from_raiden(self.raiden).block_hash,
+            block_identifier=chain_state.block_hash,
             signed_settle_tx=signed_settle_tx
         )
 
