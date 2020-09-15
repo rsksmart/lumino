@@ -76,7 +76,8 @@ class LightClientMessageHandler:
             storage.write_light_client_payment(payment)
 
     @classmethod
-    def update_light_client_payment_status(cls, payment_id: int, status: LightClientPaymentStatus, storage: SerializedSQLiteStorage):
+    def update_light_client_payment_status(cls, payment_id: int, status: LightClientPaymentStatus,
+                                           storage: SerializedSQLiteStorage):
         exists_payment = storage.get_light_client_payment(payment_id)
         if not exists_payment:
             storage.update_light_client_payment_status(payment_id, status, storage)
@@ -89,7 +90,8 @@ class LightClientMessageHandler:
                                                         wal: WriteAheadLog
                                                         ):
         existing_message = wal.storage.is_light_client_protocol_message_already_stored(payment_id, order,
-                                                                                       str(message_type.value), message_protocol_type)
+                                                                                       str(message_type.value),
+                                                                                       message_protocol_type)
 
         if existing_message:
             return LightClientProtocolMessage(existing_message[5] is not None,
@@ -144,18 +146,18 @@ class LightClientMessageHandler:
                                           light_client_address)
 
     @staticmethod
-    def get_order_for_ack(ack_parent_type: string, ack_type: string, is_delivered_from_initiator: bool = False):
+    def get_order_for_ack(ack_parent_type: string, ack_type: string, is_received_delivered: bool = False):
         switcher_processed = {
             LockedTransfer.__name__: 3,
             Secret.__name__: 13,
             LockExpired.__name__: 3
         }
         switcher_delivered = {
-            LockedTransfer.__name__: 4 if is_delivered_from_initiator else 2,
-            RevealSecret.__name__: 10 if is_delivered_from_initiator else 8,
+            LockedTransfer.__name__: 4 if not is_received_delivered else 2,
+            RevealSecret.__name__: 10 if not is_received_delivered else 8,
             SecretRequest.__name__: 6,
-            Secret.__name__: 14 if is_delivered_from_initiator else 12,
-            LockExpired.__name__: 4 if is_delivered_from_initiator else 2,
+            Secret.__name__: 14 if not is_received_delivered else 12,
+            LockExpired.__name__: 4 if not is_received_delivered else 2,
 
         }
         if ack_type.lower() == "processed":
@@ -210,6 +212,26 @@ class LightClientMessageHandler:
                 cls.log.info("Message for lc already received, ignoring db storage")
 
     @classmethod
+    def is_received_delivered(cls, locked_transfer, delivered_sender):
+        signed_locked_transfer_message = json.loads(locked_transfer.signed_message)
+        unsigned_locked_transfer_message = json.loads(
+            locked_transfer.unsigned_message) if locked_transfer.unsigned_message is not None else None
+        payment_initiator = signed_locked_transfer_message["initiator"]
+        recipient = signed_locked_transfer_message["recipient"]
+        target = signed_locked_transfer_message["target"]
+        if recipient != target and recipient != payment_initiator and target != payment_initiator:
+            # Mediated sent
+            return to_checksum_address(delivered_sender) != payment_initiator
+        else:
+            # Mediated received, normal received, normal sent
+            if unsigned_locked_transfer_message is None:
+                # Received payment
+                return to_checksum_address(delivered_sender) == payment_initiator
+            else:
+                # Normal sent
+                return to_checksum_address(delivered_sender) != payment_initiator
+
+    @classmethod
     def store_lc_delivered(cls, message: Delivered, wal: WriteAheadLog):
         # If exists for that payment, the same message by the order, then discard it.
         message_identifier = message.delivered_message_identifier
@@ -232,25 +254,19 @@ class LightClientMessageHandler:
             message_type = LightClientProtocolMessageType.PaymentExpired
 
         # Check if message is from initiator or it is a reception
-        is_delivered_from_initiator = True
+        received_delivered = True
         delivered_sender = message.sender
         if not first_message_is_lt:
             # get lt to get the payment identifier
             locked_transfer = LightClientMessageHandler.get_light_client_payment_locked_transfer(
                 protocol_message.light_client_payment_id, wal)
-            signed_locked_transfer_message = json.loads(locked_transfer.signed_message)
-            payment_initiator = signed_locked_transfer_message["initiator"]
-            if to_checksum_address(delivered_sender) != to_checksum_address(payment_initiator):
-                is_delivered_from_initiator = False
+            received_delivered = cls.is_received_delivered(locked_transfer, delivered_sender)
         else:
             # message is the lt
-            payment_initiator = json_message["initiator"]
-            if to_checksum_address(delivered_sender) != to_checksum_address(payment_initiator):
-                is_delivered_from_initiator = False
-
+            received_delivered = cls.is_received_delivered(protocol_message, delivered_sender)
         # Get the msg order
         order = LightClientMessageHandler.get_order_for_ack(json_message["type"], message.__class__.__name__.lower(),
-                                                            is_delivered_from_initiator)
+                                                            received_delivered)
 
         # Persist the message
         if order == -1:

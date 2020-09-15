@@ -1583,8 +1583,10 @@ class RestAPI:
         payment_identifier: typing.PaymentID,
         message_identifier: typing.PaymentID,
         secret_hash: typing.SecretHash,
+        transfer_prev_secrethash: typing.SecretHash,
         payment_hash_invoice: typing.PaymentHashInvoice,
-        signed_locked_transfer: LockedTransfer
+        signed_locked_transfer: LockedTransfer,
+        channel_identifier: typing.ChannelID
     ):
         log.debug(
             "Initiating payment light",
@@ -1612,8 +1614,10 @@ class RestAPI:
                 amount=amount,
                 identifier=payment_identifier,
                 secrethash=secret_hash,
+                transfer_prev_secrethash=transfer_prev_secrethash,
                 payment_hash_invoice=payment_hash_invoice,
-                signed_locked_transfer=signed_locked_transfer
+                signed_locked_transfer=signed_locked_transfer,
+                channel_identifier=channel_identifier
             )
         except (
             InvalidAmount,
@@ -1626,29 +1630,6 @@ class RestAPI:
             return api_error(errors=str(e), status_code=HTTPStatus.CONFLICT)
         except InsufficientFunds as e:
             return api_error(errors=str(e), status_code=HTTPStatus.PAYMENT_REQUIRED)
-
-        # FIXME mmartinez return correctly and check when the payment schema must be dumped
-        # if payment_status.payment_done.get() is False:
-        #     return api_error(
-        #         errors="Payment couldn't be completed "
-        #                "(insufficient funds, no route to target or target offline).",
-        #         status_code=HTTPStatus.CONFLICT,
-        #     )
-        #
-        # secret = payment_status.payment_done.get()
-        #
-        # payment = {
-        #     "initiator_address": self.raiden_api.address,
-        #     "registry_address": registry_address,
-        #     "token_address": token_address,
-        #     "target_address": target_address,
-        #     "amount": amount,
-        #     "identifier": identifier,
-        #     "secret": secret,
-        #     "secret_hash": sha3(secret),
-        # }
-        # result = self.payment_schema.dump(payment)
-        # return api_response(result=result.data)
         return None
 
     def _deposit_light(
@@ -2158,7 +2139,8 @@ class RestAPI:
                                               sender: typing.AddressHex,
                                               receiver: typing.AddressHex,
                                               message: Dict,
-                                              message_type_value: str
+                                              message_type_value: str,
+                                              additional_metadata: Dict = None
                                               ):
         # TODO mmartinez7 pending msg validations
         # TODO call from dict will work but we need to validate each parameter in order to know if there are no extra or missing params.
@@ -2179,11 +2161,12 @@ class RestAPI:
         message_type = LightClientProtocolMessageType[message_type_value]
 
         if message["type"] == "LockedTransfer":
+            previous_hash = additional_metadata.get("previous_hash") if additional_metadata is not None else None
             lt = LockedTransfer.from_dict(message)
             self.initiate_payment_light(self.raiden_api.raiden.default_registry.address, lt.token, lt.initiator,
                                         lt.target, lt.locked_amount, lt.payment_identifier, payment_request.payment_id,
-                                        lt.lock.secrethash,
-                                        EMPTY_PAYMENT_HASH_INVOICE, lt)
+                                        lt.lock.secrethash,previous_hash,
+                                        EMPTY_PAYMENT_HASH_INVOICE, lt, lt.channel_identifier)
         elif message["type"] == "Delivered":
             delivered = Delivered.from_dict(message)
             self.initiate_send_delivered_light(sender, receiver, delivered, message_order, payment_request.payment_id,
@@ -2214,7 +2197,8 @@ class RestAPI:
         partner_address: typing.AddressHex,
         token_address: typing.TokenAddress,
         amount: typing.TokenAmount,
-        secrethash: typing.SecretHash
+        secrethash: typing.SecretHash,
+        prev_secrethash: typing.SecretHash = None
     ):
         headers = request.headers
         api_key = headers.get("x-api-key")
@@ -2230,7 +2214,7 @@ class RestAPI:
         try:
             hub_message = self.raiden_api.create_light_client_payment(registry_address, creator_address,
                                                                       partner_address, token_address,
-                                                                      amount, secrethash)
+                                                                      amount, secrethash, prev_secrethash)
             return api_response(hub_message.to_dict())
         except ChannelNotFound as e:
             return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.NOT_FOUND, log=log)
