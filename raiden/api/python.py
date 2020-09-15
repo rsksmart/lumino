@@ -590,12 +590,14 @@ class RaidenAPI:
         Race condition, this can fail if channel was settled externally.
         """
 
+        chain_state = views.state_from_raiden(self.raiden)
+
         channels_to_settle = ChannelValidator.validate_and_get_channels_to_settle(
             token_address=token_address,
             creator_address=creator_address,
             partner_address=partner_address,
             registry_address=registry_address,
-            raiden=self.raiden)
+            chain_state=chain_state)
 
         # get the channel to settle
         channel_iterator = filter(lambda channel:

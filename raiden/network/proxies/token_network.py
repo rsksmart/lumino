@@ -2285,14 +2285,14 @@ class TokenNetwork:
         log.info("settle light successful", **log_details)
 
     def validate_settlement_transaction_error(self,
-                                              channel_identifier,
-                                              checking_block,
-                                              error_prefix,
-                                              log_details,
-                                              partner,
+                                              channel_identifier: ChannelID,
+                                              checking_block: BlockNumber,
+                                              error_prefix: str,
+                                              log_details: Dict,
+                                              partner: Address,
                                               transaction_error,
-                                              is_light,
-                                              gas_limit=None):
+                                              is_light: bool,
+                                              gas_limit: int = None):
         transaction_executed = is_light or gas_limit is not None
         if not transaction_executed or transaction_error:
             if transaction_error["blockNumber"]:

@@ -26,7 +26,8 @@ from raiden.transfer.events import (
     EventInvalidReceivedTransferRefund,
     EventInvalidReceivedUnlock,
     SendProcessed,
-    ContractSendChannelUpdateTransferLight, ContractSendChannelSettleLight)
+    ContractSendChannelUpdateTransferLight,
+    ContractSendChannelSettleLight)
 from raiden.transfer.identifiers import CanonicalIdentifier
 from raiden.transfer.mediated_transfer.events import (
     CHANNEL_IDENTIFIER_GLOBAL_QUEUE,
@@ -1827,7 +1828,6 @@ def handle_block(
             )
 
             if channel_state.is_light_channel:
-                # get which of the participants is the lc to differentiate the address
                 event = ContractSendChannelSettleLight(
                     canonical_identifier=channel_state.canonical_identifier,
                     triggered_by_block_hash=state_change.block_hash,

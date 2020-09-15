@@ -107,10 +107,10 @@ class LightClientMessageHandler:
                                   unsigned_message: Message,
                                   wal: WriteAheadLog):
 
-        return message_type and light_client_address and unsigned_message \
-                            and wal.storage.is_message_already_stored(light_client_address,
-                                                                      message_type.value,
-                                                                      unsigned_message) is not None
+        return message_type and light_client_address and unsigned_message and wal.storage\
+            .is_message_already_stored(light_client_address,
+                                       message_type.value,
+                                       unsigned_message)
 
     @classmethod
     def is_light_client_protocol_message_already_stored_message_id(cls, message_id: int, payment_id: int, order: int,
