@@ -264,8 +264,9 @@ class MatrixTransport(Runnable):
     _room_sep = "_"
     log = log
 
-    def __init__(self, config: dict, current_server_name: str = None):
+    def __init__(self, address: Address, config: dict, current_server_name: str = None):
         super().__init__()
+        self.address=address
         self._config = config
         self._raiden_service: Optional[RaidenService] = None
 
@@ -828,7 +829,7 @@ class MatrixTransport(Runnable):
         )
 
         assert self._raiden_service is not None
-        self._raiden_service.on_message(delivered)
+        self._raiden_service.on_message(delivered, self.address)
 
     def _receive_message(self, message: Union[SignedRetrieableMessage, Processed]):
         print("---- Matrix Received Message HUB Transport" + str(message))
@@ -850,7 +851,7 @@ class MatrixTransport(Runnable):
             self._raiden_service.sign(delivered_message)
             retrier = self._get_retrier(message.sender)
             retrier.enqueue_global(delivered_message)
-            self._raiden_service.on_message(message)
+            self._raiden_service.on_message(message, self.address)
 
         except (InvalidAddress, UnknownAddress, UnknownTokenAddress):
             self.log.warning("Exception while processing message", exc_info=True)
@@ -1717,7 +1718,7 @@ class MatrixLightClientTransport(MatrixTransport):
         )
 
         assert self._raiden_service is not None
-        self._raiden_service.on_message(delivered, True)
+        self._raiden_service.on_message(delivered, self.get_address(), True)
 
     def _receive_message_to_lc(self, message: Union[SignedRetrieableMessage, Processed]):
         print("<<---- Matrix Received Message LC transport" + str(message))
@@ -1732,7 +1733,7 @@ class MatrixLightClientTransport(MatrixTransport):
         try:
             # Just manage the message, the Delivered response will be initiated by the LightClient invoking
             # send_for_light_client_with_retry
-            self._raiden_service.on_message(message, True)
+            self._raiden_service.on_message(message, self.get_address(), True)
 
         except (InvalidAddress, UnknownAddress, UnknownTokenAddress):
             self.log.warning("Exception while processing message", exc_info=True)

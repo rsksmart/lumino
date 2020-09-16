@@ -1373,7 +1373,7 @@ class ContractReceiveUpdateTransfer(ContractReceiveStateChange):
 class ReceiveUnlockLight(BalanceProofStateChange):
     def __init__(
         self, message_identifier: MessageID, secret: Secret, balance_proof: BalanceProofSignedState,
-        signed_unlock: Unlock
+        signed_unlock: Unlock, recipient: Address
     ) -> None:
         if not isinstance(balance_proof, BalanceProofSignedState):
             raise ValueError("balance_proof must be an instance of BalanceProofSignedState")
@@ -1386,10 +1386,11 @@ class ReceiveUnlockLight(BalanceProofStateChange):
         self.secret = secret
         self.secrethash = secrethash
         self.signed_unlock = signed_unlock
+        self.recipient = recipient
 
     def __repr__(self) -> str:
-        return "<ReceiveUnlockLight msgid:{} secrethash:{} balance_proof:{}>".format(
-            self.message_identifier, pex(self.secrethash), self.balance_proof
+        return "<ReceiveUnlockLight msgid:{} secrethash:{} balance_proof:{} recipient:{}>".format(
+            self.message_identifier, pex(self.secrethash), self.balance_proof, self.recipient
         )
 
     def __eq__(self, other: Any) -> bool:
@@ -1398,6 +1399,7 @@ class ReceiveUnlockLight(BalanceProofStateChange):
             and self.message_identifier == other.message_identifier
             and self.secret == other.secret
             and self.secrethash == other.secrethash
+            and self.recipient == other.recipient
             and super().__eq__(other)
         )
 
@@ -1409,7 +1411,8 @@ class ReceiveUnlockLight(BalanceProofStateChange):
             "message_identifier": str(self.message_identifier),
             "secret": serialize_bytes(self.secret),
             "balance_proof": self.balance_proof,
-            "signed_unlock": self.signed_unlock
+            "signed_unlock": self.signed_unlock,
+            "recipient": self.recipient
         }
 
     @classmethod
@@ -1418,7 +1421,8 @@ class ReceiveUnlockLight(BalanceProofStateChange):
             message_identifier=MessageID(int(data["message_identifier"])),
             secret=deserialize_secret(data["secret"]),
             balance_proof=data["balance_proof"],
-            signed_unlock=data["signed_unlock"]
+            signed_unlock=data["signed_unlock"],
+            recipient=data["recipient"]
         )
 
 

@@ -18,7 +18,7 @@ def reveal_secret_with_resolver(
 
     assert isinstance(raiden.wal, WriteAheadLog), "RaidenService has not been started"
     current_state = raiden.wal.state_manager.current_state
-    task = current_state.payment_mapping.secrethashes_to_task[secret_request_event.secrethash]
+    task = current_state.payment_mapping[raiden.address].secrethashes_to_task[raiden.address, secret_request_event.secrethash]
     token = task.target_state.transfer.token
 
     request = {

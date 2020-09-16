@@ -121,7 +121,7 @@ def _setup_matrix(config):
 
             light_client_transports.append(light_client_transport)
 
-        hub_transport = MatrixTransport(config["transport"]["matrix"])
+        hub_transport = MatrixTransport(config["address"], config["transport"]["matrix"])
 
         node_transport = NodeTransport(hub_transport, light_client_transports)
 
@@ -288,6 +288,7 @@ def run_app(
     config["services"]["pathfinding_max_paths"] = pathfinding_max_paths
     config["services"]["monitoring_enabled"] = enable_monitoring
     config["chain_id"] = network_id
+    config["address"] = address
 
     setup_environment(config, environment_type)
 

@@ -471,6 +471,7 @@ class ReceiveSecretRequestLight(AuthenticatedSenderStateChange):
         expiration: BlockExpiration,
         secrethash: SecretHash,
         sender: Address,
+        recipient: Address,
         secret_request_message: SecretRequest
     ) -> None:
         super().__init__(sender)
@@ -479,11 +480,12 @@ class ReceiveSecretRequestLight(AuthenticatedSenderStateChange):
         self.expiration = expiration
         self.secrethash = secrethash
         self.secret_request_message = secret_request_message
+        self.recipient = recipient
         self.revealsecret = None
 
     def __repr__(self) -> str:
-        return "<ReceiveSecretRequestLight paymentid:{} amount:{} secrethash:{} sender:{}>".format(
-            self.payment_identifier, self.amount, pex(self.secrethash), pex(self.sender)
+        return "<ReceiveSecretRequestLight paymentid:{} amount:{} secrethash:{} sender:{} recipient:[]>".format(
+            self.payment_identifier, self.amount, pex(self.secrethash), pex(self.sender), pex(self.recipient)
         )
 
     def __eq__(self, other: Any) -> bool:
@@ -493,6 +495,7 @@ class ReceiveSecretRequestLight(AuthenticatedSenderStateChange):
             and self.amount == other.amount
             and self.secrethash == other.secrethash
             and self.sender == other.sender
+            and self.recipient == other.recipient
             and self.revealsecret == other.revealsecret
             and super().__eq__(other)
         )
@@ -507,6 +510,7 @@ class ReceiveSecretRequestLight(AuthenticatedSenderStateChange):
             "expiration": str(self.expiration),
             "secrethash": serialize_bytes(self.secrethash),
             "sender": to_checksum_address(self.sender),
+            "recipient": to_checksum_address(self.recipient)
             "revealsecret": self.revealsecret,
             "secret_request_message": self.secret_request_message
         }
@@ -519,6 +523,7 @@ class ReceiveSecretRequestLight(AuthenticatedSenderStateChange):
             expiration=BlockExpiration(int(data["expiration"])),
             secrethash=SecretHash(deserialize_bytes(data["secrethash"])),
             sender=to_canonical_address(data["sender"]),
+            recipient=to_canonical_address(data["recipient"]),
             secret_request_message=data["secret_request_message"]
         )
         instance.revealsecret = data["revealsecret"]
@@ -571,17 +576,18 @@ class ReceiveSecretReveal(AuthenticatedSenderStateChange):
 class ReceiveSecretRevealLight(AuthenticatedSenderStateChange):
     """ A SecretReveal light client message received. """
 
-    def __init__(self, secret: Secret, sender: Address, secret_reveal_message: RevealSecret) -> None:
+    def __init__(self, secret: Secret, sender: Address, recipient: Address, secret_reveal_message: RevealSecret) -> None:
         super().__init__(sender)
         secrethash = sha3(secret)
 
         self.secret = secret
         self.secrethash = secrethash
+        self.recipient = recipient
         self.secret_reveal_message = secret_reveal_message
 
     def __repr__(self) -> str:
-        return "<ReceiveSecretRevealLight secrethash:{} sender:{}>".format(
-            pex(self.secrethash), pex(self.sender)
+        return "<ReceiveSecretRevealLight secrethash:{} sender:{} recipient: {}>".format(
+            pex(self.secrethash), pex(self.sender), pex(self.recipient)
         )
 
     def __eq__(self, other: Any) -> bool:
@@ -589,6 +595,7 @@ class ReceiveSecretRevealLight(AuthenticatedSenderStateChange):
             isinstance(other, ReceiveSecretRevealLight)
             and self.secret == other.secret
             and self.secrethash == other.secrethash
+            and self.recipient == other.recipient
             and super().__eq__(other)
         )
 
@@ -600,6 +607,7 @@ class ReceiveSecretRevealLight(AuthenticatedSenderStateChange):
             "secret": serialize_bytes(self.secret),
             "secrethash": serialize_bytes(self.secrethash),
             "sender": to_checksum_address(self.sender),
+            "recipient": to_checksum_address(self.recipient)
             "secret_reveal_message": self.secret_reveal_message
         }
 
@@ -608,6 +616,7 @@ class ReceiveSecretRevealLight(AuthenticatedSenderStateChange):
         instance = cls(
             secret=Secret(deserialize_bytes(data["secret"])),
             sender=to_canonical_address(data["sender"]),
+            recipient=to_canonical_address(data["recipient"]),
             secret_reveal_message=data["secret_reveal_message"]
         )
         instance.secrethash = deserialize_bytes(data["secrethash"])

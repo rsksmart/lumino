@@ -292,7 +292,7 @@ class ChainState(State):
         self.identifiers_to_paymentnetworks: Dict[PaymentNetworkID, PaymentNetworkState] = dict()
         self.nodeaddresses_to_networkstates: Dict[Address, str] = dict()
         self.our_address = our_address
-        self.payment_mapping = PaymentMappingState()
+        self.payment_mapping = Dict[AddressHex, PaymentMappingState] = dict()
         self.pending_transactions: List[ContractSendEvent] = list()
         self.pseudo_random_generator = pseudo_random_generator
         self.queueids_to_queues: QueueIdsToQueues = dict()
@@ -725,7 +725,7 @@ class PaymentMappingState(State):
     __slots__ = ("secrethashes_to_task",)
 
     def __init__(self) -> None:
-        self.secrethashes_to_task: Dict[True[AddressHex,SecretHash], TransferTask] = dict()
+        self.secrethashes_to_task: Dict[SecretHash, TransferTask] = dict()
 
     def __repr__(self) -> str:
         return "<PaymentMappingState qtd_transfers:{}>".format(len(self.secrethashes_to_task))

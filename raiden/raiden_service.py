@@ -656,8 +656,8 @@ class RaidenService(Runnable):
         assert self.wal, f"WAL object not yet initialized. node:{self!r}"
         return views.block_number(self.wal.state_manager.current_state)
 
-    def on_message(self, message: Message, is_light_client: bool = False):
-        self.message_handler.on_message(self, message, is_light_client)
+    def on_message(self, message: Message, address: Address, is_light_client: bool = False):
+        self.message_handler.on_message(self, message, address, is_light_client)
 
     def handle_and_track_state_change(self, state_change: StateChange):
         """ Dispatch the state change and does not handle the exceptions.
@@ -873,29 +873,30 @@ class RaidenService(Runnable):
         """
 
         with self.payment_identifier_lock:
-            for task in chain_state.payment_mapping.secrethashes_to_task.values():
-                if not isinstance(task, InitiatorTask):
-                    continue
+            for node_address in chain_state.payment_mapping.keys():
+                for task in chain_state.payment_mapping[node_address].secrethashes_to_task.values():
+                    if not isinstance(task, InitiatorTask):
+                        continue
 
-                # Every transfer in the transfers_list must have the same target
-                # and payment_identifier, so using the first transfer is
-                # sufficient.
-                initiator = next(iter(task.manager_state.initiator_transfers.values()))
-                transfer = initiator.transfer
-                transfer_description = initiator.transfer_description
-                target = transfer.target
-                identifier = transfer.payment_identifier
-                balance_proof = transfer.balance_proof
-                payment_hash_invoice = transfer.payment_hash_invoice
-                self.targets_to_identifiers_to_statuses[target][identifier] = PaymentStatus(
-                    payment_identifier=identifier,
-                    payment_hash_invoice=payment_hash_invoice,
-                    amount=transfer_description.amount,
-                    token_network_identifier=TokenNetworkID(
-                        balance_proof.token_network_identifier
-                    ),
-                    payment_done=AsyncResult(),
-                )
+                    # Every transfer in the transfers_list must have the same target
+                    # and payment_identifier, so using the first transfer is
+                    # sufficient.
+                    initiator = next(iter(task.manager_state.initiator_transfers.values()))
+                    transfer = initiator.transfer
+                    transfer_description = initiator.transfer_description
+                    target = transfer.target
+                    identifier = transfer.payment_identifier
+                    balance_proof = transfer.balance_proof
+                    payment_hash_invoice = transfer.payment_hash_invoice
+                    self.targets_to_identifiers_to_statuses[target][identifier] = PaymentStatus(
+                        payment_identifier=identifier,
+                        payment_hash_invoice=payment_hash_invoice,
+                        amount=transfer_description.amount,
+                        token_network_identifier=TokenNetworkID(
+                            balance_proof.token_network_identifier
+                        ),
+                        payment_done=AsyncResult(),
+                    )
 
     def _initialize_messages_queues(self, chain_state: ChainState):
         """Initialize all the message queues with the transport.

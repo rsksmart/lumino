@@ -526,30 +526,22 @@ def secret_from_transfer_task(
     return transfer_state.transfer_description.secret
 
 
-def get_transfer_role(chain_state: ChainState, secrethash: SecretHash) -> Optional[str]:
+def get_transfer_role(chain_state: ChainState, node_address: AddressHex, secrethash: SecretHash) -> Optional[str]:
     """
     Returns 'initiator', 'mediator' or 'target' to signify the role the node has
     in a transfer. If a transfer task is not found for the secrethash then the
     function returns None
     """
-    task = chain_state.payment_mapping.secrethashes_to_task.get(secrethash)
+    task = chain_state.payment_mapping[node_address].secrethashes_to_task.get(secrethash)
     if not task:
         return None
     return role_from_transfer_task(task)
 
 
-def get_transfer_secret(chain_state: ChainState, secrethash: SecretHash) -> Optional[Secret]:
+def get_transfer_secret(chain_state: ChainState, node_address: AddressHex, secrethash: SecretHash) -> Optional[Secret]:
     return secret_from_transfer_task(
-        chain_state.payment_mapping.secrethashes_to_task.get(secrethash), secrethash
+        chain_state.payment_mapping[node_address].secrethashes_to_task.get(secrethash), secrethash
     )
-
-
-def get_transfer_task(chain_state: ChainState, secrethash: SecretHash) -> Optional[TransferTask]:
-    return chain_state.payment_mapping.secrethashes_to_task.get(secrethash)
-
-
-def get_all_transfer_tasks(chain_state: ChainState) -> Dict[SecretHash, TransferTask]:
-    return chain_state.payment_mapping.secrethashes_to_task
 
 
 def list_channelstate_for_tokennetwork(

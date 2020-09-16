@@ -69,7 +69,7 @@ from raiden.transfer.state import (
     NettingChannelState,
     TargetTask,
     TransferTask,
-    ChainState)
+    ChainState, PaymentMappingState)
 
 from raiden.transfer.state_change import ActionChannelClose
 from raiden.utils import pex, typing
@@ -193,25 +193,25 @@ def get_transfer_from_task(
 
 
 def transfer_tasks_view(
-    transfer_tasks: Dict[SecretHash, TransferTask],
+    payment_mapping: Dict[Address, PaymentMappingState],
     token_address: TokenAddress = None,
     channel_id: ChannelID = None,
 ) -> List[Dict[str, Any]]:
     view = list()
 
-    for secrethash, transfer_task in transfer_tasks.items():
-        transfer, role = get_transfer_from_task(secrethash, transfer_task)
-
-        if transfer is None:
-            continue
-        if token_address is not None:
-            if transfer.token != token_address:
+    for node_address in payment_mapping.keys():
+        for secrethash, transfer_task in payment_mapping[node_address].items():
+            transfer, role = get_transfer_from_task(secrethash, transfer_task)
+            if transfer is None:
                 continue
-            elif channel_id is not None:
-                if transfer.balance_proof.channel_identifier != channel_id:
+            if token_address is not None:
+                if transfer.token != token_address:
                     continue
+                elif channel_id is not None:
+                    if transfer.balance_proof.channel_identifier != channel_id:
+                        continue
 
-        view.append(flatten_transfer(transfer, role))
+            view.append(flatten_transfer(transfer, role))
 
     return view
 
@@ -1385,7 +1385,6 @@ class RaidenAPI:
         self, token_address: TokenAddress = None, partner_address: Address = None
     ) -> List[Dict[str, Any]]:
         chain_state = views.state_from_raiden(self.raiden)
-        transfer_tasks = views.get_all_transfer_tasks(chain_state)
         channel_id = None
 
         if token_address is not None:
@@ -1401,7 +1400,7 @@ class RaidenAPI:
                 )
                 channel_id = partner_channel.identifier
 
-        return transfer_tasks_view(transfer_tasks, token_address, channel_id)
+        return transfer_tasks_view(chain_state.payment_mapping, token_address, channel_id)
 
     def get_network_graph(self, token_network_address):
         chain_state = views.state_from_raiden(self.raiden)
@@ -1733,8 +1732,8 @@ class RaidenAPI:
                 privkey=self.raiden.privkey,
             )
             if prev_secrethash:
-                current_payment_task = chain_state.payment_mapping.secrethashes_to_task[prev_secrethash]
-                chain_state.payment_mapping.secrethashes_to_task.update(
+                current_payment_task = chain_state.payment_mapping[creator_address].secrethashes_to_task[prev_secrethash]
+                chain_state.payment_mapping[creator_address].secrethashes_to_task.update(
                     {secrethash: copy.deepcopy(current_payment_task)}
                 )
                 possible_routes = routes.filter_acceptable_routes(
