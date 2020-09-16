@@ -387,7 +387,7 @@ class ChainState(State):
             to_canonical_address, serialization.identity, data["nodeaddresses_to_networkstates"]
         )
         restored.payment_mapping = map_dict(
-            to_canonical_address, serialization.identity(, data["payment_mapping"])
+            to_canonical_address, serialization.identity, data["payment_mapping"]
         )
         restored.pending_transactions = data["pending_transactions"]
         restored.queueids_to_queues = serialization.deserialize_queueid_to_queue(

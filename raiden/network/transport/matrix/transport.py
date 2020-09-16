@@ -266,7 +266,7 @@ class MatrixTransport(Runnable):
 
     def __init__(self, address: Address, config: dict, current_server_name: str = None):
         super().__init__()
-        self.address=address
+        self.address =address
         self._config = config
         self._raiden_service: Optional[RaidenService] = None
 
@@ -1351,7 +1351,7 @@ class MatrixLightClientTransport(MatrixTransport):
                  _encrypted_light_client_seed_for_retry_signature: str,
                  _address: str,
                  current_server_name: str = None):
-        super().__init__(config, current_server_name)
+        super().__init__(_address, config, current_server_name)
         self._encrypted_light_client_password_signature = _encrypted_light_client_password_signature
         self._encrypted_light_client_display_name_signature = _encrypted_light_client_display_name_signature
         self._encrypted_light_client_seed_for_retry_signature = _encrypted_light_client_seed_for_retry_signature

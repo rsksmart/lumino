@@ -484,7 +484,7 @@ class ReceiveSecretRequestLight(AuthenticatedSenderStateChange):
         self.revealsecret = None
 
     def __repr__(self) -> str:
-        return "<ReceiveSecretRequestLight paymentid:{} amount:{} secrethash:{} sender:{} recipient:[]>".format(
+        return "<ReceiveSecretRequestLight paymentid:{} amount:{} secrethash:{} sender:{} recipient:{} >".format(
             self.payment_identifier, self.amount, pex(self.secrethash), pex(self.sender), pex(self.recipient)
         )
 

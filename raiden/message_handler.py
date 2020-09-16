@@ -1,6 +1,6 @@
 import structlog
 
-from eth_utils import to_checksum_address
+from eth_utils import to_checksum_address, to_canonical_address
 
 from raiden.constants import EMPTY_SECRET
 from raiden.lightclient.handlers.light_client_message_handler import LightClientMessageHandler
@@ -40,7 +40,7 @@ class MessageHandler:
     def on_message(self, raiden: RaidenService, message: Message, node_address: Address, is_light_client: bool = False) -> None:
         # pylint: disable=unidiomatic-typecheck
         print("On received message " + str(type(message)))
-
+        node_address = to_canonical_address(node_address)
         if type(message) == SecretRequest:
             assert isinstance(message, SecretRequest), MYPY_ANNOTATION
             self.handle_message_secretrequest(raiden, message, node_address, is_light_client)
