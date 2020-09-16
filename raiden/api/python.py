@@ -609,7 +609,22 @@ class RaidenAPI:
         channel_list = list(channel_iterator)
 
         if not channel_list:
-            raise RaidenRecoverableError("Failed trying to settle a channel that's not in waiting_for_settle state")
+            # we check if the channel is already settled, in that case we raise an exception indicating that
+            settled_channels = views.get_channelstate_settled(
+                chain_state=chain_state,
+                payment_network_id=registry_address,
+                token_address=token_address
+            )
+            filtered_settled_channels_iterator = filter(lambda channel:
+                                                        channel.our_state.address == creator_address
+                                                        and channel.partner_state.address == partner_address
+                                                        and channel.token_address == token_address
+                                                        and channel.identifier == channel_identifier, settled_channels)
+            filtered_settled_channels_list = list(filtered_settled_channels_iterator)
+            if filtered_settled_channels_list:
+                raise RaidenRecoverableError("Failed trying to settle a channel that's already settled")
+            else:
+                raise RaidenRecoverableError("Failed trying to settle a channel that's not in waiting_for_settle state")
 
         channel_state = channel_list[0]
 
