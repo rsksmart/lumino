@@ -243,7 +243,7 @@ URLS_HUB_V1 = [
         LightClientResource
     ),
     (
-        '/payments_light/register_onchain_secret/',
+        '/payments_light/register_onchain_secret',
         RegisterSecretLightResource
     ),
 ]
