@@ -510,7 +510,7 @@ class ReceiveSecretRequestLight(AuthenticatedSenderStateChange):
             "expiration": str(self.expiration),
             "secrethash": serialize_bytes(self.secrethash),
             "sender": to_checksum_address(self.sender),
-            "recipient": to_checksum_address(self.recipient)
+            "recipient": to_checksum_address(self.recipient),
             "revealsecret": self.revealsecret,
             "secret_request_message": self.secret_request_message
         }
@@ -607,7 +607,7 @@ class ReceiveSecretRevealLight(AuthenticatedSenderStateChange):
             "secret": serialize_bytes(self.secret),
             "secrethash": serialize_bytes(self.secrethash),
             "sender": to_checksum_address(self.sender),
-            "recipient": to_checksum_address(self.recipient)
+            "recipient": to_checksum_address(self.recipient),
             "secret_reveal_message": self.secret_reveal_message
         }
 

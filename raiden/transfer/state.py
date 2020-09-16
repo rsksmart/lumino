@@ -292,7 +292,7 @@ class ChainState(State):
         self.identifiers_to_paymentnetworks: Dict[PaymentNetworkID, PaymentNetworkState] = dict()
         self.nodeaddresses_to_networkstates: Dict[Address, str] = dict()
         self.our_address = our_address
-        self.payment_mapping = Dict[AddressHex, PaymentMappingState] = dict()
+        self.payment_mapping : Dict[AddressHex, PaymentMappingState] = dict()
         self.pending_transactions: List[ContractSendEvent] = list()
         self.pseudo_random_generator = pseudo_random_generator
         self.queueids_to_queues: QueueIdsToQueues = dict()

@@ -211,7 +211,10 @@ def subdispatch_to_paymenttask(
 ) -> TransitionResult[ChainState]:
     block_number = chain_state.block_number
     block_hash = chain_state.block_hash
-    sub_task = chain_state.payment_mapping[node_address].secrethashes_to_task.get(secrethash)
+    sub_task = None
+    node_payment_mapping = chain_state.payment_mapping.get(node_address)
+    if node_payment_mapping:
+        sub_task = chain_state.payment_mapping[node_address].secrethashes_to_task.get(secrethash)
 
     events: List[Event] = list()
     if sub_task:
@@ -346,7 +349,10 @@ def subdispatch_initiatortask(
     secrethash: SecretHash,
 ) -> TransitionResult[ChainState]:
     block_number = chain_state.block_number
-    sub_task = chain_state.payment_mapping[node_address].secrethashes_to_task.get(secrethash)
+    sub_task = None
+    node_payment_mapping = chain_state.payment_mapping.get(node_address)
+    if node_payment_mapping:
+        sub_task = chain_state.payment_mapping[node_address].secrethashes_to_task.get(secrethash)
 
     if not sub_task:
         is_valid_subtask = True
@@ -396,8 +402,10 @@ def subdispatch_mediatortask(
 ) -> TransitionResult[ChainState]:
     block_number = chain_state.block_number
     block_hash = chain_state.block_hash
-    sub_task = chain_state.payment_mapping[node_address].secrethashes_to_task.get(secrethash)
-
+    sub_task = None
+    node_payment_mapping = chain_state.payment_mapping.get(node_address)
+    if node_payment_mapping:
+        sub_task = chain_state.payment_mapping[node_address].secrethashes_to_task.get(secrethash)
     if not sub_task:
         is_valid_subtask = True
         mediator_state = None
@@ -447,7 +455,10 @@ def subdispatch_targettask(
     storage
 ) -> TransitionResult[ChainState]:
     block_number = chain_state.block_number
-    sub_task = chain_state.payment_mapping[node_address].secrethashes_to_task.get(secrethash)
+    sub_task = None
+    node_payment_mapping = chain_state.payment_mapping.get(node_address)
+    if node_payment_mapping:
+        sub_task = chain_state.payment_mapping[node_address].secrethashes_to_task.get(secrethash)
 
     if not sub_task:
         is_valid_subtask = True
