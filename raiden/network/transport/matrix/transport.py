@@ -254,13 +254,13 @@ class _RetryQueue(Runnable):
 class MatrixTransport(TransportLayer, Runnable):
     _room_prefix = "raiden"
     _room_sep = "_"
-    log = log
 
     def __init__(self, address: Address, config: dict, current_server_name: str = None):
         TransportLayer.__init__(self, address)
         Runnable.__init__(self)
         self._config = config
         self._raiden_service: Optional[RaidenService] = None
+        self.log = log
 
         available_servers = get_available_servers_from_config(self._config)
 
@@ -1337,10 +1337,10 @@ class MatrixTransport(TransportLayer, Runnable):
         return True
 
     def link_exception(self, callback: Any):
-        Runnable.link_exception(self, callback)
+        self.greenlet.link_exception(callback)
 
     def join(self, timeout=None):
-        Runnable.join(self, timeout)
+        self.greenlet.join(timeout)
 
 
 class MatrixLightClientTransport(MatrixTransport):
