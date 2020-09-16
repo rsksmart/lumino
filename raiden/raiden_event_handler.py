@@ -1,8 +1,9 @@
 from abc import ABC, abstractmethod
+from base64 import b64encode
 from typing import TYPE_CHECKING
 
 import structlog
-from eth_utils import to_checksum_address, to_hex
+from eth_utils import to_checksum_address, to_hex, encode_hex
 
 from raiden.constants import EMPTY_BALANCE_HASH, EMPTY_HASH, EMPTY_MESSAGE_HASH, EMPTY_SIGNATURE
 from raiden.exceptions import ChannelOutdatedError, RaidenUnrecoverableError
@@ -101,7 +102,11 @@ def unlock_light(raiden: "RaidenService",
                  chain_state: ChainState,
                  channel_unlock_event: ContractSendChannelBatchUnlockLight,
                  participant: Address,
-                 partner: Address):
+                 partner: Address,
+                 end_state: NettingChannelEndState):
+    merkle_tree_leaves = get_batch_unlock(end_state)
+    leaves_packed = str(b64encode(b"".join(lock.encoded for lock in merkle_tree_leaves)))
+
     canonical_identifier: CanonicalIdentifier = channel_unlock_event.canonical_identifier
 
     token_network = views.get_token_network_by_identifier(chain_state, canonical_identifier.token_network_address)
@@ -109,7 +114,8 @@ def unlock_light(raiden: "RaidenService",
         token_address=token_network.token_address(),
         channel_identifier=canonical_identifier.channel_identifier,
         receiver=participant,
-        sender=partner
+        sender=partner,
+        merkle_tree_leaves=leaves_packed
     )
     if not LightClientMessageHandler.is_message_already_stored(
         light_client_address=channel_unlock_event.client,
@@ -590,7 +596,8 @@ class RaidenEventHandler(EventHandler):
                 chain_state=chain_state,
                 channel_unlock_event=channel_unlock_event,
                 participant=channel_state.partner_state.address,
-                partner=channel_state.our_state.address
+                partner=channel_state.our_state.address,
+                end_state=our_state_for_unlock
             )
         partner_state_for_unlock = get_partner_state_for_unlock(raiden,
                                                                 channel_unlock_event.canonical_identifier,
@@ -602,7 +609,8 @@ class RaidenEventHandler(EventHandler):
                 chain_state=chain_state,
                 channel_unlock_event=channel_unlock_event,
                 participant=channel_state.our_state.address,
-                partner=channel_state.partner_state.address
+                partner=channel_state.partner_state.address,
+                end_state=partner_state_for_unlock
             )
 
     @staticmethod

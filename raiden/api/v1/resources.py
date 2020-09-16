@@ -156,7 +156,7 @@ class LightChannelsResourceByTokenAndPartnerAddress(BaseResource):
 
 
 class UnlockPaymentLightResource(BaseResource):
-    post_schema = UnlockPaymentLightPutSchema()
+    post_schema = UnlockPaymentLightPostSchema()
 
     @use_kwargs(post_schema)
     def post(self, signed_tx: typing.SignedTransaction, **kwargs):
