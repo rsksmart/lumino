@@ -30,7 +30,7 @@ from raiden.api.v1.encoding import (
     WatchtowerPutResource,
     LightClientMessageGetSchema,
     RegisterSecretLightSchema,
-    UnlockPaymentLightPutSchema
+    UnlockPaymentLightPostSchema
 )
 from raiden.messages import Unlock
 
