@@ -1412,7 +1412,7 @@ class ReceiveUnlockLight(BalanceProofStateChange):
             "secret": serialize_bytes(self.secret),
             "balance_proof": self.balance_proof,
             "signed_unlock": self.signed_unlock,
-            "recipient": self.recipient
+            "recipient": to_checksum_address(self.recipient)
         }
 
     @classmethod

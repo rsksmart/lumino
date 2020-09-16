@@ -310,7 +310,7 @@ class ChainState(State):
             self.block_number,
             pex(self.block_hash),
             lpex(self.identifiers_to_paymentnetworks.keys()),
-            len(self.payment_mapping.secrethashes_to_task),
+            1, #TODO fix this len
             self.chain_id,
         )
 
@@ -351,7 +351,11 @@ class ChainState(State):
                 to_checksum_address, serialization.identity, self.nodeaddresses_to_networkstates
             ),
             "our_address": to_checksum_address(self.our_address),
-            "payment_mapping": self.payment_mapping,
+            "payment_mapping": map_dict(
+                serialization.checksum_address,
+                serialization.identity,
+                self.payment_mapping,
+            ),
             "pending_transactions": self.pending_transactions,
             "queueids_to_queues": serialization.serialize_queueid_to_queue(
                 self.queueids_to_queues
@@ -382,7 +386,9 @@ class ChainState(State):
         restored.nodeaddresses_to_networkstates = map_dict(
             to_canonical_address, serialization.identity, data["nodeaddresses_to_networkstates"]
         )
-        restored.payment_mapping = data["payment_mapping"]
+        restored.payment_mapping = map_dict(
+            to_canonical_address, serialization.identity(, data["payment_mapping"])
+        )
         restored.pending_transactions = data["pending_transactions"]
         restored.queueids_to_queues = serialization.deserialize_queueid_to_queue(
             data["queueids_to_queues"]
