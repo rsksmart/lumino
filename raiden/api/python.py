@@ -1820,3 +1820,8 @@ class RaidenAPI:
                 status_code=HTTPStatus.FORBIDDEN,
                 log=log
             )
+
+    def unlock_payment_light(self, signed_tx: typing.SignedTransaction, token_address: typing.TokenAddress):
+        registry = self.raiden.default_registry
+        token_network = self.raiden.chain.token_network(registry.get_token_network(token_address))
+        token_network.proxy.broadcast_signed_transaction_and_wait(signed_tx)

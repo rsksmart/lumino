@@ -161,6 +161,7 @@ class TokenNetwork:
 
         return call_result
 
+
     def token_address(self) -> Address:
         """ Return the token of this manager. """
         return to_canonical_address(self.proxy.contract.functions.token().call())

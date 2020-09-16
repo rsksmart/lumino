@@ -88,7 +88,12 @@ from raiden.api.v1.resources import (
     LightClientMatrixCredentialsBuildResource,
     LightClientResource,
     PaymentLightResource,
-    CreatePaymentLightResource, WatchtowerResource, LightClientMessageResource, RegisterSecretLightResource)
+    CreatePaymentLightResource,
+    WatchtowerResource,
+    LightClientMessageResource,
+    RegisterSecretLightResource,
+    UnlockPaymentLightResource
+)
 
 from raiden.constants import GENESIS_BLOCK_NUMBER, UINT256_MAX, Environment, EMPTY_PAYMENT_HASH_INVOICE
 
@@ -115,7 +120,11 @@ from raiden.exceptions import (
     TokenNotRegistered,
     TransactionThrew,
     UnknownTokenAddress,
-    RawTransactionFailed, UnhandledLightClient, RaidenRecoverableError, InvalidPaymentIdentifier)
+    RawTransactionFailed,
+    UnhandledLightClient,
+    RaidenRecoverableError,
+    InvalidPaymentIdentifier
+)
 from raiden.transfer import channel, views
 from raiden.transfer.events import (
     EventPaymentReceivedSuccess,
@@ -224,6 +233,14 @@ URLS_FN_V1 = [
     ),
 ]
 
+
+URLS_COMMON_V1 = [
+    ("/tokens", TokensResource),
+    ("/tokens/<hexaddress:token_address>", RegisterTokenResource),
+    ("/tokens/network/<hexaddress:token_network>", GetTokenResource),
+    ("/address", AddressResource),
+]
+
 URLS_HUB_V1 = [
     ("/light_channels", ChannelsResourceLight),
     (
@@ -231,28 +248,13 @@ URLS_HUB_V1 = [
         LightChannelsResourceByTokenAndPartnerAddress
     ),
     ("/payments_light", PaymentLightResource),
-    ("/light_client_messages", LightClientMessageResource, "Message polling"),
     ("/payments_light/create", CreatePaymentLightResource, "create_payment"),
+    ("/payments_light/unlock/<hexaddress:token_address>", UnlockPaymentLightResource),
+    ('/light_clients/', LightClientResource),
+    ('/light_clients/matrix/credentials', LightClientMatrixCredentialsBuildResource,),
+    ("/light_client_messages", LightClientMessageResource, "Message polling"),
     ("/watchtower", WatchtowerResource),
-    (
-        '/light_clients/matrix/credentials',
-        LightClientMatrixCredentialsBuildResource,
-    ),
-    (
-        '/light_clients/',
-        LightClientResource
-    ),
-    (
-        '/payments_light/register_onchain_secret',
-        RegisterSecretLightResource
-    ),
-]
-
-URLS_COMMON_V1 = [
-    ("/tokens", TokensResource),
-    ("/tokens/<hexaddress:token_address>", RegisterTokenResource),
-    ("/tokens/network/<hexaddress:token_network>", GetTokenResource),
-    ("/address", AddressResource),
+    ('/payments_light/register_onchain_secret', RegisterSecretLightResource),
 ]
 
 
@@ -2221,3 +2223,12 @@ class RestAPI:
             return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.NOT_FOUND, log=log)
         except UnhandledLightClient as e:
             return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.FORBIDDEN, log=log)
+
+    def post_unlock_payment_light(self, signed_tx: typing.SignedTransaction, token_address: typing.TokenAddress):
+        try:
+            self.raiden_api.unlock_payment_light(signed_tx, token_address)
+            return api_response(result=dict(), status_code=HTTPStatus.NO_CONTENT)
+        except RawTransactionFailed as e:
+            return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.BAD_REQUEST, log=log)
+        except RaidenRecoverableError as e:
+            return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.INTERNAL_SERVER_ERROR, log=log)

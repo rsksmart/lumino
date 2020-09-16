@@ -27,8 +27,12 @@ from raiden.api.v1.encoding import (
     LightClientMatrixCredentialsBuildSchema,
     PaymentLightPutSchema,
     CreatePaymentLightPostSchema,
-    WatchtowerPutResource, LightClientMessageGetSchema, RegisterSecretLightSchema)
-from raiden.messages import  Unlock
+    WatchtowerPutResource,
+    LightClientMessageGetSchema,
+    RegisterSecretLightSchema,
+    UnlockPaymentLightPutSchema
+)
+from raiden.messages import Unlock
 
 from raiden.utils import typing
 
@@ -149,6 +153,14 @@ class LightChannelsResourceByTokenAndPartnerAddress(BaseResource):
         return self.rest_api.get_channel(
             registry_address=self.rest_api.raiden_api.raiden.default_registry.address, **kwargs
         )
+
+
+class UnlockPaymentLightResource(BaseResource):
+    post_schema = UnlockPaymentLightPutSchema()
+
+    @use_kwargs(post_schema)
+    def post(self, signed_tx: typing.SignedTransaction, **kwargs):
+        return self.rest_api.post_unlock_payment_light(signed_tx, **kwargs)
 
 
 class TokensResource(BaseResource):

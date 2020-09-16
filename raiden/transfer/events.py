@@ -359,6 +359,73 @@ class ContractSendChannelBatchUnlock(ContractSendEvent):
         return restored
 
 
+class ContractSendChannelBatchUnlockLight(ContractSendEvent):
+    """ Event emitted when the lock must be claimed on-chain. """
+
+    def __init__(
+        self,
+        canonical_identifier: CanonicalIdentifier,
+        client: Address,
+        participant: Address,
+        triggered_by_block_hash: BlockHash,
+    ) -> None:
+        super().__init__(triggered_by_block_hash)
+        self.canonical_identifier = canonical_identifier
+        self.participant = participant
+        self.client = client
+
+    @property
+    def token_network_identifier(self) -> TokenNetworkAddress:
+        return TokenNetworkAddress(self.canonical_identifier.token_network_address)
+
+    @property
+    def channel_identifier(self) -> ChannelID:
+        return self.canonical_identifier.channel_identifier
+
+    def __repr__(self) -> str:
+        return (
+            "<ContractSendChannelBatchUnlock token_network_id:{} "
+            "channel:{} participant:{} triggered_by_block_hash:{}"
+            ">"
+        ).format(
+            pex(self.token_network_identifier),
+            self.channel_identifier,
+            pex(self.participant),
+            pex(self.triggered_by_block_hash),
+        )
+
+    def __eq__(self, other: Any) -> bool:
+        return (
+            super().__eq__(other)
+            and isinstance(other, ContractSendChannelBatchUnlockLight)
+            and self.canonical_identifier == other.canonical_identifier
+            and self.participant == other.participant
+        )
+
+    def __ne__(self, other: Any) -> bool:
+        return not self.__eq__(other)
+
+    def to_dict(self) -> Dict[str, Any]:
+        result = {
+            "canonical_identifier": self.canonical_identifier.to_dict(),
+            "participant": to_checksum_address(self.participant),
+            "triggered_by_block_hash": serialize_bytes(self.triggered_by_block_hash),
+        }
+
+        return result
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "ContractSendChannelBatchUnlockLight":
+        restored = cls(
+            canonical_identifier=CanonicalIdentifier.from_dict(data["canonical_identifier"]),
+            participant=to_canonical_address(data["participant"]),
+            triggered_by_block_hash=BlockHash(deserialize_bytes(data["triggered_by_block_hash"])),
+        )
+
+        return restored
+
+
+
 class ContractSendSecretReveal(ContractSendExpirableEvent):
     """ Event emitted when the lock must be claimed on-chain. """
 

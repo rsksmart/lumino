@@ -3,6 +3,7 @@ from enum import Enum
 from typing import Any, Dict, List
 
 from eth_utils import decode_hex, to_canonical_address, to_checksum_address
+from requests import HTTPError
 from web3.contract import Contract
 from web3.utils.contracts import encode_transaction_data, find_matching_fn_abi
 
@@ -12,7 +13,9 @@ from raiden.exceptions import (
     InsufficientFunds,
     ReplacementTransactionUnderpriced,
     TransactionAlreadyPending,
+    RawTransactionFailed,
 )
+from raiden.network.rpc.transactions import check_transaction_threw
 from raiden.utils import typing
 from raiden.utils.filters import decode_event
 
@@ -75,6 +78,17 @@ class ContractProxy:
     def broadcast_signed_transaction(self, signed_tx):
         txhash = self.jsonrpc_client.send_signed_transaction(signed_tx)
         return txhash
+
+    def broadcast_signed_transaction_and_wait(self, signed_tx):
+        try:
+            transaction_hash = self.broadcast_signed_transaction(signed_tx)
+            self.jsonrpc_client.poll(transaction_hash)
+            receipt_or_none = check_transaction_threw(self.client, transaction_hash)
+            if receipt_or_none:
+                raise RaidenRecoverableError("transaction failed")
+        except HTTPError:
+            raise RawTransactionFailed("Transaction malformed")
+
 
     def transact(
         self, function_name: str, startgas: int, *args: Any, **kwargs: Any

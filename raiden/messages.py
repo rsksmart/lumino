@@ -1831,6 +1831,61 @@ class RequestMonitoring(SignedMessage):
             and recover(reward_proof_data, self.reward_proof_signature) == requesting_address
         )
 
+class UnlockLightRequest(Message):
+
+    def __init__(self, token_address: Address, channel_identifier: ChannelID, sender: Address, receiver: Address, **kwargs):
+        super().__init__(**kwargs)
+        self.channel_identifier = channel_identifier
+        self.sender = sender
+        self.receiver = receiver
+        self.token_address = token_address
+
+    def __eq__(self, other):
+        return (
+            super().__eq__(other)
+            and isinstance(other, UnlockLightRequest)
+            and self.channel_identifier == other.channel_identifier
+            and self.sender == other.sender
+            and self.receiver == other.receiver
+            and self.token_address == other.token_address
+        )
+
+    @classmethod
+    def unpack(cls, packed):
+        return cls(
+            token_address=packed.token_address,
+            channel_identifier=packed.channel_identifier,
+            receiver=packed.receiver,
+            sender=packed.sender
+        )
+
+    def pack(self, packed) -> None:
+        packed.channel_identifier = self.channel_identifier
+        packed.sender = self.sender
+        packed.receiver = self.receiver
+        packed.token_address = self.token_address
+
+    def to_dict(self):
+        return {
+            "type": self.__class__.__name__,
+            "token_address": to_normalized_address(self.token_address),
+            "channel_identifier": self.channel_identifier,
+            "receiver": to_normalized_address(self.receiver),
+            "sender": to_normalized_address(self.sender)
+        }
+
+    @classmethod
+    def from_dict(cls, data):
+        msg = f'Cannot decode data. Provided type is {data["type"]}, expected {cls.__name__}'
+        assert data["type"] == cls.__name__, msg
+        return cls(
+            token_address=data["token_address"],
+            channel_identifier=data["channel_identifier"],
+            receiver=data["receiver"],
+            sender=data["sender"]
+        )
+
+
 
 class RequestRegisterSecret(Message):
 
