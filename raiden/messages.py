@@ -1831,14 +1831,17 @@ class RequestMonitoring(SignedMessage):
             and recover(reward_proof_data, self.reward_proof_signature) == requesting_address
         )
 
+
 class UnlockLightRequest(Message):
 
-    def __init__(self, token_address: Address, channel_identifier: ChannelID, sender: Address, receiver: Address, **kwargs):
+    def __init__(self, token_address: Address, channel_identifier: ChannelID, sender: Address, receiver: Address,
+                 merkle_tree_leaves: str, **kwargs):
         super().__init__(**kwargs)
         self.channel_identifier = channel_identifier
         self.sender = sender
         self.receiver = receiver
         self.token_address = token_address
+        self.merkle_tree_leaves = merkle_tree_leaves
 
     def __eq__(self, other):
         return (
@@ -1848,6 +1851,7 @@ class UnlockLightRequest(Message):
             and self.sender == other.sender
             and self.receiver == other.receiver
             and self.token_address == other.token_address
+            and self.merkle_tree_leaves == other.merkle_tree_leaves
         )
 
     @classmethod
@@ -1856,7 +1860,8 @@ class UnlockLightRequest(Message):
             token_address=packed.token_address,
             channel_identifier=packed.channel_identifier,
             receiver=packed.receiver,
-            sender=packed.sender
+            sender=packed.sender,
+            merkle_tree_leaves=packed.merkle_tree_leaves
         )
 
     def pack(self, packed) -> None:
@@ -1864,6 +1869,7 @@ class UnlockLightRequest(Message):
         packed.sender = self.sender
         packed.receiver = self.receiver
         packed.token_address = self.token_address
+        packed.merkle_tree_leaves = self.merkle_tree_leaves
 
     def to_dict(self):
         return {
@@ -1871,7 +1877,8 @@ class UnlockLightRequest(Message):
             "token_address": to_normalized_address(self.token_address),
             "channel_identifier": self.channel_identifier,
             "receiver": to_normalized_address(self.receiver),
-            "sender": to_normalized_address(self.sender)
+            "sender": to_normalized_address(self.sender),
+            "merkle_tree_leaves": str(self.merkle_tree_leaves)
         }
 
     @classmethod
@@ -1882,7 +1889,8 @@ class UnlockLightRequest(Message):
             token_address=data["token_address"],
             channel_identifier=data["channel_identifier"],
             receiver=data["receiver"],
-            sender=data["sender"]
+            sender=data["sender"],
+            merkle_tree_leaves=data["merkle_tree_leaves"]
         )
 
 

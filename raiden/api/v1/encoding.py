@@ -500,7 +500,7 @@ class PaymentSchema(BaseSchema):
         decoding_class = dict
 
 
-class UnlockPaymentLightPutSchema(BaseSchema):
+class UnlockPaymentLightPostSchema(BaseSchema):
     signed_tx = fields.String(required=True)
 
     class Meta:

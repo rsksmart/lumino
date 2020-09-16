@@ -27,7 +27,7 @@ from raiden.api.v1.encoding import (
     LightClientMatrixCredentialsBuildSchema,
     PaymentLightPutSchema,
     CreatePaymentLightPostSchema,
-    WatchtowerPutResource, LightClientMessageGetSchema, UnlockPaymentLightPutSchema)
+    WatchtowerPutResource, LightClientMessageGetSchema, UnlockPaymentLightPostSchema)
 from raiden.messages import  Unlock
 
 from raiden.utils import typing
@@ -152,7 +152,7 @@ class LightChannelsResourceByTokenAndPartnerAddress(BaseResource):
 
 
 class UnlockPaymentLightResource(BaseResource):
-    post_schema = UnlockPaymentLightPutSchema()
+    post_schema = UnlockPaymentLightPostSchema()
 
     @use_kwargs(post_schema)
     def post(self, signed_tx: typing.SignedTransaction, **kwargs):
