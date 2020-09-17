@@ -446,7 +446,12 @@ def test_matrix_message_retry(
     message = Processed(message_identifier=0)
     transport._raiden_service.sign(message)
     chain_state.queueids_to_queues[queueid] = [message]
-    retry_queue.enqueue_global(message)
+    retry_queue.enqueue(
+        queue_identifier=QueueIdentifier(
+            recipient=retry_queue.receiver, channel_identifier=CHANNEL_IDENTIFIER_GLOBAL_QUEUE
+        ),
+        message=message
+    )
 
     gevent.sleep(1)
 
