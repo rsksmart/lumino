@@ -309,6 +309,8 @@ def test_matrix_message_sync(matrix_transports):
 
     raiden_service1.handle_and_track_state_change = MagicMock()
 
+    transport0._address = raiden_service0.address
+    transport1._address = raiden_service1.address
     transport0.start(raiden_service0, message_handler, None)
     transport1.start(raiden_service1, message_handler, None)
 
@@ -529,6 +531,9 @@ def test_matrix_cross_server_with_load_balance(matrix_transports):
     raiden_service1 = MockRaidenService(message_handler1)
     raiden_service2 = MockRaidenService(message_handler2)
 
+    transport0._address = raiden_service0.address
+    transport1._address = raiden_service1.address
+    transport2._address = raiden_service2.address
     transport0.start(raiden_service0, message_handler0, "")
     transport1.start(raiden_service1, message_handler1, "")
     transport2.start(raiden_service2, message_handler2, "")
@@ -752,6 +757,8 @@ def test_matrix_invite_private_room_happy_case(matrix_transports, expected_join_
 
     transport0, transport1 = matrix_transports
 
+    transport0._address = raiden_service0.address
+    transport1._address = raiden_service1.address
     transport0.start(raiden_service0, raiden_service0.message_handler, None)
     transport1.start(raiden_service1, raiden_service1.message_handler, None)
 
@@ -811,6 +818,8 @@ def test_matrix_invite_private_room_unhappy_case1(
 
     transport0, transport1 = matrix_transports
 
+    transport0._address = raiden_service0.address
+    transport1._address = raiden_service1.address
     transport0.start(raiden_service0, raiden_service0.message_handler, None)
     transport1.start(raiden_service1, raiden_service1.message_handler, None)
 
@@ -870,6 +879,8 @@ def test_matrix_invite_private_room_unhappy_case_2(
 
     transport0, transport1 = matrix_transports
 
+    transport0._address = raiden_service0.address
+    transport1._address = raiden_service1.address
     transport0.start(raiden_service0, raiden_service0.message_handler, None)
     transport1.start(raiden_service1, raiden_service1.message_handler, None)
 
@@ -940,6 +951,8 @@ def test_matrix_invite_private_room_unhappy_case_3(matrix_transports, expected_j
 
     transport0, transport1 = matrix_transports
 
+    transport0._address = raiden_service0.address
+    transport1._address = raiden_service1.address
     transport0.start(raiden_service0, raiden_service0.message_handler, None)
     transport1.start(raiden_service1, raiden_service1.message_handler, None)
 
@@ -990,6 +1003,8 @@ def test_matrix_user_roaming(matrix_transports):
     raiden_service0 = MockRaidenService(message_handler0)
     raiden_service1 = MockRaidenService(message_handler1)
 
+    transport0._address = raiden_service0.address
+    transport1._address = raiden_service1.address
     transport0.start(raiden_service0, message_handler0, "")
     transport1.start(raiden_service1, message_handler1, "")
 
@@ -1005,6 +1020,7 @@ def test_matrix_user_roaming(matrix_transports):
 
     assert not is_reachable(transport1, raiden_service0.address)
 
+    transport2._address = raiden_service0.address
     transport2.start(raiden_service0, message_handler0, "")
 
     transport2.start_health_check(raiden_service1.address)
@@ -1018,6 +1034,7 @@ def test_matrix_user_roaming(matrix_transports):
 
     assert not is_reachable(transport1, raiden_service0.address)
 
+    transport0._address = raiden_service0.address
     transport0.start(raiden_service0, message_handler0, "")
     with Timeout(40):
         while not is_reachable(transport1, raiden_service0.address):
@@ -1045,6 +1062,8 @@ def test_matrix_multi_user_roaming(matrix_transports):
     raiden_service1 = MockRaidenService(message_handler1)
 
     # Both nodes on the same server
+    transport0._address = raiden_service0.address
+    transport3._address = raiden_service1.address
     transport0.start(raiden_service0, message_handler0, "")
     transport3.start(raiden_service1, message_handler1, "")
 
@@ -1056,6 +1075,7 @@ def test_matrix_multi_user_roaming(matrix_transports):
     # Node two switches to second server
     transport3.stop()
 
+    transport4._address = raiden_service1.address
     transport4.start(raiden_service1, message_handler1, "")
     transport4.start_health_check(raiden_service0.address)
     gevent.sleep(0.5)
@@ -1065,6 +1085,7 @@ def test_matrix_multi_user_roaming(matrix_transports):
     # Node two switches to third server
     transport4.stop()
 
+    transport5._address = raiden_service1.address
     transport5.start(raiden_service1, message_handler1, "")
     transport5.start_health_check(raiden_service0.address)
     gevent.sleep(0.5)
@@ -1073,8 +1094,10 @@ def test_matrix_multi_user_roaming(matrix_transports):
     # Node one switches to second server, Node two back to first
     transport0.stop()
     transport5.stop()
+    transport1._address = raiden_service0.address
     transport1.start(raiden_service0, message_handler0, "")
     transport1.start_health_check(raiden_service1.address)
+    transport3._address = raiden_service1.address
     transport3.start(raiden_service1, message_handler1, "")
     gevent.sleep(0.5)
 
@@ -1083,6 +1106,7 @@ def test_matrix_multi_user_roaming(matrix_transports):
     # Node two joins on second server again
     transport3.stop()
 
+    transport4._address = raiden_service1.address
     transport4.start(raiden_service1, message_handler1, "")
     gevent.sleep(0.5)
 
@@ -1091,6 +1115,7 @@ def test_matrix_multi_user_roaming(matrix_transports):
     # Node two switches to third server
     transport4.stop()
 
+    transport5._address = raiden_service1.address
     transport5.start(raiden_service1, message_handler1, "")
     gevent.sleep(0.5)
 
@@ -1100,8 +1125,10 @@ def test_matrix_multi_user_roaming(matrix_transports):
     transport1.stop()
     transport5.stop()
 
+    transport2._address = raiden_service0.address
     transport2.start(raiden_service0, message_handler0, "")
     transport2.start_health_check(raiden_service1.address)
+    transport3._address = raiden_service1.address
     transport3.start(raiden_service1, message_handler1, "")
     gevent.sleep(0.5)
 
@@ -1110,6 +1137,7 @@ def test_matrix_multi_user_roaming(matrix_transports):
     # Node two switches to second server
 
     transport3.stop()
+    transport4._address = raiden_service1.address
     transport4.start(raiden_service1, message_handler1, "")
 
     gevent.sleep(0.5)
@@ -1118,6 +1146,7 @@ def test_matrix_multi_user_roaming(matrix_transports):
     # Node two joins on third server
 
     transport4.stop()
+    transport5._address = raiden_service1.address
     transport5.start(raiden_service1, message_handler1, "")
 
     gevent.sleep(0.5)
@@ -1138,6 +1167,8 @@ def test_reproduce_handle_invite_send_race_issue_3588(matrix_transports):
     raiden_service0 = MockRaidenService(message_handler0)
     raiden_service1 = MockRaidenService(message_handler1)
 
+    transport0._address = raiden_service0.address
+    transport1._address = raiden_service1.address
     transport0.start(raiden_service0, message_handler0, "")
     transport1.start(raiden_service1, message_handler1, "")
 
@@ -1160,6 +1191,8 @@ def test_send_to_device(matrix_transports):
     raiden_service1 = MockRaidenService(message_handler1)
     transport1._receive_to_device = MagicMock()
 
+    transport0._address = raiden_service0.address
+    transport1._address = raiden_service1.address
     transport0.start(raiden_service0, message_handler0, "")
     transport1.start(raiden_service1, message_handler1, "")
 
