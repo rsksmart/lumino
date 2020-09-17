@@ -79,6 +79,8 @@ def mock_matrix(
         # We are just unit testing the matrix transport receive so do nothing
         assert message
 
+    raiden_service = MockRaidenService()
+
     config = dict(
         retry_interval=retry_interval,
         retries_before_backoff=retries_before_backoff,
@@ -89,8 +91,8 @@ def mock_matrix(
         private_rooms=private_rooms,
     )
 
-    transport = MatrixTransport(config)
-    transport._raiden_service = MockRaidenService()
+    transport = MatrixTransport(raiden_service.address, config)
+    transport._raiden_service = raiden_service
     transport._stop_event.clear()
     transport._address_mgr.add_userid_for_address(factories.HOP1, USERID1)
     transport._client.user_id = USERID0
