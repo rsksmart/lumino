@@ -11,4 +11,4 @@ class Config:
 
 
 # placeholder config-like setting
-transport_config = Config(MatrixTransport, MatrixLightClientTransport)
+cfg = Config(MatrixTransport, MatrixLightClientTransport)

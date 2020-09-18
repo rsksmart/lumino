@@ -143,7 +143,7 @@ from raiden.billing.invoices.util.time_util import is_invoice_expired, UTC_FORMA
 from raiden.billing.invoices.constants.errors import AUTO_PAY_INVOICE, INVOICE_EXPIRED, INVOICE_PAID
 
 from raiden.utils.signer import recover
-from transport.config import transport_config
+from transport.config import cfg as transport_config
 
 log = structlog.get_logger(__name__)
 
