@@ -64,7 +64,7 @@ semantic-version==2.6.0
 semver==2.8.1
 simplegeneric==0.8.1
 six==1.11.0
-structlog==18.2.0
+structlog==20.1.0
 toolz==0.9.0
 traitlets==4.3.2
 urllib3==1.23

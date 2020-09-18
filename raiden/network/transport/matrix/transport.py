@@ -254,13 +254,13 @@ class _RetryQueue(Runnable):
 class MatrixTransport(TransportLayer, Runnable):
     _room_prefix = "raiden"
     _room_sep = "_"
+    log = log
 
     def __init__(self, address: Address, config: dict, current_server_name: str = None):
         TransportLayer.__init__(self, address)
         Runnable.__init__(self)
         self._config = config
         self._raiden_service: Optional[RaidenService] = None
-        self.log = log
 
         available_servers = get_available_servers_from_config(self._config)
 
@@ -1735,6 +1735,7 @@ class MatrixLightClientTransport(MatrixTransport):
         except (InvalidAddress, UnknownAddress, UnknownTokenAddress):
             self.log.warning("Exception while processing message", exc_info=True)
             return
+
 
 class NodeTransport:
 
