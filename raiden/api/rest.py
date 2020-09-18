@@ -16,6 +16,7 @@ from flask_restful import Api, abort
 from gevent.pywsgi import WSGIServer
 from hexbytes import HexBytes
 from raiden.lightclient.handlers.light_client_message_handler import LightClientMessageHandler
+from raiden.network.transport.matrix import MatrixLightClientTransport
 from raiden_webui import RAIDEN_WEBUI_PATH
 
 from raiden.api.validations.api_error_builder import ApiErrorBuilder
@@ -142,7 +143,6 @@ from raiden.billing.invoices.util.time_util import is_invoice_expired, UTC_FORMA
 from raiden.billing.invoices.constants.errors import AUTO_PAY_INVOICE, INVOICE_EXPIRED, INVOICE_PAID
 
 from raiden.utils.signer import recover
-from raiden.ui.app import get_matrix_light_client_instance
 
 log = structlog.get_logger(__name__)
 
@@ -1552,7 +1552,7 @@ class RestAPI:
         self.raiden_api.initiate_send_secret_request_light(sender_address, receiver_address, secret_request)
 
     def initiate_send_lock_expired_light(self, sender_address: typing.Address, receiver_address: typing.Address,
-                                         lock_expired: LockExpired, payment_id:int):
+                                         lock_expired: LockExpired, payment_id: int):
         self.raiden_api.initiate_send_lock_expired_light(sender_address, receiver_address, lock_expired, payment_id)
 
     def initiate_payment_light(
@@ -2027,16 +2027,22 @@ class RestAPI:
         light_client_transport_class = MatrixLightClientTransport
 
         # Recover lighclient address from password and signed_password
-        address_recovered_from_signed_password = recover(data=password.encode(),
-                                                         signature=decode_hex(signed_password))
+        address_recovered_from_signed_password = recover(
+            data=password.encode(),
+            signature=decode_hex(signed_password)
+        )
 
         # Recover lighclient address from display and signed_display_name
-        address_recovered_from_signed_display_name = recover(data=display_name.encode(),
-                                                             signature=decode_hex(signed_display_name))
+        address_recovered_from_signed_display_name = recover(
+            data=display_name.encode(),
+            signature=decode_hex(signed_display_name)
+        )
 
         # Recover lightclient addres from seed retry and signed_seed_retry
-        address_recovered_from_signed_seed_retry = recover(data=seed_retry.encode(),
-                                                           signature=decode_hex(signed_seed_retry))
+        address_recovered_from_signed_seed_retry = recover(
+            data=seed_retry.encode(),
+            signature=decode_hex(signed_seed_retry)
+        )
 
         if address_recovered_from_signed_password != address or \
             address_recovered_from_signed_display_name != address or \
@@ -2051,10 +2057,10 @@ class RestAPI:
             signed_password,
             password,
             signed_display_name,
-            signed_seed_retry)
+            signed_seed_retry
+        )
 
-        if light_client is not None and light_client["result_code"] == 200:
-
+        if light_client and light_client["result_code"] == 200:
             config = self.raiden_api.raiden.config["transport"]["matrix"]
             config["light_client_password"] = light_client["encrypt_signed_password"]
             config["light_client_display_name"] = light_client["encrypt_signed_display_name"]
@@ -2153,7 +2159,7 @@ class RestAPI:
             lt = LockedTransfer.from_dict(message)
             self.initiate_payment_light(self.raiden_api.raiden.default_registry.address, lt.token, lt.initiator,
                                         lt.target, lt.locked_amount, lt.payment_identifier, payment_request.payment_id,
-                                        lt.lock.secrethash,previous_hash,
+                                        lt.lock.secrethash, previous_hash,
                                         EMPTY_PAYMENT_HASH_INVOICE, lt, lt.channel_identifier)
         elif message["type"] == "Delivered":
             delivered = Delivered.from_dict(message)
