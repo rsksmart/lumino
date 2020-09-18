@@ -99,7 +99,6 @@ from raiden.utils.typing import (
 from raiden.utils.upgrades import UpgradeManager
 from raiden_contracts.contract_manager import ContractManager
 from eth_utils import to_canonical_address, to_checksum_address
-from transport.layer import TransportLayer
 
 log = structlog.get_logger(__name__)  # pylint: disable=invalid-name
 StatusesDict = Dict[TargetAddress, Dict[PaymentID, "PaymentStatus"]]
@@ -574,7 +573,7 @@ class RaidenService(Runnable):
     def __repr__(self):
         return f"<{self.__class__.__name__} node:{pex(self.address)}>"
 
-    def start_transport_in_runtime(self, transport: TransportLayer, chain_state: ChainState):
+    def start_transport_in_runtime(self, transport, chain_state: ChainState):
         # Start hub transport
         transport.start(
             raiden_service=self,
