@@ -1348,14 +1348,11 @@ class MatrixLightClientTransport(MatrixTransport):
     def __init__(self,
                  address: Address,
                  config: dict,
-                 _encrypted_light_client_password_signature: str,
-                 _encrypted_light_client_display_name_signature: str,
-                 _encrypted_light_client_seed_for_retry_signature: str,
                  current_server_name: str = None):
         MatrixTransport.__init__(self, address, config, current_server_name)
-        self._encrypted_light_client_password_signature = _encrypted_light_client_password_signature
-        self._encrypted_light_client_display_name_signature = _encrypted_light_client_display_name_signature
-        self._encrypted_light_client_seed_for_retry_signature = _encrypted_light_client_seed_for_retry_signature
+        self._encrypted_light_client_password_signature = config["light_client_password"]
+        self._encrypted_light_client_display_name_signature = config["light_client_display_name"]
+        self._encrypted_light_client_seed_for_retry_signature = config["light_client_seed_retry"]
 
     def start(  # type: ignore
         self,

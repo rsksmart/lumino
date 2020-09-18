@@ -111,13 +111,15 @@ def _setup_matrix(config):
                              light_client["address"])
                     continue
 
-            light_client_transport = get_matrix_light_client_instance(
+            config = config["transport"]["matrix"]
+            config["encrypt_signed_password"] = light_client["password"]
+            config["encrypt_signed_display_name"] = light_client["display_name"]
+            config["encrypt_signed_seed_retry"] = light_client["seed_retry"]
+            light_client_transport = MatrixLightClientTransport(
                 light_client['address'],
-                config["transport"]["matrix"],
-                light_client['password'],
-                light_client['display_name'],
-                light_client['seed_retry'],
-                current_server_name)
+                config,
+                current_server_name
+            )
 
             light_client_transports.append(light_client_transport)
 
@@ -130,25 +132,6 @@ def _setup_matrix(config):
         sys.exit(1)
 
     return node_transport
-
-
-def get_matrix_light_client_instance(
-    address,
-    config,
-    password,
-    display_name,
-    seed_retry,
-    current_server_name: str = None
-):
-    light_client_transport = MatrixLightClientTransport(
-        address,
-        config,
-        password,
-        display_name,
-        seed_retry,
-        current_server_name
-    )
-    return light_client_transport
 
 
 def _setup_web3(eth_rpc_endpoint):
@@ -173,6 +156,7 @@ def _setup_web3(eth_rpc_endpoint):
         )
         sys.exit(1)
     return web3
+
 
 def get_account_and_private_key(
     account_manager: AccountManager, address: Optional[Address], password_file: Optional[TextIO]
@@ -428,11 +412,7 @@ def _get_network_info(network_id, config_data):
 
 def validate_network_contracts(config_network, running_network):
     if running_network['token_network_registry'] == config_network['token_network_registry'] and \
-       running_network['secret_registry'] == config_network['secret_registry'] and \
-       running_network['endpoint_registry'] == config_network['endpoint_registry']:
+        running_network['secret_registry'] == config_network['secret_registry'] and \
+        running_network['endpoint_registry'] == config_network['endpoint_registry']:
         return True
     return False
-
-
-
-

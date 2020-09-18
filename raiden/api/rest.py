@@ -2023,6 +2023,9 @@ class RestAPI:
                               display_name,
                               seed_retry):
 
+        # this should eventually be set according to a config value
+        light_client_transport_class = MatrixLightClientTransport
+
         # Recover lighclient address from password and signed_password
         address_recovered_from_signed_password = recover(data=password.encode(),
                                                          signature=decode_hex(signed_password))
@@ -2052,18 +2055,21 @@ class RestAPI:
 
         if light_client is not None and light_client["result_code"] == 200:
 
-            matrix_light_client_transport_instance = get_matrix_light_client_instance(
+            config = self.raiden_api.raiden.config["transport"]["matrix"]
+            config["light_client_password"] = light_client["encrypt_signed_password"]
+            config["light_client_display_name"] = light_client["encrypt_signed_display_name"]
+            config["light_client_seed_retry"] = light_client["encrypt_signed_seed_retry"]
+            light_client_transport = light_client_transport_class(
                 address=light_client["address"],
-                config=self.raiden_api.raiden.config["transport"]["matrix"],
-                password=light_client["encrypt_signed_password"],
-                display_name=light_client["encrypt_signed_display_name"],
-                seed_retry=light_client["encrypt_signed_seed_retry"])
+                config=config
+            )
 
-            self.raiden_api.raiden.start_transport_in_runtime(transport=matrix_light_client_transport_instance,
-                                                              chain_state=views.state_from_raiden(
-                                                                  self.raiden_api.raiden))
+            self.raiden_api.raiden.start_transport_in_runtime(
+                transport=light_client_transport,
+                chain_state=views.state_from_raiden(self.raiden_api.raiden)
+            )
 
-            self.raiden_api.raiden.transport.add_light_client_transport(matrix_light_client_transport_instance)
+            self.raiden_api.raiden.transport.add_light_client_transport(light_client_transport)
 
         return api_response(light_client)
 
