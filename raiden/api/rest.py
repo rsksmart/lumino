@@ -16,7 +16,6 @@ from flask_restful import Api, abort
 from gevent.pywsgi import WSGIServer
 from hexbytes import HexBytes
 from raiden.lightclient.handlers.light_client_message_handler import LightClientMessageHandler
-from raiden.network.transport.matrix import MatrixLightClientTransport
 from raiden_webui import RAIDEN_WEBUI_PATH
 
 from raiden.api.validations.api_error_builder import ApiErrorBuilder
