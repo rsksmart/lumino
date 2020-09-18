@@ -143,6 +143,7 @@ from raiden.billing.invoices.util.time_util import is_invoice_expired, UTC_FORMA
 from raiden.billing.invoices.constants.errors import AUTO_PAY_INVOICE, INVOICE_EXPIRED, INVOICE_PAID
 
 from raiden.utils.signer import recover
+from transport.config import transport_config
 
 log = structlog.get_logger(__name__)
 
@@ -2014,31 +2015,29 @@ class RestAPI:
         data_to_sign = self.raiden_api.get_data_for_registration_request(address)
         return api_response(data_to_sign)
 
-    def register_light_client(self,
-                              address,
-                              signed_password,
-                              signed_display_name,
-                              signed_seed_retry,
-                              password,
-                              display_name,
-                              seed_retry):
-
-        # this should eventually be set according to a config value
-        light_client_transport_class = MatrixLightClientTransport
-
-        # Recover lighclient address from password and signed_password
+    def register_light_client(
+        self,
+        address,
+        signed_password,
+        signed_display_name,
+        signed_seed_retry,
+        password,
+        display_name,
+        seed_retry
+    ):
+        # Recover light client address from password and signed_password
         address_recovered_from_signed_password = recover(
             data=password.encode(),
             signature=decode_hex(signed_password)
         )
 
-        # Recover lighclient address from display and signed_display_name
+        # Recover light client address from display and signed_display_name
         address_recovered_from_signed_display_name = recover(
             data=display_name.encode(),
             signature=decode_hex(signed_display_name)
         )
 
-        # Recover lightclient addres from seed retry and signed_seed_retry
+        # Recover light client address from seed retry and signed_seed_retry
         address_recovered_from_signed_seed_retry = recover(
             data=seed_retry.encode(),
             signature=decode_hex(signed_seed_retry)
@@ -2065,7 +2064,7 @@ class RestAPI:
             config["light_client_password"] = light_client["encrypt_signed_password"]
             config["light_client_display_name"] = light_client["encrypt_signed_display_name"]
             config["light_client_seed_retry"] = light_client["encrypt_signed_seed_retry"]
-            light_client_transport = light_client_transport_class(
+            light_client_transport = transport_config.light_client_transport(
                 address=light_client["address"],
                 config=config
             )
