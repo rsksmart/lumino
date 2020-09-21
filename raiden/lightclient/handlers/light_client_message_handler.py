@@ -19,7 +19,8 @@ from raiden.utils.typing import AddressHex
 def build_light_client_protocol_message(identifier: int, message: Message, signed: bool, payment_id: int,
                                         order: int,
                                         message_type: LightClientProtocolMessageType,
-                                        light_client_address: AddressHex) -> LightClientProtocolMessage:
+                                        sender_light_client_address: AddressHex,
+                                        receiver_light_client_address: AddressHex) -> LightClientProtocolMessage:
     if signed:
         signed_msg = message
         unsigned_msg = None
@@ -35,7 +36,8 @@ def build_light_client_protocol_message(identifier: int, message: Message, signe
         unsigned_msg,
         signed_msg,
         None,
-        light_client_address
+        sender_light_client_address,
+        receiver_light_client_address
     )
 
 
@@ -44,12 +46,14 @@ class LightClientMessageHandler:
 
     @classmethod
     def store_light_client_protocol_message(cls, identifier: int, message: Message, signed: bool, payment_id: int,
-                                            light_client_address: AddressHex, order: int,
+                                            sender_light_client_address: AddressHex,
+                                            receiver_light_client_address: AddressHex, order: int,
                                             message_type: LightClientProtocolMessageType, wal: WriteAheadLog):
         return wal.storage.write_light_client_protocol_message(
             message,
             build_light_client_protocol_message(identifier, message, signed,
-                                                payment_id, order, message_type, light_client_address)
+                                                payment_id, order, message_type, sender_light_client_address,
+                                                receiver_light_client_address)
         )
 
     @classmethod
@@ -116,7 +120,8 @@ class LightClientMessageHandler:
                                           message[2],
                                           message[3],
                                           None,
-                                          message[6])
+                                          message[6],
+                                          message[7])
 
     @classmethod
     def get_light_client_payment_locked_transfer(cls, payment_identifier: int, wal: WriteAheadLog):
@@ -127,7 +132,8 @@ class LightClientMessageHandler:
         unsigned_message = message[3]
         signed_message = message[4]
         payment_id = message[5]
-        light_client_address = message[6]
+        sender_light_client_address = message[6]
+        receiver_light_client_address = message[7]
 
         return LightClientProtocolMessage(signed_message is not None,
                                           message_order,
@@ -137,7 +143,8 @@ class LightClientMessageHandler:
                                           unsigned_message,
                                           signed_message,
                                           None,
-                                          light_client_address)
+                                          sender_light_client_address,
+                                          receiver_light_client_address)
 
     @staticmethod
     def get_order_for_ack(ack_parent_type: string, ack_type: string, is_received_delivered: bool = False):
@@ -197,7 +204,8 @@ class LightClientMessageHandler:
                     message,
                     True,
                     protocol_message.light_client_payment_id,
-                    protocol_message.light_client_address,
+                    protocol_message.sender_light_client_address,
+                    protocol_message.receiver_light_client_address,
                     order,
                     message_type,
                     wal
@@ -272,7 +280,7 @@ class LightClientMessageHandler:
             if not exists:
                 LightClientMessageHandler.store_light_client_protocol_message(
                     message_identifier, message, True, protocol_message.light_client_payment_id,
-                    protocol_message.light_client_address, order,
+                    protocol_message.sender_light_client_address, protocol_message.receiver_light_client_address, order,
                     message_type, wal)
             else:
                 cls.log.info("Message for lc already received, ignoring db storage")

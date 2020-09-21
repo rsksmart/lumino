@@ -1,3 +1,5 @@
+import copy
+
 from eth_utils import decode_hex
 from raiden.transfer import channel, views
 from raiden.transfer.architecture import Event, StateChange, TransitionResult
@@ -105,14 +107,24 @@ def handle_channelnew(
     ] = (our_address, partner_address)
 
     if our_address not in token_network_state.channelidentifiers_to_channels:
-        token_network_state.channelidentifiers_to_channels[our_address]: Dict[AddressHex, NettingChannelState] = dict()
+        token_network_state.channelidentifiers_to_channels[our_address] = dict()
 
     # Ignore duplicated channelnew events. For this to work properly on channel
     # reopens the blockchain events ChannelSettled and ChannelOpened must be
     # processed in correct order, this should be guaranteed by the filters in
     # the ethereum node
     if channel_identifier not in token_network_state.channelidentifiers_to_channels[our_address]:
+
         token_network_state.channelidentifiers_to_channels[our_address][channel_identifier] = channel_state
+
+        #if channel_state.test: ## mismo hub, 2 light clients
+        if partner_address not in token_network_state.channelidentifiers_to_channels:
+            token_network_state.channelidentifiers_to_channels[partner_address] = dict()
+        channel_state_copy = copy.deepcopy(channel_state)
+        channel_state_copy.our_state, channel_state_copy.partner_state = channel_state_copy.partner_state,channel_state_copy.our_state
+        token_network_state.channelidentifiers_to_channels[partner_address][channel_identifier] = channel_state_copy
+
+
 
         addresses_to_ids = token_network_state.partneraddresses_to_channelidentifiers
         addresses_to_ids[our_address].append(channel_identifier)

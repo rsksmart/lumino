@@ -626,8 +626,8 @@ class MatrixTransport(Runnable):
         """ Join rooms invited by whitelisted partners """
         if self._stop_event.ready():
             return
-
-        self.log.debug("Got invite", room_id=room_id)
+        print("///// RECIBI INVITE ////")
+        self.log.info("Got invite", room_id=room_id)
         invite_events = [
             event
             for event in state["events"]
@@ -664,11 +664,6 @@ class MatrixTransport(Runnable):
             )
             return
 
-        if not self._address_mgr.is_address_known(peer_address):
-            self.log.debug(
-                "Got invited by a non-whitelisted user - ignoring", room_id=room_id, user=user
-            )
-            return
 
         join_rules_events = [
             event for event in state["events"] if event["type"] == "m.room.join_rules"
@@ -940,7 +935,7 @@ class MatrixTransport(Runnable):
         if room_is_empty:
             last_ex: Optional[Exception] = None
             retry_interval = 0.1
-            self.log.debug("Waiting for peer to join from invite", peer_address=address_hex)
+            self.log.info("Waiting for peer to join from invite", peer_address=address_hex)
             for _ in range(JOIN_RETRIES):
                 try:
                     member_ids = {member.user_id for member in room.get_joined_members()}
@@ -997,26 +992,29 @@ class MatrixTransport(Runnable):
                 room = self._client.join_room(room_name_full)
             except MatrixRequestError as error:
                 if error.code == 404:
-                    self.log.debug(
+                    self.log.info(
                         f"No room for peer, trying to create",
                         room_name=room_name_full,
                         error=error,
                     )
                 else:
-                    self.log.debug(
+                    self.log.info(
                         f"Error joining room",
                         room_name=room_name,
                         error=error.content,
                         error_code=error.code,
                     )
             else:
+                print("////VOY A INVITAR /////")
+                print("invitados")
+                print(invitees)
                 # Invite users to existing room
                 member_ids = {user.user_id for user in room.get_joined_members(force_resync=True)}
                 users_to_invite = set(invitees_uids) - member_ids
-                self.log.debug("Inviting users", room=room, invitee_ids=users_to_invite)
+                self.log.info("Inviting users", room=room, invitee_ids=users_to_invite)
                 for invitee_id in users_to_invite:
                     room.invite_user(invitee_id)
-                self.log.debug("Room joined successfully", room=room)
+                self.log.info("Room joined successfully", room=room)
                 break
 
             # if can't, try creating it
@@ -1031,11 +1029,11 @@ class MatrixTransport(Runnable):
                 else:
                     msg = "Error creating room, retrying."
 
-                self.log.debug(
+                self.log.info(
                     msg, room_name=room_name, error=error.content, error_code=error.code
                 )
             else:
-                self.log.debug("Room created successfully", room=room, invitees=invitees)
+                self.log.info("Room created successfully", room=room, invitees=invitees)
                 break
         else:
             # if can't join nor create, create an unnamed one
@@ -1085,7 +1083,7 @@ class MatrixTransport(Runnable):
         if not room._members:
             room.get_joined_members(force_resync=True)
         if user.user_id not in room._members:
-            self.log.debug("Inviting", user=user, room=room)
+            self.log.info("Inviting", user=user, room=room)
             try:
                 room.invite_user(user.user_id)
             except (json.JSONDecodeError, MatrixRequestError):
@@ -1452,7 +1450,7 @@ class MatrixLightClientTransport(MatrixTransport):
                 "No room for receiver", receiver=to_normalized_address(receiver_address)
             )
             return
-        self.log.debug(
+        self.log.info(
             "Send raw", receiver=pex(receiver_address), room=room, data=data.replace("\n", "\\n")
         )
         print("---- Matrix Send Message " + data)
@@ -1508,7 +1506,7 @@ class MatrixLightClientTransport(MatrixTransport):
         if room_is_empty:
             last_ex: Optional[Exception] = None
             retry_interval = 0.1
-            self.log.debug("Waiting for peer to join from invite", peer_address=address_hex)
+            self.log.info("Waiting for peer to join from invite", peer_address=address_hex)
             for _ in range(JOIN_RETRIES):
                 try:
                     member_ids = {member.user_id for member in room.get_joined_members()}
@@ -1552,26 +1550,29 @@ class MatrixLightClientTransport(MatrixTransport):
                 room = self._client.join_room(room_name_full)
             except MatrixRequestError as error:
                 if error.code == 404:
-                    self.log.debug(
+                    self.log.info(
                         f"No room for peer, trying to create",
                         room_name=room_name_full,
                         error=error,
                     )
                 else:
-                    self.log.debug(
+                    self.log.info(
                         f"Error joining room",
                         room_name=room_name,
                         error=error.content,
                         error_code=error.code,
                     )
             else:
+                print("////VOY A INVITAR /////")
+                print("invitados")
+                print(invitees)
                 # Invite users to existing room
                 member_ids = {user.user_id for user in room.get_joined_members(force_resync=True)}
                 users_to_invite = set(invitees_uids) - member_ids
-                self.log.debug("Inviting users", room=room, invitee_ids=users_to_invite)
+                self.log.info("Inviting users", room=room, invitee_ids=users_to_invite)
                 for invitee_id in users_to_invite:
                     room.invite_user(invitee_id)
-                self.log.debug("Room joined successfully", room=room)
+                self.log.info("Room joined successfully", room=room)
                 break
 
             # if can't, try creating it
@@ -1586,11 +1587,11 @@ class MatrixLightClientTransport(MatrixTransport):
                 else:
                     msg = "Error creating room, retrying."
 
-                self.log.debug(
+                self.log.info(
                     msg, room_name=room_name, error=error.content, error_code=error.code
                 )
             else:
-                self.log.debug("Room created successfully", room=room, invitees=invitees)
+                self.log.info("Room created successfully", room=room, invitees=invitees)
                 break
         else:
             # if can't join nor create, create an unnamed one
@@ -1653,7 +1654,7 @@ class MatrixLightClientTransport(MatrixTransport):
                 reason = "required private room, but received message in a public"
             else:
                 reason = "unknown room for user"
-            self.log.debug(
+            self.log.info(
                 "Ignoring invalid message",
                 peer_user=user.user_id,
                 peer_address=pex(peer_address),
@@ -1669,7 +1670,7 @@ class MatrixLightClientTransport(MatrixTransport):
             if self._is_room_global(room):
                 # This must not happen. Nodes must not listen on global rooms.
                 raise RuntimeError(f"Received message in global room {room.aliases}.")
-            self.log.debug(
+            self.log.info(
                 "Received message triggered new comms room for peer",
                 peer_user=user.user_id,
                 peer_address=pex(peer_address),

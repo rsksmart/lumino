@@ -119,8 +119,11 @@ CREATE TABLE IF NOT EXISTS light_client_protocol_message (
     unsigned_message JSON,
     signed_message JSON,
     message_type TEXT CHECK (message_type in ('PaymentSuccessful', 'PaymentFailure', 'PaymentExpired', 'SettlementRequired', 'PaymentRefund')) NOT NULL,
-    light_client_address TEXT NOT NULL,
-    FOREIGN KEY(light_client_address) REFERENCES client(address) ON DELETE CASCADE ON UPDATE CASCADE
+    sender_light_client_address TEXT NULLABLE,
+    receiver_light_client_address TEXT NULLABLE,
+    FOREIGN KEY(sender_light_client_address) REFERENCES client(address) ON DELETE CASCADE ON UPDATE CASCADE,
+    FOREIGN KEY(receiver_light_client_address) REFERENCES client(address) ON DELETE CASCADE ON UPDATE CASCADE
+
 );
 """
 

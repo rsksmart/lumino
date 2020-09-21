@@ -55,7 +55,8 @@ class StoreMessageEvent(Event):
         message: Message,
         is_signed: bool,
         message_type: LightClientProtocolMessageType,
-        light_client_address: AddressHex
+        sender_light_client_address: AddressHex,
+        receiver_light_client_address: AddressHex
     ) -> None:
         self.message_id = message_id
         self.payment_id = payment_id
@@ -63,7 +64,8 @@ class StoreMessageEvent(Event):
         self.message = message
         self.is_signed = is_signed
         self.message_type = message_type
-        self.light_client_address = light_client_address
+        self.sender_light_client_address = sender_light_client_address
+        self.receiver_light_client_address = receiver_light_client_address
 
     def __eq__(self, other: Any) -> bool:
         return (
@@ -73,7 +75,8 @@ class StoreMessageEvent(Event):
             and self.message == other.message
             and self.is_signed == other.is_signed
             and self.message_type == other.message_type
-            and self.light_client_address == other.light_client_address
+            and self.sender_light_client_address == other.sender_light_client_address
+            and self.receiver_light_client_address == other.receiver_light_client_address
         )
 
     def __ne__(self, other: Any) -> bool:
@@ -87,7 +90,8 @@ class StoreMessageEvent(Event):
             "message": self.message.to_dict(),
             "is_signed": str(self.is_signed),
             "message_type": str(self.message_type),
-            "light_client_address": to_checksum_address(self.light_client_address)
+            "sender_light_client_address": to_checksum_address(self.sender_light_client_address) if self.sender_light_client_address is not None else None,
+            "receiver_light_client_address": to_checksum_address(self.receiver_light_client_address) if self.receiver_light_client_address is not None else None
         }
         return result
 
@@ -100,7 +104,9 @@ class StoreMessageEvent(Event):
             message=Message.from_dict(data["message"]),
             is_signed=bool(data["is_signed"]),
             message_type=LightClientProtocolMessageType(data["message_type"]),
-            light_client_address=to_canonical_address(data["light_client_address"])
+            receiver_light_client_address=to_canonical_address(data["receiver_light_client_address"]),
+            sender_light_client_address=to_canonical_address(data["sender_light_client_address"])
+
         )
         return restored
 

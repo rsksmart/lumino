@@ -190,7 +190,8 @@ class RaidenEventHandler(EventHandler):
                                                                           store_message_event.message,
                                                                           store_message_event.is_signed,
                                                                           store_message_event.payment_id,
-                                                                          store_message_event.light_client_address,
+                                                                          store_message_event.sender_light_client_address,
+                                                                          store_message_event.receiver_light_client_address,
                                                                           store_message_event.message_order,
                                                                           store_message_event.message_type,
                                                                           raiden.wal)

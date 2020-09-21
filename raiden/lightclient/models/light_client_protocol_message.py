@@ -26,7 +26,8 @@ class LightClientProtocolMessage:
         unsigned_message: Message = None,
         signed_message: Message = None,
         internal_msg_identifier: int = None,
-        light_client_address: AddressHex = None,
+        sender_light_client_address: AddressHex = None,
+        receiver_light_client_address: AddressHex = None
     ):
         self.identifier = int(identifier)
         self.is_signed = is_signed
@@ -36,7 +37,9 @@ class LightClientProtocolMessage:
         self.signed_message = signed_message
         self.light_client_payment_id = light_client_payment_id
         self.internal_msg_identifier = internal_msg_identifier
-        self.light_client_address = light_client_address
+        self.sender_light_client_address = sender_light_client_address
+        self.receiver_light_client_address = receiver_light_client_address
+
 
     def to_dict(self):
         signed_msg_dict = None
@@ -55,7 +58,9 @@ class LightClientProtocolMessage:
             "signed_message": signed_msg_dict,
             "light_client_payment_id": self.light_client_payment_id,
             "internal_msg_identifier": self.internal_msg_identifier,
-            "light_client_address": self.light_client_address
+            "sender_light_client_address": self.sender_light_client_address,
+            "receiver_light_client_address": self.receiver_light_client_address
+
         }
         return result
 
@@ -73,5 +78,7 @@ class DbLightClientProtocolMessage:
         self.message_type = light_client_protocol_message.message_type
         self.unsigned_message = light_client_protocol_message.unsigned_message
         self.signed_message = light_client_protocol_message.signed_message
-        self.light_client_address = light_client_protocol_message.light_client_address
+        self.sender_light_client_address = light_client_protocol_message.sender_light_client_address
+        self.receiver_light_client_address = light_client_protocol_message.receiver_light_client_address
+
 

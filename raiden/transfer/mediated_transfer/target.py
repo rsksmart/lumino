@@ -213,7 +213,9 @@ def handle_inittarget_light(
                 transfer.lock.amount,
                 str(date.today()),
                 LightClientPaymentStatus.Pending,
-                transfer.payment_identifier
+                transfer.payment_identifier,
+                transfer.initiator,
+                transfer.target
             )
 
             payment_exists = LightClientService.get_light_client_payment(payment.payment_id, storage)
@@ -232,19 +234,23 @@ def handle_inittarget_light(
                 secrethash=transfer.lock.secrethash,
             )
 
+            lt_sender_light_client_address = transfer.initiator if channel_state.both_participants_are_light_clients else None
             store_locked_transfer_event = StoreMessageEvent(transfer.message_identifier, transfer.payment_identifier, 1,
                                                             state_change.signed_lockedtransfer, True,
                                                             LightClientProtocolMessageType.PaymentSuccessful,
-                                                            transfer.target)
+                                                            sender_light_client_address=lt_sender_light_client_address,
+                                                            receiver_light_client_address=transfer.target)
 
             secret_request_message = SecretRequest.from_event(secret_request)
+            sr_receiver_light_client_address = transfer.initiator if channel_state.both_participants_are_light_clients else None
             store_secret_request_event = StoreMessageEvent(message_identifier,
                                                            transfer.payment_identifier,
                                                            5,
                                                            secret_request_message,
                                                            False,
                                                            LightClientProtocolMessageType.PaymentSuccessful,
-                                                           transfer.target)
+                                                           sender_light_client_address=transfer.target,
+                                                           receiver_light_client_address=sr_receiver_light_client_address)
             channel_events.append(store_secret_request_event)
             channel_events.append(store_locked_transfer_event)
         elif not safe_to_wait:
@@ -257,7 +263,9 @@ def handle_inittarget_light(
                 transfer.lock.amount,
                 str(date.today()),
                 LightClientPaymentStatus.Expired,
-                transfer.payment_identifier
+                transfer.payment_identifier,
+                transfer.initiator,
+                transfer.target
             )
             LightClientMessageHandler.store_light_client_payment(payment, storage)
             store_expired_locked_transfer_event = StoreMessageEvent(transfer.message_identifier, transfer.payment_identifier, 1,
@@ -284,7 +292,8 @@ def handle_inittarget_light(
 
 def handle_send_secret_reveal_light(
     target_state: TargetTransferState,
-    state_change: ActionSendSecretRevealLight
+    state_change: ActionSendSecretRevealLight,
+    channel_state: NettingChannelState,
 ) -> TransitionResult[TargetTransferState]:
     message_identifier = state_change.reveal_secret.message_identifier
     transfer = target_state.transfer
@@ -298,10 +307,12 @@ def handle_send_secret_reveal_light(
         secret=state_change.reveal_secret.secret,
         signed_secret_reveal=state_change.reveal_secret
     )
+    sender_light_client_address = state_change.sender if channel_state.both_participants_are_light_clients else None
     store_reveal_secret_event = StoreMessageEvent(message_identifier, transfer.payment_identifier, 9,
                                                   state_change.reveal_secret, True,
                                                   LightClientProtocolMessageType.PaymentSuccessful,
-                                                  transfer.target)
+                                                  sender_light_client_address=sender_light_client_address,
+                                                  receiver_light_client_address=transfer.target)
     iteration = TransitionResult(target_state, [revealsecret, store_reveal_secret_event])
     return iteration
 
@@ -345,13 +356,15 @@ def handle_send_secret_request_light(
             signed_secret_request=state_change.secret_request
         )
 
+        receiver_light_client_address = transfer.initiator
         store_secret_request_event = StoreMessageEvent(state_change.secret_request.message_identifier,
                                                        transfer.payment_identifier,
                                                        5,
                                                        state_change.secret_request,
                                                        True,
                                                        LightClientProtocolMessageType.PaymentSuccessful,
-                                                       transfer.target)
+                                                       transfer.target,
+                                                       receiver_light_client_address=receiver_light_client_address)
         events.append(secret_request_light)
         events.append(store_secret_request_event)
 
@@ -447,6 +460,8 @@ def handle_offchain_secretreveal_light(
         )
         reveal_secret_to_send_msg = message_from_sendevent(reveal_secret_to_send_event)
 
+        receiver_light_client_address = state_change.recipient if channel_state.both_participants_are_light_clients else None
+
         store_received_reveal = StoreMessageEvent(
             received_reveal_secret.message_identifier,
             target_state.transfer.payment_identifier,
@@ -454,7 +469,8 @@ def handle_offchain_secretreveal_light(
             received_reveal_secret,
             True,
             LightClientProtocolMessageType.PaymentSuccessful,
-            target_state.transfer.target
+            target_state.transfer.target,
+            receiver_light_client_address=receiver_light_client_address
         )
         store_reveal_to_send = StoreMessageEvent(
             message_identifier,
@@ -463,7 +479,8 @@ def handle_offchain_secretreveal_light(
             reveal_secret_to_send_msg,
             False,
             LightClientProtocolMessageType.PaymentSuccessful,
-            target_state.transfer.target
+            target_state.transfer.target,
+            receiver_light_client_address=receiver_light_client_address
         )
 
         iteration = TransitionResult(target_state, [store_received_reveal, store_reveal_to_send])
@@ -525,6 +542,8 @@ def handle_unlock_light(
             transfer.payment_identifier, transfer.lock.secrethash
         )
 
+        sender_light_client_address = transfer.initiator if channel_state.both_participants_are_light_clients else None
+
         store_unlock_message = StoreMessageEvent(
             state_change.signed_unlock.message_identifier,
             state_change.signed_unlock.payment_identifier,
@@ -532,7 +551,8 @@ def handle_unlock_light(
             state_change.signed_unlock,
             True,
             LightClientProtocolMessageType.PaymentSuccessful,
-            transfer.target
+            sender_light_client_address=sender_light_client_address,
+            receiver_light_client_address=transfer.target
         )
 
         events.extend([payment_received_success, unlock_success, store_unlock_message])
@@ -707,7 +727,7 @@ def state_transition(
         assert isinstance(state_change, ActionSendSecretRevealLight), MYPY_ANNOTATION
         assert target_state, "ActionSendSecretRevealLight should be accompanied by a valid target state"
         iteration = handle_send_secret_reveal_light(
-            target_state, state_change
+            target_state, state_change, channel_state
         )
     elif type(state_change) == Block:
         assert isinstance(state_change, Block), MYPY_ANNOTATION

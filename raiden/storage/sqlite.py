@@ -195,16 +195,18 @@ class SQLiteStorage:
                 "unsigned_message, "
                 "signed_message, "
                 "light_client_payment_id, "
-                "light_client_address "
+                "sender_light_client_address, "
+                "receiver_light_client_address "
                 ")"
-                "VALUES(?, ?, ?, ?, ?, ?, ?)",
+                "VALUES(?, ?, ?, ?, ?, ?, ?, ?)",
                 (str(msg_dto.identifier),
                  msg_dto.message_order,
                  str(msg_dto.message_type.value),
                  msg_dto.unsigned_message,
                  msg_dto.signed_message,
                  str(msg_dto.light_client_payment_id) if msg_dto.light_client_payment_id else None,
-                 to_checksum_address(msg_dto.light_client_address),
+                 to_checksum_address(msg_dto.sender_light_client_address) if msg_dto.sender_light_client_address is not None else None,
+                 to_checksum_address(msg_dto.receiver_light_client_address) if msg_dto.receiver_light_client_address is not None else None,
                  ),
             )
             last_id = cursor.lastrowid
@@ -1346,7 +1348,7 @@ class SQLiteStorage:
         cursor = self.conn.cursor()
         cursor.execute(
             """
-            SELECT lcp.payment_id as payment_id, lcpm.light_client_address as light_client_address,
+            SELECT lcp.payment_id, lcpm.sender_light_client_address, lcpm.receiver_light_client_address,
             lcp.partner_address as partner_address, lcp.is_lc_initiator as is_lc_initiator,
             lcp.token_network_id as token_network_id, lcp.amount as amount, lcp.created_on as created_on,
             lcp.payment_status as payment_status
@@ -1365,9 +1367,10 @@ class SQLiteStorage:
             " FROM light_client_protocol_message A INNER JOIN light_client_payment B" +
             " ON A.light_client_payment_id = B.payment_id" +
             " WHERE A.internal_msg_identifier >= ?" +
-            " AND A.light_client_address = ?" +
+            " AND (A.sender_light_client_address = ?" +
+            " OR A.receiver_light_client_Address = ?)" +
             "ORDER BY light_client_payment_id, message_order ASC",
-            (from_message, light_client),
+            (from_message, light_client, light_client),
 
         )
         return cursor.fetchall()
@@ -1377,7 +1380,7 @@ class SQLiteStorage:
         cursor.execute(
             """
             SELECT identifier, message_order, unsigned_message, signed_message,
-            light_client_payment_id, message_type, light_client_address
+            light_client_payment_id, message_type, sender_light_client_address, receiver_light_client_address
             FROM light_client_protocol_message
             WHERE identifier = ?
             ORDER BY message_order ASC
@@ -1408,7 +1411,7 @@ class SQLiteStorage:
         cursor = self.conn.cursor()
         cursor.execute(
             "SELECT identifier, message_order,message_type, unsigned_message, "
-            " signed_message, light_client_payment_id, light_client_address " +
+            " signed_message, light_client_payment_id, sender_light_client_address, receiver_light_client_address " +
             " FROM light_client_protocol_message A INNER JOIN light_client_payment B" +
             " ON A.light_client_payment_id = B.payment_id" +
             " WHERE A.message_order = 1" +
@@ -1465,7 +1468,6 @@ class SerializedSQLiteStorage(SQLiteStorage):
 
     def update_invoice(self, payment_hash_invoice):
         return super().update_invoice(payment_hash_invoice)
-
 
     def write_light_client_protocol_message(self, new_message, msg_dto):
         serialized_data = self.serializer.serialize(new_message)

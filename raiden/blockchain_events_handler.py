@@ -111,7 +111,8 @@ def handle_channel_new(raiden: "RaidenService", event: Event):
             reveal_timeout=raiden.config["reveal_timeout"],
             payment_channel_proxy=channel_proxy,
             opened_block_number=block_number,
-            is_light_channel=is_light_channel
+            is_light_channel=is_light_channel,
+            both_participants_are_light_clients=is_participant1_handled_lc and is_participant2_handled_lc
         )
 
         if is_participant1_handled_lc or is_participant2_handled_lc:

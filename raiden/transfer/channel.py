@@ -1429,6 +1429,8 @@ def events_for_expired_lock(
     msg = "caller must make sure the channel is open"
     assert get_status(channel_state) == CHANNEL_STATE_OPENED, msg
 
+    recipient = channel_state.partner_state.address,
+
     send_lock_expired, merkletree = create_sendexpiredlock(
         sender_end_state=channel_state.our_state,
         locked_lock=locked_lock,
@@ -1436,7 +1438,7 @@ def events_for_expired_lock(
         chain_id=channel_state.chain_id,
         token_network_identifier=TokenNetworkID(channel_state.token_network_identifier),
         channel_identifier=channel_state.identifier,
-        recipient=channel_state.partner_state.address,
+        recipient=recipient,
         payment_identifier=payment_identifier,
         is_light_channel=channel_state.is_light_channel
     )
@@ -1451,13 +1453,15 @@ def events_for_expired_lock(
 
         if channel_state.is_light_channel:
             # Store the send lock expired light message
+            receiver_light_client_address = recipient if channel_state.both_participants_are_light_clients else None
             store_lock_expired = StoreMessageEvent(send_lock_expired.message_identifier,
                                                    send_lock_expired.payment_identifier,
                                                    1,
                                                    LockExpired.from_event(send_lock_expired),
                                                    False,
                                                    LightClientProtocolMessageType.PaymentExpired,
-                                                   send_lock_expired.sender)
+                                                   send_lock_expired.sender,
+                                                   receiver_light_client_address=receiver_light_client_address)
             events.append(store_lock_expired)
         events.append(send_lock_expired)
 

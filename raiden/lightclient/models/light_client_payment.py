@@ -28,7 +28,8 @@ class LightClientPayment:
         identifier: string,
         # this is only to get easy access to the client, we only query this from DB but is not needed
         # to create a payment
-        light_client_address: AddressHex = None
+        sender_light_client_address: AddressHex = None,
+        receiver_light_client_address: AddressHex = None
     ):
         self.payment_id = int(identifier)
         self.partner_address = to_checksum_address(partner_address)
@@ -37,6 +38,7 @@ class LightClientPayment:
         self.amount = amount
         self.created_on = created_on
         self.payment_status = payment_status
-        self.light_client_address = light_client_address
+        self.sender_light_client_address = sender_light_client_address
+        self.receiver_light_client_address = receiver_light_client_address
 
 

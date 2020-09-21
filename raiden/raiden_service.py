@@ -1328,6 +1328,8 @@ class RaidenService(Runnable):
                                       delivered: Delivered, msg_order: int, payment_id: int,
                                       message_type: LightClientProtocolMessageType):
         lc_transport = self.get_light_client_transport(to_checksum_address(sender_address))
+        # check if receiver is a handled light client too
+        receiver_is_light_client = self.get_light_client_transport(to_checksum_address(receiver_address)) is not None
         if lc_transport:
             LightClientMessageHandler.store_light_client_protocol_message(
                 delivered.delivered_message_identifier,
@@ -1335,6 +1337,7 @@ class RaidenService(Runnable):
                 True,
                 payment_id,
                 sender_address,
+                receiver_address if receiver_is_light_client else None,
                 msg_order,
                 message_type,
                 self.wal
@@ -1345,6 +1348,8 @@ class RaidenService(Runnable):
                                       processed: Processed, msg_order: int, payment_id: int,
                                       message_type: LightClientProtocolMessageType):
         lc_transport = self.get_light_client_transport(to_checksum_address(sender_address))
+        # check if receiver is a handled light client too
+        receiver_is_light_client = self.get_light_client_transport(to_checksum_address(receiver_address)) is not None
         if lc_transport:
             LightClientMessageHandler.store_light_client_protocol_message(
                 processed.message_identifier,
@@ -1352,6 +1357,7 @@ class RaidenService(Runnable):
                 True,
                 payment_id,
                 sender_address,
+                receiver_address if receiver_is_light_client else None,
                 msg_order,
                 message_type,
                 self.wal
