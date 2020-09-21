@@ -16,7 +16,7 @@ class Node(ABC):
         Messages to be received by this Node should be have this address as the message receiver.
         Messages to be sent from this Node should have this address as the message sender.
         """
-        self._address = address  # messages handled by this node will be received by this address and sent from it.
+        self._address = address  
 
     @property
     def address(self):
