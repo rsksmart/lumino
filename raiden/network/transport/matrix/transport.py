@@ -74,7 +74,7 @@ from raiden.utils.typing import (
     Union,
     cast,
 )
-from transport.node import Node as NodeTransport
+from transport.node import Node as TransportNode
 
 log = structlog.get_logger(__name__)
 
@@ -251,13 +251,13 @@ class _RetryQueue(Runnable):
         return f"<{self.__class__.__name__} for {to_normalized_address(self.receiver)}>"
 
 
-class MatrixTransport(NodeTransport, Runnable):
+class MatrixTransport(TransportNode, Runnable):
     _room_prefix = "raiden"
     _room_sep = "_"
     log = log
 
     def __init__(self, address: Address, config: dict, current_server_name: str = None):
-        NodeTransport.__init__(self, address)
+        TransportNode.__init__(self, address)
         Runnable.__init__(self)
         self._config = config
         self._raiden_service: Optional[RaidenService] = None
