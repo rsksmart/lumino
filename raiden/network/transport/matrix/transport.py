@@ -73,8 +73,9 @@ from raiden.utils.typing import (
     Union,
     cast,
 )
-from transport.abstraction import Layer as TransportLayer
-from transport.components import Message as TransportMessage
+from transport.node import Node as TransportNode
+from transport.layer import Layer as TransportLayer
+from transport.message import Message as TransportMessage
 
 log = structlog.get_logger(__name__)
 
@@ -251,13 +252,13 @@ class _RetryQueue(Runnable):
         return f"<{self.__class__.__name__} for {to_normalized_address(self.receiver)}>"
 
 
-class MatrixTransport(TransportLayer, Runnable):
+class MatrixTransport(TransportNode, Runnable):
     _room_prefix = "raiden"
     _room_sep = "_"
     log = log
 
     def __init__(self, address: Address, config: dict, current_server_name: str = None):
-        TransportLayer.__init__(self, address)
+        TransportNode.__init__(self, address)
         Runnable.__init__(self)
         self._config = config
         self._raiden_service: Optional[RaidenService] = None
@@ -1736,14 +1737,3 @@ class MatrixLightClientTransport(MatrixTransport):
             return
 
 
-class NodeTransport:
-
-    def __init__(self, hub_transport: TransportLayer, light_client_transports: List[TransportLayer]):
-        self.hub_transport = hub_transport
-        self.light_client_transports = light_client_transports
-
-    def add_light_client_transport(self, light_client_transport: TransportLayer):
-        self.light_client_transports.append(light_client_transport)
-
-    def remove_light_client_transport(self, light_client_transport: TransportLayer):
-        self.light_client_transports.remove(light_client_transport)
