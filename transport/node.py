@@ -25,13 +25,13 @@ class Node(ABC):
     @abstractmethod
     def start(self, raiden_service: RaidenService, message_handler: MessageHandler, prev_auth_data: str):
         """
-        Start the transport layer.
+        Start the transport node.
         """
 
     @abstractmethod
     def stop(self):
         """
-        Stop the transport layer.
+        Stop the transport node.
         """
 
     @abstractmethod
@@ -59,11 +59,11 @@ class Node(ABC):
     @abstractmethod
     def link_exception(self, callback: Any):
         """
-        Add a callback function to be executed once the transport layer is halted due to an exception.
+        Add a callback function to be executed once the transport node is halted due to an exception.
         """
 
     @abstractmethod
     def join(self, timeout=None):
         """
-        Wait until the transport layer finishes its pending tasks or the given timeout passes.
+        Wait until the transport node finishes its pending tasks or the given timeout passes.
         """
