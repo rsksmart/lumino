@@ -256,12 +256,13 @@ class MatrixTransport(TransportLayer, Runnable):
     _room_sep = "_"
     log = log
 
-    def __init__(self, address: Address, config: dict, current_server_name: str = None):
+    def __init__(self, address: Address, config: dict):
         TransportLayer.__init__(self, address)
         Runnable.__init__(self)
         self._config = config
         self._raiden_service: Optional[RaidenService] = None
 
+        current_server_name = config.get("current_server_name")
         available_servers = get_available_servers_from_config(self._config)
 
         def _http_retry_delay() -> Iterable[float]:
@@ -1347,9 +1348,8 @@ class MatrixLightClientTransport(MatrixTransport):
 
     def __init__(self,
                  address: Address,
-                 config: dict,
-                 current_server_name: str = None):
-        MatrixTransport.__init__(self, address, config, current_server_name)
+                 config: dict):
+        MatrixTransport.__init__(self, address, config)
         self._encrypted_light_client_password_signature = config["light_client_password"]
         self._encrypted_light_client_display_name_signature = config["light_client_display_name"]
         self._encrypted_light_client_seed_for_retry_signature = config["light_client_seed_retry"]

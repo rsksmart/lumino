@@ -112,13 +112,13 @@ def _setup_matrix(config):
                     continue
 
             config = config["transport"]["matrix"]
+            config["current_server_name"] = current_server_name
             config["encrypt_signed_password"] = light_client["password"]
             config["encrypt_signed_display_name"] = light_client["display_name"]
             config["encrypt_signed_seed_retry"] = light_client["seed_retry"]
             light_client_transport = MatrixLightClientTransport(
                 light_client['address'],
                 config,
-                current_server_name
             )
 
             light_client_transports.append(light_client_transport)
