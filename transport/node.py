@@ -16,11 +16,7 @@ class Node(ABC):
         Messages to be received by this Node should be have this address as the message receiver.
         Messages to be sent from this Node should have this address as the message sender.
         """
-        self._address = address
-
-    @property
-    def address(self):
-        return self._address
+        self.address = address
 
     @abstractmethod
     def start(self, raiden_service: RaidenService, message_handler: MessageHandler, prev_auth_data: str):
