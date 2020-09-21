@@ -2063,7 +2063,7 @@ class RestAPI:
             config["light_client_password"] = light_client["encrypt_signed_password"]
             config["light_client_display_name"] = light_client["encrypt_signed_display_name"]
             config["light_client_seed_retry"] = light_client["encrypt_signed_seed_retry"]
-            light_client_transport = transport_config.light_client_transport(
+            light_client_transport = transport_config.light_client_transport_class(
                 address=light_client["address"],
                 config=config
             )
