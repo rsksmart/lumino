@@ -28,7 +28,8 @@ from raiden.message_handler import MessageHandler
 from raiden.network.blockchain_service import BlockChainService
 from raiden.network.rpc.client import JSONRPCClient
 from raiden.network.transport import MatrixTransport
-from raiden.network.transport.matrix import MatrixLightClientTransport, NodeTransport
+from raiden.network.transport.matrix import MatrixLightClientTransport
+from transport.layer import Layer as TransportLayer
 from raiden.raiden_event_handler import RaidenEventHandler
 from raiden.settings import (
     DEFAULT_MATRIX_KNOWN_SERVERS,
@@ -125,7 +126,7 @@ def _setup_matrix(config):
 
         hub_transport = MatrixTransport(config["address"], config["transport"]["matrix"])
 
-        node_transport = NodeTransport(hub_transport, light_client_transports)
+        node_transport = TransportLayer(hub_transport, light_client_transports)
 
     except RaidenError as ex:
         click.secho(f"FATAL: {ex}", fg="red")
