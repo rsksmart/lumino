@@ -79,6 +79,8 @@ def mock_matrix(
         # We are just unit testing the matrix transport receive so do nothing
         assert message
 
+    raiden_service = MockRaidenService()
+
     config = dict(
         retry_interval=retry_interval,
         retries_before_backoff=retries_before_backoff,
@@ -89,8 +91,8 @@ def mock_matrix(
         private_rooms=private_rooms,
     )
 
-    transport = MatrixTransport(config)
-    transport._raiden_service = MockRaidenService()
+    transport = MatrixTransport(raiden_service.address, config)
+    transport._raiden_service = raiden_service
     transport._stop_event.clear()
     transport._address_mgr.add_userid_for_address(factories.HOP1, USERID1)
     transport._client.user_id = USERID0
@@ -307,6 +309,8 @@ def test_matrix_message_sync(matrix_transports):
 
     raiden_service1.handle_and_track_state_change = MagicMock()
 
+    transport0._address = raiden_service0.address
+    transport1._address = raiden_service1.address
     transport0.start(raiden_service0, message_handler, None)
     transport1.start(raiden_service1, message_handler, None)
 
@@ -406,8 +410,10 @@ def test_matrix_message_retry(
     the receiver comes back again, the message should be sent again.
     """
     partner_address = factories.make_address()
+    raiden_service = MockRaidenService(None)
 
     transport = MatrixTransport(
+        address=raiden_service.address,
         config={
             "global_rooms": global_rooms,
             "retries_before_backoff": retries_before_backoff,
@@ -419,7 +425,6 @@ def test_matrix_message_retry(
         },
     )
     transport._send_raw = MagicMock()
-    raiden_service = MockRaidenService(None)
 
     transport.start(raiden_service, raiden_service.message_handler, None)
     transport.log = MagicMock()
@@ -441,7 +446,12 @@ def test_matrix_message_retry(
     message = Processed(message_identifier=0)
     transport._raiden_service.sign(message)
     chain_state.queueids_to_queues[queueid] = [message]
-    retry_queue.enqueue_global(message)
+    retry_queue.enqueue(
+        queue_identifier=QueueIdentifier(
+            recipient=retry_queue.receiver, channel_identifier=CHANNEL_IDENTIFIER_GLOBAL_QUEUE
+        ),
+        message=message
+    )
 
     gevent.sleep(1)
 
@@ -485,7 +495,9 @@ def test_join_invalid_discovery(
     to be handled, and if no discovery room is found on any of the available_servers, one in
     our current server should be created
     """
+    raiden_service = MockRaidenService(None)
     transport = MatrixTransport(
+        raiden_service.address,
         {
             "global_rooms": global_rooms,
             "retries_before_backoff": retries_before_backoff,
@@ -498,7 +510,6 @@ def test_join_invalid_discovery(
     )
     transport._client.api.retry_timeout = 0
     transport._send_raw = MagicMock()
-    raiden_service = MockRaidenService(None)
 
     transport.start(raiden_service, raiden_service.message_handler, None)
     transport.log = MagicMock()
@@ -525,6 +536,9 @@ def test_matrix_cross_server_with_load_balance(matrix_transports):
     raiden_service1 = MockRaidenService(message_handler1)
     raiden_service2 = MockRaidenService(message_handler2)
 
+    transport0._address = raiden_service0.address
+    transport1._address = raiden_service1.address
+    transport2._address = raiden_service2.address
     transport0.start(raiden_service0, message_handler0, "")
     transport1.start(raiden_service1, message_handler1, "")
     transport2.start(raiden_service2, message_handler2, "")
@@ -549,8 +563,9 @@ def test_matrix_cross_server_with_load_balance(matrix_transports):
 def test_matrix_discovery_room_offline_server(
     local_matrix_servers, retries_before_backoff, retry_interval, private_rooms, global_rooms
 ):
-
+    raiden_service = MockRaidenService(None)
     transport = MatrixTransport(
+        raiden_service.address,
         {
             "global_rooms": global_rooms,
             "retries_before_backoff": retries_before_backoff,
@@ -561,7 +576,7 @@ def test_matrix_discovery_room_offline_server(
             "private_rooms": private_rooms,
         }
     )
-    transport.start(MockRaidenService(None), MessageHandler(set()), "")
+    transport.start(raiden_service, MessageHandler(set()), "")
     gevent.sleep(0.2)
 
     discovery_room_name = make_room_alias(transport.network_id, "discovery")
@@ -574,7 +589,9 @@ def test_matrix_discovery_room_offline_server(
 def test_matrix_send_global(
     local_matrix_servers, retries_before_backoff, retry_interval, private_rooms, global_rooms
 ):
+    raiden_service = MockRaidenService(None)
     transport = MatrixTransport(
+        raiden_service.address,
         {
             "global_rooms": global_rooms + [MONITORING_BROADCASTING_ROOM],
             "retries_before_backoff": retries_before_backoff,
@@ -585,7 +602,7 @@ def test_matrix_send_global(
             "private_rooms": private_rooms,
         }
     )
-    transport.start(MockRaidenService(None), MessageHandler(set()), "")
+    transport.start(raiden_service, MessageHandler(set()), "")
     gevent.idle()
 
     ms_room_name = make_room_alias(transport.network_id, MONITORING_BROADCASTING_ROOM)
@@ -745,6 +762,8 @@ def test_matrix_invite_private_room_happy_case(matrix_transports, expected_join_
 
     transport0, transport1 = matrix_transports
 
+    transport0._address = raiden_service0.address
+    transport1._address = raiden_service1.address
     transport0.start(raiden_service0, raiden_service0.message_handler, None)
     transport1.start(raiden_service1, raiden_service1.message_handler, None)
 
@@ -804,6 +823,8 @@ def test_matrix_invite_private_room_unhappy_case1(
 
     transport0, transport1 = matrix_transports
 
+    transport0._address = raiden_service0.address
+    transport1._address = raiden_service1.address
     transport0.start(raiden_service0, raiden_service0.message_handler, None)
     transport1.start(raiden_service1, raiden_service1.message_handler, None)
 
@@ -863,6 +884,8 @@ def test_matrix_invite_private_room_unhappy_case_2(
 
     transport0, transport1 = matrix_transports
 
+    transport0._address = raiden_service0.address
+    transport1._address = raiden_service1.address
     transport0.start(raiden_service0, raiden_service0.message_handler, None)
     transport1.start(raiden_service1, raiden_service1.message_handler, None)
 
@@ -933,6 +956,8 @@ def test_matrix_invite_private_room_unhappy_case_3(matrix_transports, expected_j
 
     transport0, transport1 = matrix_transports
 
+    transport0._address = raiden_service0.address
+    transport1._address = raiden_service1.address
     transport0.start(raiden_service0, raiden_service0.message_handler, None)
     transport1.start(raiden_service1, raiden_service1.message_handler, None)
 
@@ -983,6 +1008,8 @@ def test_matrix_user_roaming(matrix_transports):
     raiden_service0 = MockRaidenService(message_handler0)
     raiden_service1 = MockRaidenService(message_handler1)
 
+    transport0._address = raiden_service0.address
+    transport1._address = raiden_service1.address
     transport0.start(raiden_service0, message_handler0, "")
     transport1.start(raiden_service1, message_handler1, "")
 
@@ -998,6 +1025,7 @@ def test_matrix_user_roaming(matrix_transports):
 
     assert not is_reachable(transport1, raiden_service0.address)
 
+    transport2._address = raiden_service0.address
     transport2.start(raiden_service0, message_handler0, "")
 
     transport2.start_health_check(raiden_service1.address)
@@ -1011,6 +1039,7 @@ def test_matrix_user_roaming(matrix_transports):
 
     assert not is_reachable(transport1, raiden_service0.address)
 
+    transport0._address = raiden_service0.address
     transport0.start(raiden_service0, message_handler0, "")
     with Timeout(40):
         while not is_reachable(transport1, raiden_service0.address):
@@ -1038,6 +1067,8 @@ def test_matrix_multi_user_roaming(matrix_transports):
     raiden_service1 = MockRaidenService(message_handler1)
 
     # Both nodes on the same server
+    transport0._address = raiden_service0.address
+    transport3._address = raiden_service1.address
     transport0.start(raiden_service0, message_handler0, "")
     transport3.start(raiden_service1, message_handler1, "")
 
@@ -1049,6 +1080,7 @@ def test_matrix_multi_user_roaming(matrix_transports):
     # Node two switches to second server
     transport3.stop()
 
+    transport4._address = raiden_service1.address
     transport4.start(raiden_service1, message_handler1, "")
     transport4.start_health_check(raiden_service0.address)
     gevent.sleep(0.5)
@@ -1058,6 +1090,7 @@ def test_matrix_multi_user_roaming(matrix_transports):
     # Node two switches to third server
     transport4.stop()
 
+    transport5._address = raiden_service1.address
     transport5.start(raiden_service1, message_handler1, "")
     transport5.start_health_check(raiden_service0.address)
     gevent.sleep(0.5)
@@ -1066,8 +1099,10 @@ def test_matrix_multi_user_roaming(matrix_transports):
     # Node one switches to second server, Node two back to first
     transport0.stop()
     transport5.stop()
+    transport1._address = raiden_service0.address
     transport1.start(raiden_service0, message_handler0, "")
     transport1.start_health_check(raiden_service1.address)
+    transport3._address = raiden_service1.address
     transport3.start(raiden_service1, message_handler1, "")
     gevent.sleep(0.5)
 
@@ -1076,6 +1111,7 @@ def test_matrix_multi_user_roaming(matrix_transports):
     # Node two joins on second server again
     transport3.stop()
 
+    transport4._address = raiden_service1.address
     transport4.start(raiden_service1, message_handler1, "")
     gevent.sleep(0.5)
 
@@ -1084,6 +1120,7 @@ def test_matrix_multi_user_roaming(matrix_transports):
     # Node two switches to third server
     transport4.stop()
 
+    transport5._address = raiden_service1.address
     transport5.start(raiden_service1, message_handler1, "")
     gevent.sleep(0.5)
 
@@ -1093,8 +1130,10 @@ def test_matrix_multi_user_roaming(matrix_transports):
     transport1.stop()
     transport5.stop()
 
+    transport2._address = raiden_service0.address
     transport2.start(raiden_service0, message_handler0, "")
     transport2.start_health_check(raiden_service1.address)
+    transport3._address = raiden_service1.address
     transport3.start(raiden_service1, message_handler1, "")
     gevent.sleep(0.5)
 
@@ -1103,6 +1142,7 @@ def test_matrix_multi_user_roaming(matrix_transports):
     # Node two switches to second server
 
     transport3.stop()
+    transport4._address = raiden_service1.address
     transport4.start(raiden_service1, message_handler1, "")
 
     gevent.sleep(0.5)
@@ -1111,6 +1151,7 @@ def test_matrix_multi_user_roaming(matrix_transports):
     # Node two joins on third server
 
     transport4.stop()
+    transport5._address = raiden_service1.address
     transport5.start(raiden_service1, message_handler1, "")
 
     gevent.sleep(0.5)
@@ -1131,6 +1172,8 @@ def test_reproduce_handle_invite_send_race_issue_3588(matrix_transports):
     raiden_service0 = MockRaidenService(message_handler0)
     raiden_service1 = MockRaidenService(message_handler1)
 
+    transport0._address = raiden_service0.address
+    transport1._address = raiden_service1.address
     transport0.start(raiden_service0, message_handler0, "")
     transport1.start(raiden_service1, message_handler1, "")
 
@@ -1153,6 +1196,8 @@ def test_send_to_device(matrix_transports):
     raiden_service1 = MockRaidenService(message_handler1)
     transport1._receive_to_device = MagicMock()
 
+    transport0._address = raiden_service0.address
+    transport1._address = raiden_service1.address
     transport0.start(raiden_service0, message_handler0, "")
     transport1.start(raiden_service1, message_handler1, "")
 

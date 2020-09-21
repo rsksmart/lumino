@@ -1,5 +1,3 @@
-
-
 import random
 
 import gevent
@@ -947,4 +945,3 @@ def run_test_batch_unlock_after_restart(raiden_network, token_addresses, deposit
             participant=alice_bob_channel_state.partner_state.address,
             partner=alice_bob_channel_state.our_state.address,
         )
-

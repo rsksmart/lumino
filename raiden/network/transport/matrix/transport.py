@@ -1337,10 +1337,10 @@ class MatrixTransport(TransportLayer, Runnable):
         return True
 
     def link_exception(self, callback: Any):
-        Runnable.link_exception(self, callback)
+        self.greenlet.link_exception(callback)
 
     def join(self, timeout=None):
-        Runnable.join(self, timeout)
+        self.greenlet.join(timeout)
 
 
 class MatrixLightClientTransport(MatrixTransport):
@@ -1735,6 +1735,7 @@ class MatrixLightClientTransport(MatrixTransport):
         except (InvalidAddress, UnknownAddress, UnknownTokenAddress):
             self.log.warning("Exception while processing message", exc_info=True)
             return
+
 
 class NodeTransport:
 

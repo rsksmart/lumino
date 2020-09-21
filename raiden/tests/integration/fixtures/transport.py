@@ -63,6 +63,7 @@ def matrix_transports(
         server = local_matrix_servers[transport_index % len(local_matrix_servers)]
         transports.append(
             MatrixTransport(
+                bytearray(),  # must be set before starting the transport
                 {
                     "global_rooms": global_rooms,
                     "retries_before_backoff": retries_before_backoff,
