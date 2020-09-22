@@ -74,7 +74,6 @@ from raiden.utils.typing import (
     cast,
 )
 from transport.node import Node as TransportNode
-from transport.layer import Layer as TransportLayer
 from transport.message import Message as TransportMessage
 
 log = structlog.get_logger(__name__)
