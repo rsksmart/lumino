@@ -33,14 +33,12 @@ class Layer(ABC):
         Return the transport nodes for every light client registered in the running Lumino node.
         """
 
-    @property
     @abstractmethod
     def add_light_client_transport(self, light_client_transport: TransportNode):
         """
         Add a light client transport node to the layer.
         """
 
-    @property
     @abstractmethod
     def remove_light_client_transport(self, light_client_transport: TransportNode):
         """
