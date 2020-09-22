@@ -9,7 +9,7 @@ from raiden.constants import (
     PATH_FINDING_BROADCASTING_ROOM,
 )
 from raiden.message_handler import MessageHandler
-from raiden.network.transport import MatrixNode
+from raiden.network.transport import MatrixNode as MatrixTransportNode
 from raiden.raiden_event_handler import RaidenEventHandler
 from raiden.settings import DEFAULT_NUMBER_OF_BLOCK_CONFIRMATIONS
 from raiden.tests.utils.detect_failure import raise_on_failure
@@ -113,7 +113,7 @@ def run_test_regression_transport_global_queues_are_initialized_on_restart_for_s
 
     app0.stop()
 
-    transport = MatrixNode(app0.config["transport"]["matrix"])
+    transport = MatrixTransportNode(app0.config["transport"]["matrix"])
     transport.send_async = Mock()
     transport._send_raw = Mock()
 
