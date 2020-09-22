@@ -34,8 +34,9 @@ class Layer(ABC):
         Return the transport nodes for every light client registered in the running Lumino node.
         """
 
+    @staticmethod
     @abstractmethod
-    def new_light_client_transport(self, address: Address, config: Dict[str, Any]) -> TransportNode:
+    def new_light_client_transport(address: Address, config: Dict[str, Any]) -> TransportNode:
         """
         Instantiate a new transport node for a light client to be registered on the transport layer.
         """

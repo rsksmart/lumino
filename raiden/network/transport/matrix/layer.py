@@ -97,7 +97,8 @@ class MatrixLayer(TransportLayer):
     def light_client_transports(self) -> List[TransportNode]:
         return self._light_client_transports
 
-    def new_light_client_transport(self, address: Address, config: Dict[str, Any]) -> TransportNode:
+    @staticmethod
+    def new_light_client_transport(address: Address, config: Dict[str, Any]) -> TransportNode:
         return MatrixLightClientTransport(address, config)
 
     def add_light_client_transport(self, light_client_transport: TransportNode):
