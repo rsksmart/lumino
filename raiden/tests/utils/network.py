@@ -19,7 +19,6 @@ from raiden.tests.utils.factories import UNIT_CHAIN_ID
 from raiden.tests.utils.protocol import HoldRaidenEventHandler, WaitForMessage
 from raiden.transfer.identifiers import CanonicalIdentifier
 from raiden.transfer.views import state_from_raiden
-from raiden.ui.app import _setup_matrix
 from raiden.utils import BlockNumber, merge_dict, pex
 from raiden.utils.typing import Address, Optional
 from raiden.waiting import wait_for_payment_network
