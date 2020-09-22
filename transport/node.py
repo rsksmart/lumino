@@ -9,6 +9,11 @@ from raiden.utils import Address
 
 
 class Node(ABC):
+    """
+    Node represents a single address manaaged by the transport layer of the running Lumino node.
+    This address can work as a sender or receiver of communications in the context of transport,
+    and it can belong to both a node acting as a hub as well as one registered as a light client.
+    """
 
     def __init__(self, address: Address):
         """
