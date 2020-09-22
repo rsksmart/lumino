@@ -17,7 +17,7 @@ class Layer(ABC):
     def __init__(self, config: Dict[str, Any]):
         """
         Initialize the transport layer based on the received configuration in the form of an arbitrary dictionary.
-        This constructor should ultimately set the hub and light client transports in the transport layer.
+        This constructor should ultimately set the hub and light client transport nodes in the transport layer.
         """
 
     @property
