@@ -11,6 +11,7 @@ from raiden.network.blockchain_service import BlockChainService
 from raiden.network.rpc.client import JSONRPCClient
 from raiden.network.throttle import TokenBucket
 from raiden.network.transport import MatrixTransport, UDPTransport
+from raiden.network.transport.matrix.layer import MatrixLayer
 from raiden.raiden_event_handler import RaidenEventHandler
 from raiden.settings import DEFAULT_NUMBER_OF_BLOCK_CONFIRMATIONS, DEFAULT_RETRY_TIMEOUT
 from raiden.tests.utils.app import database_from_privatekey
@@ -364,7 +365,7 @@ def create_apps(
             user_deposit = blockchain.user_deposit(user_deposit_address)
 
         if use_matrix:
-            transport = _setup_matrix(config)
+            transport = MatrixLayer(config)
         else:
             throttle_policy = TokenBucket(
                 config["transport"]["udp"]["throttle_capacity"],
