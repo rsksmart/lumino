@@ -157,7 +157,7 @@ def ping_pong_message_success(transport0, transport1):
     return all_messages_received
 
 
-def is_reachable(transport: MatrixNode, address: Address) -> bool:
+def is_reachable(transport: MatrixTransportNode, address: Address) -> bool:
     return (
         transport._address_mgr.get_address_reachability(address) is AddressReachability.REACHABLE
     )
