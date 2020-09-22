@@ -2213,6 +2213,8 @@ class TokenNetwork:
             # gas will stop us from sending a transaction that will fail
             pass
 
+        transaction_error = None
+
         with self.channel_operations_lock[partner]:
             error_prefix = "Call to settle will fail"
             gas_limit = self.proxy.estimate_gas(
@@ -2293,7 +2295,7 @@ class TokenNetwork:
         """
             This function throws an exception with details about the error
         """
-        if transaction_error["blockNumber"]:
+        if transaction_error and transaction_error["blockNumber"]:
             block = transaction_error["blockNumber"]
         else:
             block = checking_block
@@ -2301,7 +2303,7 @@ class TokenNetwork:
         self.proxy.jsonrpc_client.check_for_insufficient_eth(
             transaction_name="settleChannel",
             address=self.node_address,
-            transaction_executed=transaction_error["blockNumber"] is not None,
+            transaction_executed=transaction_error and transaction_error["blockNumber"] is not None,
             required_gas=GAS_REQUIRED_FOR_SETTLE_CHANNEL,
             block_identifier=block,
         )
