@@ -12,7 +12,7 @@ from definitions import ROOT_DIR
 import json
 from eth_utils import encode_hex
 
-from raiden.network.transport.matrix.layer import MatrixLayer
+from raiden.network.transport.matrix.layer import MatrixLayer as MatrixTransportLayer
 
 from raiden.accounts import AccountManager
 from raiden.constants import (
@@ -256,7 +256,7 @@ def run_app(
             config, blockchain_service, address, contracts, endpoint_registry_contract_address
         )
     elif transport == "matrix":
-        transport = MatrixLayer(config)  # this should be replaced by structured or consistent config use
+        transport = MatrixTransportLayer(config)  # this should be replaced by structured or consistent config use
     else:
         raise RuntimeError(f'Unknown transport type "{transport}" given')
 

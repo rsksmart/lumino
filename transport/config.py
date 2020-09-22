@@ -1,4 +1,4 @@
-from raiden.network.transport.matrix.layer import MatrixLayer
+from raiden.network.transport.matrix.layer import MatrixLayer as MatrixTransportLayer
 
 from transport.layer import Layer as TransportLayer
 
@@ -13,4 +13,4 @@ class Config:
 
 
 # Matrix is hard-coded as the chosen implementation for now
-cfg = Config(MatrixLayer)
+cfg = Config(MatrixTransportLayer)
