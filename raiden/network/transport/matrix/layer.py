@@ -11,7 +11,6 @@ from raiden.network.transport.matrix import MatrixLightClientTransport
 from raiden.network.transport.matrix.utils import get_available_servers_from_config, server_is_available
 from raiden.settings import DEFAULT_MATRIX_KNOWN_SERVERS
 from raiden.storage import sqlite, serialize
-from raiden.ui.app import log
 from raiden.utils.cli import get_matrix_servers
 from transport.layer import Layer as TransportLayer
 from transport.node import Node as TransportNode
@@ -20,6 +19,8 @@ from transport.node import Node as TransportNode
 class MatrixLayer(TransportLayer):
 
     def __init__(self, config: Dict[str, Any]):
+        from raiden.ui.app import log
+
         if config["transport"]["matrix"].get("available_servers") is None:
             # fetch list of known servers from raiden-network/raiden-tranport repo
             available_servers_url = DEFAULT_MATRIX_KNOWN_SERVERS[config["environment_type"]]
@@ -80,8 +81,8 @@ class MatrixLayer(TransportLayer):
 
                 light_client_transports.append(light_client_transport)
 
-            self._hub_transport : TransportNode = MatrixTransport(config["address"], config["transport"]["matrix"])
-            self._light_client_transports : List[TransportNode] = light_client_transports
+            self._hub_transport: TransportNode = MatrixTransport(config["address"], config["transport"]["matrix"])
+            self._light_client_transports: List[TransportNode] = light_client_transports
 
         except RaidenError as ex:
             click.secho(f"FATAL: {ex}", fg="red")
