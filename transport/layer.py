@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any
 
+from raiden.utils import Address
 from transport.node import Node as TransportNode
 
 
@@ -31,6 +32,12 @@ class Layer(ABC):
     def light_client_transports(self) -> List[TransportNode]:
         """
         Return the transport nodes for every light client registered in the running Lumino node.
+        """
+
+    @abstractmethod
+    def new_light_client_transport(self, address: Address, config: Dict[str, Any]) -> TransportNode:
+        """
+        Instantiate a new transport node for a light client to be registered on the transport layer.
         """
 
     @abstractmethod

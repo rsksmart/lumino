@@ -11,6 +11,7 @@ from raiden.network.transport.matrix import MatrixLightClientTransport
 from raiden.network.transport.matrix.utils import get_available_servers_from_config, server_is_available
 from raiden.settings import DEFAULT_MATRIX_KNOWN_SERVERS
 from raiden.storage import sqlite, serialize
+from raiden.utils import Address
 from raiden.utils.cli import get_matrix_servers
 from transport.layer import Layer as TransportLayer
 from transport.node import Node as TransportNode
@@ -95,6 +96,9 @@ class MatrixLayer(TransportLayer):
     @property
     def light_client_transports(self) -> List[TransportNode]:
         return self._light_client_transports
+
+    def new_light_client_transport(self, address: Address, config: Dict[str, Any]) -> TransportNode:
+        return MatrixLightClientTransport(address, config)
 
     def add_light_client_transport(self, light_client_transport: TransportNode):
         self._light_client_transports.append(light_client_transport)
