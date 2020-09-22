@@ -93,7 +93,7 @@ class _RetryQueue(Runnable):
         # generator that tells if the message should be sent now
         expiration_generator: Iterator[bool]
 
-    def __init__(self, transport: "MatrixTransport", receiver: Address):
+    def __init__(self, transport: "MatrixNode", receiver: Address):
         self.transport = transport
         self.receiver = receiver
         self._message_queue: List[_RetryQueue._MessageData] = list()
@@ -251,7 +251,7 @@ class _RetryQueue(Runnable):
         return f"<{self.__class__.__name__} for {to_normalized_address(self.receiver)}>"
 
 
-class MatrixTransport(TransportNode, Runnable):
+class MatrixNode(TransportNode, Runnable):
     _room_prefix = "raiden"
     _room_sep = "_"
     log = log
@@ -1344,12 +1344,12 @@ class MatrixTransport(TransportNode, Runnable):
         self.greenlet.join(timeout)
 
 
-class MatrixLightClientTransport(MatrixTransport):
+class MatrixLightClientNode(MatrixNode):
 
     def __init__(self,
                  address: Address,
                  config: dict):
-        MatrixTransport.__init__(self, address, config)
+        MatrixNode.__init__(self, address, config)
         self._encrypted_light_client_password_signature = config["light_client_password"]
         self._encrypted_light_client_display_name_signature = config["light_client_display_name"]
         self._encrypted_light_client_seed_for_retry_signature = config["light_client_seed_retry"]
@@ -1420,7 +1420,7 @@ class MatrixLightClientTransport(MatrixTransport):
                 retrier.start()
 
         self.log.debug("Matrix started", config=self._config)
-        MatrixTransport.start_greenlet_for_light_client(self)
+        MatrixNode.start_greenlet_for_light_client(self)
         self._started = True
 
     def _run(self):

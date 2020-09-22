@@ -6,8 +6,8 @@ import click
 
 from raiden.constants import PATH_FINDING_BROADCASTING_ROOM, MONITORING_BROADCASTING_ROOM
 from raiden.exceptions import RaidenError
-from raiden.network.transport import MatrixTransport
-from raiden.network.transport.matrix import MatrixLightClientTransport
+from raiden.network.transport import MatrixNode
+from raiden.network.transport.matrix import MatrixLightClientNode
 from raiden.network.transport.matrix.utils import get_available_servers_from_config, server_is_available
 from raiden.settings import DEFAULT_MATRIX_KNOWN_SERVERS
 from raiden.storage import sqlite, serialize
@@ -75,14 +75,14 @@ class MatrixLayer(TransportLayer):
                 config["encrypt_signed_password"] = light_client["password"]
                 config["encrypt_signed_display_name"] = light_client["display_name"]
                 config["encrypt_signed_seed_retry"] = light_client["seed_retry"]
-                light_client_transport = MatrixLightClientTransport(
+                light_client_transport = MatrixLightClientNode(
                     light_client['address'],
                     config,
                 )
 
                 light_client_transports.append(light_client_transport)
 
-            self._hub_transport: TransportNode = MatrixTransport(config["address"], config["transport"]["matrix"])
+            self._hub_transport: TransportNode = MatrixNode(config["address"], config["transport"]["matrix"])
             self._light_client_transports: List[TransportNode] = light_client_transports
 
         except RaidenError as ex:
@@ -99,7 +99,7 @@ class MatrixLayer(TransportLayer):
 
     @staticmethod
     def new_light_client_transport(address: Address, config: Dict[str, Any]) -> TransportNode:
-        return MatrixLightClientTransport(address, config)
+        return MatrixLightClientNode(address, config)
 
     def add_light_client_transport(self, light_client_transport: TransportNode):
         self._light_client_transports.append(light_client_transport)

@@ -1,4 +1,4 @@
-from raiden.network.transport.matrix.transport import MatrixTransport, _RetryQueue, MatrixLightClientTransport  # noqa
+from raiden.network.transport.matrix.transport import MatrixNode, _RetryQueue, MatrixLightClientNode  # noqa
 from transport.layer import Layer as TransportLayer  # noqa
 from raiden.network.transport.matrix.utils import (  # noqa
     AddressReachability,
