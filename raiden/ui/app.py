@@ -256,7 +256,7 @@ def run_app(
             config, blockchain_service, address, contracts, endpoint_registry_contract_address
         )
     elif transport == "matrix":
-        transport = MatrixLayer(config)
+        transport = MatrixLayer(config)  # this should be replaced by structured or consistent config use
     else:
         raise RuntimeError(f'Unknown transport type "{transport}" given')
 
