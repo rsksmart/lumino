@@ -36,7 +36,7 @@ class Layer(ABC):
 
     @staticmethod
     @abstractmethod
-    def new_light_client_transport(address: Address, config: Dict[str, Any]) -> TransportNode:
+    def new_light_client_transport(address: Address, config: dict, auth_params: dict) -> TransportNode:
         """
         Instantiate a new transport node for a light client to be registered on the transport layer.
         """

@@ -72,12 +72,15 @@ class MatrixLayer(TransportLayer):
 
                 config = config["transport"]["matrix"]
                 config["current_server_name"] = current_server_name
-                config["encrypt_signed_password"] = light_client["password"]
-                config["encrypt_signed_display_name"] = light_client["display_name"]
-                config["encrypt_signed_seed_retry"] = light_client["seed_retry"]
+                auth_params = {
+                    "light_client_password": light_client["password"],
+                    "light_client_display_name": light_client["display_name"],
+                    "light_client_seed_retry": light_client["seed_retry"]
+                }
                 light_client_transport = MatrixLightClientTransportNode(
                     light_client['address'],
                     config,
+                    auth_params,
                 )
 
                 light_client_transports.append(light_client_transport)
@@ -98,8 +101,8 @@ class MatrixLayer(TransportLayer):
         return self._light_client_transports
 
     @staticmethod
-    def new_light_client_transport(address: Address, config: Dict[str, Any]) -> TransportNode:
-        return MatrixLightClientTransportNode(address, config)
+    def new_light_client_transport(address: Address, config: dict, auth_params: dict) -> TransportNode:
+        return MatrixLightClientTransportNode(address, config, auth_params)
 
     def add_light_client_transport(self, light_client_transport: TransportNode):
         self._light_client_transports.append(light_client_transport)

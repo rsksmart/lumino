@@ -2024,6 +2024,8 @@ class RestAPI:
         display_name,
         seed_retry
     ):
+        config = self.raiden_api.raiden.config["transport"]["matrix"]
+
         # Recover light client address from password and signed_password
         address_recovered_from_signed_password = recover(
             data=password.encode(),
@@ -2059,13 +2061,15 @@ class RestAPI:
         )
 
         if light_client and light_client["result_code"] == 200:
-            config = self.raiden_api.raiden.config["transport"]["matrix"]
-            config["light_client_password"] = light_client["encrypt_signed_password"]
-            config["light_client_display_name"] = light_client["encrypt_signed_display_name"]
-            config["light_client_seed_retry"] = light_client["encrypt_signed_seed_retry"]
+            auth_params = {
+                "light_client_password": light_client["encrypt_signed_password"],
+                "light_client_display_name": light_client["encrypt_signed_display_name"],
+                "light_client_seed_retry": light_client["encrypt_signed_seed_retry"]
+            }
             light_client_transport = transport_config.transport_layer.new_light_client_transport(
                 address=light_client["address"],
-                config=config
+                config=config,
+                auth_params=auth_params,
             )
 
             self.raiden_api.raiden.start_transport_in_runtime(

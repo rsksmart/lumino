@@ -1346,13 +1346,11 @@ class MatrixNode(TransportNode, Runnable):
 
 class MatrixLightClientNode(MatrixNode):
 
-    def __init__(self,
-                 address: Address,
-                 config: dict):
+    def __init__(self, address: Address, config: dict, auth_params: dict):
         MatrixNode.__init__(self, address, config)
-        self._encrypted_light_client_password_signature = config["light_client_password"]
-        self._encrypted_light_client_display_name_signature = config["light_client_display_name"]
-        self._encrypted_light_client_seed_for_retry_signature = config["light_client_seed_retry"]
+        self._encrypted_light_client_password_signature = auth_params["light_client_password"]
+        self._encrypted_light_client_display_name_signature = auth_params["light_client_display_name"]
+        self._encrypted_light_client_seed_for_retry_signature = auth_params["light_client_seed_retry"]
 
     def start(  # type: ignore
         self,
