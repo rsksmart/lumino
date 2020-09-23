@@ -312,7 +312,7 @@ def handle_send_secret_reveal_light(
                                                   state_change.reveal_secret, True,
                                                   LightClientProtocolMessageType.PaymentSuccessful,
                                                   sender_light_client_address=sender_light_client_address,
-                                                  receiver_light_client_address=transfer.target)
+                                                  receiver_light_client_address=transfer.initiator)
     iteration = TransitionResult(target_state, [revealsecret, store_reveal_secret_event])
     return iteration
 
@@ -462,6 +462,7 @@ def handle_offchain_secretreveal_light(
 
         receiver_light_client_address = state_change.recipient if channel_state.both_participants_are_light_clients else None
 
+
         store_received_reveal = StoreMessageEvent(
             received_reveal_secret.message_identifier,
             target_state.transfer.payment_identifier,
@@ -469,7 +470,7 @@ def handle_offchain_secretreveal_light(
             received_reveal_secret,
             True,
             LightClientProtocolMessageType.PaymentSuccessful,
-            target_state.transfer.target,
+            target_state.transfer.initiator,
             receiver_light_client_address=receiver_light_client_address
         )
         store_reveal_to_send = StoreMessageEvent(
@@ -479,8 +480,8 @@ def handle_offchain_secretreveal_light(
             reveal_secret_to_send_msg,
             False,
             LightClientProtocolMessageType.PaymentSuccessful,
-            target_state.transfer.target,
-            receiver_light_client_address=receiver_light_client_address
+            sender_light_client_address=receiver_light_client_address,
+            receiver_light_client_address= target_state.transfer.initiator
         )
 
         iteration = TransitionResult(target_state, [store_received_reveal, store_reveal_to_send])

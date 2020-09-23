@@ -612,7 +612,7 @@ def handle_offchain_secretreveal_light(
         )
         unlock_msg = Unlock.from_event(unlock_lock)
 
-        receiver_light_client_address = state_change.recipient if channel_state.both_participants_are_light_clients else None
+        receiver_light_client_address = transfer_description.target if channel_state.both_participants_are_light_clients else None
 
         store_received_secret_reveal_event = StoreMessageEvent(state_change.secret_reveal_message.message_identifier,
                                                                transfer_description.payment_identifier,

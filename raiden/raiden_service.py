@@ -1329,20 +1329,27 @@ class RaidenService(Runnable):
                                       message_type: LightClientProtocolMessageType):
         lc_transport = self.get_light_client_transport(to_checksum_address(sender_address))
         # check if receiver is a handled light client too
+        print("ME LLEGO UN DELIVERED CON ORDEN")
+        print(msg_order)
+        print(sender_address.hex())
+        print(receiver_address.hex())
         receiver_is_light_client = self.get_light_client_transport(to_checksum_address(receiver_address)) is not None
         if lc_transport:
-            LightClientMessageHandler.store_light_client_protocol_message(
-                delivered.delivered_message_identifier,
-                delivered,
-                True,
-                payment_id,
-                sender_address,
-                receiver_address if receiver_is_light_client else None,
-                msg_order,
-                message_type,
-                self.wal
-            )
-            lc_transport.send_for_light_client_with_retry(receiver_address, delivered)
+            exists = LightClientMessageHandler.is_light_client_protocol_message_already_stored_message_id(
+                delivered.delivered_message_identifier,payment_id, msg_order, self.wal)
+            if not exists:
+                LightClientMessageHandler.store_light_client_protocol_message(
+                    delivered.delivered_message_identifier,
+                    delivered,
+                    True,
+                    payment_id,
+                    sender_address,
+                    receiver_address if receiver_is_light_client else None,
+                    msg_order,
+                    message_type,
+                    self.wal
+                )
+                lc_transport.send_for_light_client_with_retry(receiver_address, delivered)
 
     def initiate_send_processed_light(self, sender_address: Address, receiver_address: Address,
                                       processed: Processed, msg_order: int, payment_id: int,
