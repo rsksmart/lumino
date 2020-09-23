@@ -473,18 +473,8 @@ def handle_offchain_secretreveal_light(
             target_state.transfer.initiator,
             receiver_light_client_address=receiver_light_client_address
         )
-        store_reveal_to_send = StoreMessageEvent(
-            message_identifier,
-            target_state.transfer.payment_identifier,
-            9,
-            reveal_secret_to_send_msg,
-            False,
-            LightClientProtocolMessageType.PaymentSuccessful,
-            sender_light_client_address=receiver_light_client_address,
-            receiver_light_client_address= target_state.transfer.initiator
-        )
 
-        iteration = TransitionResult(target_state, [store_received_reveal, store_reveal_to_send])
+        iteration = TransitionResult(target_state, [store_received_reveal])
 
     else:
         # TODO: event for byzantine behavior
