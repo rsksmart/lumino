@@ -558,11 +558,16 @@ def valid_lockedtransfer_check(
     distributable = get_distributable(sender_state, receiver_state)
     expected_locked_amount = current_locked_amount + lock.amount
 
+    print("sender_state = {}".format(sender_state.balance_proof))
+    print("receiver_state = {}".format(receiver_state.balance_proof))
+
     is_balance_proof_usable, invalid_balance_proof_msg = is_balance_proof_usable_onchain(
         received_balance_proof=received_balance_proof,
         channel_state=channel_state,
         sender_state=sender_state,
     )
+
+    print("IS BALANCE PROOF USABLE ?????????????????????????????? {} {}".format(is_balance_proof_usable, invalid_balance_proof_msg))
 
     result: MerkletreeOrError = (False, None, None, None)
 
@@ -1447,7 +1452,20 @@ def events_for_expired_lock(
         channel_state.our_state.merkletree = merkletree
         channel_state.our_state.balance_proof = send_lock_expired.balance_proof
 
-        _del_unclaimed_lock(channel_state.our_state, locked_lock.secrethash)
+        print("HANDLING EXPIRED LOCK FROM BLOCK CHANGE, OUR BALANCE PROOF WAS UPDATED WITH NONCE = {}".format(channel_state.our_state.balance_proof.nonce))
+        print("OUR PARTNER BALANCE PROOF HAS NONCE = {}".format(
+            channel_state.partner_state.balance_proof.nonce if channel_state.partner_state.balance_proof else "NO BALANCE PROOF"))
+
+        # we only delete the lock when we know that the balance proof with the nonce was updated on both sides
+        if channel_state.partner_state.balance_proof \
+           and channel_state.partner_state.balance_proof.nonce == channel_state.our_state.balance_proof.nonce:
+            # this means we already received the lock expired message with the updated nonce
+            # so we can delete this to trigger the payment task deletion
+            # otherwise the partner needs to send us the lock expired with
+            # the updated nonce before we can delete the payment task
+            _del_unclaimed_lock(channel_state.our_state, locked_lock.secrethash)
+            _del_unclaimed_lock(channel_state.partner_state, locked_lock.secrethash)
+            print("DELETED LOCK BECAUSE WE ALREADY RECEIVED A LOCK EXPIRED SO WE CAN DELETE IT SINCE WE ARE SENDING OUT THE LOCK EXPIRED")
 
         if channel_state.is_light_channel:
             # Store the send lock expired light message
@@ -1627,7 +1645,22 @@ def handle_receive_lock_expired(
         channel_state.partner_state.balance_proof = state_change.balance_proof
         channel_state.partner_state.merkletree = merkletree
 
-        _del_unclaimed_lock(channel_state.partner_state, state_change.secrethash)
+        print("HANDLING EXPIRED LOCK FROM RECEIVE LOCK EXPIRED, PARTNER BALANCE PROOF WAS UPDATED WITH NONCE = {}".format(
+            channel_state.partner_state.balance_proof.nonce))
+        print("OUR BALANCE PROOF HAS NONCE = {}".format(
+            channel_state.our_state.balance_proof.nonce if channel_state.our_state.balance_proof else "NO BALANCE PROOF"))
+
+        # we only delete the lock when we know that the balance proof with the nonce was updated on both sides
+        if channel_state.our_state.balance_proof \
+           and channel_state.our_state.balance_proof.nonce == channel_state.partner_state.balance_proof.nonce:
+            # this means we already sent the lock expired message with the updated nonce
+            # so we can delete this to trigger the payment task deletion
+            # otherwise we needs to send the lock expired with
+            # the updated nonce before we can delete the payment task
+            _del_unclaimed_lock(channel_state.partner_state, state_change.secrethash)
+            _del_unclaimed_lock(channel_state.our_state, state_change.secrethash)
+            print(
+                "DELETED LOCK BECAUSE WE ALREADY SENT A LOCK EXPIRED SO WE CAN DELETE IT SINCE WE ARE RECEIVING THE LOCK EXPIRED FROM THE PARTNER")
 
         send_processed = SendProcessed(
             recipient=state_change.balance_proof.sender,
@@ -1660,10 +1693,27 @@ def handle_receive_lock_expired_light(
     events: List[Event] = list()
     if is_valid:
         assert merkletree, "is_valid_lock_expired should return merkletree if valid"
+
         channel_state.partner_state.balance_proof = state_change.balance_proof
         channel_state.partner_state.merkletree = merkletree
 
-        _del_unclaimed_lock(channel_state.partner_state, state_change.secrethash)
+        print(
+            "HANDLING EXPIRED LOCK FROM RECEIVE LOCK EXPIRED LIGHT, PARTNER BALANCE PROOF WAS UPDATED WITH NONCE = {}".format(
+                channel_state.partner_state.balance_proof.nonce))
+        print("OUR BALANCE PROOF HAS NONCE = {}".format(
+            channel_state.our_state.balance_proof.nonce if channel_state.our_state.balance_proof else "NO BALANCE PROOF"))
+
+        # we only delete the lock when we know that the balance proof with the nonce was updated on both sides
+        if channel_state.our_state.balance_proof \
+           and channel_state.our_state.balance_proof.nonce == channel_state.partner_state.balance_proof.nonce:
+            # this means we already sent the lock expired message with the updated nonce
+            # so we can delete this to trigger the payment task deletion
+            # otherwise we needs to send the lock expired with
+            # the updated nonce before we can delete the payment task
+            _del_unclaimed_lock(channel_state.partner_state, state_change.secrethash)
+            _del_unclaimed_lock(channel_state.our_state, state_change.secrethash)
+            print(
+                "DELETED LOCK BECAUSE WE ALREADY SENT A LOCK EXPIRED SO WE CAN DELETE IT SINCE WE ARE RECEIVING THE LOCK EXPIRED FROM THE PARTNER")
 
         store_lock_expired = StoreMessageEvent(
             state_change.lock_expired.message_identifier,
@@ -1811,6 +1861,9 @@ def handle_block(
     assert state_change.block_number == block_number
 
     events: List[Event] = list()
+
+    print("HANDLE BLOCK FOR CHANNEL ID {} WITH PARTNER {}".format(channel_state.canonical_identifier.channel_identifier, channel_state.partner_state.address.hex()))
+    print("PARTNER BALANCE PROOF = {}".format(channel_state.partner_state.balance_proof))
 
     if get_status(channel_state) == CHANNEL_STATE_CLOSED:
         msg = "channel get_status is STATE_CLOSED, but close_transaction is not set"

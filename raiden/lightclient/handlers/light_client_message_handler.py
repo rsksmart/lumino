@@ -73,8 +73,8 @@ class LightClientMessageHandler:
     def update_light_client_payment_status(cls, payment_id: int, status: LightClientPaymentStatus,
                                            storage: SerializedSQLiteStorage):
         exists_payment = storage.get_light_client_payment(payment_id)
-        if not exists_payment:
-            storage.update_light_client_payment_status(payment_id, status, storage)
+        if exists_payment:
+            storage.update_light_client_payment_status(payment_id, status)
 
     @classmethod
     def is_light_client_protocol_message_already_stored(cls, payment_id: int,

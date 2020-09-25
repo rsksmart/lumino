@@ -2,6 +2,8 @@ import random
 
 from eth_utils import keccak
 
+from raiden.lightclient.handlers.light_client_message_handler import LightClientMessageHandler
+from raiden.lightclient.models.light_client_payment import LightClientPaymentStatus
 from raiden.lightclient.models.light_client_protocol_message import LightClientProtocolMessageType
 
 from raiden.messages import RefundTransfer
@@ -27,7 +29,7 @@ from raiden.transfer.mediated_transfer.state_change import (
     ReceiveSecretReveal,
     ActionTransferReroute,
     ActionInitInitiatorLight, ReceiveSecretRequestLight, ActionSendSecretRevealLight, ReceiveSecretRevealLight,
-    ReceiveTransferCancelRoute, StoreRefundTransferLight)
+    ReceiveTransferCancelRoute, StoreRefundTransferLight, ReceiveLockExpiredLight)
 from raiden.transfer.state import RouteState
 from raiden.transfer.state_change import ActionCancelPayment, Block, ContractReceiveSecretReveal
 from raiden.utils.typing import (
@@ -142,8 +144,6 @@ def subdispatch_to_initiatortransfer(
     channelidentifiers_to_channels: ChannelMap,
     pseudo_random_generator: random.Random,
 ) -> TransitionResult[InitiatorTransferState]:
-    print("initiator_manager subdispatch_to_initiatortransfer")
-
     channel_identifier = initiator_state.channel_identifier
     channel_state = channelidentifiers_to_channels[initiator_state.transfer_description.initiator].get(
         channel_identifier)
@@ -159,6 +159,9 @@ def subdispatch_to_initiatortransfer(
 
     if sub_iteration.new_state is None:
         print("No new state, payment task for initiator ends")
+        print("DELETED TASK FOR PAYMENT WITH SECRETHASH = {}".format(initiator_state.transfer.lock.secrethash))
+        print("TASK = {}".format(payment_state.initiator_transfers[initiator_state.transfer.lock.secrethash].to_dict()))
+        print("STATE CHANGE = {}".format(state_change))
         del payment_state.initiator_transfers[initiator_state.transfer.lock.secrethash]
 
     return sub_iteration
@@ -175,7 +178,6 @@ def subdispatch_to_all_initiatortransfer(
     will alter the `initiator_transfers` list and this is not
     allowed if iterating over the original list.
     """
-    print("Block initiator manager subdispatch_to_all_initiatortransfer")
     for secrethash in list(payment_state.initiator_transfers.keys()):
         initiator_state = payment_state.initiator_transfers[secrethash]
         sub_iteration = subdispatch_to_initiatortransfer(
@@ -383,6 +385,47 @@ def handle_transferreroute(
     return TransitionResult(payment_state, events)
 
 
+def handle_lock_expired_light(
+    payment_state: InitiatorPaymentState,
+    state_change: ReceiveLockExpiredLight,
+    channelidentifiers_to_channels: ChannelMap,
+    block_number: BlockNumber,
+    storage
+) -> TransitionResult[InitiatorPaymentState]:
+    initiator_state = payment_state.initiator_transfers.get(state_change.secrethash)
+    if not initiator_state:
+        return TransitionResult(payment_state, list())
+
+    """Update the status of the payment to Expired ."""
+    LightClientMessageHandler.update_light_client_payment_status(initiator_state.transfer.payment_identifier,
+                                                                 LightClientPaymentStatus.Expired, storage)
+
+    channel_identifier = initiator_state.channel_identifier
+    try:
+        channel_state = channelidentifiers_to_channels[
+            initiator_state.transfer_description.initiator].get(channel_identifier)
+    except KeyError:
+        return TransitionResult(payment_state, list())
+
+    secrethash = initiator_state.transfer.lock.secrethash
+    result = channel.handle_receive_lock_expired_light(
+        channel_state=channel_state, state_change=state_change, block_number=block_number,
+        payment_id=initiator_state.transfer.payment_identifier
+    )
+    assert result.new_state, "handle_receive_lock_expired should not delete the task"
+
+    if not channel.get_lock(result.new_state.partner_state, secrethash):
+        transfer = initiator_state.transfer
+        unlock_failed = EventUnlockClaimFailed(
+            identifier=transfer.payment_identifier,
+            secrethash=transfer.lock.secrethash,
+            reason="Lock expired",
+        )
+        result.events.append(unlock_failed)
+
+    return TransitionResult(payment_state, result.events)
+
+
 def handle_lock_expired(
     payment_state: InitiatorPaymentState,
     state_change: ReceiveLockExpired,
@@ -428,7 +471,6 @@ def handle_lock_expired(
         result.events.append(unlock_failed)
 
     return TransitionResult(payment_state, result.events)
-
 
 
 def handle_offchain_secretreveal_light(
@@ -743,6 +785,16 @@ def state_transition(
             state_change=state_change,
             channelidentifiers_to_channels=channelidentifiers_to_channels,
             block_number=block_number,
+        )
+    elif type(state_change) == ReceiveLockExpiredLight:
+        assert isinstance(state_change, ReceiveLockExpiredLight), MYPY_ANNOTATION
+        assert payment_state, "ReceiveLockExpired should be accompanied by a valid payment state"
+        iteration = handle_lock_expired_light(
+            payment_state=payment_state,
+            state_change=state_change,
+            channelidentifiers_to_channels=channelidentifiers_to_channels,
+            block_number=block_number,
+            storage=storage
         )
     elif type(state_change) == ContractReceiveSecretReveal:
         assert isinstance(state_change, ContractReceiveSecretReveal), MYPY_ANNOTATION
