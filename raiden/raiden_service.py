@@ -1334,11 +1334,11 @@ class RaidenService(Runnable):
                 delivered.delivered_message_identifier,
                 delivered,
                 True,
-                payment_id,
                 sender_address,
                 msg_order,
                 message_type,
-                self.wal
+                self.wal,
+                payment_id
             )
             queue_identifier = QueueIdentifier(
                 recipient=receiver_address, channel_identifier=CHANNEL_IDENTIFIER_GLOBAL_QUEUE
@@ -1354,11 +1354,11 @@ class RaidenService(Runnable):
                 processed.message_identifier,
                 processed,
                 True,
-                payment_id,
                 sender_address,
                 msg_order,
                 message_type,
-                self.wal
+                self.wal,
+                payment_id
             )
             queue_identifier = QueueIdentifier(
                 recipient=receiver_address, channel_identifier=CHANNEL_IDENTIFIER_GLOBAL_QUEUE

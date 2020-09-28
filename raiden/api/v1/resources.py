@@ -27,7 +27,7 @@ from raiden.api.v1.encoding import (
     LightClientMatrixCredentialsBuildSchema,
     PaymentLightPutSchema,
     CreatePaymentLightPostSchema,
-    WatchtowerPutResource, LightClientMessageGetSchema)
+    WatchtowerPutResource, LightClientMessageGetSchema, SettlementLightSchema)
 from raiden.messages import  Unlock
 
 from raiden.utils import typing
@@ -147,6 +147,16 @@ class LightChannelsResourceByTokenAndPartnerAddress(BaseResource):
 
     def get(self, **kwargs):
         return self.rest_api.get_channel(
+            registry_address=self.rest_api.raiden_api.raiden.default_registry.address, **kwargs
+        )
+
+
+class SettlementLightResourceByTokenAndPartnerAddress(BaseResource):
+    schema = SettlementLightSchema
+
+    @use_kwargs(schema, locations=("json",))
+    def post(self, **kwargs):
+        return self.rest_api.settlement_light(
             registry_address=self.rest_api.raiden_api.raiden.default_registry.address, **kwargs
         )
 
