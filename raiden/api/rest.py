@@ -887,7 +887,7 @@ class RestAPI:
     def register_secret_light(self, signed_tx: typing.SignedTransaction):
         try:
             self.raiden_api.register_secret_light(signed_tx)
-            return api_response(result=dict(), status_code=HTTPStatus.NO_CONTENT)
+            return api_response(result=dict(), status_code=HTTPStatus.OK)
         except InsufficientFunds as e:
             return api_error(errors=str(e), status_code=HTTPStatus.PAYMENT_REQUIRED)
         except (RawTransactionFailed, InvalidPaymentIdentifier) as e:
