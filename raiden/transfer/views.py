@@ -283,37 +283,17 @@ def get_channelstate_for(
     )
 
     channel_state = None
-    address_to_get_channel_state = creator_address
-
-    # Dos casos el primer cuando un ligth client crea un canal con un nodo normal a traves del hub
-    # Cuando un light client crea una canal con un hub directamente
-
-    channel = None
-    if token_network and creator_address in token_network.channelidentifiers_to_channels or \
-        token_network and partner_address in token_network.channelidentifiers_to_channels:
-        channels = []
-        for channel_id in token_network.partneraddresses_to_channelidentifiers[partner_address]:
-
-            if creator_address in token_network.channelidentifiers_to_channels:
-                channel = token_network.channelidentifiers_to_channels[creator_address].get(channel_id)
-
-            if channel is None and partner_address in token_network.channelidentifiers_to_channels:
-                # Check if partner address had a open channel, can be a hub node.
-                channel = token_network.channelidentifiers_to_channels[partner_address].get(channel_id)
-                address_to_get_channel_state = partner_address
-
-            if channel is not None:
-                if channel.close_transaction is None or channel.close_transaction.result != 'success':
-                    channels.append(token_network.channelidentifiers_to_channels[address_to_get_channel_state][channel_id])
-            channel = None
-
+    if token_network:
+        channels = [
+            token_network.channelidentifiers_to_channels[creator_address].get(channel_id)
+            for channel_id in token_network.partneraddresses_to_channelidentifiers[partner_address]
+        ]
         states = filter_channels_by_status(channels, [CHANNEL_STATE_UNUSABLE])
         # If multiple channel states are found, return the last one.
         if states:
             channel_state = states[-1]
 
     return channel_state
-
 
 def get_channelstate_for_close_channel(
     chain_state: ChainState,
@@ -641,7 +621,7 @@ def filter_channels_by_status(
 
     states = []
     for channel_state in channel_states:
-        if channel.get_status(channel_state) not in exclude_states:
+        if channel_state and channel.get_status(channel_state) not in exclude_states:
             states.append(channel_state)
 
     return states

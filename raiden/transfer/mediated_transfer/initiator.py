@@ -612,7 +612,8 @@ def handle_offchain_secretreveal_light(
         )
         unlock_msg = Unlock.from_event(unlock_lock)
 
-        receiver_light_client_address = transfer_description.target if channel_state.both_participants_are_light_clients else None
+        sender_light_client_address = transfer_description.target if channel_state.both_participants_are_light_clients else None
+
 
         store_received_secret_reveal_event = StoreMessageEvent(state_change.secret_reveal_message.message_identifier,
                                                                transfer_description.payment_identifier,
@@ -620,13 +621,13 @@ def handle_offchain_secretreveal_light(
                                                                state_change.secret_reveal_message,
                                                                True,
                                                                LightClientProtocolMessageType.PaymentSuccessful,
-                                                               transfer_description.initiator,
-                                                               receiver_light_client_address=receiver_light_client_address)
+                                                               sender_light_client_address=sender_light_client_address,
+                                                               receiver_light_client_address=transfer_description.initiator)
         store_created_unlock_event = StoreMessageEvent(message_identifier, transfer_description.payment_identifier, 11,
                                                        unlock_msg, False,
                                                        LightClientProtocolMessageType.PaymentSuccessful,
-                                                       transfer_description.initiator,
-                                                       receiver_light_client_address=receiver_light_client_address)
+                                                       sender_light_client_address,
+                                                       receiver_light_client_address=transfer_description.initiator)
         events = list()
         events.append(store_received_secret_reveal_event)
         events.append(store_created_unlock_event)

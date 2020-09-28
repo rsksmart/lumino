@@ -58,7 +58,7 @@ class LightClientUtils:
             channel_identifier=channel_state.canonical_identifier.channel_identifier,
             transferred_amount=transferred_amount,
             locked_amount=locked_amount,
-            recipient=channel_state.partner_state.address,
+            recipient=partner_address, # TODO is this ok? what happenswith mediated payments?
             locksroot=locksroot,
             lock=lock,
             target=TargetAddress(partner_address),
