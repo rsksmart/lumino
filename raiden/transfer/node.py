@@ -804,7 +804,7 @@ def handle_init_mediator(
     token_network_identifier = transfer.balance_proof.token_network_identifier
 
     return subdispatch_mediatortask(
-        chain_state, state_change, TokenNetworkID(token_network_identifier), state_change.from_transfer.target, secrethash, storage
+        chain_state, state_change, TokenNetworkID(token_network_identifier), chain_state.our_address, secrethash, storage
     )
 
 

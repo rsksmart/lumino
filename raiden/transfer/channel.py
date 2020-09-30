@@ -563,6 +563,8 @@ def valid_lockedtransfer_check(
         channel_state=channel_state,
         sender_state=sender_state,
     )
+    print("is balance proof usable")
+    print(invalid_balance_proof_msg)
 
     result: MerkletreeOrError = (False, None, None, None)
 
@@ -1742,7 +1744,9 @@ def handle_receive_lockedtransfer_light(
     is_valid, msg, merkletree, handle_invoice_result = is_valid_lockedtransfer(
         mediated_transfer, channel_state, channel_state.partner_state, channel_state.our_state, storage
     )
-
+    print("is valid")
+    print(is_valid)
+    print(msg)
     if is_valid:
         assert merkletree, "is_valid_lock_expired should return merkletree if valid"
         channel_state.partner_state.balance_proof = mediated_transfer.balance_proof

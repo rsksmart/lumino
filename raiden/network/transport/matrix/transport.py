@@ -875,6 +875,8 @@ class MatrixTransport(Runnable):
 
     def _send_raw(self, receiver_address: Address, data: str):
         with self._getroom_lock:
+            print("get room for receiver address")
+            print(receiver_address)
             room = self._get_room_for_address(receiver_address)
         if not room:
             self.log.error(
@@ -911,6 +913,7 @@ class MatrixTransport(Runnable):
         address_pair = sorted(
             [to_normalized_address(address) for address in [address, self._raiden_service.address]]
         )
+        print("making room alias")
         room_name = make_room_alias(self.network_id, *address_pair)
 
         # no room with expected name => create one and invite peer
