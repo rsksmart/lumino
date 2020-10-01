@@ -2,11 +2,13 @@ import random
 
 from eth_utils import keccak
 
+from raiden.exceptions import RaidenUnrecoverableError
 from raiden.lightclient.handlers.light_client_message_handler import LightClientMessageHandler
 from raiden.lightclient.models.light_client_payment import LightClientPaymentStatus
 from raiden.lightclient.models.light_client_protocol_message import LightClientProtocolMessageType
 
 from raiden.messages import RefundTransfer
+from raiden.storage.sqlite import SerializedSQLiteStorage
 
 from raiden.transfer import channel, routes
 from raiden.transfer.architecture import Event, StateChange, TransitionResult
@@ -29,7 +31,7 @@ from raiden.transfer.mediated_transfer.state_change import (
     ReceiveSecretReveal,
     ActionTransferReroute,
     ActionInitInitiatorLight, ReceiveSecretRequestLight, ActionSendSecretRevealLight, ReceiveSecretRevealLight,
-    ReceiveTransferCancelRoute, StoreRefundTransferLight, ReceiveLockExpiredLight)
+    ReceiveTransferCancelRoute, StoreRefundTransferLight, ReceiveLockExpiredLight, ActionTransferRerouteLight)
 from raiden.transfer.state import RouteState
 from raiden.transfer.state_change import ActionCancelPayment, Block, ContractReceiveSecretReveal
 from raiden.utils.typing import (
@@ -336,7 +338,7 @@ def handle_transferreroute(
 
     is_valid_refund = channel.refund_transfer_matches_transfer(refund_transfer, original_transfer)
     is_valid, channel_events, _, _ = channel.handle_receive_lockedtransfer(
-        channel_state, refund_transfer, None
+        channel_state, refund_transfer, storage
     )
 
     if not is_valid_lock or not is_valid_refund or not is_valid:
@@ -381,6 +383,59 @@ def handle_transferreroute(
         # LockExpired message that our partner will send us.
         # https://github.com/raiden-network/raiden/issues/3146#issuecomment-447378046
         return TransitionResult(payment_state, events)
+
+    return TransitionResult(payment_state, events)
+
+
+def handle_transfer_reroute_light(
+    payment_state: InitiatorPaymentState,
+    state_change: ActionTransferRerouteLight,
+    channel_identifiers_to_channels: ChannelMap,
+    storage: SerializedSQLiteStorage
+) -> TransitionResult[InitiatorPaymentState]:
+
+    print("raiden/transfer/mediated_transfer/initiator_manager.py:396 running handle_transfer_reroute_light")
+
+    refund_transfer = state_change.refund_transfer
+
+    if not refund_transfer:
+        raise RaidenUnrecoverableError("Refund Transfer not found, state has changed with action "
+                                       "ActionTransferRerouteLight but refund_transfer param was not set")
+
+    store_refund_transfer = StoreMessageEvent(refund_transfer.message_identifier,
+                                              refund_transfer.payment_identifier,
+                                              1,
+                                              refund_transfer,
+                                              True,
+                                              LightClientProtocolMessageType.PaymentRefund,
+                                              refund_transfer.recipient)
+
+    try:
+        initiator_state = payment_state.initiator_transfers.get(state_change.transfer.lock.secrethash)
+        channel_identifier = initiator_state.channel_identifier
+        channel_state = channel_identifiers_to_channels[initiator_state.transfer.initiator].get(channel_identifier)
+    except KeyError:
+        return TransitionResult(payment_state, list())
+
+    refund_transfer = state_change.transfer
+    original_transfer = initiator_state.transfer
+
+    is_valid_lock = (
+        refund_transfer.lock.secrethash == original_transfer.lock.secrethash
+        and refund_transfer.lock.amount == original_transfer.lock.amount
+        and refund_transfer.lock.expiration == original_transfer.lock.expiration
+    )
+
+    is_valid_refund = channel.refund_transfer_matches_transfer(refund_transfer, original_transfer)
+    is_valid, channel_events, _, _ = channel.handle_receive_lockedtransfer_light(
+        channel_state, refund_transfer, storage
+    )
+
+    if not is_valid_lock or not is_valid_refund or not is_valid:
+        return TransitionResult(payment_state, list())
+
+    events: List[Event] = [store_refund_transfer]
+    events.extend(channel_events)
 
     return TransitionResult(payment_state, events)
 
@@ -659,20 +714,6 @@ def handle_secretreveal_light(
     return TransitionResult(payment_state, sub_iteration.events)
 
 
-def handle_store_refund_transfer_light(payment_state: InitiatorPaymentState,
-                                       refund_transfer: RefundTransfer
-                                       ) -> TransitionResult[InitiatorPaymentState]:
-    order = 1
-    store_refund_transfer = StoreMessageEvent(refund_transfer.message_identifier,
-                                              refund_transfer.payment_identifier,
-                                              order,
-                                              refund_transfer,
-                                              True,
-                                              LightClientProtocolMessageType.PaymentRefund, refund_transfer.recipient)
-    return TransitionResult(payment_state, [store_refund_transfer])
-
-
-
 def state_transition(
     payment_state: Optional[InitiatorPaymentState],
     state_change: StateChange,
@@ -752,6 +793,16 @@ def state_transition(
             block_number=block_number,
             storage=storage,
         )
+    elif type(state_change) == ActionTransferRerouteLight:
+        assert isinstance(state_change, ActionTransferRerouteLight), MYPY_ANNOTATION
+        msg = "ActionTransferRerouteLight should be accompanied by a valid payment state"
+        assert payment_state, msg
+        iteration = handle_transfer_reroute_light(
+            payment_state=payment_state,
+            state_change=state_change,
+            channel_identifiers_to_channels=channelidentifiers_to_channels,
+            storage=storage
+        )
     elif type(state_change) == ActionCancelPayment:
         assert isinstance(state_change, ActionCancelPayment), MYPY_ANNOTATION
         assert payment_state, "ActionCancelPayment should be accompanied by a valid payment state"
@@ -806,10 +857,6 @@ def state_transition(
             channelidentifiers_to_channels=channelidentifiers_to_channels,
             pseudo_random_generator=pseudo_random_generator,
         )
-    elif type(state_change) == StoreRefundTransferLight:
-        assert isinstance(state_change, StoreRefundTransferLight), MYPY_ANNOTATION
-        assert payment_state, "StoreRefundTransferLight should be accompanied by a valid payment state"
-        iteration = handle_store_refund_transfer_light(payment_state=payment_state, refund_transfer=state_change.transfer)
     else:
         iteration = TransitionResult(payment_state, list())
 

@@ -1803,6 +1803,8 @@ def handle_receive_lockedtransfer_light(
         channel_state.partner_state.balance_proof = mediated_transfer.balance_proof
         channel_state.partner_state.merkletree = merkletree
 
+        print("raiden/transfer/channel.py:1806 PARTNER STATE UPDATED WITH BP {}".format(channel_state.partner_state.balance_proof))
+
         lock = mediated_transfer.lock
         channel_state.partner_state.secrethashes_to_lockedlocks[lock.secrethash] = lock
         events = []

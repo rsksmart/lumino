@@ -1720,7 +1720,7 @@ class MatrixLightClientTransport(MatrixTransport):
         self._raiden_service.on_message(delivered, True)
 
     def _receive_message_to_lc(self, message: Union[SignedRetrieableMessage, Processed]):
-        print("<<---- Matrix Received Message LC transport" + str(message))
+        print("<<---- Matrix Received Message LC transport {}".format(message.to_dict() if message else str(message)))
         assert self._raiden_service is not None
         self.log.debug(
             "Message received",

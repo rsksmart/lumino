@@ -666,6 +666,43 @@ class ActionTransferReroute(BalanceProofStateChange):
         return instance
 
 
+class ActionTransferRerouteLight(ActionTransferReroute):
+    def __init__(
+        self, transfer: LockedTransferSignedState, secret: Secret, refund_transfer: RefundTransfer
+    ) -> None:
+        super().__init__(transfer, secret)
+        if not isinstance(refund_transfer, RefundTransfer):
+            raise ValueError("refund_transfer must be an RefundTransfer instance.")
+        self.refund_transfer = refund_transfer
+
+    def __repr__(self) -> str:
+        return "<ActionTransferRerouteLight sender:{} transfer:{} transfer:{}>".format(
+            pex(self.sender),
+            self.transfer,
+            self.refund_transfer
+        )
+
+    def __eq__(self, other: Any) -> bool:
+        return (
+            isinstance(other, ActionTransferRerouteLight)
+            and self.refund_transfer == other.refund_transfer
+            and super().__eq__(other)
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        super_dict: Dict[str, Any] = super().to_dict()
+        super_dict["refund_transfer"] = self.refund_transfer
+        return super_dict
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "ActionTransferRerouteLight":
+        instance = cls(
+            transfer=data["transfer"],
+            secret=Secret(deserialize_bytes(data["secret"])),
+            refund_transfer=data["refund_transfer"]
+        )
+        return instance
+
 
 class ReceiveTransferRefund(BalanceProofStateChange):
     """ A RefundTransfer message received. """
@@ -866,39 +903,4 @@ class ActionSendUnlockLight(AuthenticatedSenderStateChange):
             receiver=to_canonical_address(data["receiver"])
         )
         return instance
-
-
-class StoreRefundTransferLight(StateChange):
-    """ Initial state of a refund transfer reception.
-
-    Args:
-        transfer: a message object that represents the refund transfer sent to a light client
-    """
-
-    def __init__(
-        self, transfer: RefundTransfer
-    ) -> None:
-        if not isinstance(transfer, RefundTransfer):
-            raise ValueError("transfer must be an RefundTransfer instance.")
-
-        self.transfer = transfer
-
-    def __repr__(self) -> str:
-        return "<StoreRefundTransferLight transfer:{}>".format(self.transfer)
-
-    def __eq__(self, other: Any) -> bool:
-        return (
-            isinstance(other, StoreRefundTransferLight)
-            and self.transfer == other.transfer
-        )
-
-    def __ne__(self, other: Any) -> bool:
-        return not self.__eq__(other)
-
-    def to_dict(self) -> Dict[str, Any]:
-        return {"transfer": self.transfer.to_dict()}
-
-    @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "StoreRefundTransferLight":
-        return cls(transfer=RefundTransfer.from_dict(data["transfer"]))
 
