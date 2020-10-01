@@ -210,6 +210,20 @@ class SQLiteStorage:
             last_id = cursor.lastrowid
         return last_id
 
+    def is_message_already_stored(self, light_client_address, message_type, unsigned_message):
+        cursor = self.conn.cursor()
+        cursor.execute(
+            """
+            SELECT *
+                FROM light_client_protocol_message lcpm
+                WHERE lcpm.light_client_address == ?
+                AND lcpm.message_type == ?
+                AND lcpm.unsigned_message == ?
+            """,
+            (to_checksum_address(light_client_address), str(message_type), str(unsigned_message)))
+
+        return cursor.fetchone()
+
     def is_light_client_protocol_message_already_stored(self, payment_id: int, order: int,
                                                         message_type: str, message_protocol_type:str):
         cursor = self.conn.cursor()
@@ -1361,14 +1375,14 @@ class SQLiteStorage:
     def get_light_client_messages(self, from_message, light_client):
         cursor = self.conn.cursor()
         cursor.execute(
-            "SELECT identifier, message_order, unsigned_message, signed_message, light_client_payment_id, internal_msg_identifier, message_type" +
-            " FROM light_client_protocol_message A INNER JOIN light_client_payment B" +
-            " ON A.light_client_payment_id = B.payment_id" +
-            " WHERE A.internal_msg_identifier >= ?" +
-            " AND A.light_client_address = ?" +
-            "ORDER BY light_client_payment_id, message_order ASC",
+            """
+            SELECT identifier, message_order, unsigned_message, signed_message, light_client_payment_id, internal_msg_identifier, message_type
+            FROM light_client_protocol_message
+            WHERE internal_msg_identifier >= ?
+            AND light_client_address = ?
+            ORDER BY light_client_payment_id, message_order ASC
+            """,
             (from_message, light_client),
-
         )
         return cursor.fetchall()
 
@@ -1474,6 +1488,10 @@ class SerializedSQLiteStorage(SQLiteStorage):
         else:
             msg_dto.unsigned_message = serialized_data
         return super().write_light_client_protocol_message(msg_dto)
+
+    def is_message_already_stored(self, light_client_address, message_type, unsigned_message):
+        unsigned_message_string = self.serializer.serialize(unsigned_message)
+        return super().is_message_already_stored(light_client_address, message_type, unsigned_message_string)
 
     def write_state_change(self, state_change, log_time):
         serialized_data = self.serializer.serialize(state_change)

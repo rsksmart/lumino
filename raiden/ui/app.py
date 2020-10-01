@@ -88,7 +88,7 @@ def get_account_and_private_key(
         address_hex = to_normalized_address(address)
 
     if password_file:
-        privatekey_bin = unlock_account_with_passwordfile(
+        privatekey_bin, pubkey_bin = unlock_account_with_passwordfile(
             account_manager=account_manager, address_hex=address_hex, password_file=password_file
         )
     else:
