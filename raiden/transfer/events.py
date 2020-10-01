@@ -165,6 +165,21 @@ class ContractSendChannelSettle(ContractSendEvent):
         return restored
 
 
+class ContractSendChannelSettleLight(ContractSendChannelSettle):
+    """ Event emitted if the netting channel must be settled for light clients. """
+
+    def __init__(
+        self,
+        canonical_identifier: CanonicalIdentifier,
+        triggered_by_block_hash: BlockHash,
+        channel_state: NettingChannelState
+    ):
+        super().__init__(
+            canonical_identifier=canonical_identifier,
+            triggered_by_block_hash=triggered_by_block_hash,
+            channel_state=channel_state)
+
+
 class ContractSendChannelUpdateTransfer(ContractSendExpirableEvent):
     """ Event emitted if the netting channel balance proof must be updated. """
 
