@@ -59,7 +59,7 @@ from raiden.transfer.views import get_channelstate_by_token_network_and_partner
 from raiden.utils import pex
 from raiden.utils.typing import MYPY_ANNOTATION, Address, Nonce, TokenNetworkID, AddressHex, ChannelID, BlockHash
 from raiden.billing.invoices.handlers.invoice_handler import handle_receive_events_with_payments
-from transport.components import Message as TransportMessage
+from transport.message import Message as TransportMessage
 
 import random
 
