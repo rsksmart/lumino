@@ -4,7 +4,7 @@ import logging
 import socket
 
 from http import HTTPStatus
-from typing import Dict
+from typing import Dict, Union
 
 import gevent
 import gevent.pool
@@ -2114,7 +2114,7 @@ class RestAPI:
                                                   channel_id: int,
                                                   token_network_address: typing.TokenNetworkAddress,
                                                   lc_bp_signature: typing.Signature,
-                                                  partner_balance_proof: Unlock):
+                                                  partner_balance_proof: Union[Unlock, LockedTransfer]):
         headers = request.headers
         api_key = headers.get("x-api-key")
         if not api_key:

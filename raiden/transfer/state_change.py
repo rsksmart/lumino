@@ -699,7 +699,7 @@ class ContractReceiveChannelNewBalance(ContractReceiveStateChange):
 
 
 class ContractReceiveChannelSettled(ContractReceiveStateChange):
-    """ A channel to which this node IS a participant was settled. """
+    """ A channel to which this node IS a participa nt was settled. """
 
     def __init__(
         self,

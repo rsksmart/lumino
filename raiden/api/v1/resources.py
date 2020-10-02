@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Dict, Union
 
 from flask import Blueprint
 from flask_restful import Resource
@@ -32,7 +32,7 @@ from raiden.api.v1.encoding import (
     RegisterSecretLightSchema,
     UnlockPaymentLightPostSchema
 )
-from raiden.messages import Unlock
+from raiden.messages import Unlock, LockedTransfer
 
 from raiden.utils import typing
 
@@ -566,8 +566,8 @@ class WatchtowerResource(BaseResource):
             channel_id: int,
             token_network_address: typing.TokenNetworkAddress,
             lc_bp_signature: typing.Signature,
-            partner_balance_proof: Unlock
-            ):
+            partner_balance_proof: Union[Unlock, LockedTransfer]
+    ):
         """
         put a signed balance proof to be used by the hub, submitting it when the channel between a light client
         and a partner is closed by the partner. The signed balance proof is submitted as a tokenNetwork.updateNonClosingBalanceProf transaction.

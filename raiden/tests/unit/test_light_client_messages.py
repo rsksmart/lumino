@@ -154,9 +154,11 @@ def test_lock_expired():
     lock_expired = LockExpired(chain_id=dict_data["chain_id"], nonce=dict_data["nonce"],
                                message_identifier=dict_data["message_identifier"],
                                transferred_amount=dict_data["transferred_amount"],
-                               locked_amount=dict_data["locked_amount"], locksroot=decode_hex(dict_data["locksroot"]),
+                               locked_amount=dict_data["locked_amount"], locksroot=decode_hex(
+                                   dict_data["locksroot"]),
                                channel_identifier=dict_data["channel_identifier"],
-                               token_network_address=to_canonical_address(dict_data["token_network_address"]),
+                               token_network_address=to_canonical_address(
+                                   dict_data["token_network_address"]),
                                recipient=to_canonical_address(dict_data["recipient"]),
                                secrethash=SecretHash(decode_hex(dict_data["secrethash"])))
     lock_expired.sign(signer)
@@ -196,8 +198,84 @@ def test_update_non_closing_balance_proof():
     )
 
     print("Update non consling blanace proof signature " + non_closing_signature.hex())
-    our_recovered_address = recover(data=our_signed_data, signature=Signature(non_closing_signature))
-    assert our_recovered_address == to_canonical_address("0x920984391853d81CCeeC41AdB48a45D40594A0ec")
+    our_recovered_address = recover(
+        data=our_signed_data, signature=Signature(non_closing_signature))
+    assert our_recovered_address == to_canonical_address(
+        "0x920984391853d81CCeeC41AdB48a45D40594A0ec")
+
+
+def test_update_non_closing_balance_proof_locked():
+    dict_data = {"type": "Secret",
+                 "chain_id": 33, "message_identifier": 11519063203689793209,
+                 "payment_identifier": 14479511804263315584,
+                 "secret": "0x061c302034fa6a4882788a7ff3834b4e3e8bafbdc572fab8d34113e9e32e5cd8", "nonce": 12,
+                 "token_network_address": "0x013b47e5eb40a476dc0e9a212d376899288561a2", "channel_identifier": 22,
+                 "transferred_amount": 60000000, "locked_amount": 0,
+                 "locksroot": "0x0000000000000000000000000000000000000000000000000000000000000000",
+                 "signature": "0x16820ee8ea32b053e4bb837f528b08e6d4e4afb6c468db4a39dc72cba32f2ff51e5db385b72b524c1c44d4801a06d13216ce3a5261db27847b90e3c4bacf82d11c"}
+    # dict_data = {"type": "Secret", "chain_id": 33, "message_identifier": 18237677588114994956, "payment_identifier": 1322351847924173620, "secret": "0xa4678d1f1db376f20854619fc8aa8021f88f318e14ff600aa051e8e4ded5d023", "nonce": 2, "token_network_address": "0x7351ed719de72db92a54c99ef2c4d287f69672a1", "channel_identifier": 3, "transferred_amount": 100000000000000000, "locked_amount": 0, "locksroot": "0x0000000000000000000000000000000000000000000000000000000000000000", "signature": "0x5c805ba51ac4776d879c276d54c1ed97905399e227e7b9ef50aa4f36605ac25e5ab707641c4bd85a0d89549841beaf4f0e06c839ad5460aaf26d4c68b9af822c1b"}
+    ''''dict_data = {"type": "LockedTransfer", 
+                 "chain_id": 33, 
+                 "message_identifier": "3487480489721621994", 
+                 "payment_identifier": "15924561963570450742", 
+                 "payment_hash_invoice": "0x", 
+                 "nonce": 1, 
+                 "token_network_address": "0x77f3985239349f9ae826f2e5dd8fd31fbcee2a44", 
+                 "token": "0x892e3b9870099f20b1e325b39cbdb8f2572c6291", 
+                 "channel_identifier": 45, 
+                 "transferred_amount": 0, 
+                 "locked_amount": "10000000000000000", 
+                 "recipient": "0xc32b9a1893a09031848b6cd227959d5220656943", 
+                 "locksroot": "0x7ee74ada5b45530ac7b486a329f53b7a10129a562887f96ccdf9a00c2b2a8de9", 
+                 "lock": {
+                    "type": "Lock", "amount": "10000000000000000", "expiration": 236092, "secrethash": "0x4ef085d4aa12a40db536d3734f19f241b348f9620b2a44ab9c883add32b68eec"}, "target": "0xc32b9a1893a09031848b6cd227959d5220656943", "initiator": "0x48beb61c2b5304414b1e00a8a26879559634ecb2", "fee": 0, "signature": "0x2ef526fad89682792ef2bb3e9bdf30a081c6b86880dc5d96593ceb8e54be575a534bbb822ab88b215a8b5a259498709634b9664f3d43c7eedb921154e28685d71c", "message_order": 1, "secret": "0x1a00cab4ea00b505426a3c219f7a7dcc55289b58773edfc33a9b017da7bd1b82"}
+    '''
+    dict_data = {"type": "LockedTransfer", 
+                 "chain_id": 33, 
+                 "message_identifier": 3487480489721621994, 
+                 "payment_identifier": 15924561963570450742, 
+                 "payment_hash_invoice": "0x", 
+                 "nonce": 1, 
+                 "token_network_address": "0x77f3985239349f9ae826f2e5dd8fd31fbcee2a44", 
+                 "token": "0x892e3b9870099f20b1e325b39cbdb8f2572c6291", 
+                 "channel_identifier": 45, 
+                 "transferred_amount": 0, 
+                 "locked_amount": 10000000000000000, 
+                 "recipient": "0xc32b9a1893a09031848b6cd227959d5220656943", 
+                 "locksroot": "0x7ee74ada5b45530ac7b486a329f53b7a10129a562887f96ccdf9a00c2b2a8de9", 
+                 "lock": {
+                    "type": "Lock", "amount": 10000000000000000, "expiration": 236092, "secrethash": "0x4ef085d4aa12a40db536d3734f19f241b348f9620b2a44ab9c883add32b68eec"}, 
+                    "target": "0xc32b9a1893a09031848b6cd227959d5220656943", 
+                    "initiator": "0x48beb61c2b5304414b1e00a8a26879559634ecb2", 
+                    "fee": 0,
+                     "signature": "0x2ef526fad89682792ef2bb3e9bdf30a081c6b86880dc5d96593ceb8e54be575a534bbb822ab88b215a8b5a259498709634b9664f3d43c7eedb921154e28685d71c", 
+                     "message_order": 1, "secret": "0x1a00cab4ea00b505426a3c219f7a7dcc55289b58773edfc33a9b017da7bd1b82"}
+    
+    balance_proof_msg = LockedTransfer.from_dict(dict_data)
+    balance_proof = balanceproof_from_envelope(balance_proof_msg)
+    non_closing_signature = create_balance_proof_update_signature(
+        token_network_address="0x77f3985239349f9ae826f2e5dd8fd31fbcee2a44",
+        channel_identifier=45,
+        balance_hash=balance_proof.balance_hash,
+        nonce=1,
+        additional_hash=balance_proof.message_hash,
+        closing_signature=decode_hex(
+            "0x2ef526fad89682792ef2bb3e9bdf30a081c6b86880dc5d96593ceb8e54be575a534bbb822ab88b215a8b5a259498709634b9664f3d43c7eedb921154e28685d71c"
+        ))
+    our_signed_data = pack_balance_proof_update(
+        nonce=balance_proof.nonce,
+        balance_hash=balance_proof.balance_hash,
+        additional_hash=balance_proof.message_hash,
+        canonical_identifier=balance_proof.canonical_identifier,
+        partner_signature=Signature(decode_hex(
+            "0x2ef526fad89682792ef2bb3e9bdf30a081c6b86880dc5d96593ceb8e54be575a534bbb822ab88b215a8b5a259498709634b9664f3d43c7eedb921154e28685d71c"))
+    )
+
+    print("Update non consling blanace proof signature " + non_closing_signature.hex())
+    our_recovered_address = recover(
+        data=our_signed_data, signature=Signature(non_closing_signature))
+    assert our_recovered_address == decode_hex(
+        "0xc32B9a1893a09031848b6Cd227959d5220656943")
 
 
 def create_balance_proof_update_signature(
@@ -210,7 +288,7 @@ def create_balance_proof_update_signature(
     v=27,
 ):
     non_closing_signature = sign_balance_proof_update_message(
-        "0X15f570a7914ed27b13ba4a63cee82ad4d77bba3cc60b037abef2f1733423eb70",
+        "0x12ce5ab765eab3a15d5bf3815fc1e4d703b7937c7e4776289a49b828cde920de",
         token_network_address,
         33,
         channel_identifier,

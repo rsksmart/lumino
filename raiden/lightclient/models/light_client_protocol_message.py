@@ -11,7 +11,7 @@ class LightClientProtocolMessageType(Enum):
     PaymentExpired = "PaymentExpired"
     SettlementRequired = "SettlementRequired"
     RequestRegisterSecret = "RequestRegisterSecret"
-    UnlockRequired = "UnlockRequired"
+    UnlockLightRequest = "UnlockLightRequest"
     PaymentRefund = "PaymentRefund"
 
 

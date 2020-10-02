@@ -302,7 +302,10 @@ class LightClientMessageHandler:
     def get_latest_light_client_non_closing_balance_proof(cls, channel_id: int, storage: SerializedSQLiteStorage):
         latest_update_balance_proof_data = storage.get_latest_light_client_non_closing_balance_proof(channel_id)
         if latest_update_balance_proof_data:
-            balance_proof = Unlock.from_dict(json.loads(latest_update_balance_proof_data[7]))
+            balance_proof_dict = json.loads(latest_update_balance_proof_data[7])
+            balance_proof = Unlock.from_dict(balance_proof_dict) \
+                if balance_proof_dict["type"] == "Secret" \
+                else LockedTransfer.from_dict(balance_proof_dict)
             return LightClientNonClosingBalanceProof(latest_update_balance_proof_data[1],
                                                      latest_update_balance_proof_data[2],
                                                      latest_update_balance_proof_data[3],
