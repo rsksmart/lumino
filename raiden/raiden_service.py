@@ -7,8 +7,7 @@ from typing import Dict, List, NamedTuple, Union
 import filelock
 import gevent
 import structlog
-from eth_utils import is_binary_address
-from eth_utils import to_canonical_address, to_checksum_address
+from eth_utils import is_binary_address, to_canonical_address, to_checksum_address
 from gevent import Greenlet
 from gevent.event import AsyncResult, Event
 from raiden.transfer.identifiers import CanonicalIdentifier
