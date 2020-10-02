@@ -1331,7 +1331,7 @@ class RaidenService(Runnable):
             queue_identifier = QueueIdentifier(
                 recipient=receiver_address, channel_identifier=CHANNEL_IDENTIFIER_GLOBAL_QUEUE
             )
-            lc_transport.send_message(TransportMessage.wrap(queue_identifier, delivered))
+            lc_transport.send_message(*TransportMessage.wrap(queue_identifier, delivered))
 
     def initiate_send_processed_light(self, sender_address: Address, receiver_address: Address,
                                       processed: Processed, msg_order: int, payment_id: int,
@@ -1351,7 +1351,7 @@ class RaidenService(Runnable):
             queue_identifier = QueueIdentifier(
                 recipient=receiver_address, channel_identifier=CHANNEL_IDENTIFIER_GLOBAL_QUEUE
             )
-            lc_transport.send_message(TransportMessage.wrap(queue_identifier, processed))
+            lc_transport.send_message(*TransportMessage.wrap(queue_identifier, processed))
 
     def initiate_send_secret_reveal_light(
         self,

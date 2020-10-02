@@ -220,7 +220,7 @@ class RaidenEventHandler(EventHandler):
         lock_expired_message = message_from_sendevent(send_lock_expired)
         raiden.sign(lock_expired_message)
         raiden.transport.hub_transport.send_message(
-            TransportMessage.wrap(send_lock_expired.queue_identifier, lock_expired_message)
+            *TransportMessage.wrap(send_lock_expired.queue_identifier, lock_expired_message)
         )
 
     @staticmethod
@@ -229,7 +229,7 @@ class RaidenEventHandler(EventHandler):
         lc_transport = raiden.get_light_client_transport(to_checksum_address(signed_lock_expired.sender))
         if lc_transport:
             lc_transport.send_message(
-                TransportMessage.wrap(send_lock_expired.queue_identifier, signed_lock_expired)
+                *TransportMessage.wrap(send_lock_expired.queue_identifier, signed_lock_expired)
             )
 
     @staticmethod
@@ -239,7 +239,7 @@ class RaidenEventHandler(EventHandler):
         mediated_transfer_message = message_from_sendevent(send_locked_transfer)
         raiden.sign(mediated_transfer_message)
         raiden.transport.hub_transport.send_message(
-            TransportMessage.wrap(send_locked_transfer.queue_identifier, mediated_transfer_message)
+            *TransportMessage.wrap(send_locked_transfer.queue_identifier, mediated_transfer_message)
         )
 
     @staticmethod
@@ -251,7 +251,7 @@ class RaidenEventHandler(EventHandler):
         for light_client_transport in raiden.transport.light_client_transports:
             if light_client_address == light_client_transport.address:
                 light_client_transport.send_message(
-                    TransportMessage.wrap(send_locked_transfer_light.queue_identifier, mediated_transfer_message)
+                    *TransportMessage.wrap(send_locked_transfer_light.queue_identifier, mediated_transfer_message)
                 )
 
     @staticmethod
@@ -259,7 +259,7 @@ class RaidenEventHandler(EventHandler):
         reveal_secret_message = message_from_sendevent(reveal_secret_event)
         raiden.sign(reveal_secret_message)
         raiden.transport.hub_transport.send_message(
-            TransportMessage.wrap(reveal_secret_event.queue_identifier, reveal_secret_message)
+            *TransportMessage.wrap(reveal_secret_event.queue_identifier, reveal_secret_message)
         )
 
     @staticmethod
@@ -268,7 +268,7 @@ class RaidenEventHandler(EventHandler):
         lc_transport = raiden.get_light_client_transport(to_checksum_address(reveal_secret_event.sender))
         if lc_transport:
             lc_transport.send_message(
-                TransportMessage.wrap(reveal_secret_event.queue_identifier, signed_secret_reveal)
+                *TransportMessage.wrap(reveal_secret_event.queue_identifier, signed_secret_reveal)
             )
 
     @staticmethod
@@ -276,7 +276,7 @@ class RaidenEventHandler(EventHandler):
         unlock_message = message_from_sendevent(balance_proof_event)
         raiden.sign(unlock_message)
         raiden.transport.hub_transport.send_message(
-            TransportMessage.wrap(balance_proof_event.queue_identifier, unlock_message)
+            *TransportMessage.wrap(balance_proof_event.queue_identifier, unlock_message)
         )
 
     @staticmethod
@@ -285,7 +285,7 @@ class RaidenEventHandler(EventHandler):
         lc_transport = raiden.get_light_client_transport(to_checksum_address(balance_proof_event.sender))
         if lc_transport:
             lc_transport.send_message(
-                TransportMessage.wrap(balance_proof_event.queue_identifier, unlock_message)
+                *TransportMessage.wrap(balance_proof_event.queue_identifier, unlock_message)
             )
 
     @staticmethod
@@ -298,7 +298,7 @@ class RaidenEventHandler(EventHandler):
         secret_request_message = message_from_sendevent(secret_request_event)
         raiden.sign(secret_request_message)
         raiden.transport.hub_transport.send_message(
-            TransportMessage.wrap(secret_request_event.queue_identifier, secret_request_message)
+            *TransportMessage.wrap(secret_request_event.queue_identifier, secret_request_message)
         )
 
     @staticmethod
@@ -309,7 +309,7 @@ class RaidenEventHandler(EventHandler):
         lc_transport = raiden.get_light_client_transport(to_checksum_address(secret_request_event.sender))
         if lc_transport:
             lc_transport.send_message(
-                TransportMessage.wrap(secret_request_event.queue_identifier, secret_request_message)
+                *TransportMessage.wrap(secret_request_event.queue_identifier, secret_request_message)
             )
 
     @staticmethod
@@ -319,7 +319,7 @@ class RaidenEventHandler(EventHandler):
         refund_transfer_message = message_from_sendevent(refund_transfer_event)
         raiden.sign(refund_transfer_message)
         raiden.transport.hub_transport.send_message(
-            TransportMessage.wrap(refund_transfer_event.queue_identifier, refund_transfer_message)
+            *TransportMessage.wrap(refund_transfer_event.queue_identifier, refund_transfer_message)
         )
 
     @staticmethod
@@ -327,7 +327,7 @@ class RaidenEventHandler(EventHandler):
         processed_message = message_from_sendevent(processed_event)
         raiden.sign(processed_message)
         raiden.transport.hub_transport.send_message(
-            TransportMessage.wrap(processed_event.queue_identifier, processed_message)
+            *TransportMessage.wrap(processed_event.queue_identifier, processed_message)
         )
 
     @staticmethod
