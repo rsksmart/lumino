@@ -1833,7 +1833,7 @@ class RequestMonitoring(SignedMessage):
 
 
 class UnlockLightRequest(Message):
-
+    
     def __init__(self, token_address: Address, channel_identifier: ChannelID, sender: Address, receiver: Address,
                  merkle_tree_leaves: str, **kwargs):
         super().__init__(**kwargs)
@@ -1917,6 +1917,96 @@ class RequestRegisterSecret(Message):
             "type": self.__class__.__name__,
             "secret_registry_address": to_normalized_address(self.secret_registry_address)
         }
+
+
+class SettlementRequiredLightMessage(Message):
+    """ Represents the settlement required message for the LC when we need the LC to sign and send a settlement """
+    def __init__(self, channel_identifier: ChannelID, channel_network_identifier: TokenNetworkAddress,
+                 participant1: Address, participant1_transferred_amount: TokenAmount,
+                 participant1_locked_amount: TokenAmount, participant1_locksroot: Locksroot, participant2: Address,
+                 participant2_transferred_amount: TokenAmount, participant2_locked_amount: TokenAmount,
+                 participant2_locksroot: Locksroot, **kwargs):
+        super().__init__(**kwargs)
+        self.channel_identifier = channel_identifier
+        self.channel_network_identifier = channel_network_identifier
+        self.participant1 = participant1
+        self.participant1_transferred_amount = participant1_transferred_amount
+        self.participant1_locked_amount = participant1_locked_amount
+        self.participant1_locksroot = participant1_locksroot
+        self.participant2 = participant2
+        self.participant2_transferred_amount = participant2_transferred_amount
+        self.participant2_locked_amount = participant2_locked_amount
+        self.participant2_locksroot = participant2_locksroot
+
+    @classmethod
+    def unpack(cls, packed) -> "SettlementRequiredLightMessage":
+        return cls(channel_identifier=packed.channel_identifier,
+                   channel_network_identifier=packed.channel_network_identifier,
+                   participant1=packed.participant1,
+                   participant1_transferred_amount=packed.participant1_transferred_amount,
+                   participant1_locked_amount=packed.participant1_locked_amount,
+                   participant1_locksroot=packed.participant1_locksroot,
+                   participant2=packed.participant2,
+                   participant2_transferred_amount=packed.participant2_transferred_amount,
+                   participant2_locked_amount=packed.participant2_locked_amount,
+                   participant2_locksroot=packed.participant2_locksroot)
+
+    def pack(self, packed) -> None:
+        packed.channel_identifier = self.channel_identifier
+        packed.channel_network_identifier = self.channel_network_identifier
+        packed.participant1 = self.participant1
+        packed.participant1_transferred_amount = self.participant1_transferred_amount
+        packed.participant1_locked_amount = self.participant1_locked_amount
+        packed.participant1_locksroot = self.participant1_locksroot
+        packed.participant2 = self.participant2
+        packed.participant2_transferred_amount = self.participant2_transferred_amount
+        packed.participant2_locked_amount = self.participant2_locked_amount
+        packed.participant2_locksroot = self.participant2_locksroot
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "type": self.__class__.__name__,
+            "channel_identifier": self.channel_identifier,
+            "channel_network_identifier": to_normalized_address(self.channel_network_identifier),
+            "participant1": to_normalized_address(self.participant1),
+            "participant1_transferred_amount": self.participant1_transferred_amount,
+            "participant1_locked_amount": self.participant1_locked_amount,
+            "participant1_locksroot": encode_hex(self.participant1_locksroot),
+            "participant2": to_normalized_address(self.participant2),
+            "participant2_transferred_amount": self.participant2_transferred_amount,
+            "participant2_locked_amount": self.participant2_locked_amount,
+            "participant2_locksroot": encode_hex(self.participant2_locksroot)
+        }
+
+    @classmethod
+    def from_dict(cls, data) -> "SettlementRequiredLightMessage":
+        error_message = f'Cannot decode data. Provided type is {data["type"]}, expected {cls.__name__}'
+        assert data["type"] == cls.__name__, error_message
+        return cls(channel_identifier=ChannelID(data["channel_identifier"]),
+                   channel_network_identifier=TokenNetworkAddress(decode_hex(data["channel_network_identifier"])),
+                   participant1=Address(decode_hex(data["participant1"])),
+                   participant1_transferred_amount=TokenAmount(int(data["participant1_transferred_amount"])),
+                   participant1_locked_amount=TokenAmount(int(data["participant1_locked_amount"])),
+                   participant1_locksroot=Locksroot(decode_hex(data["participant1_locksroot"])),
+                   participant2=Address(decode_hex(data["participant2"])),
+                   participant2_transferred_amount=TokenAmount(int(data["participant2_transferred_amount"])),
+                   participant2_locked_amount=TokenAmount(int(data["participant2_locked_amount"])),
+                   participant2_locksroot=Locksroot(decode_hex(data["participant2_locksroot"])))
+
+    def __eq__(self, other: Any) -> bool:
+        return (
+            isinstance(other, SettlementRequiredLightMessage)
+            and self.channel_identifier == other.channel_identifier
+            and self.channel_network_identifier == other.channel_network_identifier
+            and self.participant1 == other.participant1
+            and self.participant1_transferred_amount == other.participant1_transferred_amount
+            and self.participant1_locked_amount == other.participant1_locked_amount
+            and self.participant1_locksroot == other.participant1_locksroot
+            and self.participant2 == other.participant2
+            and self.participant2_transferred_amount == other.participant2_transferred_amount
+            and self.participant2_locked_amount == other.participant2_locked_amount
+            and self.participant2_locksroot == other.participant2_locksroot
+        )
 
 
 CMDID_TO_CLASS: Dict[int, Type[Message]] = {

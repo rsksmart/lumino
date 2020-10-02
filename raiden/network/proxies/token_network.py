@@ -2214,6 +2214,8 @@ class TokenNetwork:
             # gas will stop us from sending a transaction that will fail
             pass
 
+        transaction_error = None
+
         with self.channel_operations_lock[partner]:
             error_prefix = "Call to settle will fail"
             gas_limit = self.proxy.estimate_gas(
@@ -2228,33 +2230,93 @@ class TokenNetwork:
                     "settleChannel", gas_limit, channel_identifier=channel_identifier, **kwargs
                 )
                 self.client.poll(transaction_hash)
-                receipt_or_none = check_transaction_threw(self.client, transaction_hash)
+                transaction_error = check_transaction_threw(self.client, transaction_hash)
 
-        transaction_executed = gas_limit is not None
-        if not transaction_executed or receipt_or_none:
-            if transaction_executed:
-                block = receipt_or_none["blockNumber"]
-            else:
-                block = checking_block
-
-            self.proxy.jsonrpc_client.check_for_insufficient_eth(
-                transaction_name="settleChannel",
-                address=self.node_address,
-                transaction_executed=transaction_executed,
-                required_gas=GAS_REQUIRED_FOR_SETTLE_CHANNEL,
-                block_identifier=block,
-            )
-            msg = self._check_channel_state_after_settle(
-                participant1=self.node_address,
-                participant2=partner,
-                block_identifier=block,
-                channel_identifier=channel_identifier,
-            )
-            error_msg = f"{error_prefix}. {msg}"
-            log.critical(error_msg, **log_details)
-            raise RaidenUnrecoverableError(error_msg)
+        if not gas_limit or transaction_error:
+            self.handle_transaction_error_for_settlement(channel_identifier=channel_identifier,
+                                                         checking_block=checking_block,
+                                                         error_prefix=error_prefix,
+                                                         log_details=log_details,
+                                                         partner=partner,
+                                                         transaction_error=transaction_error)
 
         log.info("settle successful", **log_details)
+
+    def settle_light(
+        self,
+        given_block_identifier: BlockSpecification,
+        channel_identifier: ChannelID,
+        creator: Address,
+        partner: Address,
+        signed_settle_tx: SignedTransaction
+    ):
+        """ Send a signed settle transaction for a specific channel """
+        log_details = {
+            "given_block_identifier": given_block_identifier.hex(),
+            "channel_identifier": channel_identifier,
+            "creator": pex(creator),
+            "partner": pex(partner),
+        }
+        log.debug("settle light called", **log_details)
+
+        checking_block = self.client.get_checking_block()
+        try:
+            self._settle_preconditions(
+                channel_identifier=channel_identifier,
+                partner=partner,
+                block_identifier=given_block_identifier,
+            )
+        except NoStateForBlockIdentifier:
+            # If preconditions end up being on pruned state skip them. Estimate
+            # gas will stop us from sending a transaction that will fail
+            pass
+
+        with self.channel_operations_lock[partner]:
+            transaction_hash = self.proxy.broadcast_signed_transaction(signed_settle_tx)
+            self.client.poll(transaction_hash)
+            transaction_error = check_transaction_threw(self.client, transaction_hash)
+
+        if transaction_error:
+            self.handle_transaction_error_for_settlement(channel_identifier=channel_identifier,
+                                                         checking_block=checking_block,
+                                                         error_prefix="settle call failed",
+                                                         log_details=log_details,
+                                                         partner=partner,
+                                                         transaction_error=transaction_error)
+
+        log.info("settle light successful", **log_details)
+
+    def handle_transaction_error_for_settlement(self,
+                                                channel_identifier: ChannelID,
+                                                checking_block: BlockNumber,
+                                                error_prefix: str,
+                                                log_details: Dict,
+                                                partner: Address,
+                                                transaction_error):
+        """
+            This function throws an exception with details about the error
+        """
+        if transaction_error and transaction_error["blockNumber"]:
+            block = transaction_error["blockNumber"]
+        else:
+            block = checking_block
+
+        self.proxy.jsonrpc_client.check_for_insufficient_eth(
+            transaction_name="settleChannel",
+            address=self.node_address,
+            transaction_executed=transaction_error and transaction_error["blockNumber"] is not None,
+            required_gas=GAS_REQUIRED_FOR_SETTLE_CHANNEL,
+            block_identifier=block,
+        )
+        msg = self._check_channel_state_after_settle(
+            participant1=self.node_address,
+            participant2=partner,
+            block_identifier=block,
+            channel_identifier=channel_identifier,
+        )
+        error_msg = f"{error_prefix}. {msg}"
+        log.critical(error_msg, **log_details)
+        raise RaidenUnrecoverableError(error_msg)
 
     def events_filter(
         self,

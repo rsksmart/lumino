@@ -422,6 +422,7 @@ def get_channelstate_filter(
     payment_network_id: PaymentNetworkID,
     token_address: TokenAddress,
     filter_fn: Callable,
+    creator_address=None
 ) -> List[NettingChannelState]:
     """ Return the state of channels that match the condition in `filter_fn` """
     token_network = get_token_network_by_token_address(
@@ -432,8 +433,11 @@ def get_channelstate_filter(
     if not token_network:
         return result
 
-    if chain_state.our_address in token_network.channelidentifiers_to_channels:
-        for channel_state in token_network.channelidentifiers_to_channels[chain_state.our_address].values():
+    if not creator_address:
+        creator_address = chain_state.our_address
+
+    if creator_address in token_network.channelidentifiers_to_channels:
+        for channel_state in token_network.channelidentifiers_to_channels[creator_address].values():
             if filter_fn(channel_state):
                 result.append(channel_state)
 
@@ -477,7 +481,7 @@ def get_channelstate_closed(
 
 
 def get_channelstate_settling(
-    chain_state: ChainState, payment_network_id: PaymentNetworkID, token_address: TokenAddress
+    chain_state: ChainState, payment_network_id: PaymentNetworkID, token_address: TokenAddress, creator_address=None
 ) -> List[NettingChannelState]:
     """Return the state of settling channels in a token network."""
     return get_channelstate_filter(
@@ -485,6 +489,7 @@ def get_channelstate_settling(
         payment_network_id,
         token_address,
         lambda channel_state: channel.get_status(channel_state) == CHANNEL_STATE_SETTLING,
+        creator_address=creator_address
     )
 
 

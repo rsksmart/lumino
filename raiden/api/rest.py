@@ -92,7 +92,8 @@ from raiden.api.v1.resources import (
     WatchtowerResource,
     LightClientMessageResource,
     RegisterSecretLightResource,
-    UnlockPaymentLightResource
+    UnlockPaymentLightResource,
+    SettlementLightResourceByTokenAndPartnerAddress
 )
 
 from raiden.constants import GENESIS_BLOCK_NUMBER, UINT256_MAX, Environment, EMPTY_PAYMENT_HASH_INVOICE
@@ -246,6 +247,10 @@ URLS_HUB_V1 = [
     (
         "/light_channels/<hexaddress:token_address>/<hexaddress:creator_address>/<hexaddress:partner_address>",
         LightChannelsResourceByTokenAndPartnerAddress
+    ),
+    (
+        "/light_channels/<hexaddress:token_address>/<hexaddress:creator_address>/<hexaddress:partner_address>/settle",
+        SettlementLightResourceByTokenAndPartnerAddress
     ),
     ("/payments_light", PaymentLightResource),
     ("/payments_light/create", CreatePaymentLightResource, "create_payment"),
@@ -1635,6 +1640,51 @@ class RestAPI:
             return api_error(errors=str(e), status_code=HTTPStatus.PAYMENT_REQUIRED)
         return None
 
+    def settlement_light(self,
+                         registry_address: typing.PaymentNetworkID,
+                         token_address: typing.TokenAddress,
+                         creator_address: typing.Address,
+                         partner_address: typing.Address,
+                         channel_identifier: typing.ChannelID,
+                         signed_settle_tx: typing.SignedTransaction):
+        """ This operation validates and send the settlement signed transaction for a LC """
+        log.debug(
+            "Settling channel light",
+            node=pex(creator_address),
+            registry_address=to_checksum_address(registry_address),
+            token_address=to_checksum_address(token_address),
+            creator_address=to_checksum_address(creator_address),
+            partner_address=to_checksum_address(partner_address),
+            channel_identifier=channel_identifier
+        )
+
+        if not signed_settle_tx:
+            result = api_error(
+                errors="Signed settle transaction is required",
+                status_code=HTTPStatus.BAD_REQUEST,
+            )
+            return result
+        if not channel_identifier:
+            result = api_error(
+                errors="Channel identifier is required",
+                status_code=HTTPStatus.BAD_REQUEST,
+            )
+            return result
+
+        try:
+            channel_state = self.raiden_api.channel_settle_light(
+                registry_address=registry_address,
+                token_address=token_address,
+                creator_address=creator_address,
+                partner_address=partner_address,
+                channel_identifier=channel_identifier,
+                signed_settle_tx=signed_settle_tx
+            )
+        except Exception as e:
+            return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.BAD_REQUEST, log=log)
+
+        return self.update_channel_state(registry_address, channel_state)
+
     def _deposit_light(
         self,
         registry_address: typing.PaymentNetworkID,
@@ -1810,8 +1860,7 @@ class RestAPI:
         signed_deposit_tx: typing.SignedTransaction,
         signed_close_tx: typing.SignedTransaction,
         total_deposit: typing.TokenAmount = None,
-        state: str = None,
-
+        state: str = None
     ):
         log.debug(
             "Patching light channel",

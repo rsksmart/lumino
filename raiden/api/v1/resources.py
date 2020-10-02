@@ -30,7 +30,8 @@ from raiden.api.v1.encoding import (
     WatchtowerPutResource,
     LightClientMessageGetSchema,
     RegisterSecretLightSchema,
-    UnlockPaymentLightPostSchema
+    UnlockPaymentLightPostSchema,
+    SettlementLightSchema
 )
 from raiden.messages import Unlock, LockedTransfer
 
@@ -161,6 +162,15 @@ class UnlockPaymentLightResource(BaseResource):
     @use_kwargs(post_schema)
     def post(self, signed_tx: typing.SignedTransaction, **kwargs):
         return self.rest_api.post_unlock_payment_light(signed_tx, **kwargs)
+
+class SettlementLightResourceByTokenAndPartnerAddress(BaseResource):
+    schema = SettlementLightSchema
+
+    @use_kwargs(schema, locations=("json",))
+    def post(self, **kwargs):
+        return self.rest_api.settlement_light(
+            registry_address=self.rest_api.raiden_api.raiden.default_registry.address, **kwargs
+        )
 
 
 class TokensResource(BaseResource):
