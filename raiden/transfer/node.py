@@ -35,10 +35,18 @@ from raiden.transfer.mediated_transfer.state_change import (
     ReceiveSecretReveal,
     ReceiveTransferRefund,
     ActionTransferReroute,
-    ActionInitInitiatorLight, ReceiveSecretRequestLight, ActionSendSecretRevealLight, ReceiveSecretRevealLight,
-    ActionSendUnlockLight, ActionInitTargetLight, ActionSendSecretRequestLight, ActionSendLockExpiredLight,
-    ReceiveLockExpiredLight, ReceiveTransferCancelRoute,
-    StoreRefundTransferLight, ActionTransferRerouteLight)
+    ActionInitInitiatorLight,
+    ReceiveSecretRequestLight,
+    ActionSendSecretRevealLight,
+    ReceiveSecretRevealLight,
+    ActionSendUnlockLight,
+    ActionInitTargetLight,
+    ActionSendSecretRequestLight,
+    ActionSendLockExpiredLight,
+    ReceiveLockExpiredLight,
+    ReceiveTransferCancelRoute,
+    ActionTransferRerouteLight
+)
 from raiden.transfer.state import (
     ChainState,
     InitiatorTask,

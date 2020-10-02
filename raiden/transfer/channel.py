@@ -1733,7 +1733,12 @@ def handle_receive_lock_expired_light(
             LightClientProtocolMessageType.PaymentExpired,
             state_change.lock_expired.recipient
         )
-        events = [store_lock_expired]
+        send_processed = SendProcessed(
+            recipient=state_change.balance_proof.sender,
+            channel_identifier=CHANNEL_IDENTIFIER_GLOBAL_QUEUE,
+            message_identifier=state_change.message_identifier,
+        )
+        events = [store_lock_expired, send_processed]
     else:
         assert msg, "is_valid_lock_expired should return error msg if not valid"
         invalid_lock_expired = EventInvalidReceivedLockExpired(
@@ -1807,9 +1812,12 @@ def handle_receive_lockedtransfer_light(
 
         lock = mediated_transfer.lock
         channel_state.partner_state.secrethashes_to_lockedlocks[lock.secrethash] = lock
-        events = []
-
-
+        send_processed = SendProcessed(
+            recipient=mediated_transfer.balance_proof.sender,
+            channel_identifier=CHANNEL_IDENTIFIER_GLOBAL_QUEUE,
+            message_identifier=mediated_transfer.message_identifier,
+        )
+        events = [send_processed]
     else:
         assert msg, "is_valid_lock_expired should return error msg if not valid"
         invalid_locked = EventInvalidReceivedLockedTransfer(

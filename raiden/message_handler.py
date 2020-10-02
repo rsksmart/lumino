@@ -26,8 +26,12 @@ from raiden.transfer.mediated_transfer.state_change import (
     ReceiveSecretReveal,
     ReceiveTransferRefund,
     ActionTransferReroute,
-    ReceiveSecretRequestLight, ReceiveSecretRevealLight, ReceiveTransferCancelRoute, ReceiveLockExpiredLight,
-    StoreRefundTransferLight, ActionTransferRerouteLight)
+    ReceiveSecretRequestLight,
+    ReceiveSecretRevealLight,
+    ReceiveTransferCancelRoute,
+    ReceiveLockExpiredLight,
+    ActionTransferRerouteLight
+)
 from raiden.transfer.state import balanceproof_from_envelope
 from raiden.transfer.state_change import ReceiveDelivered, ReceiveProcessed, ReceiveUnlock, ReceiveUnlockLight
 from raiden.utils import pex, random_secret
@@ -164,24 +168,24 @@ class MessageHandler:
             )
             raiden.handle_and_track_state_change(state_change)
 
-            # Currently, the only case where we can be initiators and not
-            # know the secret is if the transfer is part of an atomic swap. In
-            # the case of an atomic swap, we will not try to re-route the
-            # transfer. In all other cases we can try to find another route
-            # (and generate a new secret)
-            old_secret = views.get_transfer_secret(chain_state, from_transfer.lock.secrethash)
-            is_secret_known = old_secret is not None and old_secret != EMPTY_SECRET
-
             if is_light_client:
-                if is_secret_known:
-                    state_change = ActionTransferRerouteLight(
-                        transfer=from_transfer,
-                        secret=random_secret(),
-                        refund_transfer=message
-                    )
-                    print("raiden/message_handler.py:184 >>>> Triggering ActionTransferRerouteLight")
-                    raiden.handle_and_track_state_change(state_change)
+                state_change = ActionTransferRerouteLight(
+                    transfer=from_transfer,
+                    secret=random_secret(),
+                    refund_transfer=message
+                )
+                print("raiden/message_handler.py:184 >>>> Triggering ActionTransferRerouteLight")
+                raiden.handle_and_track_state_change(state_change)
             else:
+
+                # Currently, the only case where we can be initiators and not
+                # know the secret is if the transfer is part of an atomic swap. In
+                # the case of an atomic swap, we will not try to re-route the
+                # transfer. In all other cases we can try to find another route
+                # (and generate a new secret)
+                old_secret = views.get_transfer_secret(chain_state, from_transfer.lock.secrethash)
+                is_secret_known = old_secret is not None and old_secret != EMPTY_SECRET
+
                 if is_secret_known:
                     state_change = ActionTransferReroute(
                         transfer=from_transfer,
