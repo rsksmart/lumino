@@ -4,7 +4,6 @@ from typing import Any
 from raiden.message_handler import MessageHandler
 from raiden.messages import Message
 from raiden.raiden_service import RaidenService
-from raiden.transfer.identifiers import QueueIdentifier
 from raiden.utils import Address
 
 
@@ -38,11 +37,11 @@ class Node(ABC):
         """
 
     @abstractmethod
-    def send_async(self, queue_identifier: QueueIdentifier, message: Message):
+    def send_message(self, message: Message, recipient: Address):
         """
-        Queue the message for sending to recipient in the queue_identifier.
-        It may be called before transport is started, to initialize message queues.
-        The actual sending will be started only when the transport is started.
+        Send a message to the recipient.
+        This method may be called before the transport node is started, but the actual message sending
+        should only be attempted when the transport node is started.
         """
 
     @abstractmethod

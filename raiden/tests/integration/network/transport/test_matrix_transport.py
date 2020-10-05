@@ -4,7 +4,6 @@ from unittest.mock import MagicMock
 
 import gevent
 import pytest
-from eth_utils import to_checksum_address
 from gevent import Timeout
 from matrix_client.errors import MatrixRequestError
 
@@ -12,8 +11,7 @@ import raiden
 from raiden.constants import (
     MONITORING_BROADCASTING_ROOM,
     PATH_FINDING_BROADCASTING_ROOM,
-    UINT64_MAX,
-    EMPTY_SIGNATURE, DISCOVERY_DEFAULT_ROOM)
+    UINT64_MAX)
 from raiden.exceptions import InsufficientFunds
 from raiden.messages import Delivered, Processed, SecretRequest, ToDevice
 from raiden.network.transport.matrix import AddressReachability, MatrixNode as MatrixTransportNode, _RetryQueue
@@ -22,7 +20,6 @@ from raiden.network.transport.matrix.utils import make_room_alias
 from raiden.tests.utils import factories
 from raiden.tests.utils.client import burn_eth
 from raiden.tests.utils.mocks import MockRaidenService
-from raiden.tests.utils.transfer import wait_assert
 from raiden.transfer import views
 from raiden.transfer.identifiers import QueueIdentifier
 from raiden.transfer.mediated_transfer.events import CHANNEL_IDENTIFIER_GLOBAL_QUEUE
@@ -30,11 +27,11 @@ from raiden.transfer.state_change import ActionChannelClose, ActionUpdateTranspo
 from raiden.utils import pex
 from raiden.utils.signer import LocalSigner
 from raiden.utils.typing import Address, List, Optional, Union
+from transport.message import Message as TransportMessage
 
 USERID0 = "@Arthur:RestaurantAtTheEndOfTheUniverse"
 USERID1 = "@Alice:Wonderland"
 HOP1_BALANCE_PROOF = factories.BalanceProofSignedStateProperties(pkey=factories.HOP1_KEY)
-
 
 # All tests in this module require matrix
 pytestmark = pytest.mark.usefixtures("skip_if_not_matrix")
@@ -57,7 +54,6 @@ def mock_matrix(
     private_rooms,
     global_rooms,
 ):
-
     from raiden.network.transport.matrix.client import User
 
     monkeypatch.setattr(User, "get_display_name", lambda _: "random_display_name")
@@ -128,7 +124,9 @@ def ping_pong_message_success(transport0, transport1):
 
     transport0._raiden_service.sign(ping_message)
     transport1._raiden_service.sign(pong_message)
-    transport0.send_async(queueid1, ping_message)
+    transport0.send_message(
+        *TransportMessage.wrap(queueid1, ping_message)
+    )
 
     with Timeout(20, exception=False):
         all_messages_received = False
@@ -142,7 +140,9 @@ def ping_pong_message_success(transport0, transport1):
 
     transport0._raiden_service.sign(pong_message)
     transport1._raiden_service.sign(ping_message)
-    transport1.send_async(queueid0, ping_message)
+    transport1.send_message(
+        *TransportMessage.wrap(queueid0, ping_message)
+    )
 
     with Timeout(20, exception=False):
         all_messages_received = False
@@ -166,7 +166,6 @@ def is_reachable(transport: MatrixTransportNode, address: Address) -> bool:
 @pytest.fixture()
 def skip_userid_validation(monkeypatch):
     import raiden.network.transport.matrix
-    import raiden.network.transport.matrix.transport
     import raiden.network.transport.matrix.utils
 
     def mock_validate_userid_signature(user):  # pylint: disable=unused-argument
@@ -298,7 +297,6 @@ def test_processing_invalid_message_cmdid_hex(  # pylint: disable=unused-argumen
 @pytest.mark.parametrize("matrix_server_count", [2])
 @pytest.mark.parametrize("number_of_transports", [2])
 def test_matrix_message_sync(matrix_transports):
-
     transport0, transport1 = matrix_transports
 
     received_messages = set()
@@ -332,7 +330,10 @@ def test_matrix_message_sync(matrix_transports):
     for i in range(5):
         message = Processed(message_identifier=i)
         transport0._raiden_service.sign(message)
-        transport0.send_async(queue_identifier, message)
+        transport0.send_message(
+            *TransportMessage.wrap(queue_identifier, message)
+        )
+
     with Timeout(40):
         while not len(received_messages) == 10:
             gevent.sleep(0.1)
@@ -350,7 +351,9 @@ def test_matrix_message_sync(matrix_transports):
     for i in range(10, 15):
         message = Processed(message_identifier=i)
         transport0._raiden_service.sign(message)
-        transport0.send_async(queue_identifier, message)
+        transport0.send_message(
+            *TransportMessage.wrap(queue_identifier, message)
+        )
 
     # Should fetch the 5 messages sent while transport1 was offline
     transport1.start(transport1._raiden_service, message_handler, latest_auth_data)
@@ -464,7 +467,7 @@ def test_matrix_message_retry(
 
     gevent.sleep(retry_interval)
 
-    #Checks in log.info that the message was logged correctly
+    # Checks in log.info that the message was logged correctly
     transport.log.info.assert_called_with(
         "Partner not reachable. Skipping.",
         partner=pex(partner_address),
@@ -628,6 +631,7 @@ def test_matrix_send_global(
     transport.stop()
     transport.get()
 
+
 @pytest.mark.skip
 def test_monitoring_global_messages(
     local_matrix_servers,
@@ -685,6 +689,7 @@ def test_monitoring_global_messages(
         while ms_room.send_text.call_count < 1:
             gevent.idle()
     assert ms_room.send_text.call_count == 1
+
 
 @pytest.mark.skip
 @pytest.mark.parametrize("matrix_server_count", [1])
@@ -1054,7 +1059,6 @@ def test_matrix_user_roaming(matrix_transports):
 @pytest.mark.parametrize("matrix_server_count", [3])
 @pytest.mark.parametrize("number_of_transports", [6])
 def test_matrix_multi_user_roaming(matrix_transports):
-
     # 6 transports on 3 servers, where 0,3, 1,4, etc are one the same server
     transport0, transport1, transport2, transport3, transport4, transport5 = matrix_transports
     received_messages0 = set()
