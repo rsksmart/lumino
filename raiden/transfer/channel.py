@@ -559,16 +559,11 @@ def valid_lockedtransfer_check(
     distributable = get_distributable(sender_state, receiver_state)
     expected_locked_amount = current_locked_amount + lock.amount
 
-    print("sender_state = {}".format(sender_state.balance_proof))
-    print("receiver_state = {}".format(receiver_state.balance_proof))
-
     is_balance_proof_usable, invalid_balance_proof_msg = is_balance_proof_usable_onchain(
         received_balance_proof=received_balance_proof,
         channel_state=channel_state,
         sender_state=sender_state,
     )
-
-    print("IS BALANCE PROOF USABLE ?????????????????????????????? {} {}".format(is_balance_proof_usable, invalid_balance_proof_msg))
 
     result: MerkletreeOrError = (False, None, None, None)
 

@@ -167,9 +167,6 @@ def subdispatch_to_initiatortransfer(
 
     if sub_iteration.new_state is None:
         print("No new state, payment task for initiator ends")
-        print("DELETED TASK FOR PAYMENT WITH SECRETHASH = {}".format(initiator_state.transfer.lock.secrethash))
-        print("TASK = {}".format(payment_state.initiator_transfers[initiator_state.transfer.lock.secrethash].to_dict()))
-        print("STATE CHANGE = {}".format(state_change))
         del payment_state.initiator_transfers[initiator_state.transfer.lock.secrethash]
 
     return sub_iteration

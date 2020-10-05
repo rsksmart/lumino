@@ -121,9 +121,6 @@ def handle_block(
         else:
             # if lock is not in our or our partner's locked locks then the
             # task can go
-            print(
-                "TRIGGERING TRANSITION RESULT WITH NONE CAUSING PAYMENT TASK WITH SECRET HASH = {} TO BE DELETED".format(
-                    secrethash.hex()))
             return TransitionResult(None, list())
 
     lock_expiration_threshold = BlockNumber(
@@ -178,9 +175,6 @@ def handle_block(
             channel_state=channel_state, secrethash=secrethash
         )
         initiator_state.transfer_state = "transfer_expired"
-
-        if not lock_exists:
-            print("TRIGGERING TRANSITION RESULT WITH NONE CAUSING PAYMENT TASK WITH SECRET HASH = {} TO BE DELETED".format(secrethash.hex()))
 
         return TransitionResult(
             # If the lock is either in our state or partner state we keep the

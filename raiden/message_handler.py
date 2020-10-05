@@ -174,7 +174,6 @@ class MessageHandler:
                     secret=random_secret(),
                     refund_transfer=message
                 )
-                print("raiden/message_handler.py:184 >>>> Triggering ActionTransferRerouteLight")
                 raiden.handle_and_track_state_change(state_change)
             else:
 
