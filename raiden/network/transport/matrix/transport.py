@@ -10,13 +10,12 @@ from gevent.event import Event
 from gevent.lock import Semaphore
 from gevent.queue import JoinableQueue
 from matrix_client.errors import MatrixRequestError
-
 from raiden.constants import DISCOVERY_DEFAULT_ROOM
 from raiden.exceptions import InvalidAddress, UnknownAddress, UnknownTokenAddress
 from raiden.message_handler import MessageHandler
 from raiden.messages import (
-    Delivered,
     Message,
+    Delivered,
     Ping,
     Pong,
     Processed,
@@ -75,6 +74,7 @@ from raiden.utils.typing import (
     cast,
 )
 from transport.node import Node as TransportNode
+from transport.message import Message as TransportMessage
 
 log = structlog.get_logger(__name__)
 
@@ -491,33 +491,32 @@ class MatrixTransport(TransportNode, Runnable):
             # representing the target node
             self._address_mgr.refresh_address_presence(node_address)
 
-    def send_async(self, queue_identifier: QueueIdentifier, message: Message):
+    def send_message(self, message: TransportMessage, recipient: Address):
         """Queue the message for sending to recipient in the queue_identifier
 
         It may be called before transport is started, to initialize message queues
         The actual sending is started only when the transport is started
         """
+        raiden_message, queue_identifier = TransportMessage.unwrap(message)
 
         # even if transport is not started, can run to enqueue messages to send when it starts
-        receiver_address = queue_identifier.recipient
-
-        if not is_binary_address(receiver_address):
-            raise ValueError("Invalid address {}".format(pex(receiver_address)))
+        if not is_binary_address(recipient):
+            raise ValueError("Invalid address {}".format(pex(recipient)))
 
         # These are not protocol messages, but transport specific messages
-        if isinstance(message, (Ping, Pong)):
+        if isinstance(raiden_message, (Ping, Pong)):
             raise ValueError(
-                "Do not use send_async for {} messages".format(message.__class__.__name__)
+                "Do not use send_message for {} messages".format(raiden_message.__class__.__name__)
             )
 
         self.log.info(
-            "Send async",
-            receiver_address=pex(receiver_address),
-            message=message,
+            "Send message",
+            recipient=pex(recipient),
+            message=raiden_message,
             queue_identifier=queue_identifier,
         )
 
-        self._send_with_retry(queue_identifier, message)
+        self._send_with_retry(queue_identifier, raiden_message)
 
     def send_global(self, room: str, message: Message) -> None:
         """Sends a message to one of the global rooms
@@ -845,7 +844,7 @@ class MatrixTransport(TransportNode, Runnable):
             queue_identifier = QueueIdentifier(
                 recipient=message.sender, channel_identifier=CHANNEL_IDENTIFIER_GLOBAL_QUEUE
             )
-            self.send_async(queue_identifier, delivered_message)
+            self.send_message(*TransportMessage.wrap(queue_identifier, delivered_message))
             self._raiden_service.on_message(message)
 
         except (InvalidAddress, UnknownAddress, UnknownTokenAddress):
