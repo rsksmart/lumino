@@ -400,13 +400,14 @@ class ContractSendChannelBatchUnlockLight(ContractSendEvent):
     def __repr__(self) -> str:
         return (
             "<ContractSendChannelBatchUnlock token_network_id:{} "
-            "channel:{} participant:{} triggered_by_block_hash:{}"
+            "channel:{} participant:{} triggered_by_block_hash:{} client{}"
             ">"
         ).format(
             pex(self.token_network_identifier),
             self.channel_identifier,
             pex(self.participant),
             pex(self.triggered_by_block_hash),
+            pex(self.client),
         )
 
     def __eq__(self, other: Any) -> bool:
@@ -415,6 +416,7 @@ class ContractSendChannelBatchUnlockLight(ContractSendEvent):
             and isinstance(other, ContractSendChannelBatchUnlockLight)
             and self.canonical_identifier == other.canonical_identifier
             and self.participant == other.participant
+            and self.client == other.client
         )
 
     def __ne__(self, other: Any) -> bool:
@@ -424,6 +426,7 @@ class ContractSendChannelBatchUnlockLight(ContractSendEvent):
         result = {
             "canonical_identifier": self.canonical_identifier.to_dict(),
             "participant": to_checksum_address(self.participant),
+            "client": to_checksum_address(self.client),
             "triggered_by_block_hash": serialize_bytes(self.triggered_by_block_hash),
         }
 
@@ -435,6 +438,8 @@ class ContractSendChannelBatchUnlockLight(ContractSendEvent):
             canonical_identifier=CanonicalIdentifier.from_dict(data["canonical_identifier"]),
             participant=to_canonical_address(data["participant"]),
             triggered_by_block_hash=BlockHash(deserialize_bytes(data["triggered_by_block_hash"])),
+            client=BlockHash(to_canonical_address(data["triggered_by_block_hash"])),
+            
         )
 
         return restored

@@ -7,6 +7,7 @@ from eth_utils import (
     encode_hex,
     to_canonical_address,
     to_normalized_address,
+    to_checksum_address
 )
 
 from raiden.constants import UINT64_MAX, UINT256_MAX, EMPTY_PAYMENT_HASH_INVOICE
@@ -1874,10 +1875,10 @@ class UnlockLightRequest(Message):
     def to_dict(self):
         return {
             "type": self.__class__.__name__,
-            "token_address": to_normalized_address(self.token_address),
+            "token_address": to_checksum_address(self.token_address),
             "channel_identifier": self.channel_identifier,
-            "receiver": to_normalized_address(self.receiver),
-            "sender": to_normalized_address(self.sender),
+            "receiver": to_checksum_address(self.receiver),
+            "sender": to_checksum_address(self.sender),
             "merkle_tree_leaves": str(self.merkle_tree_leaves)
         }
 

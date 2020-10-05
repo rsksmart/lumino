@@ -113,7 +113,7 @@ def unlock_light(raiden: "RaidenService",
                  partner: Address,
                  end_state: NettingChannelEndState):
     merkle_tree_leaves = get_batch_unlock(end_state)
-    leaves_packed = str(b64encode(b"".join(lock.encoded for lock in merkle_tree_leaves)))
+    leaves_packed = str(encode_hex(b"".join(lock.encoded for lock in merkle_tree_leaves)))
 
     canonical_identifier: CanonicalIdentifier = channel_unlock_event.canonical_identifier
 
@@ -430,13 +430,13 @@ class RaidenEventHandler(EventHandler):
             raiden.wal)
         # Do not store the RegisterSecretRequest twice for same payment
         if not existing_message:
-            
-            LightClientMessageHandler.store_light_client_protocol_message(message=channel_reveal_secret_event.message_id,
+
+            LightClientMessageHandler.store_light_client_protocol_message(identifier=channel_reveal_secret_event.message_id,
                                                                           message=message,
                                                                           signed=False,
                                                                           payment_id=channel_reveal_secret_event.payment_identifier,
                                                                           light_client_address=channel_reveal_secret_event.light_client_address,
-                                                                          message_order=0,
+                                                                          order=0,
                                                                           message_type=LightClientProtocolMessageType.RequestRegisterSecret,
                                                                           wal=raiden.wal)
     @staticmethod

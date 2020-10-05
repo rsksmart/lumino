@@ -13,7 +13,7 @@ from raiden.exceptions import (
     InsufficientFunds,
     ReplacementTransactionUnderpriced,
     TransactionAlreadyPending,
-    RawTransactionFailed,
+    RawTransactionFailed, RaidenRecoverableError,
 )
 from raiden.network.rpc.transactions import check_transaction_threw
 from raiden.utils import typing
@@ -83,7 +83,7 @@ class ContractProxy:
         try:
             transaction_hash = self.broadcast_signed_transaction(signed_tx)
             self.jsonrpc_client.poll(transaction_hash)
-            receipt_or_none = check_transaction_threw(self.client, transaction_hash)
+            receipt_or_none = check_transaction_threw(self.jsonrpc_client, transaction_hash)
             if receipt_or_none:
                 raise RaidenRecoverableError("transaction failed")
         except HTTPError:
