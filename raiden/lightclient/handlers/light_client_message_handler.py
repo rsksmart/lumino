@@ -68,6 +68,18 @@ class LightClientMessageHandler:
                                                                               str(message_type.value))
 
     @classmethod
+    def update_onchain_light_client_protocol_message_set_signed_transaction(
+        cls,
+        internal_msg_identifier: int,
+        signed_message: Message,
+        wal: WriteAheadLog
+    ):
+        return wal.storage.update_onchain_light_client_protocol_message_set_signed_transaction(
+            internal_msg_identifier=internal_msg_identifier,
+            signed_message=signed_message
+        )
+
+    @classmethod
     def store_light_client_payment(cls, payment: LightClientPayment, storage: SerializedSQLiteStorage):
         exists_payment = storage.get_light_client_payment(payment.payment_id)
         if not exists_payment:
@@ -133,6 +145,21 @@ class LightClientMessageHandler:
                                           message[3],
                                           None,
                                           message[6])
+
+    @classmethod
+    def get_light_client_protocol_message_by_internal_identifier(cls, internal_msg_identifier: int, wal: WriteAheadLog):
+        message = wal.storage.get_light_client_protocol_message_by_internal_identifier(internal_msg_identifier)
+        if message:
+            return LightClientProtocolMessage(message[3] is not None,
+                                              message[1],
+                                              message[4],
+                                              message[0],
+                                              message[5],
+                                              message[2],
+                                              message[3],
+                                              message[8],
+                                              message[6])
+        return None
 
     @classmethod
     def get_light_client_payment_locked_transfer(cls, payment_identifier: int, wal: WriteAheadLog):

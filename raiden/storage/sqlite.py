@@ -1410,6 +1410,27 @@ class SQLiteStorage:
         )
         return cursor.fetchone()
 
+    def get_light_client_protocol_message_by_internal_identifier(self, internal_msg_identifier: int):
+        cursor = self.conn.cursor()
+        cursor.execute(
+            """
+            SELECT internal_msg_identifier,
+                   identifier,
+                   message_order,
+                   unsigned_message,
+                   signed_message,
+                   light_client_payment_id,
+                   message_type,
+                   light_client_address,
+                   internal_msg_identifier
+            FROM light_client_protocol_message
+            WHERE internal_msg_identifier = ?
+            ORDER BY message_order ASC
+            """,
+            (str(internal_msg_identifier),),
+        )
+        return cursor.fetchone()
+
     def get_latest_light_client_non_closing_balance_proof(self, channel_id):
         cursor = self.conn.cursor()
         cursor.execute(
