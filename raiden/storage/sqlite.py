@@ -8,6 +8,7 @@ from eth_utils import to_checksum_address
 from raiden.constants import RAIDEN_DB_VERSION, SQLITE_MIN_REQUIRED_VERSION
 from raiden.exceptions import InvalidDBData, InvalidNumberInput
 from raiden.lightclient.models.client_model import ClientType
+from raiden.messages import Message
 from raiden.storage.serialize import SerializationBase
 from raiden.storage.utils import DB_SCRIPT_CREATE_TABLES, TimestampedEvent
 from raiden.utils import get_system_spec
@@ -1376,11 +1377,24 @@ class SQLiteStorage:
         cursor = self.conn.cursor()
         cursor.execute(
             """
-            SELECT identifier, message_order, unsigned_message, signed_message, light_client_payment_id, internal_msg_identifier, message_type
-            FROM light_client_protocol_message
-            WHERE internal_msg_identifier >= ?
-            AND light_client_address = ?
-            ORDER BY light_client_payment_id, message_order ASC
+            SELECT lcpm1.identifier,
+                   lcpm1.message_order,
+                   lcpm1.unsigned_message,
+                   lcpm1.signed_message,
+                   lcpm1.light_client_payment_id,
+                   lcpm1.internal_msg_identifier,
+                   lcpm1.message_type
+            FROM light_client_protocol_message lcpm1
+            WHERE lcpm1.internal_msg_identifier >= ?
+            AND lcpm1.light_client_address = ?
+            AND lcpm1.internal_msg_identifier NOT IN (
+                SELECT lcpm2.internal_msg_identifier
+                FROM light_client_protocol_message lcpm2
+                WHERE lcpm2.internal_msg_identifier >= ?
+                AND lcpm2.message_type IN ('SettlementRequired', 'RequestRegisterSecret', 'UnlockLightRequest')
+                AND lcpm2.signed_message IS NOT NULL
+            )
+            ORDER BY lcpm1.light_client_payment_id, lcpm1.message_order ASC
             """,
             (from_message, light_client),
         )
@@ -1473,6 +1487,18 @@ class SerializedSQLiteStorage(SQLiteStorage):
 
             last_id = cursor.lastrowid
         return last_id
+
+    def update_light_client_protocol_message_with_signed_message(self,
+                                                                 internal_msg_identifier: int,
+                                                                 signed_message: Message):
+        return self.update(
+            """
+                UPDATE light_client_protocol_message
+                SET signed_message = ?
+                WHERE internal_msg_identifier = ?;
+            """,
+            (internal_msg_identifier, self.serializer.serialize(signed_message))
+        )
 
     def query_invoice(self, payment_hash_invoice):
         return super().query_invoice(payment_hash_invoice)
@@ -1616,4 +1642,12 @@ class SerializedSQLiteStorage(SQLiteStorage):
             cursor = self.conn.execute("UPDATE client SET pending_for_deletion = TRUE WHERE address = ?", (address,))
             last_id = cursor.lastrowid
 
+        return last_id
+
+    def update(self, update_sql: str, params: Any) -> int:
+        """ Aux method to generalize the update calls """
+        with self.write_lock, self.conn:
+            cursor = self.conn.cursor()
+            cursor.execute(update_sql, params)
+            last_id = cursor.lastrowid
         return last_id
