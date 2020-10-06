@@ -1674,7 +1674,7 @@ def handle_receive_lock_expired_light(
             payment_id,
             1,
             state_change.lock_expired,
-            False,
+            True,
             LightClientProtocolMessageType.PaymentExpired,
             state_change.lock_expired.recipient
         )
@@ -1754,8 +1754,6 @@ def handle_receive_lockedtransfer_light(
         assert merkletree, "is_valid_lock_expired should return merkletree if valid"
         channel_state.partner_state.balance_proof = mediated_transfer.balance_proof
         channel_state.partner_state.merkletree = merkletree
-
-        print("raiden/transfer/channel.py:1806 PARTNER STATE UPDATED WITH BP {}".format(channel_state.partner_state.balance_proof))
 
         lock = mediated_transfer.lock
         channel_state.partner_state.secrethashes_to_lockedlocks[lock.secrethash] = lock

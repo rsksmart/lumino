@@ -171,7 +171,6 @@ class MessageHandler:
             if is_light_client:
                 state_change = ActionTransferRerouteLight(
                     transfer=from_transfer,
-                    secret=random_secret(),
                     refund_transfer=message
                 )
                 raiden.handle_and_track_state_change(state_change)

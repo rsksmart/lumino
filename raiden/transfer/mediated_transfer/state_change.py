@@ -666,13 +666,14 @@ class ActionTransferReroute(BalanceProofStateChange):
         return instance
 
 
-class ActionTransferRerouteLight(ActionTransferReroute):
+class ActionTransferRerouteLight(BalanceProofStateChange):
     def __init__(
-        self, transfer: LockedTransferSignedState, secret: Secret, refund_transfer: RefundTransfer
+        self, transfer: LockedTransferSignedState, refund_transfer: RefundTransfer
     ) -> None:
-        super().__init__(transfer, secret)
+        super().__init__(transfer.balance_proof)
         if not isinstance(refund_transfer, RefundTransfer):
             raise ValueError("refund_transfer must be an RefundTransfer instance.")
+        self.transfer = transfer
         self.refund_transfer = refund_transfer
 
     def __repr__(self) -> str:
@@ -698,7 +699,6 @@ class ActionTransferRerouteLight(ActionTransferReroute):
     def from_dict(cls, data: Dict[str, Any]) -> "ActionTransferRerouteLight":
         instance = cls(
             transfer=data["transfer"],
-            secret=Secret(deserialize_bytes(data["secret"])),
             refund_transfer=data["refund_transfer"]
         )
         return instance

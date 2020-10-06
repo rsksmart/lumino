@@ -397,8 +397,6 @@ def handle_transfer_reroute_light(
     storage: SerializedSQLiteStorage
 ) -> TransitionResult[InitiatorPaymentState]:
 
-    print("raiden/transfer/mediated_transfer/initiator_manager.py:396 running handle_transfer_reroute_light")
-
     refund_transfer = state_change.refund_transfer
 
     if not refund_transfer:
@@ -798,8 +796,7 @@ def state_transition(
         )
     elif type(state_change) == ActionTransferRerouteLight:
         assert isinstance(state_change, ActionTransferRerouteLight), MYPY_ANNOTATION
-        msg = "ActionTransferRerouteLight should be accompanied by a valid payment state"
-        assert payment_state, msg
+        assert payment_state, "ActionTransferRerouteLight should be accompanied by a valid payment state"
         iteration = handle_transfer_reroute_light(
             payment_state=payment_state,
             state_change=state_change,
