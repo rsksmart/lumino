@@ -1,4 +1,5 @@
 import copy
+from itertools import chain
 
 from raiden.lightclient.models.light_client_protocol_message import LightClientProtocolMessageType
 from raiden.transfer import channel, token_network, views
@@ -853,13 +854,13 @@ def handle_receive_transfer_refund_cancel_route(
 ) -> TransitionResult[ChainState]:
 
     new_secrethash = state_change.secrethash
-    current_payment_task = chain_state.payment_mapping[state_change.sender].secrethashes_to_task[
+    current_payment_task = chain_state.payment_mapping[chain_state.our_address].secrethashes_to_task[
         state_change.transfer.lock.secrethash
     ]
-    chain_state.payment_mapping[state_change.sender].secrethashes_to_task.update(
+    chain_state.payment_mapping[chain_state.our_address].secrethashes_to_task.update(
         {new_secrethash: copy.deepcopy(current_payment_task)}
     )
-    return subdispatch_to_paymenttask(chain_state, state_change, state_change.transfer.target, new_secrethash, storage)
+    return subdispatch_to_paymenttask(chain_state, state_change, chain_state.our_address, new_secrethash, storage)
 
 
 def handle_receive_transfer_cancel_route(
