@@ -844,7 +844,7 @@ def handle_receive_transfer_refund(
     chain_state: ChainState, state_change: ReceiveTransferRefund
 ) -> TransitionResult[ChainState]:
     return subdispatch_to_paymenttask(
-        chain_state, state_change, state_change.transfer.target, state_change.transfer.lock.secrethash
+        chain_state, state_change, state_change.transfer.initiator, state_change.transfer.lock.secrethash
     )
 
 
@@ -866,7 +866,7 @@ def handle_receive_transfer_cancel_route(
     chain_state: ChainState, state_change: ReceiveTransferCancelRoute
 ) -> TransitionResult[ChainState]:
     return subdispatch_to_paymenttask(
-        chain_state, state_change, state_change.transfer.target, state_change.transfer.lock.secrethash
+        chain_state, state_change, state_change.transfer.initiator, state_change.transfer.lock.secrethash
     )
 
 
