@@ -12,13 +12,10 @@ from definitions import ROOT_DIR
 import json
 from eth_utils import encode_hex
 
-from raiden.network.transport.matrix.utils import get_available_servers_from_config, server_is_available
-from raiden.storage import serialize, sqlite
+from raiden.network.transport.matrix.layer import MatrixLayer as MatrixTransportLayer
 
 from raiden.accounts import AccountManager
 from raiden.constants import (
-    MONITORING_BROADCASTING_ROOM,
-    PATH_FINDING_BROADCASTING_ROOM,
     RAIDEN_DB_VERSION,
     Environment,
     RoutingMode,
@@ -27,12 +24,8 @@ from raiden.exceptions import RaidenError
 from raiden.message_handler import MessageHandler
 from raiden.network.blockchain_service import BlockChainService
 from raiden.network.rpc.client import JSONRPCClient
-from raiden.network.transport import MatrixTransport
-from raiden.network.transport.matrix import MatrixLightClientTransport
-from transport.layer import Layer as TransportLayer
 from raiden.raiden_event_handler import RaidenEventHandler
 from raiden.settings import (
-    DEFAULT_MATRIX_KNOWN_SERVERS,
     DEFAULT_NAT_KEEPALIVE_RETRIES,
     DEFAULT_NUMBER_OF_BLOCK_CONFIRMATIONS,
 )
@@ -55,101 +48,11 @@ from raiden.ui.startup import (
     setup_udp_or_exit,
 )
 from raiden.utils import BlockNumber, pex, split_endpoint
-from raiden.utils.cli import get_matrix_servers
 from raiden.utils.typing import Address, Optional, PrivateKey, Tuple
 from raiden_contracts.constants import ID_TO_NETWORKNAME
 from raiden_contracts.contract_manager import ContractManager
 
 log = structlog.get_logger(__name__)
-
-
-def _setup_matrix(config):
-    if config["transport"]["matrix"].get("available_servers") is None:
-        # fetch list of known servers from raiden-network/raiden-tranport repo
-        available_servers_url = DEFAULT_MATRIX_KNOWN_SERVERS[config["environment_type"]]
-        available_servers = get_matrix_servers(available_servers_url)
-        log.debug("Fetching available matrix servers", available_servers=available_servers)
-        config["transport"]["matrix"]["available_servers"] = available_servers
-
-    # TODO: This needs to be adjusted once #3735 gets implemented
-    # Add PFS broadcast room if enabled
-    if config["services"]["pathfinding_service_address"] is not None:
-        if PATH_FINDING_BROADCASTING_ROOM not in config["transport"]["matrix"]["global_rooms"]:
-            config["transport"]["matrix"]["global_rooms"].append(PATH_FINDING_BROADCASTING_ROOM)
-
-    # Add monitoring service broadcast room if enabled
-    if config["services"]["monitoring_enabled"] is True:
-        config["transport"]["matrix"]["global_rooms"].append(MONITORING_BROADCASTING_ROOM)
-
-    try:
-
-        database_path = config["database_path"]
-
-        database_dir = os.path.dirname(config["database_path"])
-        os.makedirs(database_dir, exist_ok=True)
-
-        storage = sqlite.SerializedSQLiteStorage(
-            database_path=database_path, serializer=serialize.JSONSerializer()
-        )
-
-        light_clients = storage.get_all_light_clients()
-
-        light_client_transports = []
-        for light_client in light_clients:
-
-            current_server_name = None
-
-            if light_client["current_server_name"]:
-                current_server_name = light_client["current_server_name"]
-                available_servers = get_available_servers_from_config(config["transport"]["matrix"])
-                if not server_is_available(current_server_name, available_servers):
-                    # we flag the light client as pending for deletion because it's associated to a server that
-                    # is not available anymore so we need to force a new on-boarding, the next request from that LC will
-                    # delete it and respond with an error to control the re-onboard
-                    storage.flag_light_client_as_pending_for_deletion(light_client["address"])
-                    log.info("No available server with name " + current_server_name +
-                             ", LC has been flagged for deletion from DB, on-boarding is needed for LC with address: " +
-                             light_client["address"])
-                    continue
-
-            light_client_transport = get_matrix_light_client_instance(
-                light_client['address'],
-                config["transport"]["matrix"],
-                light_client['password'],
-                light_client['display_name'],
-                light_client['seed_retry'],
-                current_server_name)
-
-            light_client_transports.append(light_client_transport)
-
-        hub_transport = MatrixTransport(config["address"], config["transport"]["matrix"])
-
-        node_transport = TransportLayer(hub_transport, light_client_transports)
-
-    except RaidenError as ex:
-        click.secho(f"FATAL: {ex}", fg="red")
-        sys.exit(1)
-
-    return node_transport
-
-
-def get_matrix_light_client_instance(
-    address,
-    config,
-    password,
-    display_name,
-    seed_retry,
-    current_server_name: str = None
-):
-    light_client_transport = MatrixLightClientTransport(
-        address,
-        config,
-        password,
-        display_name,
-        seed_retry,
-        current_server_name
-    )
-    return light_client_transport
 
 
 def _setup_web3(eth_rpc_endpoint):
@@ -174,6 +77,7 @@ def _setup_web3(eth_rpc_endpoint):
         )
         sys.exit(1)
     return web3
+
 
 def get_account_and_private_key(
     account_manager: AccountManager, address: Optional[Address], password_file: Optional[TextIO]
@@ -352,7 +256,7 @@ def run_app(
             config, blockchain_service, address, contracts, endpoint_registry_contract_address
         )
     elif transport == "matrix":
-        transport = _setup_matrix(config)
+        transport = MatrixTransportLayer(config)  # this should be replaced by structured or consistent config use
     else:
         raise RuntimeError(f'Unknown transport type "{transport}" given')
 
@@ -429,11 +333,7 @@ def _get_network_info(network_id, config_data):
 
 def validate_network_contracts(config_network, running_network):
     if running_network['token_network_registry'] == config_network['token_network_registry'] and \
-       running_network['secret_registry'] == config_network['secret_registry'] and \
-       running_network['endpoint_registry'] == config_network['endpoint_registry']:
+        running_network['secret_registry'] == config_network['secret_registry'] and \
+        running_network['endpoint_registry'] == config_network['endpoint_registry']:
         return True
     return False
-
-
-
-

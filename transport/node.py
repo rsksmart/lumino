@@ -9,11 +9,11 @@ from raiden.utils import Address
 
 class Node(ABC):
     """
-    Node is an abstraction that represents a Lumino node (regular or light client) managed
-    by a transport layer.
-
-    It should implement concrete methods which take care of doing the actual sending and receiving
-    of messages through the transport layer that manages it.
+    Node is an abstraction that represents a single address (belonging to regular node or one registered as a light
+    client) managed by the transport layer of the running Lumino node.
+    This address can work both as a sender or a receiver of communications in the context of transport operations.
+    It should implement concrete methods which have the responsibility of doing the actual sending and receiving of
+    messages through the transport layer that manages it.
     """
 
     def __init__(self, address: Address):
@@ -22,11 +22,7 @@ class Node(ABC):
         Messages to be received by this Node should be have this address as the message receiver.
         Messages to be sent from this Node should have this address as the message sender.
         """
-        self._address = address
-
-    @property
-    def address(self):
-        return self._address
+        self.address = address
 
     @abstractmethod
     def start(self, raiden_service: RaidenService, message_handler: MessageHandler, prev_auth_data: str):

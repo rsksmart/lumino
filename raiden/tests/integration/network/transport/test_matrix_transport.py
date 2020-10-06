@@ -14,7 +14,7 @@ from raiden.constants import (
     UINT64_MAX)
 from raiden.exceptions import InsufficientFunds
 from raiden.messages import Delivered, Processed, SecretRequest, ToDevice
-from raiden.network.transport.matrix import AddressReachability, MatrixTransport, _RetryQueue
+from raiden.network.transport.matrix import AddressReachability, MatrixNode as MatrixTransportNode, _RetryQueue
 from raiden.network.transport.matrix.client import Room
 from raiden.network.transport.matrix.utils import make_room_alias
 from raiden.tests.utils import factories
@@ -87,18 +87,18 @@ def mock_matrix(
         private_rooms=private_rooms,
     )
 
-    transport = MatrixTransport(raiden_service.address, config)
+    transport = MatrixTransportNode(raiden_service.address, config)
     transport._raiden_service = raiden_service
     transport._stop_event.clear()
     transport._address_mgr.add_userid_for_address(factories.HOP1, USERID1)
     transport._client.user_id = USERID0
 
-    monkeypatch.setattr(MatrixTransport, "_get_user", mock_get_user)
+    monkeypatch.setattr(MatrixTransportNode, "_get_user", mock_get_user)
     monkeypatch.setattr(
-        MatrixTransport, "_get_room_ids_for_address", mock_get_room_ids_for_address
+        MatrixTransportNode, "_get_room_ids_for_address", mock_get_room_ids_for_address
     )
-    monkeypatch.setattr(MatrixTransport, "_set_room_id_for_address", mock_set_room_id_for_address)
-    monkeypatch.setattr(MatrixTransport, "_receive_message", mock_receive_message)
+    monkeypatch.setattr(MatrixTransportNode, "_set_room_id_for_address", mock_set_room_id_for_address)
+    monkeypatch.setattr(MatrixTransportNode, "_receive_message", mock_receive_message)
 
     return transport
 
@@ -157,7 +157,7 @@ def ping_pong_message_success(transport0, transport1):
     return all_messages_received
 
 
-def is_reachable(transport: MatrixTransport, address: Address) -> bool:
+def is_reachable(transport: MatrixTransportNode, address: Address) -> bool:
     return (
         transport._address_mgr.get_address_reachability(address) is AddressReachability.REACHABLE
     )
@@ -415,7 +415,7 @@ def test_matrix_message_retry(
     partner_address = factories.make_address()
     raiden_service = MockRaidenService(None)
 
-    transport = MatrixTransport(
+    transport = MatrixTransportNode(
         address=raiden_service.address,
         config={
             "global_rooms": global_rooms,
@@ -499,7 +499,7 @@ def test_join_invalid_discovery(
     our current server should be created
     """
     raiden_service = MockRaidenService(None)
-    transport = MatrixTransport(
+    transport = MatrixTransportNode(
         raiden_service.address,
         {
             "global_rooms": global_rooms,
@@ -567,7 +567,7 @@ def test_matrix_discovery_room_offline_server(
     local_matrix_servers, retries_before_backoff, retry_interval, private_rooms, global_rooms
 ):
     raiden_service = MockRaidenService(None)
-    transport = MatrixTransport(
+    transport = MatrixTransportNode(
         raiden_service.address,
         {
             "global_rooms": global_rooms,
@@ -593,7 +593,7 @@ def test_matrix_send_global(
     local_matrix_servers, retries_before_backoff, retry_interval, private_rooms, global_rooms
 ):
     raiden_service = MockRaidenService(None)
-    transport = MatrixTransport(
+    transport = MatrixTransportNode(
         raiden_service.address,
         {
             "global_rooms": global_rooms + [MONITORING_BROADCASTING_ROOM],
@@ -645,7 +645,7 @@ def test_monitoring_global_messages(
     Test that RaidenService sends RequestMonitoring messages to global
     MONITORING_BROADCASTING_ROOM room on newly received balance proofs.
     """
-    transport = MatrixTransport(
+    transport = MatrixTransportNode(
         {
             "global_rooms": global_rooms + [MONITORING_BROADCASTING_ROOM],
             "retries_before_backoff": retries_before_backoff,
@@ -705,7 +705,7 @@ def test_pfs_global_messages(
     Test that RaidenService sends UpdatePFS messages to global
     PATH_FINDING_BROADCASTING_ROOM room on newly received balance proofs.
     """
-    transport = MatrixTransport(
+    transport = MatrixTransportNode(
         {
             "global_rooms": global_rooms,  # FIXME: #3735
             "retries_before_backoff": retries_before_backoff,

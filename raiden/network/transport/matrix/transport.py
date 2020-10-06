@@ -93,7 +93,7 @@ class _RetryQueue(Runnable):
         # generator that tells if the message should be sent now
         expiration_generator: Iterator[bool]
 
-    def __init__(self, transport: "MatrixTransport", receiver: Address):
+    def __init__(self, transport: "MatrixNode", receiver: Address):
         self.transport = transport
         self.receiver = receiver
         self._message_queue: List[_RetryQueue._MessageData] = list()
@@ -251,17 +251,18 @@ class _RetryQueue(Runnable):
         return f"<{self.__class__.__name__} for {to_normalized_address(self.receiver)}>"
 
 
-class MatrixTransport(TransportNode, Runnable):
+class MatrixNode(TransportNode, Runnable):
     _room_prefix = "raiden"
     _room_sep = "_"
     log = log
 
-    def __init__(self, address: Address, config: dict, current_server_name: str = None):
+    def __init__(self, address: Address, config: dict):
         TransportNode.__init__(self, address)
         Runnable.__init__(self)
         self._config = config
         self._raiden_service: Optional[RaidenService] = None
 
+        current_server_name = config.get("current_server_name")
         available_servers = get_available_servers_from_config(self._config)
 
         def _http_retry_delay() -> Iterable[float]:
@@ -1342,19 +1343,13 @@ class MatrixTransport(TransportNode, Runnable):
         self.greenlet.join(timeout)
 
 
-class MatrixLightClientTransport(MatrixTransport):
+class MatrixLightClientNode(MatrixNode):
 
-    def __init__(self,
-                 address: Address,
-                 config: dict,
-                 _encrypted_light_client_password_signature: str,
-                 _encrypted_light_client_display_name_signature: str,
-                 _encrypted_light_client_seed_for_retry_signature: str,
-                 current_server_name: str = None):
-        MatrixTransport.__init__(self, address, config, current_server_name)
-        self._encrypted_light_client_password_signature = _encrypted_light_client_password_signature
-        self._encrypted_light_client_display_name_signature = _encrypted_light_client_display_name_signature
-        self._encrypted_light_client_seed_for_retry_signature = _encrypted_light_client_seed_for_retry_signature
+    def __init__(self, address: Address, config: dict, auth_params: dict):
+        MatrixNode.__init__(self, address, config)
+        self._encrypted_light_client_password_signature = auth_params["light_client_password"]
+        self._encrypted_light_client_display_name_signature = auth_params["light_client_display_name"]
+        self._encrypted_light_client_seed_for_retry_signature = auth_params["light_client_seed_retry"]
 
     def start(  # type: ignore
         self,
@@ -1422,7 +1417,7 @@ class MatrixLightClientTransport(MatrixTransport):
                 retrier.start()
 
         self.log.debug("Matrix started", config=self._config)
-        MatrixTransport.start_greenlet_for_light_client(self)
+        MatrixNode.start_greenlet_for_light_client(self)
         self._started = True
 
     def _run(self):
