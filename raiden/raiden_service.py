@@ -998,8 +998,6 @@ class RaidenService(Runnable):
 
         events_queues = views.get_all_messagequeues(chain_state)
 
-        light_client_transports = self.transport.light_clients
-
         for event_queue in events_queues.values():
             for event in event_queue:
                 if isinstance(event, SendLockedTransfer):
@@ -1008,7 +1006,7 @@ class RaidenService(Runnable):
                         self.transport.full_node.whitelist(address=transfer.target)
                 if isinstance(event, SendLockedTransferLight):
                     transfer = event.signed_locked_transfer
-                    for light_client_transport in light_client_transports:
+                    for light_client_transport in self.transport.light_clients:
                         if transfer.initiator == to_canonical_address(light_client_transport.address):
                             light_client_transport.whitelist(address=transfer.target)
 

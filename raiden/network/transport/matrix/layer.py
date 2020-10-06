@@ -52,9 +52,9 @@ class MatrixLayer(TransportLayer):
 
             light_clients = storage.get_all_light_clients()
 
-            light_client_transports = []
-            for light_client in light_clients:
+            self._light_clients: List[TransportNode] = []
 
+            for light_client in light_clients:
                 current_server_name = None
 
                 if light_client["current_server_name"]:
@@ -83,10 +83,9 @@ class MatrixLayer(TransportLayer):
                     auth_params,
                 )
 
-                light_client_transports.append(light_client_transport)
+                self._light_clients.append(light_client_transport)
 
             self._full_node: TransportNode = MatrixTransportNode(config["address"], config["transport"]["matrix"])
-            self._light_clients: List[TransportNode] = light_client_transports
 
         except RaidenError as ex:
             click.secho(f"FATAL: {ex}", fg="red")
