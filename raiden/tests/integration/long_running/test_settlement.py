@@ -561,7 +561,7 @@ def run_test_automatic_secret_registration(raiden_chain, token_addresses):
 
     # Stop app0 to avoid sending the unlock, this must be done after the locked
     # transfer is sent.
-    app0.raiden.transport.hub_transport.stop()
+    app0.raiden.transport.full_node.stop()
 
     reveal_secret = RevealSecret(message_identifier=random.randint(0, UINT64_MAX), secret=secret)
     app0.raiden.sign(reveal_secret)

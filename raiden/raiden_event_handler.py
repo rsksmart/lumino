@@ -219,7 +219,7 @@ class RaidenEventHandler(EventHandler):
     def handle_send_lockexpired(raiden: "RaidenService", send_lock_expired: SendLockExpired):
         lock_expired_message = message_from_sendevent(send_lock_expired)
         raiden.sign(lock_expired_message)
-        raiden.transport.hub_transport.send_message(
+        raiden.transport.full_node.send_message(
             *TransportMessage.wrap(send_lock_expired.queue_identifier, lock_expired_message)
         )
 
@@ -238,7 +238,7 @@ class RaidenEventHandler(EventHandler):
     ):
         mediated_transfer_message = message_from_sendevent(send_locked_transfer)
         raiden.sign(mediated_transfer_message)
-        raiden.transport.hub_transport.send_message(
+        raiden.transport.full_node.send_message(
             *TransportMessage.wrap(send_locked_transfer.queue_identifier, mediated_transfer_message)
         )
 
@@ -248,7 +248,7 @@ class RaidenEventHandler(EventHandler):
     ):
         mediated_transfer_message = send_locked_transfer_light.signed_locked_transfer
         light_client_address = to_checksum_address(send_locked_transfer_light.signed_locked_transfer.initiator)
-        for light_client_transport in raiden.transport.light_client_transports:
+        for light_client_transport in raiden.transport.light_clients:
             if light_client_address == light_client_transport.address:
                 light_client_transport.send_message(
                     *TransportMessage.wrap(send_locked_transfer_light.queue_identifier, mediated_transfer_message)
@@ -258,7 +258,7 @@ class RaidenEventHandler(EventHandler):
     def handle_send_secretreveal(raiden: "RaidenService", reveal_secret_event: SendSecretReveal):
         reveal_secret_message = message_from_sendevent(reveal_secret_event)
         raiden.sign(reveal_secret_message)
-        raiden.transport.hub_transport.send_message(
+        raiden.transport.full_node.send_message(
             *TransportMessage.wrap(reveal_secret_event.queue_identifier, reveal_secret_message)
         )
 
@@ -275,7 +275,7 @@ class RaidenEventHandler(EventHandler):
     def handle_send_balanceproof(raiden: "RaidenService", balance_proof_event: SendBalanceProof):
         unlock_message = message_from_sendevent(balance_proof_event)
         raiden.sign(unlock_message)
-        raiden.transport.hub_transport.send_message(
+        raiden.transport.full_node.send_message(
             *TransportMessage.wrap(balance_proof_event.queue_identifier, unlock_message)
         )
 
@@ -297,7 +297,7 @@ class RaidenEventHandler(EventHandler):
 
         secret_request_message = message_from_sendevent(secret_request_event)
         raiden.sign(secret_request_message)
-        raiden.transport.hub_transport.send_message(
+        raiden.transport.full_node.send_message(
             *TransportMessage.wrap(secret_request_event.queue_identifier, secret_request_message)
         )
 
@@ -318,7 +318,7 @@ class RaidenEventHandler(EventHandler):
     ):
         refund_transfer_message = message_from_sendevent(refund_transfer_event)
         raiden.sign(refund_transfer_message)
-        raiden.transport.hub_transport.send_message(
+        raiden.transport.full_node.send_message(
             *TransportMessage.wrap(refund_transfer_event.queue_identifier, refund_transfer_message)
         )
 
@@ -326,7 +326,7 @@ class RaidenEventHandler(EventHandler):
     def handle_send_processed(raiden: "RaidenService", processed_event: SendProcessed):
         processed_message = message_from_sendevent(processed_event)
         raiden.sign(processed_message)
-        raiden.transport.hub_transport.send_message(
+        raiden.transport.full_node.send_message(
             *TransportMessage.wrap(processed_event.queue_identifier, processed_message)
         )
 

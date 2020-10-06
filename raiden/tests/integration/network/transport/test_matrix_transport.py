@@ -394,7 +394,7 @@ def test_matrix_tx_error_handling(  # pylint: disable=unused-argument
         )
         app0.raiden.handle_and_track_state_change(close_channel)
 
-    app0.raiden.transport.hub_transport._client.add_presence_listener(make_tx)
+    app0.raiden.transport.full_node._client.add_presence_listener(make_tx)
 
     exception = ValueError("exception was not raised from the transport")
     with pytest.raises(InsufficientFunds), gevent.Timeout(200, exception=exception):
