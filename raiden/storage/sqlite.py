@@ -8,7 +8,6 @@ from eth_utils import to_checksum_address
 from raiden.constants import RAIDEN_DB_VERSION, SQLITE_MIN_REQUIRED_VERSION
 from raiden.exceptions import InvalidDBData, InvalidNumberInput
 from raiden.lightclient.models.client_model import ClientType
-from raiden.messages import Message
 from raiden.storage.serialize import SerializationBase
 from raiden.storage.utils import DB_SCRIPT_CREATE_TABLES, TimestampedEvent
 from raiden.utils import get_system_spec
@@ -1490,7 +1489,7 @@ class SerializedSQLiteStorage(SQLiteStorage):
 
     def update_light_client_protocol_message_with_signed_message(self,
                                                                  internal_msg_identifier: int,
-                                                                 signed_message: Message):
+                                                                 signed_message: "Message"):
         return self.update(
             """
                 UPDATE light_client_protocol_message
