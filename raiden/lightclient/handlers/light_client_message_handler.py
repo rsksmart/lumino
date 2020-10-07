@@ -54,15 +54,18 @@ class LightClientMessageHandler:
         )
 
     @classmethod
-    def update_stored_msg_set_signed_data(
+    def update_offchain_light_client_protocol_message_set_signed_message(
         cls, message: Message,
         payment_id: int,
         order: int,
         message_type: LightClientProtocolMessageType,
         wal: WriteAheadLog
     ):
-        return wal.storage.update_light_client_protocol_message_set_signed_data(payment_id, order, message,
-                                                                                str(message_type.value))
+        return wal.storage\
+            .update_offchain_light_client_protocol_message_set_signed_message(payment_id,
+                                                                              order,
+                                                                              message,
+                                                                              str(message_type.value))
 
     @classmethod
     def update_stored_msg_set_signed_tx_by_message_id(

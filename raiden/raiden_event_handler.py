@@ -253,11 +253,12 @@ class RaidenEventHandler(EventHandler):
             stored_but_unsigned = existing_message.signed_message is None
             if stored_but_unsigned and store_message_event.is_signed:
                 # Update messages that were created by the hub and now are received signed by the light client
-                LightClientMessageHandler.update_stored_msg_set_signed_data(store_message_event.message,
-                                                                            store_message_event.payment_id,
-                                                                            store_message_event.message_order,
-                                                                            store_message_event.message_type,
-                                                                            raiden.wal)
+                LightClientMessageHandler\
+                    .update_offchain_light_client_protocol_message_set_signed_message(store_message_event.message,
+                                                                                      store_message_event.payment_id,
+                                                                                      store_message_event.message_order,
+                                                                                      store_message_event.message_type,
+                                                                                      raiden.wal)
             else:
                 log.info("Message for lc already received, ignoring db storage")
 
