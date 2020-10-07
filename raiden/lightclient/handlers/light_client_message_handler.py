@@ -157,7 +157,7 @@ class LightClientMessageHandler:
                                               message[5],
                                               message[2],
                                               message[3],
-                                              message[8],
+                                              message[7],
                                               message[6])
         return None
 

@@ -1414,8 +1414,7 @@ class SQLiteStorage:
         cursor = self.conn.cursor()
         cursor.execute(
             """
-            SELECT internal_msg_identifier,
-                   identifier,
+            SELECT identifier,
                    message_order,
                    unsigned_message,
                    signed_message,
@@ -1522,7 +1521,6 @@ class SerializedSQLiteStorage(SQLiteStorage):
 
     def update_invoice(self, payment_hash_invoice):
         return super().update_invoice(payment_hash_invoice)
-
 
     def write_light_client_protocol_message(self, new_message, msg_dto):
         serialized_data = self.serializer.serialize(new_message)
