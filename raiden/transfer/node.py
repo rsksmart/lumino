@@ -202,7 +202,7 @@ def subdispatch_to_all_lockedtransfers(
     events = list()
     for node_address in chain_state.payment_mapping.keys():
         for secrethash in list(chain_state.payment_mapping[node_address].secrethashes_to_task.keys()):
-            result = subdispatch_to_paymenttask(chain_state, state_change, secrethash, storage)
+            result = subdispatch_to_paymenttask(chain_state, state_change, node_address, secrethash, storage)
             events.extend(result.events)
     return TransitionResult(chain_state, events)
 
@@ -327,21 +327,33 @@ def handle_init_unlock_light(
 def handle_init_send_lock_expired_light(
     chain_state: ChainState, state_change: ActionSendLockExpiredLight
 ) -> TransitionResult[ChainState]:
+    channel_state = views.get_channelstate_by_canonical_identifier_and_address(
+        chain_state=chain_state,
+        canonical_identifier=CanonicalIdentifier(
+            chain_identifier=chain_state.chain_id,
+            token_network_address=state_change.signed_lock_expired.token_network_address,
+            channel_identifier=state_change.signed_lock_expired.channel_identifier,
+        ),
+        address=state_change.sender
+    )
+
     signed_lock_expired = state_change.signed_lock_expired
     send_lock_expired_light = SendLockExpiredLight(state_change.receiver, signed_lock_expired.message_identifier,
                                                    signed_lock_expired, state_change.signed_lock_expired.secrethash,
                                                    state_change.payment_id)
+    receiver_light_client_address = send_lock_expired_light.recipient if channel_state.both_participants_are_light_clients else None
     store_lock_expired_light = StoreMessageEvent(signed_lock_expired.message_identifier, state_change.payment_id,
                                                  1, signed_lock_expired, True,
                                                  LightClientProtocolMessageType.PaymentExpired,
-                                                 signed_lock_expired.sender)
+                                                 sender_light_client_address=signed_lock_expired.sender,
+                                                 receiver_light_client_address=receiver_light_client_address)
     events = [send_lock_expired_light, store_lock_expired_light]
     return TransitionResult(chain_state, events)
 
 
 def handle_store_refund_transfer_light( chain_state: ChainState, state_change: StoreRefundTransferLight
                                         ) -> TransitionResult[ChainState]:
-    return subdispatch_to_paymenttask(chain_state, state_change, state_change.transfer.target, state_change.transfer.lock.secrethash)
+    return subdispatch_to_paymenttask(chain_state, state_change, state_change.transfer.initiator, state_change.transfer.lock.secrethash)
 
 
 def subdispatch_initiatortask(

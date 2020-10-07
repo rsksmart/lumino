@@ -618,15 +618,22 @@ def handle_secretreveal_light(
 
 
 def handle_store_refund_transfer_light(payment_state: InitiatorPaymentState,
-                                       refund_transfer: RefundTransfer
+                                       refund_transfer: RefundTransfer,
+                                       channelidentifiers_to_channels: ChannelMap,
                                        ) -> TransitionResult[InitiatorPaymentState]:
+    channel_state = channelidentifiers_to_channels[refund_transfer.recipient].get(refund_transfer.channel_identifier)
+    sender_light_client = state_change.receiver if channel_state.both_participants_are_light_clients else None
+
     order = 1
     store_refund_transfer = StoreMessageEvent(refund_transfer.message_identifier,
                                               refund_transfer.payment_identifier,
                                               order,
                                               refund_transfer,
                                               True,
-                                              LightClientProtocolMessageType.PaymentRefund, refund_transfer.recipient)
+                                              LightClientProtocolMessageType.PaymentRefund,
+                                              sender_light_client_address=sender_light_client,
+                                              receiver_light_client_address=refund_transfer.recipient
+                                              )
     return TransitionResult(payment_state, [store_refund_transfer])
 
 
@@ -757,7 +764,7 @@ def state_transition(
     elif type(state_change) == StoreRefundTransferLight:
         assert isinstance(state_change, StoreRefundTransferLight), MYPY_ANNOTATION
         assert payment_state, "StoreRefundTransferLight should be accompanied by a valid payment state"
-        iteration = handle_store_refund_transfer_light(payment_state=payment_state, refund_transfer=state_change.transfer)
+        iteration = handle_store_refund_transfer_light(payment_state=payment_state, refund_transfer=state_change.transfer, channelidentifiers_to_channels=channelidentifiers_to_channels)
     else:
         iteration = TransitionResult(payment_state, list())
 

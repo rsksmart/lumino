@@ -268,11 +268,18 @@ def handle_inittarget_light(
                 transfer.initiator,
                 transfer.target
             )
+            sender_light_client_address = transfer.initiator if channel_state.both_participants_are_light_clients else None
             LightClientMessageHandler.store_light_client_payment(payment, storage)
-            store_expired_locked_transfer_event = StoreMessageEvent(transfer.message_identifier, transfer.payment_identifier, 1,
-                                                            state_change.signed_lockedtransfer, True,
-                                                            LightClientProtocolMessageType.PaymentExpired,
-                                                                    transfer.target)
+            store_expired_locked_transfer_event = StoreMessageEvent(
+                transfer.message_identifier,
+                transfer.payment_identifier,
+                1,
+                state_change.signed_lockedtransfer,
+                True,
+                LightClientProtocolMessageType.PaymentExpired,
+                sender_light_client_address=sender_light_client_address,
+                receiver_light_client_address=transfer.target
+            )
             channel_events.append(store_expired_locked_transfer_event)
         iteration = TransitionResult(target_state, channel_events)
     else:
