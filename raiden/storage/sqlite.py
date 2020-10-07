@@ -1507,7 +1507,7 @@ class SerializedSQLiteStorage(SQLiteStorage):
 
     def update_onchain_light_client_protocol_message_set_signed_transaction(self,
                                                                             internal_msg_identifier: int,
-                                                                            signed_message: "Message"):
+                                                                            signed_message: "SignedTransaction"):
         return self.update(
             """
                 UPDATE light_client_protocol_message

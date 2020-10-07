@@ -71,7 +71,7 @@ class LightClientMessageHandler:
     def update_onchain_light_client_protocol_message_set_signed_transaction(
         cls,
         internal_msg_identifier: int,
-        signed_message: Message,
+        signed_message: "SignedTransaction",
         wal: WriteAheadLog
     ):
         return wal.storage.update_onchain_light_client_protocol_message_set_signed_transaction(
