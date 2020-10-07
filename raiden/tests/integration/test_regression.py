@@ -122,7 +122,7 @@ def run_test_regression_revealsecret_after_secret(
         host_port = None
         app1.raiden.transport.receive(reveal_data, host_port)
     elif transport_protocol is TransportProtocol.MATRIX:
-        app1.raiden.transport.hub_transport._receive_message(reveal_secret)  # pylint: disable=protected-access
+        app1.raiden.transport.full_node._receive_message(reveal_secret)  # pylint: disable=protected-access
     else:
         raise TypeError("Unknown TransportProtocol")
 
@@ -195,9 +195,9 @@ def run_test_regression_multiple_revealsecret(raiden_network, token_addresses, t
     if transport_protocol is TransportProtocol.UDP:
         message_data = mediated_transfer.encode()
         host_port = None
-        app1.raiden.transport.hub_transport.receive(message_data, host_port)
+        app1.raiden.transport.full_node.receive(message_data, host_port)
     elif transport_protocol is TransportProtocol.MATRIX:
-        app1.raiden.transport.hub_transport._receive_message(mediated_transfer)
+        app1.raiden.transport.full_node._receive_message(mediated_transfer)
     else:
         raise TypeError("Unknown TransportProtocol")
 
@@ -222,11 +222,11 @@ def run_test_regression_multiple_revealsecret(raiden_network, token_addresses, t
     if transport_protocol is TransportProtocol.UDP:
         messages = [unlock.encode(), reveal_secret.encode()]
         host_port = None
-        receive_method = app1.raiden.transport.hub_transport.receive
+        receive_method = app1.raiden.transport.full_node.receive
         wait = set(gevent.spawn_later(0.1, receive_method, data, host_port) for data in messages)
     elif transport_protocol is TransportProtocol.MATRIX:
         messages = [unlock, reveal_secret]
-        receive_method = app1.raiden.transport.hub_transport._receive_message
+        receive_method = app1.raiden.transport.full_node._receive_message
         wait = set(gevent.spawn_later(0.1, receive_method, data) for data in messages)
     else:
         raise TypeError("Unknown TransportProtocol")

@@ -2115,7 +2115,7 @@ class RestAPI:
                 "light_client_display_name": light_client["encrypt_signed_display_name"],
                 "light_client_seed_retry": light_client["encrypt_signed_seed_retry"]
             }
-            light_client_transport = transport_config.transport_layer.new_light_client_transport(
+            light_client_transport = transport_config.transport_layer.new_light_client(
                 address=light_client["address"],
                 config=config,
                 auth_params=auth_params,
@@ -2126,7 +2126,7 @@ class RestAPI:
                 chain_state=views.state_from_raiden(self.raiden_api.raiden)
             )
 
-            self.raiden_api.raiden.transport.add_light_client_transport(light_client_transport)
+            self.raiden_api.raiden.transport.add_light_client(light_client_transport)
 
         return api_response(light_client)
 

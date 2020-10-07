@@ -52,9 +52,9 @@ class MatrixLayer(TransportLayer):
 
             light_clients = storage.get_all_light_clients()
 
-            light_client_transports = []
-            for light_client in light_clients:
+            self._light_clients: List[TransportNode] = []
 
+            for light_client in light_clients:
                 current_server_name = None
 
                 if light_client["current_server_name"]:
@@ -83,29 +83,28 @@ class MatrixLayer(TransportLayer):
                     auth_params,
                 )
 
-                light_client_transports.append(light_client_transport)
+                self._light_clients.append(light_client_transport)
 
-            self._hub_transport: TransportNode = MatrixTransportNode(config["address"], config["transport"]["matrix"])
-            self._light_client_transports: List[TransportNode] = light_client_transports
+            self._full_node: TransportNode = MatrixTransportNode(config["address"], config["transport"]["matrix"])
 
         except RaidenError as ex:
             click.secho(f"FATAL: {ex}", fg="red")
             sys.exit(1)
 
     @property
-    def hub_transport(self) -> TransportNode:
-        return self._hub_transport
+    def full_node(self) -> TransportNode:
+        return self._full_node
 
     @property
-    def light_client_transports(self) -> List[TransportNode]:
-        return self._light_client_transports
+    def light_clients(self) -> List[TransportNode]:
+        return self._light_clients
 
     @staticmethod
-    def new_light_client_transport(address: Address, config: dict, auth_params: dict) -> TransportNode:
+    def new_light_client(address: Address, config: dict, auth_params: dict) -> TransportNode:
         return MatrixLightClientTransportNode(address, config, auth_params)
 
-    def add_light_client_transport(self, light_client_transport: TransportNode):
-        self._light_client_transports.append(light_client_transport)
+    def add_light_client(self, light_client_transport: TransportNode):
+        self._light_clients.append(light_client_transport)
 
-    def remove_light_client_transport(self, light_client_transport: TransportNode):
-        self._light_client_transports.remove(light_client_transport)
+    def remove_light_client(self, light_client_transport: TransportNode):
+        self._light_clients.remove(light_client_transport)

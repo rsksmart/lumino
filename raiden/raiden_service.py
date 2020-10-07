@@ -487,9 +487,9 @@ class RaidenService(Runnable):
         # - Send pending message
         self.alarm.link_exception(self.on_error)
 
-        self.transport.hub_transport.link_exception(self.on_error)
+        self.transport.full_node.link_exception(self.on_error)
 
-        for light_client_transport in self.transport.light_client_transports:
+        for light_client_transport in self.transport.light_clients:
             light_client_transport.link_exception(self.on_error)
 
         self._start_transport(chain_state)
@@ -528,15 +528,15 @@ class RaidenService(Runnable):
         #
         # We need a timeout to prevent an endless loop from trying to
         # contact the disconnected client
-        self.transport.hub_transport.stop()
+        self.transport.full_node.stop()
 
-        for light_client_transport in self.transport.light_client_transports:
+        for light_client_transport in self.transport.light_clients:
             light_client_transport.stop()
 
         self.alarm.stop()
 
-        self.transport.hub_transport.join()
-        for light_client_transport in self.transport.light_client_transports:
+        self.transport.full_node.join()
+        for light_client_transport in self.transport.light_clients:
             light_client_transport.join()
 
         self.alarm.join()
@@ -597,7 +597,7 @@ class RaidenService(Runnable):
             prev_auth_data = chain_state.last_node_transport_state_authdata.hub_last_transport_authdata,
 
         # Start hub transport
-        self.transport.hub_transport.start(
+        self.transport.full_node.start(
             raiden_service=self,
             message_handler=self.message_handler,
             prev_auth_data=prev_auth_data,
@@ -605,7 +605,7 @@ class RaidenService(Runnable):
 
         # Start lightclient transports
         selected_prev_auth_data = None
-        for light_client_transport in self.transport.light_client_transports:
+        for light_client_transport in self.transport.light_clients:
             if chain_state.last_node_transport_state_authdata is not None:
                 for client_last_transport_authdata in \
                     chain_state.last_node_transport_state_authdata.clients_last_transport_authdata:
@@ -623,7 +623,7 @@ class RaidenService(Runnable):
         self._start_health_check_for_light_client_neighbour(chain_state)
 
     def _start_health_check_for_light_client_neighbour(self, chain_state: ChainState):
-        for light_client in self.transport.light_client_transports:
+        for light_client in self.transport.light_clients:
             for neighbour in views.all_neighbour_nodes(chain_state, light_client.address):
                 self._start_health_check_for_neighbour(neighbour)
 
@@ -764,12 +764,12 @@ class RaidenService(Runnable):
         """
         if self.transport:
             if creator_address is not None:
-                if self.transport.light_client_transports is not None:
-                    for light_client_transport in self.transport.light_client_transports:
+                if self.transport.light_clients is not None:
+                    for light_client_transport in self.transport.light_clients:
                         if to_checksum_address(creator_address) == light_client_transport.address:
                             light_client_transport.start_health_check(node_address)
             else:
-                self.transport.hub_transport.start_health_check(node_address)
+                self.transport.full_node.start_health_check(node_address)
 
     def _callback_new_block(self, latest_block: Dict):
         """Called once a new block is detected by the alarm task.
@@ -967,7 +967,7 @@ class RaidenService(Runnable):
 
     def get_light_client_transport(self, address):
         light_client_transport_result = None
-        for light_client_transport in self.transport.light_client_transports:
+        for light_client_transport in self.transport.light_clients:
             if address == light_client_transport.address:
                 light_client_transport_result = light_client_transport
 
@@ -977,7 +977,7 @@ class RaidenService(Runnable):
         for neighbour in views.all_neighbour_nodes(chain_state):
             if neighbour == ConnectionManager.BOOTSTRAP_ADDR:
                 continue
-            self.transport.hub_transport.whitelist(neighbour)
+            self.transport.full_node.whitelist(neighbour)
 
     def _set_light_clients_transports_whitelist(self, chain_state: ChainState):
         light_clients = self.wal.storage.get_all_light_clients()
@@ -998,17 +998,15 @@ class RaidenService(Runnable):
 
         events_queues = views.get_all_messagequeues(chain_state)
 
-        light_client_transports = self.transport.light_client_transports
-
         for event_queue in events_queues.values():
             for event in event_queue:
                 if isinstance(event, SendLockedTransfer):
                     transfer = event.transfer
                     if transfer.initiator == self.address:
-                        self.transport.hub_transport.whitelist(address=transfer.target)
+                        self.transport.full_node.whitelist(address=transfer.target)
                 if isinstance(event, SendLockedTransferLight):
                     transfer = event.signed_locked_transfer
-                    for light_client_transport in light_client_transports:
+                    for light_client_transport in self.transport.light_clients:
                         if transfer.initiator == to_canonical_address(light_client_transport.address):
                             light_client_transport.whitelist(address=transfer.target)
 
