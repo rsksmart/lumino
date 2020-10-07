@@ -32,12 +32,10 @@ from raiden.exceptions import (
     RaidenUnrecoverableError,
     SamePeerAddress,
     RawTransactionFailed)
-from raiden.lightclient.handlers.light_client_message_handler import LightClientMessageHandler
 from raiden.network.proxies.token import Token
 from raiden.network.proxies.utils import compare_contract_versions
 from raiden.network.rpc.client import StatelessFilter, check_address_has_code
 from raiden.network.rpc.transactions import check_transaction_threw
-from raiden.storage.wal import WriteAheadLog
 from raiden.transfer.balance_proof import pack_balance_proof, pack_balance_proof_update
 from raiden.transfer.identifiers import CanonicalIdentifier
 from raiden.utils import pex, safe_gas_limit
