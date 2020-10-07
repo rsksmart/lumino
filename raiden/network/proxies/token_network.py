@@ -2249,9 +2249,7 @@ class TokenNetwork:
         channel_identifier: ChannelID,
         creator: Address,
         partner: Address,
-        signed_settle_tx: SignedTransaction,
-        internal_msg_identifier: int,
-        wal: WriteAheadLog
+        signed_settle_tx: SignedTransaction
     ):
         """ Send a signed settle transaction for a specific channel """
         log_details = {
@@ -2278,12 +2276,6 @@ class TokenNetwork:
             transaction_hash = self.proxy.broadcast_signed_transaction(signed_settle_tx)
             self.client.poll(transaction_hash)
             transaction_error = check_transaction_threw(self.client, transaction_hash)
-
-        LightClientMessageHandler.update_onchain_light_client_protocol_message_set_signed_transaction(
-            internal_msg_identifier=internal_msg_identifier,
-            signed_message=signed_settle_tx,
-            wal=wal
-        )
 
         if transaction_error:
             self.handle_transaction_error_for_settlement(channel_identifier=channel_identifier,

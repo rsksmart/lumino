@@ -1514,7 +1514,7 @@ class SerializedSQLiteStorage(SQLiteStorage):
                 SET signed_message = ?
                 WHERE internal_msg_identifier = ?;
             """,
-            (internal_msg_identifier, self.serializer.serialize(signed_message))
+            (self.serializer.serialize(signed_message), internal_msg_identifier)
         )
 
     def query_invoice(self, payment_hash_invoice):

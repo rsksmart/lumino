@@ -579,7 +579,6 @@ class RaidenAPI:
     def settle_light(
         self,
         registry_address: PaymentNetworkID,
-        internal_msg_identifier: int,
         token_address: TokenAddress,
         creator_address: Address,
         partner_address: Address,
@@ -635,9 +634,7 @@ class RaidenAPI:
 
         channel_proxy.settle_channel_light(
             block_identifier=chain_state.block_hash,
-            signed_settle_tx=signed_settle_tx,
-            internal_msg_identifier=internal_msg_identifier,
-            wal=self.raiden.wal
+            signed_settle_tx=signed_settle_tx
         )
 
         waiting.wait_for_settle(
@@ -827,7 +824,6 @@ class RaidenAPI:
     def channel_settle_light(
         self,
         registry_address: PaymentNetworkID,
-        internal_msg_identifier: int,
         token_address: TokenAddress,
         creator_address: Address,
         partner_address: Address,
@@ -841,7 +837,6 @@ class RaidenAPI:
         """
         return self.settle_light(
             registry_address=registry_address,
-            internal_msg_identifier=internal_msg_identifier,
             token_address=token_address,
             creator_address=creator_address,
             partner_address=partner_address,

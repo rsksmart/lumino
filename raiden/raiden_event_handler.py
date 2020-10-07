@@ -677,7 +677,7 @@ class RaidenEventHandler(EventHandler):
         # The second participant transferred + locked amount must be higher by contract requirement
         our_bp_is_larger = our_maximum > partner_maximum
         if our_bp_is_larger:
-            message = SettlementRequiredLightMessage (
+            message = SettlementRequiredLightMessage(
                 channel_identifier=channel_settle_light_event.channel_identifier,
                 channel_network_identifier=channel_settle_light_event.token_network_identifier,
                 participant1=payment_channel.participant2,

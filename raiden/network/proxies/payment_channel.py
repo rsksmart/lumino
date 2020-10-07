@@ -5,7 +5,6 @@ from web3.utils.filters import Filter
 
 from raiden.constants import GENESIS_BLOCK_NUMBER, UINT256_MAX
 from raiden.network.proxies.token_network import ChannelDetails, TokenNetwork
-from raiden.storage.wal import WriteAheadLog
 from raiden.utils.filters import decode_event, get_filter_args_for_specific_event_from_channel
 from raiden.utils.typing import (
     AdditionalHash,
@@ -184,17 +183,13 @@ class PaymentChannel:
 
     def settle_channel_light(self,
                              block_identifier: BlockSpecification,
-                             signed_settle_tx: SignedTransaction,
-                             internal_msg_identifier: int,
-                             wal: WriteAheadLog):
+                             signed_settle_tx: SignedTransaction):
         self.token_network.settle_light(
             given_block_identifier=block_identifier,
             channel_identifier=self.channel_identifier,
             creator=self.participant1,
             partner=self.participant2,
-            signed_settle_tx=signed_settle_tx,
-            internal_msg_identifier=internal_msg_identifier,
-            wal=wal
+            signed_settle_tx=signed_settle_tx
         )
 
     def close(

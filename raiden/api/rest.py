@@ -1665,10 +1665,22 @@ class RestAPI:
                 log=log
             )
 
+        if message.is_signed:
+            return ApiErrorBuilder.build_and_log_error(
+                errors="Failed trying to settle a channel that's already settled",
+                status_code=HTTPStatus.CONFLICT,
+                log=log
+            )
+
+        LightClientMessageHandler.update_onchain_light_client_protocol_message_set_signed_transaction(
+            internal_msg_identifier=internal_msg_identifier,
+            signed_message=signed_settle_tx,
+            wal=self.raiden_api.raiden.wal
+        )
+
         try:
             channel_state = self.raiden_api.channel_settle_light(
                 registry_address=registry_address,
-                internal_msg_identifier=internal_msg_identifier,
                 token_address=token_address,
                 creator_address=creator_address,
                 partner_address=partner_address,
