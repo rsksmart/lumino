@@ -1834,7 +1834,7 @@ class RequestMonitoring(SignedMessage):
 
 
 class UnlockLightRequest(Message):
-    
+
     def __init__(self, token_address: Address, channel_identifier: ChannelID, sender: Address, receiver: Address,
                  merkle_tree_leaves: str, **kwargs):
         super().__init__(**kwargs)
@@ -1887,7 +1887,7 @@ class UnlockLightRequest(Message):
         msg = f'Cannot decode data. Provided type is {data["type"]}, expected {cls.__name__}'
         assert data["type"] == cls.__name__, msg
         return cls(
-            token_address=data["token_address"],
+            token_address=Address(decode_hex(data["token_address"])),
             channel_identifier=data["channel_identifier"],
             receiver=data["receiver"],
             sender=data["sender"],

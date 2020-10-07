@@ -1,4 +1,5 @@
-from eth_utils import to_bytes, to_canonical_address, to_checksum_address, to_hex, to_normalized_address
+from eth_utils import to_bytes, to_canonical_address, to_checksum_address, to_hex, to_normalized_address, decode_hex, \
+    encode_hex
 
 from raiden.constants import UINT256_MAX
 from raiden.transfer.architecture import (
@@ -439,7 +440,7 @@ class ContractSendChannelBatchUnlockLight(ContractSendEvent):
             participant=to_canonical_address(data["participant"]),
             triggered_by_block_hash=BlockHash(deserialize_bytes(data["triggered_by_block_hash"])),
             client=BlockHash(to_canonical_address(data["triggered_by_block_hash"])),
-            
+
         )
 
         return restored
@@ -522,9 +523,9 @@ class ContractSendSecretRevealLight(Event):
 
     def to_dict(self) -> Dict[str, Any]:
         return {
-            "payment_identifier": str(self.payment_identifier),
+            "payment_identifier": self.payment_identifier,
             "message_id": str(self.message_id),
-            "light_client_address": str(self.light_client_address),
+            "light_client_address": encode_hex(self.light_client_address),
         }
 
     @classmethod
@@ -532,7 +533,7 @@ class ContractSendSecretRevealLight(Event):
         return cls(
             payment_identifier=data["payment_identifier"],
             message_id=data["message_id"],
-            light_client_address=data["light_client_address"]
+            light_client_address=Address(decode_hex(data["light_client_address"]))
         )
 
 

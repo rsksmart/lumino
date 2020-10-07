@@ -1,16 +1,14 @@
 import random
 
-from raiden.lightclient.models.light_client_protocol_message import LightClientProtocolMessageType
-from raiden.messages import RequestRegisterSecret
 from raiden.transfer.architecture import Event
 from raiden.transfer.channel import get_status
 from raiden.transfer.events import ContractSendSecretReveal, ContractSendSecretRevealLight
-from raiden.transfer.mediated_transfer.events import StoreMessageEvent
 from raiden.transfer.mediated_transfer.state import TargetTransferState
 from raiden.transfer.state import (
     CHANNEL_STATE_CLOSED,
     CHANNEL_STATES_PRIOR_TO_CLOSED,
-    NettingChannelState, message_identifier_from_prng,
+    NettingChannelState,
+    message_identifier_from_prng,
 )
 from raiden.utils.typing import BlockExpiration, BlockHash, List, Secret, T_Secret
 

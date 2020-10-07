@@ -329,7 +329,6 @@ def handle_channel_settled(raiden: "RaidenService", event: Event):
     transaction_hash = data["transaction_hash"]
 
     chain_state = views.state_from_raiden(raiden)
-    # TODO fixme mmartinez7 what about when is a light client?
     channel_state = get_channelstate_by_canonical_identifier(
         chain_state=chain_state,
         canonical_identifier=CanonicalIdentifier(

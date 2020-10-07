@@ -255,11 +255,11 @@ URLS_HUB_V1 = [
     ("/payments_light", PaymentLightResource),
     ("/payments_light/create", CreatePaymentLightResource, "create_payment"),
     ("/payments_light/unlock/<hexaddress:token_address>", UnlockPaymentLightResource),
+    ('/payments_light/register_onchain_secret', RegisterSecretLightResource),
     ('/light_clients/', LightClientResource),
     ('/light_clients/matrix/credentials', LightClientMatrixCredentialsBuildResource,),
     ("/light_client_messages", LightClientMessageResource, "Message polling"),
     ("/watchtower", WatchtowerResource),
-    ('/payments_light/register_onchain_secret', RegisterSecretLightResource),
 ]
 
 
@@ -2277,7 +2277,10 @@ class RestAPI:
         try:
             self.raiden_api.unlock_payment_light(signed_tx, token_address)
             return api_response(result=dict(), status_code=HTTPStatus.OK)
-        except RawTransactionFailed as e:
+        except InsufficientFunds as e:
+            return api_error(errors=str(e), status_code=HTTPStatus.PAYMENT_REQUIRED)
+        except (RawTransactionFailed, InvalidPaymentIdentifier) as e:
             return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.BAD_REQUEST, log=log)
-        except RaidenRecoverableError as e:
-            return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.INTERNAL_SERVER_ERROR, log=log)
+        except Exception as e:
+            return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.INTERNAL_SERVER_ERROR,
+                                                       log=log)
