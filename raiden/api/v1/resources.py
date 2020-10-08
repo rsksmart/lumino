@@ -160,8 +160,8 @@ class UnlockPaymentLightResource(BaseResource):
     post_schema = UnlockPaymentLightPostSchema()
 
     @use_kwargs(post_schema)
-    def post(self, signed_tx: typing.SignedTransaction, message_identifier: str, **kwargs):
-        return self.rest_api.post_unlock_payment_light(message_identifier, signed_tx, **kwargs)
+    def post(self, internal_msg_identifier: int, signed_tx: typing.SignedTransaction, message_identifier: str, token_address: typing.TokenAddress):
+        return self.rest_api.post_unlock_payment_light(internal_msg_identifier, signed_tx, token_address, message_identifier=message_identifier)
 
 class SettlementLightResourceByTokenAndPartnerAddress(BaseResource):
     schema = SettlementLightSchema
