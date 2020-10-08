@@ -277,7 +277,7 @@ class RaidenAPI:
             raise TokenAppExpired("Token app expired")
 
     def register_secret_light(self, signed_tx: typing.SignedTransaction):
-        self.raiden.default_secret_registry.register_secret_light(signed_tx)
+        self.raiden.default_secret_registry.proxy.broadcast_signed_transaction_and_wait(signed_tx)
 
     def token_network_register(
         self,

@@ -2282,5 +2282,6 @@ class RestAPI:
         except (RawTransactionFailed, InvalidPaymentIdentifier) as e:
             return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.BAD_REQUEST, log=log)
         except Exception as e:
-            return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.INTERNAL_SERVER_ERROR,
-                                                       log=log)
+            return ApiErrorBuilder.build_and_log_error(
+                errors=str(e), status_code=HTTPStatus.INTERNAL_SERVER_ERROR, log=log
+            )

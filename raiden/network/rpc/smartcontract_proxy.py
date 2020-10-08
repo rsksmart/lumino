@@ -83,11 +83,13 @@ class ContractProxy:
         try:
             transaction_hash = self.broadcast_signed_transaction(signed_tx)
             self.jsonrpc_client.poll(transaction_hash)
-            receipt_or_none = check_transaction_threw(self.jsonrpc_client, transaction_hash)
-            if receipt_or_none:
+            receipt = check_transaction_threw(self.jsonrpc_client, transaction_hash)
+            if receipt:
                 raise RaidenRecoverableError("transaction failed")
         except HTTPError:
             raise RawTransactionFailed("Transaction malformed")
+        except Exception as e:
+            raise e
 
 
     def transact(
