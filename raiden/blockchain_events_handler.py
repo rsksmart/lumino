@@ -3,6 +3,11 @@ from typing import TYPE_CHECKING, Optional
 import gevent
 import structlog
 from eth_utils import to_checksum_address, encode_hex
+from raiden_contracts.constants import (
+    EVENT_SECRET_REVEALED,
+    EVENT_TOKEN_NETWORK_CREATED,
+    ChannelEvent,
+)
 
 from raiden.blockchain.events import Event
 from raiden.blockchain.state import get_channel_state
@@ -26,19 +31,15 @@ from raiden.transfer.state_change import (
     ContractReceiveRouteNew,
     ContractReceiveSecretReveal,
     ContractReceiveUpdateTransfer,
-    ContractReceiveChannelClosedLight, ContractReceiveChannelSettledLight)
+    ContractReceiveChannelClosedLight,
+    ContractReceiveChannelSettledLight
+)
 from raiden.transfer.utils import (
     get_event_with_balance_proof_by_locksroot,
     get_state_change_with_balance_proof_by_locksroot,
 )
 from raiden.transfer.views import get_token_network_by_identifier
 from raiden.utils import pex, typing
-from raiden_contracts.constants import (
-    EVENT_SECRET_REVEALED,
-    EVENT_TOKEN_NETWORK_CREATED,
-    ChannelEvent,
-)
-
 from raiden.utils.typing import TokenNetworkID, AddressHex
 
 if TYPE_CHECKING:

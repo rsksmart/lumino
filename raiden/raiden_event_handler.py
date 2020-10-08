@@ -1,11 +1,12 @@
+import random
 from abc import ABC, abstractmethod
-from base64 import b64encode
 from typing import TYPE_CHECKING
 
 import structlog
 from eth_utils import to_checksum_address, to_hex, encode_hex
 
 from raiden.api.objects import SettlementParameters
+from raiden.billing.invoices.handlers.invoice_handler import handle_receive_events_with_payments
 from raiden.constants import EMPTY_BALANCE_HASH, EMPTY_HASH, EMPTY_MESSAGE_HASH, EMPTY_SIGNATURE
 from raiden.exceptions import ChannelOutdatedError, RaidenUnrecoverableError
 from raiden.lightclient.handlers.light_client_message_handler import LightClientMessageHandler
@@ -58,8 +59,7 @@ from raiden.transfer.mediated_transfer.events import (
     SendLockExpiredLight
 )
 from raiden.transfer.state import ChainState, message_identifier_from_prng, NettingChannelEndState
-from raiden.transfer.unlock import get_channel_state, get_our_state_for_unlock, get_partner_state_for_unlock, \
-    should_search_events, should_search_state_changes
+from raiden.transfer.unlock import get_channel_state, should_search_events, should_search_state_changes
 from raiden.transfer.utils import (
     get_event_with_balance_proof_by_balance_hash,
     get_state_change_with_balance_proof_by_balance_hash, get_state_change_with_balance_proof_by_locksroot,
@@ -68,10 +68,6 @@ from raiden.transfer.utils import (
 from raiden.transfer.views import get_channelstate_by_token_network_and_partner
 from raiden.utils import pex
 from raiden.utils.typing import MYPY_ANNOTATION, Address, Nonce, TokenNetworkID, AddressHex, ChannelID, BlockHash
-
-from raiden.billing.invoices.handlers.invoice_handler import handle_receive_events_with_payments
-
-import random
 
 if TYPE_CHECKING:
     # pylint: disable=unused-import
@@ -424,11 +420,11 @@ class RaidenEventHandler(EventHandler):
     ):
         message = RequestRegisterSecret(raiden.default_secret_registry.address)
         existing_message = LightClientMessageHandler.is_light_client_protocol_message_already_stored(
-            channel_reveal_secret_event.payment_identifier,
-            0,
-            LightClientProtocolMessageType.RequestRegisterSecret,
-            message.to_dict()["type"],
-            raiden.wal)
+            payment_id=channel_reveal_secret_event.payment_identifier,
+            order=0,
+            message_type=LightClientProtocolMessageType.RequestRegisterSecret,
+            message_protocol_type=message.to_dict()["type"],
+            wal=raiden.wal)
         # Do not store the RegisterSecretRequest twice for same payment
         if not existing_message:
 

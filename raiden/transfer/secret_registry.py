@@ -33,7 +33,7 @@ def events_for_onchain_secretreveal(
                     triggered_by_block_hash=block_hash,
                 )
             ]
-        if target_state is not None:
+        if target_state:
             return [
                 ContractSendSecretRevealLight(
                     message_id=message_identifier_from_prng(pseudo_random_generator),

@@ -446,7 +446,6 @@ class ContractSendChannelBatchUnlockLight(ContractSendEvent):
         return restored
 
 
-
 class ContractSendSecretReveal(ContractSendExpirableEvent):
     """ Event emitted when the lock must be claimed on-chain. """
 

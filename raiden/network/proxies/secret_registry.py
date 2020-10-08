@@ -75,22 +75,6 @@ class SecretRegistry:
     def register_secret(self, secret: Secret):
         self.register_secret_batch([secret])
 
-    def register_secret_light(self, signed_tx: SignedTransaction):
-        try:
-            log.debug("register_secret_light called")
-            transaction_hash = self.proxy.broadcast_signed_transaction(signed_tx)
-            self.client.poll(transaction_hash)
-            receipt_or_none = check_transaction_threw(self.client, transaction_hash)
-            if receipt_or_none:
-                log.critical("register_secret_light failed")
-                raise RaidenRecoverableError("registering secret failed")
-        except HTTPError as e:
-            log.warning("register_secret_light failed: transaction malformed", ex=e)
-            raise RawTransactionFailed("Light Client raw transaction malformed")
-        except Exception as e:
-            log.warning("register_secret_light failed", ex=e)
-            raise
-
     def register_secret_batch(self, secrets: List[Secret]):
         """Register a batch of secrets. Check if they are already registered at
         the given block identifier."""
