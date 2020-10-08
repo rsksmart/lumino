@@ -188,11 +188,10 @@ class RaidenEventHandler(EventHandler):
 
     @staticmethod
     def handle_store_message(raiden: "RaidenService", store_message_event: StoreMessageEvent):
-        existing_message = LightClientMessageHandler.is_light_client_protocol_message_already_stored(
-            store_message_event.payment_id,
-            store_message_event.message_order,
+        existing_message = LightClientMessageHandler.is_message_already_stored(
+            store_message_event.light_client_address,
             store_message_event.message_type,
-            store_message_event.message.to_dict()["type"],
+            store_message_event.message,
             raiden.wal)
         if not existing_message:
             LightClientMessageHandler.store_light_client_protocol_message(store_message_event.message_id,
@@ -204,8 +203,7 @@ class RaidenEventHandler(EventHandler):
                                                                           raiden.wal,
                                                                           store_message_event.payment_id)
         else:
-            stored_but_unsigned = existing_message.signed_message is None
-            if stored_but_unsigned and store_message_event.is_signed:
+            if not existing_message.signed_message and store_message_event.is_signed:
                 # Update messages that were created by the hub and now are received signed by the light client
                 LightClientMessageHandler.update_stored_msg_set_signed_data(store_message_event.message,
                                                                             store_message_event.payment_id,

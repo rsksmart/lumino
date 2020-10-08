@@ -1679,13 +1679,7 @@ def handle_receive_lock_expired_light(
             state_change.lock_expired.recipient
         )
 
-        send_processed = SendProcessed(
-            recipient=state_change.balance_proof.sender,
-            channel_identifier=CHANNEL_IDENTIFIER_GLOBAL_QUEUE,
-            message_identifier=state_change.message_identifier,
-        )
-
-        events = [store_lock_expired, send_processed]
+        events = [store_lock_expired]
     else:
         assert msg, "is_valid_lock_expired should return error msg if not valid"
         invalid_lock_expired = EventInvalidReceivedLockExpired(
@@ -1745,7 +1739,7 @@ def handle_receive_lockedtransfer_light(
     transfer. The receiver needs to ensure that the merkle root has the
     secrethash included, otherwise it won't be able to claim it.
     """
-    events: List[Event]
+    events: List[Event] = []
     is_valid, msg, merkletree, handle_invoice_result = is_valid_lockedtransfer(
         mediated_transfer, channel_state, channel_state.partner_state, channel_state.our_state, storage
     )
@@ -1757,12 +1751,6 @@ def handle_receive_lockedtransfer_light(
 
         lock = mediated_transfer.lock
         channel_state.partner_state.secrethashes_to_lockedlocks[lock.secrethash] = lock
-        send_processed = SendProcessed(
-            recipient=mediated_transfer.balance_proof.sender,
-            channel_identifier=CHANNEL_IDENTIFIER_GLOBAL_QUEUE,
-            message_identifier=mediated_transfer.message_identifier,
-        )
-        events = [send_processed]
     else:
         assert msg, "is_valid_lock_expired should return error msg if not valid"
         invalid_locked = EventInvalidReceivedLockedTransfer(
