@@ -73,8 +73,7 @@ class LightClientMessageHandler:
     @classmethod
     def update_light_client_payment_status(cls, payment_id: int, status: LightClientPaymentStatus,
                                            storage: SerializedSQLiteStorage):
-        exists_payment = storage.get_light_client_payment(payment_id)
-        if exists_payment:
+        if storage.get_light_client_payment(payment_id):
             storage.update_light_client_payment_status(payment_id, status)
 
     @classmethod
