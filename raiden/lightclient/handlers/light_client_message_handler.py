@@ -77,34 +77,38 @@ class LightClientMessageHandler:
             storage.update_light_client_payment_status(payment_id, status)
 
     @classmethod
-    def is_light_client_protocol_message_already_stored(cls, payment_id: int,
-                                                        order: int,
-                                                        message_type: LightClientProtocolMessageType,
-                                                        message_protocol_type: str,
-                                                        wal: WriteAheadLog
-                                                        ):
-        existing_message = wal.storage.is_light_client_protocol_message_already_stored(payment_id, order,
-                                                                                       str(message_type.value),
-                                                                                       message_protocol_type)
+    def is_message_already_stored_checking_payment(cls,
+                                                   payment_id: int,
+                                                   order: int,
+                                                   message_type: LightClientProtocolMessageType,
+                                                   message_protocol_type: str,
+                                                   light_client_address: AddressHex,
+                                                   wal: WriteAheadLog):
+        existing_message = wal.storage\
+            .is_light_client_protocol_message_already_stored(payment_id=payment_id,
+                                                             order=order,
+                                                             message_type=str(message_type.value),
+                                                             message_protocol_type=message_protocol_type,
+                                                             light_client_address=str(light_client_address))
 
         if existing_message:
-            return LightClientProtocolMessage(existing_message[5] is not None,
-                                              existing_message[3],
-                                              existing_message[2],
-                                              existing_message[1],
-                                              existing_message[6],
-                                              existing_message[4],
-                                              existing_message[5],
-                                              existing_message[0],
-                                              existing_message[7])
+            return LightClientProtocolMessage(is_signed=existing_message[5] is not None,
+                                              message_order=existing_message[3],
+                                              light_client_payment_id=existing_message[2],
+                                              identifier=existing_message[1],
+                                              message_type=existing_message[6],
+                                              unsigned_message=existing_message[4],
+                                              signed_message=existing_message[5],
+                                              internal_msg_identifier=existing_message[0],
+                                              light_client_address=existing_message[7])
         return existing_message
 
     @classmethod
-    def is_message_already_stored(cls,
-                                  light_client_address: AddressHex,
-                                  message_type: LightClientProtocolMessageType,
-                                  unsigned_message: Message,
-                                  wal: WriteAheadLog):
+    def is_message_already_stored_checking_data(cls,
+                                                light_client_address: AddressHex,
+                                                message_type: LightClientProtocolMessageType,
+                                                unsigned_message: Message,
+                                                wal: WriteAheadLog):
 
         return message_type and light_client_address and unsigned_message and wal.storage\
             .is_message_already_stored(light_client_address,
@@ -120,15 +124,16 @@ class LightClientMessageHandler:
     @classmethod
     def get_light_client_protocol_message_by_identifier(cls, message_identifier: int, wal: WriteAheadLog):
         message = wal.storage.get_light_client_protocol_message_by_identifier(message_identifier)
-        return LightClientProtocolMessage(message[3] is not None,
-                                          message[1],
-                                          message[4],
-                                          message[0],
-                                          message[5],
-                                          message[2],
-                                          message[3],
-                                          None,
-                                          message[6])
+
+        return LightClientProtocolMessage(is_signed=message[3] is not None,
+                                          message_order=message[1],
+                                          light_client_payment_id=message[4],
+                                          identifier=message[0],
+                                          message_type=message[5],
+                                          unsigned_message=message[2],
+                                          signed_message=message[3],
+                                          internal_msg_identifier=message[7],
+                                          light_client_address=message[6])
 
     @classmethod
     def get_light_client_payment_locked_transfer(cls, payment_identifier: int, wal: WriteAheadLog):
@@ -182,6 +187,7 @@ class LightClientMessageHandler:
         # get first principal message by message identifier
         protocol_message = LightClientMessageHandler.get_light_client_protocol_message_by_identifier(
             message_identifier, wal)
+
         json_message = None
         if protocol_message.signed_message is None:
             json_message = protocol_message.unsigned_message

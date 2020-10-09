@@ -225,20 +225,28 @@ class SQLiteStorage:
 
         return cursor.fetchone()
 
-    def is_light_client_protocol_message_already_stored(self, payment_id: int, order: int,
-                                                        message_type: str, message_protocol_type:str):
+    def is_light_client_protocol_message_already_stored(self,
+                                                        payment_id: int,
+                                                        order: int,
+                                                        message_type: str,
+                                                        message_protocol_type: str,
+                                                        light_client_address: str):
         cursor = self.conn.cursor()
         cursor.execute(
             """
             SELECT *
-                FROM light_client_protocol_message WHERE light_client_payment_id = ? and message_order = ? and message_type = ?
+                FROM light_client_protocol_message
+                WHERE light_client_payment_id = ?
+                AND message_order = ?
+                AND message_type = ?
+                AND light_client_address = ?
                 AND (json_extract(light_client_protocol_message.unsigned_message, '$') is not NULL
                 AND json_extract(light_client_protocol_message.unsigned_message, '$.type') == ?
                 OR json_extract(light_client_protocol_message.signed_message, '$') is not NULL
                 AND json_extract(light_client_protocol_message.signed_message, '$.type') == ?)
 
             """,
-            (str(payment_id), order, message_type,message_protocol_type,message_protocol_type)
+            (str(payment_id), order, message_type, light_client_address, message_protocol_type, message_protocol_type)
         )
 
         return cursor.fetchone()
@@ -1392,7 +1400,7 @@ class SQLiteStorage:
         cursor.execute(
             """
             SELECT identifier, message_order, unsigned_message, signed_message,
-            light_client_payment_id, message_type, light_client_address
+            light_client_payment_id, message_type, light_client_address, internal_msg_identifier
             FROM light_client_protocol_message
             WHERE identifier = ?
             ORDER BY message_order ASC
