@@ -7,7 +7,6 @@ from raiden.lightclient.handlers.light_client_message_handler import LightClient
 from raiden.lightclient.models.light_client_payment import LightClientPaymentStatus
 from raiden.lightclient.models.light_client_protocol_message import LightClientProtocolMessageType
 
-from raiden.messages import RefundTransfer
 from raiden.storage.sqlite import SerializedSQLiteStorage
 
 from raiden.transfer import channel, routes
