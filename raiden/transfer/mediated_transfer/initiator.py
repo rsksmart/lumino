@@ -560,7 +560,7 @@ def handle_send_secret_reveal_light(
 
     initiator_state.revealsecret = revealsecret
     initiator_state.received_secret_request = True
-    receiver_light_client_address = state_change.receiver if channel_state.both_participants_are_light_clients else None
+    receiver_light_client_address = state_change.receiver
 
     store_message_event = StoreMessageEvent(message_identifier, transfer_description.payment_identifier, 7,
                                             state_change.reveal_secret, True,

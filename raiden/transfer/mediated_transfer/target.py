@@ -243,7 +243,7 @@ def handle_inittarget_light(
                                                             receiver_light_client_address=transfer.target)
 
             secret_request_message = SecretRequest.from_event(secret_request)
-            sr_receiver_light_client_address = transfer.initiator if channel_state.both_participants_are_light_clients else None
+            sr_receiver_light_client_address = transfer.initiator
             store_secret_request_event = StoreMessageEvent(message_identifier,
                                                            transfer.payment_identifier,
                                                            5,

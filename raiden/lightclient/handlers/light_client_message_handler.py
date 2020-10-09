@@ -81,13 +81,13 @@ class LightClientMessageHandler:
             storage.update_light_client_payment_status(payment_id, status, storage)
 
     @classmethod
-    def is_light_client_protocol_message_already_stored(cls, payment_id: int,
+    def is_light_client_protocol_message_already_stored(cls, message_id: int, payment_id: int,
                                                         order: int,
                                                         message_type: LightClientProtocolMessageType,
                                                         message_protocol_type: str,
                                                         wal: WriteAheadLog
                                                         ):
-        existing_message = wal.storage.is_light_client_protocol_message_already_stored(payment_id, order,
+        existing_message = wal.storage.is_light_client_protocol_message_already_stored(message_id, payment_id, order,
                                                                                        str(message_type.value),
                                                                                        message_protocol_type)
 
@@ -275,14 +275,20 @@ class LightClientMessageHandler:
             cls.log.error("Unable to find principal message for {} {}: ".format(message.__class__.__name__,
                                                                                 message_identifier))
         else:
+            print("EXiste con")
+            print(message_identifier)
+            print(protocol_message.light_client_payment_id)
+            print(order)
             exists = LightClientMessageHandler.is_light_client_protocol_message_already_stored_message_id(
                 message_identifier, protocol_message.light_client_payment_id, order, wal)
             if not exists:
+                print("NO existia")
                 LightClientMessageHandler.store_light_client_protocol_message(
                     message_identifier, message, True, protocol_message.light_client_payment_id,
                     protocol_message.sender_light_client_address, protocol_message.receiver_light_client_address, order,
                     message_type, wal)
             else:
+                print("Ya existe")
                 cls.log.info("Message for lc already received, ignoring db storage")
 
     @classmethod

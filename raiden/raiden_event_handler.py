@@ -180,6 +180,7 @@ class RaidenEventHandler(EventHandler):
     @staticmethod
     def handle_store_message(raiden: "RaidenService", store_message_event: StoreMessageEvent):
         existing_message = LightClientMessageHandler.is_light_client_protocol_message_already_stored(
+            store_message_event.message_id,
             store_message_event.payment_id,
             store_message_event.message_order,
             store_message_event.message_type,

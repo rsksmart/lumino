@@ -80,6 +80,7 @@ class MessageHandler:
                                      is_light_client: bool = False) -> None:
 
         if is_light_client:
+            receiver_is_handled_lc = LightClientService.is_handled_lc(node_address, raiden.wal)
             secret_request_light = ReceiveSecretRequestLight(
                 message.payment_identifier,
                 message.amount,
@@ -87,7 +88,8 @@ class MessageHandler:
                 message.secrethash,
                 message.sender,
                 node_address,
-                message
+                message,
+                receiver_is_handled_lc
             )
             raiden.handle_and_track_state_change(secret_request_light)
         else:

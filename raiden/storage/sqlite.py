@@ -212,20 +212,20 @@ class SQLiteStorage:
             last_id = cursor.lastrowid
         return last_id
 
-    def is_light_client_protocol_message_already_stored(self, payment_id: int, order: int,
+    def is_light_client_protocol_message_already_stored(self, message_id : int, payment_id: int, order: int,
                                                         message_type: str, message_protocol_type:str):
         cursor = self.conn.cursor()
         cursor.execute(
             """
             SELECT *
-                FROM light_client_protocol_message WHERE light_client_payment_id = ? and message_order = ? and message_type = ?
+                FROM light_client_protocol_message WHERE identifier = ? and light_client_payment_id = ? and message_order = ? and message_type = ?
                 AND (json_extract(light_client_protocol_message.unsigned_message, '$') is not NULL
                 AND json_extract(light_client_protocol_message.unsigned_message, '$.type') == ?
                 OR json_extract(light_client_protocol_message.signed_message, '$') is not NULL
                 AND json_extract(light_client_protocol_message.signed_message, '$.type') == ?)
 
             """,
-            (str(payment_id), order, message_type,message_protocol_type,message_protocol_type)
+            (str(message_id), str(payment_id), order, message_type,message_protocol_type,message_protocol_type)
         )
 
         return cursor.fetchone()
@@ -1491,10 +1491,13 @@ class SerializedSQLiteStorage(SQLiteStorage):
             state_change_identifier: Id of the state change that generate these events.
             events: List of Event objects.
         """
+        print("writting event")
+        print(events)
         events_data = [
             (None, state_change_identifier, log_time, self.serializer.serialize(event))
             for event in events
         ]
+
         return super().write_events(events_data)
 
     def get_latest_state_snapshot(self) -> Optional[Tuple[int, Any]]:
