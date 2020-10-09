@@ -670,13 +670,15 @@ class RaidenEventHandler(EventHandler):
             raiden,
             channel_settle_light_event.token_network_identifier,
             channel_settle_light_event.channel_identifier,
-            channel_settle_light_event.triggered_by_block_hash)
+            channel_settle_light_event.triggered_by_block_hash
+        )
 
         canonical_identifier = CanonicalIdentifier(
             chain_identifier=raiden.chain.network_id,
             token_network_address=channel_settle_light_event.token_network_identifier,
-            channel_identifier=channel_settle_light_event.channel_identifier,
+            channel_identifier=channel_settle_light_event.channel_identifier
         )
+
         payment_channel: PaymentChannel = raiden.chain.payment_channel(
             canonical_identifier=canonical_identifier
         )
@@ -692,7 +694,7 @@ class RaidenEventHandler(EventHandler):
         # The second participant transferred + locked amount must be higher by contract requirement
         our_bp_is_larger = our_maximum > partner_maximum
         if our_bp_is_larger:
-            message = SettlementRequiredLightMessage (
+            message = SettlementRequiredLightMessage(
                 channel_identifier=channel_settle_light_event.channel_identifier,
                 channel_network_identifier=channel_settle_light_event.token_network_identifier,
                 participant1=payment_channel.participant2,
