@@ -1411,6 +1411,26 @@ class SQLiteStorage:
         )
         return cursor.fetchone()
 
+    def get_light_client_protocol_message_by_internal_identifier(self, internal_msg_identifier: int):
+        cursor = self.conn.cursor()
+        cursor.execute(
+            """
+            SELECT identifier,
+                   message_order,
+                   unsigned_message,
+                   signed_message,
+                   light_client_payment_id,
+                   message_type,
+                   light_client_address,
+                   internal_msg_identifier
+            FROM light_client_protocol_message
+            WHERE internal_msg_identifier = ?
+            ORDER BY message_order ASC
+            """,
+            (str(internal_msg_identifier),),
+        )
+        return cursor.fetchone()
+
     def get_latest_light_client_non_closing_balance_proof(self, channel_id):
         cursor = self.conn.cursor()
         cursor.execute(
@@ -1487,14 +1507,14 @@ class SerializedSQLiteStorage(SQLiteStorage):
 
     def update_onchain_light_client_protocol_message_set_signed_transaction(self,
                                                                             internal_msg_identifier: int,
-                                                                            signed_message: "Message"):
+                                                                            signed_message: "SignedTransaction"):
         return self.update(
             """
                 UPDATE light_client_protocol_message
                 SET signed_message = ?
                 WHERE internal_msg_identifier = ?;
             """,
-            (internal_msg_identifier, self.serializer.serialize(signed_message))
+            (self.serializer.serialize(signed_message), internal_msg_identifier)
         )
 
     def query_invoice(self, payment_hash_invoice):
@@ -1502,7 +1522,6 @@ class SerializedSQLiteStorage(SQLiteStorage):
 
     def update_invoice(self, payment_hash_invoice):
         return super().update_invoice(payment_hash_invoice)
-
 
     def write_light_client_protocol_message(self, new_message, msg_dto):
         serialized_data = self.serializer.serialize(new_message)
