@@ -403,13 +403,13 @@ def handle_transfer_reroute_light(
         raise RaidenUnrecoverableError("Refund Transfer not found, state has changed with action "
                                        "ActionTransferRerouteLight but refund_transfer param was not set")
 
-    store_refund_transfer = StoreMessageEvent(refund_transfer.message_identifier,
-                                              refund_transfer.payment_identifier,
-                                              1,
-                                              refund_transfer,
-                                              True,
-                                              LightClientProtocolMessageType.PaymentRefund,
-                                              refund_transfer.recipient)
+    store_refund_transfer = StoreMessageEvent(message_id=refund_transfer.message_identifier,
+                                              payment_id=refund_transfer.payment_identifier,
+                                              message_order=1,
+                                              message=refund_transfer,
+                                              is_signed=True,
+                                              message_type=LightClientProtocolMessageType.PaymentRefund,
+                                              light_client_address=refund_transfer.recipient)
 
     try:
         initiator_state = payment_state.initiator_transfers.get(state_change.transfer.lock.secrethash)
