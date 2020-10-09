@@ -1667,7 +1667,7 @@ class RestAPI:
 
         if message.is_signed:
             return ApiErrorBuilder.build_and_log_error(
-                errors="Failed trying to settle a channel that's already settled",
+                errors="Message already signed",
                 status_code=HTTPStatus.CONFLICT,
                 log=log
             )
