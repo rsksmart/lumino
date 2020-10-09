@@ -1377,10 +1377,20 @@ class SQLiteStorage:
         cursor = self.conn.cursor()
         cursor.execute(
             """
-            SELECT identifier, message_order, unsigned_message, signed_message, light_client_payment_id, internal_msg_identifier, message_type
+            SELECT identifier,
+                   message_order,
+                   unsigned_message,
+                   signed_message,
+                   light_client_payment_id,
+                   internal_msg_identifier,
+                   message_type
             FROM light_client_protocol_message
             WHERE internal_msg_identifier >= ?
             AND light_client_address = ?
+            AND (
+                message_type NOT IN ('SettlementRequired', 'RequestRegisterSecret', 'UnlockLightRequest')
+                OR signed_message IS NULL
+            )
             ORDER BY light_client_payment_id, message_order ASC
             """,
             (from_message, light_client),
@@ -1462,7 +1472,7 @@ class SerializedSQLiteStorage(SQLiteStorage):
                      serialized_signed_msg, message[0], message[5], message[6]))
         return result
 
-    def update_light_client_protocol_message_set_signed_data(self, payment_id, msg_order, signed_message, message_type):
+    def update_offchain_light_client_protocol_message_set_signed_message(self, payment_id, msg_order, signed_message, message_type):
         with self.write_lock, self.conn:
             cursor = self.conn.cursor()
             cursor.execute(
@@ -1475,18 +1485,17 @@ class SerializedSQLiteStorage(SQLiteStorage):
             last_id = cursor.lastrowid
         return last_id
 
-    def update_stored_msg_set_signed_tx_by_message_id(self, signed_tx: SignedTransaction, message_id: MessageID):
-        with self.write_lock, self.conn:
-            cursor = self.conn.cursor()
-            cursor.execute(
-                """
-                UPDATE  light_client_protocol_message set signed_message = ? WHERE identifier = ?;
-                """,
-                (str(signed_tx), str(message_id))
-            )
-
-            last_id = cursor.lastrowid
-        return last_id
+    def update_onchain_light_client_protocol_message_set_signed_transaction(self,
+                                                                            internal_msg_identifier: int,
+                                                                            signed_message: "Message"):
+        return self.update(
+            """
+                UPDATE light_client_protocol_message
+                SET signed_message = ?
+                WHERE internal_msg_identifier = ?;
+            """,
+            (internal_msg_identifier, self.serializer.serialize(signed_message))
+        )
 
     def query_invoice(self, payment_hash_invoice):
         return super().query_invoice(payment_hash_invoice)
@@ -1630,4 +1639,12 @@ class SerializedSQLiteStorage(SQLiteStorage):
             cursor = self.conn.execute("UPDATE client SET pending_for_deletion = TRUE WHERE address = ?", (address,))
             last_id = cursor.lastrowid
 
+        return last_id
+
+    def update(self, update_sql: str, params: Any) -> int:
+        """ Aux method to generalize the update calls """
+        with self.write_lock, self.conn:
+            cursor = self.conn.cursor()
+            cursor.execute(update_sql, params)
+            last_id = cursor.lastrowid
         return last_id
