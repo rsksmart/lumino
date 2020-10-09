@@ -535,8 +535,8 @@ class RegisterSecretLightResource(BaseResource):
     post_schema = RegisterSecretLightSchema()
 
     @use_kwargs(post_schema)
-    def post(self, signed_tx: typing.ByteString):
-        return self.rest_api.register_secret_light(signed_tx)
+    def post(self, internal_msg_identifier: int, signed_tx: typing.ByteString):
+        return self.rest_api.register_secret_light(internal_msg_identifier, signed_tx)
 
 
 class LightClientResource(BaseResource):
