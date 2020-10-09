@@ -18,8 +18,7 @@ def events_for_onchain_secretreveal(
     secret: Secret,
     expiration: BlockExpiration,
     block_hash: BlockHash,
-    target_state: TargetTransferState = None,
-    pseudo_random_generator: random.Random = None
+    target_state: TargetTransferState = None
 ) -> List[Event]:
     if not isinstance(secret, T_Secret):
         raise ValueError("secret must be a Secret instance")
@@ -36,7 +35,7 @@ def events_for_onchain_secretreveal(
         if target_state:
             return [
                 ContractSendSecretRevealLight(
-                    message_id=message_identifier_from_prng(pseudo_random_generator),
+                    message_id=message_identifier_from_prng(random.Random()),
                     payment_identifier=target_state.transfer.payment_identifier,
                     light_client_address=channel_state.our_state.address
                 )
