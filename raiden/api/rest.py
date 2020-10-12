@@ -891,8 +891,33 @@ class RestAPI:
         return api_response(result=closed_channels)
 
     @requires_api_key
-    def register_secret_light(self, signed_tx: typing.SignedTransaction):
+    def register_secret_light(self, internal_msg_identifier: int, signed_tx: typing.SignedTransaction):
         try:
+            message = LightClientMessageHandler.get_light_client_protocol_message_by_internal_identifier(
+                internal_msg_identifier=internal_msg_identifier,
+                wal=self.raiden_api.raiden.wal
+            )
+
+            if not message:
+                return ApiErrorBuilder.build_and_log_error(
+                    errors=f"Light Client Message with internal_msg_identifier = {internal_msg_identifier} not found",
+                    status_code=HTTPStatus.BAD_REQUEST,
+                    log=log
+                )
+
+            if message.is_signed:
+                return ApiErrorBuilder.build_and_log_error(
+                    errors=f"Light Client Message with internal_msg_identifier = {internal_msg_identifier} already signed",
+                    status_code=HTTPStatus.CONFLICT,
+                    log=log
+                )
+
+            LightClientMessageHandler.update_onchain_light_client_protocol_message_set_signed_transaction(
+                internal_msg_identifier=internal_msg_identifier,
+                signed_message=signed_tx,
+                wal=self.raiden_api.raiden.wal
+            )
+
             self.raiden_api.register_secret_light(signed_tx)
             return api_response(result=dict(), status_code=HTTPStatus.OK)
         except InsufficientFunds as e:
