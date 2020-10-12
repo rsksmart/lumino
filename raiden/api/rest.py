@@ -900,15 +900,14 @@ class RestAPI:
 
             if not message:
                 return ApiErrorBuilder.build_and_log_error(
-                    errors="Light Client Message with internal_msg_identifier = {} not found"
-                        .format(internal_msg_identifier),
+                    errors=f"Light Client Message with internal_msg_identifier = {internal_msg_identifier} not found",
                     status_code=HTTPStatus.BAD_REQUEST,
                     log=log
                 )
 
             if message.is_signed:
                 return ApiErrorBuilder.build_and_log_error(
-                    errors="Message already signed",
+                    errors="Light Client Message with internal_msg_identifier = {internal_msg_identifier} already signed",
                     status_code=HTTPStatus.CONFLICT,
                     log=log
                 )
