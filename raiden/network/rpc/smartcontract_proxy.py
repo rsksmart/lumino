@@ -13,7 +13,8 @@ from raiden.exceptions import (
     InsufficientFunds,
     ReplacementTransactionUnderpriced,
     TransactionAlreadyPending,
-    RawTransactionFailed, RaidenRecoverableError,
+    RawTransactionFailed, 
+    RaidenRecoverableError,
 )
 from raiden.network.rpc.transactions import check_transaction_threw
 from raiden.utils import typing

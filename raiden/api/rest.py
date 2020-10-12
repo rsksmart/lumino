@@ -912,9 +912,9 @@ class RestAPI:
                     log=log
                 )
 
-            LightClientMessageHandler.update_stored_msg_set_signed_tx_by_message_id(
-                message_id=internal_msg_identifier,
-                signed_tx=signed_tx,
+            LightClientMessageHandler.update_onchain_light_client_protocol_message_set_signed_transaction(
+                internal_msg_identifier=internal_msg_identifier,
+                signed_message=signed_tx,
                 wal=self.raiden_api.raiden.wal
             )
 
