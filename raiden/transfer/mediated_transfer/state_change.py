@@ -691,15 +691,16 @@ class ActionTransferRerouteLight(BalanceProofStateChange):
         )
 
     def to_dict(self) -> Dict[str, Any]:
-        super_dict: Dict[str, Any] = super().to_dict()
-        super_dict["refund_transfer"] = self.refund_transfer
-        return super_dict
+        return {
+            "transfer": self.transfer.to_dict(),
+            "refund_transfer": self.refund_transfer.to_dict()
+        }
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "ActionTransferRerouteLight":
         instance = cls(
-            transfer=data["transfer"],
-            refund_transfer=data["refund_transfer"]
+            transfer=LockedTransferSignedState.from_dict(data["transfer"]),
+            refund_transfer=RefundTransfer.from_dict(data["refund_transfer"])
         )
         return instance
 

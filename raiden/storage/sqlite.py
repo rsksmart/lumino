@@ -1,3 +1,4 @@
+import json
 import sqlite3
 import threading
 from contextlib import contextmanager
@@ -211,56 +212,92 @@ class SQLiteStorage:
             last_id = cursor.lastrowid
         return last_id
 
-    def is_message_already_stored(self, light_client_address, message_type, unsigned_message):
-        cursor = self.conn.cursor()
-        cursor.execute(
-            """
-            SELECT *
-                FROM light_client_protocol_message lcpm
-                WHERE lcpm.light_client_address == ?
-                AND lcpm.message_type == ?
-                AND lcpm.unsigned_message == ?
-            """,
-            (to_checksum_address(light_client_address), str(message_type), str(unsigned_message)))
+    def query_message_by(self,
+                         light_client_address: "AddressHex" = None,
+                         is_signed: bool = None,
+                         serialized_message: str = None,
+                         message_type: "LightClientProtocolMessageType" = None,
+                         identifier: int = None,
+                         internal_identifier: int = None,
+                         payment_id: int = None,
+                         order: int = None,
+                         message_protocol_type: str = None):
 
-        return cursor.fetchone()
+        params = list()
+        query = "SELECT * FROM light_client_protocol_message"
 
-    def is_light_client_protocol_message_already_stored(self,
-                                                        payment_id: int,
-                                                        order: int,
-                                                        message_type: str,
-                                                        message_protocol_type: str,
-                                                        light_client_address: str):
-        cursor = self.conn.cursor()
-        cursor.execute(
-            """
-            SELECT *
-                FROM light_client_protocol_message
-                WHERE light_client_payment_id = ?
-                AND message_order = ?
-                AND message_type = ?
-                AND light_client_address = ?
-                AND (json_extract(light_client_protocol_message.unsigned_message, '$') is not NULL
+        if light_client_address or serialized_message or \
+           message_type or identifier is not None or internal_identifier is not None \
+           or payment_id is not None or order is not None:
+            query += " WHERE "
+
+        if light_client_address:
+            query += "light_client_address = ? "
+            params.append(to_checksum_address(light_client_address))
+
+        if serialized_message:
+            if light_client_address:
+                query += "AND "
+            if is_signed:
+                query += "unsigned_message = ? "
+            else:
+                query += "signed_message = ? "
+            params.append(serialized_message)
+
+        if message_type:
+            if light_client_address or serialized_message:
+                query += "AND "
+            query += "message_type = ? "
+            params.append(str(message_type.value))
+
+        if identifier:
+            if light_client_address or serialized_message or message_type:
+                query += "AND "
+            query += "identifier = ? "
+            params.append(str(identifier))
+
+        if internal_identifier:
+            if light_client_address or serialized_message or message_type or identifier is not None:
+                query += "AND "
+            query += "internal_mgs_identifier = ? "
+            params.append(internal_identifier)
+
+        if payment_id:
+            if light_client_address or serialized_message or message_type \
+               or identifier is not None or internal_identifier is not None:
+                query += "AND "
+            query += "light_client_payment_id = ? "
+            params.append(str(payment_id))
+
+        if order:
+            if light_client_address or serialized_message or \
+               message_type or identifier is not None or internal_identifier is not None or payment_id is not None:
+                query += "AND "
+            query += "message_order = ? "
+            params.append(order)
+
+        if message_protocol_type:
+            if light_client_address or serialized_message or \
+               message_type or identifier is not None or internal_identifier is not None \
+               or payment_id is not None or order is not None:
+                query += "AND "
+            query += """
+                (json_extract(light_client_protocol_message.unsigned_message, '$') is not NULL
                 AND json_extract(light_client_protocol_message.unsigned_message, '$.type') == ?
                 OR json_extract(light_client_protocol_message.signed_message, '$') is not NULL
                 AND json_extract(light_client_protocol_message.signed_message, '$.type') == ?)
-
-            """,
-            (str(payment_id), order, message_type, light_client_address, message_protocol_type, message_protocol_type)
-        )
-
-        return cursor.fetchone()
-
-    def is_light_client_protocol_message_already_stored_with_message_id(self, message_id: int, payment_id: int,
-                                                                        order: int):
-        cursor = self.conn.cursor()
-        cursor.execute(
             """
-            SELECT *
-                FROM light_client_protocol_message WHERE identifier = ? and light_client_payment_id = ? and message_order = ?;
-            """,
-            (str(message_id), str(payment_id), order)
-        )
+            params.append(message_protocol_type)
+            params.append(message_protocol_type)
+
+        query += " ORDER BY light_client_address, message_order "
+
+        cursor = self.conn.cursor()
+
+        print("Query Message By SQL {}".format(query))
+        print("PARAMS {}".format(params))
+
+        cursor.execute(query, params)
 
         return cursor.fetchone()
 
@@ -1405,40 +1442,6 @@ class SQLiteStorage:
         )
         return cursor.fetchall()
 
-    def get_light_client_protocol_message_by_identifier(self, identifier):
-        cursor = self.conn.cursor()
-        cursor.execute(
-            """
-            SELECT identifier, message_order, unsigned_message, signed_message,
-            light_client_payment_id, message_type, light_client_address, internal_msg_identifier
-            FROM light_client_protocol_message
-            WHERE identifier = ?
-            ORDER BY message_order ASC
-            """,
-            (str(identifier),),
-        )
-        return cursor.fetchone()
-
-    def get_light_client_protocol_message_by_internal_identifier(self, internal_msg_identifier: int):
-        cursor = self.conn.cursor()
-        cursor.execute(
-            """
-            SELECT identifier,
-                   message_order,
-                   unsigned_message,
-                   signed_message,
-                   light_client_payment_id,
-                   message_type,
-                   light_client_address,
-                   internal_msg_identifier
-            FROM light_client_protocol_message
-            WHERE internal_msg_identifier = ?
-            ORDER BY message_order ASC
-            """,
-            (str(internal_msg_identifier),),
-        )
-        return cursor.fetchone()
-
     def get_latest_light_client_non_closing_balance_proof(self, channel_id):
         cursor = self.conn.cursor()
         cursor.execute(
@@ -1500,30 +1503,32 @@ class SerializedSQLiteStorage(SQLiteStorage):
                      serialized_signed_msg, message[0], message[5], message[6]))
         return result
 
-    def update_offchain_light_client_protocol_message_set_signed_message(self, payment_id, msg_order, signed_message, message_type):
-        with self.write_lock, self.conn:
-            cursor = self.conn.cursor()
-            cursor.execute(
-                """
-                UPDATE  light_client_protocol_message set signed_message = ? WHERE light_client_payment_id = ? and message_order = ? and message_type = ?;
-                """,
-                (self.serializer.serialize(signed_message), str(payment_id), msg_order, message_type)
-            )
-
-            last_id = cursor.lastrowid
-        return last_id
-
-    def update_onchain_light_client_protocol_message_set_signed_transaction(self,
-                                                                            internal_msg_identifier: int,
-                                                                            signed_message: "SignedTransaction"):
-        return self.update(
-            """
-                UPDATE light_client_protocol_message
-                SET signed_message = ?
-                WHERE internal_msg_identifier = ?;
-            """,
-            (self.serializer.serialize(signed_message), internal_msg_identifier)
-        )
+    def set_signed_message(self,
+                           address: "AddressHex",
+                           signed_message: Any,
+                           internal_msg_identifier: int = None,
+                           payment_id: int = None,
+                           order: int = None,
+                           message_type: "LightClientProtocolMessageType" = None):
+        params = list()
+        params.append(self.serializer.serialize(signed_message))
+        params.append(to_checksum_address(address))
+        update_sql = """
+            UPDATE light_client_protocol_message
+            SET signed_message = ?
+            WHERE light_client_address = ?;
+        """
+        if internal_msg_identifier:
+            update_sql += "AND internal_msg_identifier = ?"
+            params.append(internal_msg_identifier)
+        if payment_id is not None and order is not None and message_type is not None:
+            update_sql += "AND light_client_payment_id = ? AND message_order = ? AND message_type = ?"
+            params.append(str(payment_id))
+            params.append(order)
+            params.append(message_type)
+        print("Set Signed Message SQL".format(update_sql))
+        print("PARAMS {}".format(params))
+        return self.update(update_sql, params)
 
     def query_invoice(self, payment_hash_invoice):
         return super().query_invoice(payment_hash_invoice)
@@ -1539,9 +1544,27 @@ class SerializedSQLiteStorage(SQLiteStorage):
             msg_dto.unsigned_message = serialized_data
         return super().write_light_client_protocol_message(msg_dto)
 
-    def is_message_already_stored(self, light_client_address, message_type, unsigned_message):
-        unsigned_message_string = self.serializer.serialize(unsigned_message)
-        return super().is_message_already_stored(light_client_address, message_type, unsigned_message_string)
+    def query_message(self,
+                      light_client_address: "AddressHex" = None,
+                      is_signed: bool = None,
+                      message: "Message" = None,
+                      message_type: "LightClientProtocolMessageType" = None,
+                      identifier: int = None,
+                      internal_identifier: int = None,
+                      payment_id: int = None,
+                      order: int = None,
+                      message_protocol_type: str = None):
+
+        serialized_message = self.serializer.serialize(message) if message else None
+        return super().query_message_by(light_client_address=light_client_address,
+                                        is_signed=is_signed,
+                                        serialized_message=serialized_message,
+                                        message_type=message_type,
+                                        identifier=identifier,
+                                        internal_identifier=internal_identifier,
+                                        payment_id=payment_id,
+                                        order=order,
+                                        message_protocol_type=message_protocol_type)
 
     def write_state_change(self, state_change, log_time):
         serialized_data = self.serializer.serialize(state_change)

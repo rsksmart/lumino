@@ -1652,8 +1652,9 @@ class RestAPI:
             )
             return result
 
-        message = LightClientMessageHandler.get_light_client_protocol_message_by_internal_identifier(
-            internal_msg_identifier=internal_msg_identifier,
+        message = LightClientMessageHandler.get_message(
+            light_client_address=creator_address,
+            internal_identifier=internal_msg_identifier,
             wal=self.raiden_api.raiden.wal
         )
 
@@ -1672,7 +1673,8 @@ class RestAPI:
                 log=log
             )
 
-        LightClientMessageHandler.update_onchain_light_client_protocol_message_set_signed_transaction(
+        LightClientMessageHandler.set_signed_message(
+            address=creator_address,
             internal_msg_identifier=internal_msg_identifier,
             signed_message=signed_settle_tx,
             wal=self.raiden_api.raiden.wal
