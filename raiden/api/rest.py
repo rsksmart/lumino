@@ -907,14 +907,14 @@ class RestAPI:
 
             if message.is_signed:
                 return ApiErrorBuilder.build_and_log_error(
-                    errors="Light Client Message with internal_msg_identifier = {internal_msg_identifier} already signed",
+                    errors=f"Light Client Message with internal_msg_identifier = {internal_msg_identifier} already signed",
                     status_code=HTTPStatus.CONFLICT,
                     log=log
                 )
 
-            LightClientMessageHandler.update_onchain_light_client_protocol_message_set_signed_transaction(
-                internal_msg_identifier=internal_msg_identifier,
-                signed_message=signed_tx,
+            LightClientMessageHandler.update_stored_msg_set_signed_tx_by_message_id(
+                message_id=internal_msg_identifier,
+                signed_tx=signed_tx,
                 wal=self.raiden_api.raiden.wal
             )
 
