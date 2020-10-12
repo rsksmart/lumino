@@ -62,7 +62,7 @@ from raiden.transfer.state import ChainState, message_identifier_from_prng, Nett
 from raiden.transfer.unlock import get_channel_state, should_search_events, should_search_state_changes
 from raiden.transfer.utils import (
     get_event_with_balance_proof_by_balance_hash,
-    get_state_change_with_balance_proof_by_balance_hash, 
+    get_state_change_with_balance_proof_by_balance_hash,
     get_state_change_with_balance_proof_by_locksroot,
     get_event_with_balance_proof_by_locksroot,
 )
@@ -122,16 +122,22 @@ def unlock_light(raiden: "RaidenService",
         sender=partner,
         merkle_tree_leaves=leaves_packed
     )
-    LightClientMessageHandler.store_light_client_protocol_message(
-        identifier=message_identifier_from_prng(chain_state.pseudo_random_generator),
-        signed=False,
-        payment_id=0,
-        order=0,
-        message_type=LightClientProtocolMessageType.UnlockLightRequest,
-        wal=raiden.wal,
+    if not LightClientMessageHandler.is_message_already_stored(
         light_client_address=channel_unlock_event.client,
-        message=message
-    )
+        message_type=LightClientProtocolMessageType.UnlockLightRequest,
+        unsigned_message=message,
+        wal=raiden.wal
+    ):
+        LightClientMessageHandler.store_light_client_protocol_message(
+            identifier=message_identifier_from_prng(chain_state.pseudo_random_generator),
+            signed=False,
+            payment_id=0,
+            order=0,
+            message_type=LightClientProtocolMessageType.UnlockLightRequest,
+            wal=raiden.wal,
+            light_client_address=channel_unlock_event.client,
+            message=message
+        )
 
 class EventHandler(ABC):
     @abstractmethod
