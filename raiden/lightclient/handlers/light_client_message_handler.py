@@ -141,6 +141,21 @@ class LightClientMessageHandler:
                                           message[6])
 
     @classmethod
+    def get_light_client_protocol_message_by_internal_identifier(cls, internal_msg_identifier: int, wal: WriteAheadLog):
+        message = wal.storage.get_light_client_protocol_message_by_internal_identifier(internal_msg_identifier)
+        if message:
+            return LightClientProtocolMessage(message[3] is not None,
+                                              message[1],
+                                              message[4],
+                                              message[0],
+                                              message[5],
+                                              message[2],
+                                              message[3],
+                                              message[7],
+                                              message[6])
+        return None
+
+    @classmethod
     def get_light_client_payment_locked_transfer(cls, payment_identifier: int, wal: WriteAheadLog):
 
         message = wal.storage.get_light_client_payment_locked_transfer(payment_identifier)

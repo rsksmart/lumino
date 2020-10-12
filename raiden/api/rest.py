@@ -1642,6 +1642,7 @@ class RestAPI:
 
     def settlement_light(self,
                          registry_address: typing.PaymentNetworkID,
+                         internal_msg_identifier: int,
                          token_address: typing.TokenAddress,
                          creator_address: typing.Address,
                          partner_address: typing.Address,
@@ -1652,6 +1653,7 @@ class RestAPI:
             "Settling channel light",
             node=pex(creator_address),
             registry_address=to_checksum_address(registry_address),
+            internal_msg_identifier=internal_msg_identifier,
             token_address=to_checksum_address(token_address),
             creator_address=to_checksum_address(creator_address),
             partner_address=to_checksum_address(partner_address),
@@ -1670,6 +1672,32 @@ class RestAPI:
                 status_code=HTTPStatus.BAD_REQUEST,
             )
             return result
+
+        message = LightClientMessageHandler.get_light_client_protocol_message_by_internal_identifier(
+            internal_msg_identifier=internal_msg_identifier,
+            wal=self.raiden_api.raiden.wal
+        )
+
+        if not message:
+            return ApiErrorBuilder.build_and_log_error(
+                errors="Light Client Message with internal_msg_identifier = {} not found"
+                       .format(internal_msg_identifier),
+                status_code=HTTPStatus.BAD_REQUEST,
+                log=log
+            )
+
+        if message.is_signed:
+            return ApiErrorBuilder.build_and_log_error(
+                errors="Message already signed",
+                status_code=HTTPStatus.CONFLICT,
+                log=log
+            )
+
+        LightClientMessageHandler.update_onchain_light_client_protocol_message_set_signed_transaction(
+            internal_msg_identifier=internal_msg_identifier,
+            signed_message=signed_settle_tx,
+            wal=self.raiden_api.raiden.wal
+        )
 
         try:
             channel_state = self.raiden_api.channel_settle_light(
