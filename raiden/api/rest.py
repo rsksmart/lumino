@@ -893,7 +893,7 @@ class RestAPI:
     @requires_api_key
     def register_secret_light(self, signed_tx: typing.SignedTransaction):
         try:
-            self.raiden_api.register_secret_light(signed_tx)
+            self.raiden_api.register_secret_light(signed_tx)git merg
             return api_response(result=dict(), status_code=HTTPStatus.OK)
         except InsufficientFunds as e:
             return api_error(errors=str(e), status_code=HTTPStatus.PAYMENT_REQUIRED)

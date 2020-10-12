@@ -62,7 +62,8 @@ from raiden.transfer.state import ChainState, message_identifier_from_prng, Nett
 from raiden.transfer.unlock import get_channel_state, should_search_events, should_search_state_changes
 from raiden.transfer.utils import (
     get_event_with_balance_proof_by_balance_hash,
-    get_state_change_with_balance_proof_by_balance_hash, get_state_change_with_balance_proof_by_locksroot,
+    get_state_change_with_balance_proof_by_balance_hash, 
+    get_state_change_with_balance_proof_by_locksroot,
     get_event_with_balance_proof_by_locksroot,
 )
 from raiden.transfer.views import get_channelstate_by_token_network_and_partner
