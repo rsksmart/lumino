@@ -1888,12 +1888,11 @@ class UnlockLightRequest(Message):
         assert data["type"] == cls.__name__, msg
         return cls(
             token_address=Address(decode_hex(data["token_address"])),
-            channel_identifier=data["channel_identifier"],
-            receiver=data["receiver"],
-            sender=data["sender"],
+            channel_identifier=ChannelID.from_dict(data["channel_identifier"]),
+            receiver=Address(decode_hex(data["receiver"])),
+            sender=Address(decode_hex(data["sender"])),
             merkle_tree_leaves=data["merkle_tree_leaves"]
         )
-
 
 
 class RequestRegisterSecret(Message):
