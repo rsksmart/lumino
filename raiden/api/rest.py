@@ -1688,7 +1688,7 @@ class RestAPI:
 
         if message.is_signed:
             return ApiErrorBuilder.build_and_log_error(
-                errors="Failed trying to settle a channel that's already settled",
+                errors="Message already signed",
                 status_code=HTTPStatus.CONFLICT,
                 log=log
             )
@@ -2291,7 +2291,7 @@ class RestAPI:
                     status_code=HTTPStatus.CONFLICT,
                     log=log
                 )
-            LightClientMessageHandler.update_onchain_light_client_protocol_message_set_signed_transaction(
+            LightClientMessageHandler.update_stored_msg_set_signed_tx_by_message_id(
                     internal_msg_identifier, signed_tx, self.raiden_api.raiden.wal
             )
             self.raiden_api.unlock_payment_light(signed_tx, token_address)
