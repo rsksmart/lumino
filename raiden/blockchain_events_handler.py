@@ -426,7 +426,7 @@ def get_channelstate_by_canonical_identifier(
     canonical_identifier: CanonicalIdentifier,
     raiden: "RaidenService") -> Optional[NettingChannelState]:
     address = get_our_address_by_canonical_identifier(chain_state, canonical_identifier, raiden)
-    if address is None:
+    if not address:
         return None
     return views.get_channelstate_by_canonical_identifier_and_address(chain_state,canonical_identifier, address)
 
