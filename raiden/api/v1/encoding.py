@@ -513,6 +513,7 @@ class PaymentSchema(BaseSchema):
 
 class UnlockPaymentLightPostSchema(BaseSchema):
     signed_tx = fields.String(required=True)
+    internal_msg_identifier = fields.Integer(required=True)
 
     class Meta:
         strict = True
