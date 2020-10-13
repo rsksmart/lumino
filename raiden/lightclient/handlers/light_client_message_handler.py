@@ -54,15 +54,30 @@ class LightClientMessageHandler:
         )
 
     @classmethod
-    def update_stored_msg_set_signed_data(
+    def update_offchain_light_client_protocol_message_set_signed_message(
         cls, message: Message,
         payment_id: int,
         order: int,
         message_type: LightClientProtocolMessageType,
         wal: WriteAheadLog
     ):
-        return wal.storage.update_light_client_protocol_message_set_signed_data(payment_id, order, message,
-                                                                                str(message_type.value))
+        return wal.storage\
+            .update_offchain_light_client_protocol_message_set_signed_message(payment_id,
+                                                                              order,
+                                                                              message,
+                                                                              str(message_type.value))
+
+    @classmethod
+    def update_onchain_light_client_protocol_message_set_signed_transaction(
+        cls,
+        internal_msg_identifier: int,
+        signed_message: "SignedTransaction",
+        wal: WriteAheadLog
+    ):
+        return wal.storage.update_onchain_light_client_protocol_message_set_signed_transaction(
+            internal_msg_identifier=internal_msg_identifier,
+            signed_message=signed_message
+        )
 
     @classmethod
     def store_light_client_payment(cls, payment: LightClientPayment, storage: SerializedSQLiteStorage):
@@ -129,6 +144,21 @@ class LightClientMessageHandler:
                                           message[3],
                                           None,
                                           message[6])
+
+    @classmethod
+    def get_light_client_protocol_message_by_internal_identifier(cls, internal_msg_identifier: int, wal: WriteAheadLog):
+        message = wal.storage.get_light_client_protocol_message_by_internal_identifier(internal_msg_identifier)
+        if message:
+            return LightClientProtocolMessage(message[3] is not None,
+                                              message[1],
+                                              message[4],
+                                              message[0],
+                                              message[5],
+                                              message[2],
+                                              message[3],
+                                              message[7],
+                                              message[6])
+        return None
 
     @classmethod
     def get_light_client_payment_locked_transfer(cls, payment_identifier: int, wal: WriteAheadLog):
