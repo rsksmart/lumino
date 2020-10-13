@@ -439,7 +439,7 @@ class ContractSendChannelBatchUnlockLight(ContractSendEvent):
             canonical_identifier=CanonicalIdentifier.from_dict(data["canonical_identifier"]),
             participant=to_canonical_address(data["participant"]),
             triggered_by_block_hash=BlockHash(deserialize_bytes(data["triggered_by_block_hash"])),
-            client=BlockHash(to_canonical_address(data["triggered_by_block_hash"])),
+            client=to_canonical_address(data["client"]),
 
         )
 

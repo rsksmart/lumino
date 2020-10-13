@@ -2316,8 +2316,11 @@ class RestAPI:
                     status_code=HTTPStatus.CONFLICT,
                     log=log
                 )
-            LightClientMessageHandler.update_stored_msg_set_signed_tx_by_message_id(
-                    internal_msg_identifier, signed_tx, self.raiden_api.raiden.wal
+                
+            LightClientMessageHandler.update_onchain_light_client_protocol_message_set_signed_transaction(
+                internal_msg_identifier=internal_msg_identifier,
+                signed_message=signed_tx,
+                wal=self.raiden_api.raiden.wal
             )
             self.raiden_api.unlock_payment_light(signed_tx, token_address)
             return api_response(result=dict(), status_code=HTTPStatus.OK)
