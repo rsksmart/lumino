@@ -1901,6 +1901,13 @@ class RequestRegisterSecret(Message):
         super().__init__(**kwargs)
         self.secret_registry_address = secret_registry_address
 
+    def __eq__(self, other):
+
+        return (
+            super().__eq__(other)
+            and isinstance(other, RequestRegisterSecret)
+            and self.secret_registry_address == other.secret_registry_address
+        )
     @classmethod
     def unpack(cls, packed):
         return cls(packed.secret_registry_address)

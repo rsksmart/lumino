@@ -5,7 +5,8 @@ import structlog
 from eth_utils import encode_hex, event_abi_to_log_topic, is_binary_address, to_normalized_address
 from gevent.event import AsyncResult
 from gevent.lock import Semaphore
-from requests import HTTPError
+from raiden_contracts.constants import CONTRACT_SECRET_REGISTRY, EVENT_SECRET_REVEALED
+from raiden_contracts.contract_manager import ContractManager
 
 from raiden.constants import (
     GAS_REQUIRED_PER_SECRET_IN_BATCH,
@@ -17,11 +18,9 @@ from raiden.exceptions import (
     NoStateForBlockIdentifier,
     RaidenRecoverableError,
     RaidenUnrecoverableError,
-    RawTransactionFailed,
 )
 from raiden.network.proxies.utils import compare_contract_versions
 from raiden.network.rpc.client import StatelessFilter, check_address_has_code
-from raiden.network.rpc.transactions import check_transaction_threw
 from raiden.utils import pex, safe_gas_limit, sha3
 from raiden.utils.typing import (
     BlockNumber,
@@ -31,10 +30,7 @@ from raiden.utils.typing import (
     Secret,
     SecretHash,
     Union,
-    SignedTransaction,
 )
-from raiden_contracts.constants import CONTRACT_SECRET_REGISTRY, EVENT_SECRET_REVEALED
-from raiden_contracts.contract_manager import ContractManager
 
 log = structlog.get_logger(__name__)  # pylint: disable=invalid-name
 

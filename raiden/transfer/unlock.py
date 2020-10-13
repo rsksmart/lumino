@@ -1,15 +1,9 @@
-from typing import Optional
-
-from eth_utils import to_checksum_address, to_hex
+from eth_utils import to_checksum_address
 
 from raiden.constants import EMPTY_HASH
 from raiden.exceptions import RaidenUnrecoverableError
-from raiden.storage.restore import channel_state_until_state_change
-from raiden.transfer.channel import get_batch_unlock_gain
 from raiden.transfer.identifiers import CanonicalIdentifier
-from raiden.transfer.state import ChainState, NettingChannelState, NettingChannelEndState
-from raiden.transfer.utils import get_state_change_with_balance_proof_by_locksroot, \
-    get_event_with_balance_proof_by_locksroot
+from raiden.transfer.state import ChainState, NettingChannelState
 from raiden.transfer.views import get_channelstate_by_token_network_and_partner
 from raiden.utils import Address
 from raiden.utils.typing import TokenNetworkID
@@ -23,9 +17,7 @@ def get_channel_state(
     our_address: Address
 ) -> NettingChannelState:
 
-    canonical_identifier = canonical_identifier
     token_network_identifier = canonical_identifier.token_network_address
-    participant = participant
 
     assert raiden.wal, "The Raiden Service must be initialized to handle events"
 
