@@ -225,8 +225,13 @@ class SQLiteStorage:
 
         return cursor.fetchone()
 
-    def is_light_client_protocol_message_already_stored(self, payment_id: int, order: int,
-                                                        message_type: str, message_protocol_type:str):
+    def is_light_client_protocol_message_already_stored(self,
+                                                        payment_id: int,
+                                                        order: int,
+                                                        message_type: str,
+                                                        message_protocol_type: str,
+                                                        light_client_address: "AddressHex"):
+
         cursor = self.conn.cursor()
         cursor.execute(
             """
@@ -236,9 +241,14 @@ class SQLiteStorage:
                 AND json_extract(light_client_protocol_message.unsigned_message, '$.type') == ?
                 OR json_extract(light_client_protocol_message.signed_message, '$') is not NULL
                 AND json_extract(light_client_protocol_message.signed_message, '$.type') == ?)
-
+                AND light_client_address = ?
             """,
-            (str(payment_id), order, message_type,message_protocol_type,message_protocol_type)
+            (str(payment_id),
+             order,
+             message_type,
+             message_protocol_type,
+             message_protocol_type,
+             to_checksum_address(light_client_address))
         )
 
         return cursor.fetchone()

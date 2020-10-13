@@ -92,15 +92,19 @@ class LightClientMessageHandler:
             storage.update_light_client_payment_status(payment_id, status)
 
     @classmethod
-    def is_light_client_protocol_message_already_stored(cls, payment_id: int,
+    def is_light_client_protocol_message_already_stored(cls,
+                                                        payment_id: int,
                                                         order: int,
                                                         message_type: LightClientProtocolMessageType,
                                                         message_protocol_type: str,
-                                                        wal: WriteAheadLog
-                                                        ):
-        existing_message = wal.storage.is_light_client_protocol_message_already_stored(payment_id, order,
-                                                                                       str(message_type.value),
-                                                                                       message_protocol_type)
+                                                        light_client_address: AddressHex,
+                                                        wal: WriteAheadLog):
+        existing_message = \
+            wal.storage.is_light_client_protocol_message_already_stored(payment_id=payment_id,
+                                                                        order=order,
+                                                                        message_type=str(message_type.value),
+                                                                        message_protocol_type=message_protocol_type,
+                                                                        light_client_address=light_client_address)
 
         if existing_message:
             return LightClientProtocolMessage(existing_message[5] is not None,

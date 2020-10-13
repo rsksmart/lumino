@@ -188,11 +188,13 @@ class RaidenEventHandler(EventHandler):
 
     @staticmethod
     def handle_store_message(raiden: "RaidenService", store_message_event: StoreMessageEvent):
-        existing_message = LightClientMessageHandler.is_message_already_stored(
-            store_message_event.light_client_address,
-            store_message_event.message_type,
-            store_message_event.message,
-            raiden.wal)
+        existing_message = LightClientMessageHandler.is_light_client_protocol_message_already_stored(
+            payment_id=store_message_event.payment_id,
+            order=store_message_event.message_order,
+            message_type=store_message_event.message_type,
+            message_protocol_type=store_message_event.message.to_dict()["type"],
+            light_client_address=store_message_event.light_client_address,
+            wal=raiden.wal)
         if not existing_message:
             LightClientMessageHandler.store_light_client_protocol_message(store_message_event.message_id,
                                                                           store_message_event.message,
