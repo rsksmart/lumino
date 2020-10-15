@@ -10,6 +10,8 @@ class LightClientProtocolMessageType(Enum):
     PaymentFailure = "PaymentFailure"
     PaymentExpired = "PaymentExpired"
     SettlementRequired = "SettlementRequired"
+    RequestRegisterSecret = "RequestRegisterSecret"
+    UnlockLightRequest = "UnlockLightRequest"
     PaymentRefund = "PaymentRefund"
 
 

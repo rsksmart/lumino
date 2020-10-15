@@ -42,7 +42,8 @@ from raiden.exceptions import (
     RaidenRecoverableError,
     UnknownTokenAddress,
     InvoiceCoding,
-    UnhandledLightClient)
+    UnhandledLightClient
+)
 from raiden.lightclient.handlers.light_client_message_handler import LightClientMessageHandler
 from raiden.lightclient.handlers.light_client_service import LightClientService
 from raiden.lightclient.handlers.light_client_utils import LightClientUtils
@@ -50,7 +51,6 @@ from raiden.lightclient.lightclientmessages.hub_response_message import HubRespo
 from raiden.lightclient.lightclientmessages.payment_hub_message import PaymentHubMessage
 from raiden.lightclient.models.light_client_payment import LightClientPayment, LightClientPaymentStatus
 from raiden.lightclient.models.light_client_protocol_message import LightClientProtocolMessageType
-
 from raiden.messages import RequestMonitoring, LockedTransfer, RevealSecret, Unlock, Delivered, SecretRequest, \
     Processed, LockExpired
 from raiden.settings import DEFAULT_RETRY_TIMEOUT, DEVELOPMENT_CONTRACT_VERSION
@@ -275,6 +275,9 @@ class RaidenAPI:
         time_elapsed = diff_minutes - 30
         if time_elapsed > 30:
             raise TokenAppExpired("Token app expired")
+
+    def register_secret_light(self, signed_tx: typing.SignedTransaction):
+        self.raiden.default_secret_registry.proxy.broadcast_signed_transaction_and_wait(signed_tx)
 
     def token_network_register(
         self,
@@ -1912,3 +1915,8 @@ class RaidenAPI:
                 status_code=HTTPStatus.FORBIDDEN,
                 log=log
             )
+
+    def unlock_payment_light(self, signed_tx: typing.SignedTransaction, token_address: typing.TokenAddress):
+        registry = self.raiden.default_registry
+        token_network = self.raiden.chain.token_network(registry.get_token_network(token_address))
+        token_network.proxy.broadcast_signed_transaction_and_wait(signed_tx)
