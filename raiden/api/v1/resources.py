@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Dict, Union
 
 from flask import Blueprint
 from flask_restful import Resource
@@ -27,8 +27,13 @@ from raiden.api.v1.encoding import (
     LightClientMatrixCredentialsBuildSchema,
     PaymentLightPutSchema,
     CreatePaymentLightPostSchema,
-    WatchtowerPutResource, LightClientMessageGetSchema, SettlementLightSchema)
-from raiden.messages import  Unlock
+    WatchtowerPutResource,
+    LightClientMessageGetSchema,
+    RegisterSecretLightSchema,
+    UnlockPaymentLightPostSchema,
+    SettlementLightSchema
+)
+from raiden.messages import Unlock, LockedTransfer
 
 from raiden.utils import typing
 
@@ -150,6 +155,13 @@ class LightChannelsResourceByTokenAndPartnerAddress(BaseResource):
             registry_address=self.rest_api.raiden_api.raiden.default_registry.address, **kwargs
         )
 
+
+class UnlockPaymentLightResource(BaseResource):
+    post_schema = UnlockPaymentLightPostSchema()
+
+    @use_kwargs(post_schema)
+    def post(self, internal_msg_identifier: int, signed_tx: typing.SignedTransaction, **kwargs):
+        return self.rest_api.post_unlock_payment_light(internal_msg_identifier, signed_tx, **kwargs)
 
 class SettlementLightResourceByTokenAndPartnerAddress(BaseResource):
     schema = SettlementLightSchema
@@ -519,6 +531,14 @@ class LightClientMatrixCredentialsBuildResource(BaseResource):
         return self.rest_api.get_data_for_registration_request(address)
 
 
+class RegisterSecretLightResource(BaseResource):
+    post_schema = RegisterSecretLightSchema()
+
+    @use_kwargs(post_schema)
+    def post(self, internal_msg_identifier: int, signed_tx: typing.ByteString):
+        return self.rest_api.register_secret_light(internal_msg_identifier, signed_tx)
+
+
 class LightClientResource(BaseResource):
     post_schema = LightClientSchema()
 
@@ -556,8 +576,8 @@ class WatchtowerResource(BaseResource):
             channel_id: int,
             token_network_address: typing.TokenNetworkAddress,
             lc_bp_signature: typing.Signature,
-            partner_balance_proof: Unlock
-            ):
+            partner_balance_proof: Union[Unlock, LockedTransfer]
+    ):
         """
         put a signed balance proof to be used by the hub, submitting it when the channel between a light client
         and a partner is closed by the partner. The signed balance proof is submitted as a tokenNetwork.updateNonClosingBalanceProf transaction.

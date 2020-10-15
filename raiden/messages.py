@@ -7,6 +7,7 @@ from eth_utils import (
     encode_hex,
     to_canonical_address,
     to_normalized_address,
+    to_checksum_address
 )
 
 from raiden.constants import UINT64_MAX, UINT256_MAX, EMPTY_PAYMENT_HASH_INVOICE
@@ -1830,6 +1831,99 @@ class RequestMonitoring(SignedMessage):
             and recover(blinded_data, self.non_closing_signature) == requesting_address
             and recover(reward_proof_data, self.reward_proof_signature) == requesting_address
         )
+
+
+class UnlockLightRequest(Message):
+
+    def __init__(self, token_address: Address, channel_identifier: ChannelID, sender: Address, receiver: Address,
+                 merkle_tree_leaves: str, **kwargs):
+        super().__init__(**kwargs)
+        self.channel_identifier = channel_identifier
+        self.sender = sender
+        self.receiver = receiver
+        self.token_address = token_address
+        self.merkle_tree_leaves = merkle_tree_leaves
+
+    def __eq__(self, other):
+        return (
+            super().__eq__(other)
+            and isinstance(other, UnlockLightRequest)
+            and self.channel_identifier == other.channel_identifier
+            and self.sender == other.sender
+            and self.receiver == other.receiver
+            and self.token_address == other.token_address
+            and self.merkle_tree_leaves == other.merkle_tree_leaves
+        )
+
+    @classmethod
+    def unpack(cls, packed):
+        return cls(
+            token_address=packed.token_address,
+            channel_identifier=packed.channel_identifier,
+            receiver=packed.receiver,
+            sender=packed.sender,
+            merkle_tree_leaves=packed.merkle_tree_leaves
+        )
+
+    def pack(self, packed) -> None:
+        packed.channel_identifier = self.channel_identifier
+        packed.sender = self.sender
+        packed.receiver = self.receiver
+        packed.token_address = self.token_address
+        packed.merkle_tree_leaves = self.merkle_tree_leaves
+
+    def to_dict(self):
+        return {
+            "type": self.__class__.__name__,
+            "token_address": to_checksum_address(self.token_address),
+            "channel_identifier": self.channel_identifier,
+            "receiver": to_checksum_address(self.receiver),
+            "sender": to_checksum_address(self.sender),
+            "merkle_tree_leaves": str(self.merkle_tree_leaves)
+        }
+
+    @classmethod
+    def from_dict(cls, data):
+        msg = f'Cannot decode data. Provided type is {data["type"]}, expected {cls.__name__}'
+        assert data["type"] == cls.__name__, msg
+        return cls(
+            token_address=Address(decode_hex(data["token_address"])),
+            channel_identifier=data["channel_identifier"],
+            receiver=Address(decode_hex(data["receiver"])),
+            sender=Address(decode_hex(data["sender"])),
+            merkle_tree_leaves=data["merkle_tree_leaves"]
+        )
+
+
+class RequestRegisterSecret(Message):
+
+    def __init__(self, secret_registry_address: Address, **kwargs):
+        super().__init__(**kwargs)
+        self.secret_registry_address = secret_registry_address
+
+    def __eq__(self, other):
+
+        return (
+            super().__eq__(other)
+            and isinstance(other, RequestRegisterSecret)
+            and self.secret_registry_address == other.secret_registry_address
+        )
+    @classmethod
+    def unpack(cls, packed):
+        return cls(packed.secret_registry_address)
+
+    def pack(self, packed) -> None:
+        packed.secret_registry_address = self.secret_registry_address
+
+    @classmethod
+    def from_dict(cls, data):
+        return cls(data["secret_registry_address"])
+
+    def to_dict(self):
+        return {
+            "type": self.__class__.__name__,
+            "secret_registry_address": to_normalized_address(self.secret_registry_address)
+        }
 
 
 class SettlementRequiredLightMessage(Message):

@@ -1,8 +1,9 @@
+import datetime
 import sqlite3
 import threading
 from contextlib import contextmanager
-import datetime
 
+from dateutil.relativedelta import relativedelta
 from eth_utils import to_checksum_address
 
 from raiden.constants import RAIDEN_DB_VERSION, SQLITE_MIN_REQUIRED_VERSION
@@ -11,8 +12,7 @@ from raiden.lightclient.models.client_model import ClientType
 from raiden.storage.serialize import SerializationBase
 from raiden.storage.utils import DB_SCRIPT_CREATE_TABLES, TimestampedEvent
 from raiden.utils import get_system_spec
-from raiden.utils.typing import Any, Dict, Iterator, List, NamedTuple, Optional, Tuple, Union
-from dateutil.relativedelta import relativedelta
+from raiden.utils.typing import Any, Dict, Iterator, List, NamedTuple, Optional, Tuple, Union, SignedTransaction
 
 
 class EventRecord(NamedTuple):

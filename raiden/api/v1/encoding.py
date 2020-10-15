@@ -490,7 +490,7 @@ class SettlementLightSchema(BaseSchema):
     signed_settle_tx = fields.String(required=True)
     channel_identifier = fields.Integer(required=True)
     internal_msg_identifier = fields.Integer(required=True)
-    
+
     class Meta:
         strict = True
         # decoding to a dict is required by the @use_kwargs decorator from webargs:
@@ -505,6 +505,15 @@ class PaymentSchema(BaseSchema):
     identifier = fields.Integer(missing=None)
     secret = SecretField(missing=None)
     secret_hash = SecretHashField(missing=None)
+
+    class Meta:
+        strict = True
+        decoding_class = dict
+
+
+class UnlockPaymentLightPostSchema(BaseSchema):
+    signed_tx = fields.String(required=True)
+    internal_msg_identifier = fields.Integer(required=True)
 
     class Meta:
         strict = True
@@ -568,6 +577,16 @@ class TokenActionRequestSchema(BaseSchema):
 
 class LightClientMatrixCredentialsBuildSchema(BaseSchema):
     address = AddressField()
+
+    class Meta:
+        strict = True
+        # decoding to a dict is required by the @use_kwargs decorator from webargs
+        decoding_class = dict
+
+
+class RegisterSecretLightSchema(BaseSchema):
+    signed_tx = fields.String(required=True)
+    internal_msg_identifier = fields.Integer(required=True)
 
     class Meta:
         strict = True
