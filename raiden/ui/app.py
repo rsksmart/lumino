@@ -12,7 +12,7 @@ from definitions import ROOT_DIR
 import json
 from eth_utils import encode_hex
 
-from raiden.network.transport.matrix.layer import MatrixLayer as MatrixTransportLayer
+from transport.matrix import MatrixLayer as MatrixTransportLayer
 
 from raiden.accounts import AccountManager
 from raiden.constants import (

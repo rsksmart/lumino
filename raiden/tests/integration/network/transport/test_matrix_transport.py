@@ -14,9 +14,9 @@ from raiden.constants import (
     UINT64_MAX)
 from raiden.exceptions import InsufficientFunds
 from raiden.messages import Delivered, Processed, SecretRequest, ToDevice
-from raiden.network.transport.matrix import AddressReachability, MatrixNode as MatrixTransportNode, _RetryQueue
-from raiden.network.transport.matrix.client import Room
-from raiden.network.transport.matrix.utils import make_room_alias
+from transport.matrix import AddressReachability, MatrixNode as MatrixTransportNode, _RetryQueue
+from transport.matrix.client import Room
+from transport.matrix.utils import make_room_alias
 from raiden.tests.utils import factories
 from raiden.tests.utils.client import burn_eth
 from raiden.tests.utils.mocks import MockRaidenService
@@ -54,7 +54,7 @@ def mock_matrix(
     private_rooms,
     global_rooms,
 ):
-    from raiden.network.transport.matrix.client import User
+    from transport.matrix.client import User
 
     monkeypatch.setattr(User, "get_display_name", lambda _: "random_display_name")
 
@@ -165,24 +165,24 @@ def is_reachable(transport: MatrixTransportNode, address: Address) -> bool:
 
 @pytest.fixture()
 def skip_userid_validation(monkeypatch):
-    import raiden.network.transport.matrix
-    import raiden.network.transport.matrix.utils
+    import transport.matrix
+    import transport.matrix.utils
 
     def mock_validate_userid_signature(user):  # pylint: disable=unused-argument
         return factories.HOP1
 
     monkeypatch.setattr(
-        raiden.network.transport.matrix,
+        transport.matrix,
         "validate_userid_signature",
         mock_validate_userid_signature,
     )
     monkeypatch.setattr(
-        raiden.network.transport.matrix.transport,
+        transport.matrix.transport,
         "validate_userid_signature",
         mock_validate_userid_signature,
     )
     monkeypatch.setattr(
-        raiden.network.transport.matrix.utils,
+        transport.matrix.utils,
         "validate_userid_signature",
         mock_validate_userid_signature,
     )

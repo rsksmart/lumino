@@ -7,8 +7,8 @@ import click
 from raiden.constants import PATH_FINDING_BROADCASTING_ROOM, MONITORING_BROADCASTING_ROOM
 from raiden.exceptions import RaidenError
 from raiden.network.transport import MatrixNode as MatrixTransportNode
-from raiden.network.transport.matrix import MatrixLightClientNode as MatrixLightClientTransportNode
-from raiden.network.transport.matrix.utils import get_available_servers_from_config, server_is_available
+from transport.matrix import MatrixLightClientNode as MatrixLightClientTransportNode
+from transport.matrix.utils import get_available_servers_from_config, server_is_available
 from raiden.settings import DEFAULT_MATRIX_KNOWN_SERVERS
 from raiden.storage import sqlite, serialize
 from raiden.utils import Address

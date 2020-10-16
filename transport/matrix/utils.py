@@ -35,7 +35,7 @@ from raiden.messages import (
     decode as message_from_bytes,
     from_dict as message_from_dict,
 )
-from raiden.network.transport.matrix.client import GMatrixClient, Room, User
+from transport.matrix.client import GMatrixClient, Room, User
 from raiden.network.utils import get_http_rtt
 from raiden.utils import pex
 from raiden.utils.signer import Signer, recover

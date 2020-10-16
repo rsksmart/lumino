@@ -5,8 +5,8 @@ import pytest
 from eth_utils import to_canonical_address
 from matrix_client.user import User
 
-from raiden.network.transport.matrix import AddressReachability, UserPresence
-from raiden.network.transport.matrix.utils import USERID_RE, UserAddressManager
+from transport.matrix import AddressReachability, UserPresence
+from transport.matrix.utils import USERID_RE, UserAddressManager
 from raiden.utils import Address
 
 

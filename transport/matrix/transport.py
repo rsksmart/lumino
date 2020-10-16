@@ -24,8 +24,8 @@ from raiden.messages import (
     SignedRetrieableMessage,
     ToDevice,
 )
-from raiden.network.transport.matrix.client import GMatrixClient, Room, User
-from raiden.network.transport.matrix.utils import (
+from transport.matrix.client import GMatrixClient, Room, User
+from transport.matrix.utils import (
     JOIN_RETRIES,
     AddressReachability,
     UserAddressManager,

@@ -122,7 +122,7 @@ from raiden.settings import (
 
 from raiden.utils.cli import get_matrix_servers
 
-from raiden.network.transport.matrix.utils import make_client
+from transport.matrix.utils import make_client
 
 from urllib.parse import urlparse
 
