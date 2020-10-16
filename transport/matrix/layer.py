@@ -6,14 +6,14 @@ import click
 
 from raiden.constants import PATH_FINDING_BROADCASTING_ROOM, MONITORING_BROADCASTING_ROOM
 from raiden.exceptions import RaidenError
-from raiden.network.transport import MatrixNode as MatrixTransportNode
-from transport.matrix import MatrixLightClientNode as MatrixLightClientTransportNode
-from transport.matrix.utils import get_available_servers_from_config, server_is_available
 from raiden.settings import DEFAULT_MATRIX_KNOWN_SERVERS
 from raiden.storage import sqlite, serialize
 from raiden.utils import Address
 from raiden.utils.cli import get_matrix_servers
 from transport.layer import Layer as TransportLayer
+from transport.matrix.transport import MatrixLightClientNode as MatrixLightClientTransportNode
+from transport.matrix.transport import MatrixNode as MatrixTransportNode
+from transport.matrix.utils import get_available_servers_from_config, server_is_available
 from transport.node import Node as TransportNode
 
 

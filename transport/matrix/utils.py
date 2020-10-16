@@ -23,10 +23,12 @@ from urllib.parse import urlparse
 import gevent
 import structlog
 from cachetools import LRUCache, cached
+from ecies import decrypt
 from eth_utils import decode_hex, encode_hex, to_canonical_address, to_normalized_address
 from gevent.event import Event
 from gevent.lock import Semaphore
 from matrix_client.errors import MatrixError, MatrixRequestError
+from raiden_contracts.constants import ID_TO_NETWORKNAME
 
 from raiden.exceptions import InvalidProtocolMessage, InvalidSignature, TransportError
 from raiden.messages import (
@@ -35,14 +37,11 @@ from raiden.messages import (
     decode as message_from_bytes,
     from_dict as message_from_dict,
 )
-from transport.matrix.client import GMatrixClient, Room, User
 from raiden.network.utils import get_http_rtt
 from raiden.utils import pex
 from raiden.utils.signer import Signer, recover
 from raiden.utils.typing import Address, ChainID, Signature
-from raiden_contracts.constants import ID_TO_NETWORKNAME
-from ecies import decrypt
-
+from transport.matrix.client import GMatrixClient, Room, User
 
 log = structlog.get_logger(__name__)
 

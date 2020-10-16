@@ -1,4 +1,4 @@
-from transport.matrix import MatrixNode, _RetryQueue, MatrixLightClientNode  # noqa
+from transport.matrix import MatrixNode, _RetryQueue, MatrixLightClientNode, MatrixLayer  # noqa
 from transport.layer import Layer as TransportLayer  # noqa
 from transport.matrix.utils import (  # noqa
     AddressReachability,
