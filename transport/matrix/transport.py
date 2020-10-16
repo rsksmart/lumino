@@ -38,7 +38,7 @@ from transport.matrix.utils import (
     validate_and_parse_message,
     validate_userid_signature,
     get_available_servers_from_config, get_server_url)
-from raiden.network.transport.udp import udp_utils
+from transport.udp import udp_utils
 from raiden.raiden_service import RaidenService
 from raiden.transfer import views
 from raiden.transfer.identifiers import QueueIdentifier

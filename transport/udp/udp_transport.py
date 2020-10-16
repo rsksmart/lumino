@@ -12,8 +12,8 @@ from raiden import constants
 from raiden.exceptions import InvalidAddress, InvalidProtocolMessage, UnknownAddress
 from raiden.message_handler import MessageHandler
 from raiden.messages import Delivered, Message, Ping, Pong, SignedRetrieableMessage, decode
-from raiden.network.transport.udp import healthcheck
-from raiden.network.transport.udp.udp_utils import (
+from transport.udp import healthcheck
+from transport.udp import (
     event_first_of,
     retry_with_recovery,
     timeout_exponential_backoff,

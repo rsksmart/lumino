@@ -6,7 +6,7 @@ import structlog
 from gevent.event import Event
 
 from raiden.exceptions import UnknownAddress
-from raiden.network.transport.udp import udp_utils
+from transport.udp import udp_utils
 from raiden.transfer import views
 from raiden.transfer.state import (
     NODE_NETWORK_REACHABLE,
@@ -18,7 +18,7 @@ from raiden.utils.typing import Address, Dict, Nonce
 
 if TYPE_CHECKING:
     # pylint: disable=unused-import
-    from raiden.network.transport.udp.udp_transport import UDPTransport
+    from transport.udp import UDPTransport
 
 log = structlog.get_logger(__name__)  # pylint: disable=invalid-name
 
