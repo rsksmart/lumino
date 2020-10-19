@@ -9,7 +9,6 @@ from raiden.constants import (
     PATH_FINDING_BROADCASTING_ROOM,
 )
 from raiden.message_handler import MessageHandler
-from raiden.network.transport import MatrixNode as MatrixTransportNode
 from raiden.raiden_event_handler import RaidenEventHandler
 from raiden.settings import DEFAULT_NUMBER_OF_BLOCK_CONFIRMATIONS
 from raiden.tests.utils.detect_failure import raise_on_failure
@@ -17,6 +16,7 @@ from raiden.tests.utils.events import search_for_item
 from raiden.tests.utils.network import CHAIN
 from raiden.tests.utils.transfer import transfer
 from raiden.transfer.state_change import Block
+from transport.matrix.transport import MatrixNode as MatrixTransportNode
 
 
 @pytest.mark.parametrize("number_of_nodes", [1])

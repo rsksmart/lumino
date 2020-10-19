@@ -3,10 +3,16 @@ from typing import Any, Dict
 
 import pytest
 from gevent import server
+from raiden_contracts.constants import (
+    CONTRACT_ENDPOINT_REGISTRY,
+    CONTRACT_SECRET_REGISTRY,
+    CONTRACT_SERVICE_REGISTRY,
+    CONTRACT_TOKEN_NETWORK_REGISTRY,
+    CONTRACT_USER_DEPOSIT,
+)
 
 from raiden.app import App
 from raiden.constants import Environment, RoutingMode
-from raiden.network.transport import UDPTransport
 from raiden.tests.utils.factories import make_address
 from raiden.tests.utils.mocks import MockChain, MockWeb3, patched_get_for_succesful_pfs_info
 from raiden.ui.checks import check_ethereum_network_id
@@ -16,13 +22,7 @@ from raiden.ui.startup import (
     setup_proxies_or_exit,
     setup_udp_or_exit,
 )
-from raiden_contracts.constants import (
-    CONTRACT_ENDPOINT_REGISTRY,
-    CONTRACT_SECRET_REGISTRY,
-    CONTRACT_SERVICE_REGISTRY,
-    CONTRACT_TOKEN_NETWORK_REGISTRY,
-    CONTRACT_USER_DEPOSIT,
-)
+from transport.udp.udp_transport import UDPTransport
 
 
 def test_check_network_id_raises_with_mismatching_ids():

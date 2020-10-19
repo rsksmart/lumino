@@ -1,7 +1,7 @@
 import gevent
 from gevent.event import Event
 
-from transport.udp import event_first_of
+from transport.udp.udp_utils import event_first_of
 from raiden.utils.notifying_queue import NotifyingQueue
 
 

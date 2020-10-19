@@ -10,7 +10,7 @@ from raiden.utils.typing import Address, Iterable, Iterator, UDPMessageID
 
 if TYPE_CHECKING:
     # pylint: disable=unused-import
-    from transport.udp import UDPTransport
+    from transport.udp.udp_transport import UDPTransport
 
 log = structlog.get_logger(__name__)  # pylint: disable=invalid-name
 

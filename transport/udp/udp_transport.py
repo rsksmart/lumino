@@ -13,7 +13,7 @@ from raiden.exceptions import InvalidAddress, InvalidProtocolMessage, UnknownAdd
 from raiden.message_handler import MessageHandler
 from raiden.messages import Delivered, Message, Ping, Pong, SignedRetrieableMessage, decode
 from transport.udp import healthcheck
-from transport.udp import (
+from transport.udp.udp_utils import (
     event_first_of,
     retry_with_recovery,
     timeout_exponential_backoff,

@@ -3,26 +3,6 @@ from typing import Any, Dict, NamedTuple, Optional
 
 import click
 from eth_utils import to_canonical_address, to_checksum_address
-
-from raiden.constants import Environment, RoutingMode
-from raiden.exceptions import AddressWithoutCode, AddressWrongContract, ContractVersionMismatch
-from raiden.network.blockchain_service import BlockChainService
-from raiden.network.discovery import ContractDiscovery
-from raiden.network.pathfinding import configure_pfs_or_exit
-from raiden.network.proxies.secret_registry import SecretRegistry
-from raiden.network.proxies.service_registry import ServiceRegistry
-from raiden.network.proxies.token_network_registry import TokenNetworkRegistry
-from raiden.network.proxies.user_deposit import UserDeposit
-from raiden.network.throttle import TokenBucket
-from raiden.network.transport import UDPTransport
-from raiden.settings import DEVELOPMENT_CONTRACT_VERSION, RED_EYES_CONTRACT_VERSION
-from raiden.ui.checks import (
-    check_discovery_registration_gas,
-    check_pfs_configuration,
-    check_raiden_environment,
-    check_smart_contract_addresses,
-)
-from raiden.utils.typing import Address
 from raiden_contracts.constants import (
     CONTRACT_ENDPOINT_REGISTRY,
     CONTRACT_SECRET_REGISTRY,
@@ -35,6 +15,26 @@ from raiden_contracts.contract_manager import (
     contracts_precompiled_path,
     get_contracts_deployment_info,
 )
+
+from raiden.constants import Environment, RoutingMode
+from raiden.exceptions import AddressWithoutCode, AddressWrongContract, ContractVersionMismatch
+from raiden.network.blockchain_service import BlockChainService
+from raiden.network.discovery import ContractDiscovery
+from raiden.network.pathfinding import configure_pfs_or_exit
+from raiden.network.proxies.secret_registry import SecretRegistry
+from raiden.network.proxies.service_registry import ServiceRegistry
+from raiden.network.proxies.token_network_registry import TokenNetworkRegistry
+from raiden.network.proxies.user_deposit import UserDeposit
+from raiden.network.throttle import TokenBucket
+from raiden.settings import DEVELOPMENT_CONTRACT_VERSION, RED_EYES_CONTRACT_VERSION
+from raiden.ui.checks import (
+    check_discovery_registration_gas,
+    check_pfs_configuration,
+    check_raiden_environment,
+    check_smart_contract_addresses,
+)
+from raiden.utils.typing import Address
+from transport.udp.udp_transport import UDPTransport
 
 
 def environment_type_to_contracts_version(environment_type: Environment) -> str:

@@ -14,9 +14,6 @@ from raiden.constants import (
     UINT64_MAX)
 from raiden.exceptions import InsufficientFunds
 from raiden.messages import Delivered, Processed, SecretRequest, ToDevice
-from transport.matrix import AddressReachability, MatrixNode as MatrixTransportNode, _RetryQueue
-from transport.matrix.client import Room
-from transport.matrix.utils import make_room_alias
 from raiden.tests.utils import factories
 from raiden.tests.utils.client import burn_eth
 from raiden.tests.utils.mocks import MockRaidenService
@@ -27,6 +24,10 @@ from raiden.transfer.state_change import ActionChannelClose, ActionUpdateTranspo
 from raiden.utils import pex
 from raiden.utils.signer import LocalSigner
 from raiden.utils.typing import Address, List, Optional, Union
+from transport.matrix.client import Room
+from transport.matrix.layer import MatrixTransportNode
+from transport.matrix.transport import _RetryQueue
+from transport.matrix.utils import AddressReachability, make_room_alias
 from transport.message import Message as TransportMessage
 
 USERID0 = "@Arthur:RestaurantAtTheEndOfTheUniverse"
