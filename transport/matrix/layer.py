@@ -11,8 +11,8 @@ from raiden.storage import sqlite, serialize
 from raiden.utils import Address
 from raiden.utils.cli import get_matrix_servers
 from transport.layer import Layer as TransportLayer
-from transport.matrix.transport import MatrixLightClientNode as MatrixLightClientTransportNode
-from transport.matrix.transport import MatrixNode as MatrixTransportNode
+from transport.matrix.transport import MatrixLightClientNode as MatrixLightClientTransportNode, \
+    MatrixNode as MatrixTransportNode
 from transport.matrix.utils import get_available_servers_from_config, server_is_available
 from transport.node import Node as TransportNode
 
