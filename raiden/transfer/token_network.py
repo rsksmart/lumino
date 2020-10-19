@@ -29,7 +29,10 @@ StateChangeWithChannelID = Union[
     ContractReceiveUpdateTransfer,
 ]
 
-
+# State changes that should be duplicated in case there are two light clients
+DuplicableStateChanges = [
+    ContractReceiveChannelNewBalance
+]
 def subdispatch_to_channel_by_id_and_address(
     token_network_state: TokenNetworkState,
     state_change: StateChangeWithChannelID,
@@ -41,10 +44,17 @@ def subdispatch_to_channel_by_id_and_address(
 
     ids_to_channels = token_network_state.channelidentifiers_to_channels
 
-    channel_state = None
+    channel_states = []
     if node_address is not None:
         if node_address in ids_to_channels:
             channel_state = ids_to_channels[node_address].get(state_change.channel_identifier)
+            channel_states.append(channel_state)
+            if channel_state.both_participants_are_light_clients\
+                and type(state_change) in DuplicableStateChanges:
+                partner_channel_state = token_network_state.channelidentifiers_to_channels[channel_state.partner_state.address].get(
+                    channel_state.identifier
+                )
+                channel_states.append(partner_channel_state)
         else:
             lc_address = views.get_lc_address_by_channel_id_and_partner(token_network_state, node_address,
                                                                     state_change.canonical_identifier)
@@ -52,7 +62,9 @@ def subdispatch_to_channel_by_id_and_address(
             if lc_address in token_network_state.channelidentifiers_to_channels:
                 channel_state = token_network_state.channelidentifiers_to_channels[lc_address].get(
                     state_change.canonical_identifier.channel_identifier)
-        if channel_state:
+                channel_states.append(channel_state)
+
+        for channel_state in channel_states:
             result = channel.state_transition(
                 channel_state=channel_state,
                 state_change=state_change,
@@ -66,10 +78,10 @@ def subdispatch_to_channel_by_id_and_address(
 
             channel_identifier = state_change.channel_identifier
             if result.new_state is None:
-                del ids_to_channels[node_address][channel_identifier]
+                del ids_to_channels[channel_state.our_state.address][channel_identifier]
                 partner_to_channelids.remove(channel_identifier)
             else:
-                ids_to_channels[node_address][channel_identifier] = result.new_state
+                ids_to_channels[channel_state.our_state.address][channel_identifier] = result.new_state
 
             events.extend(result.events)
 
@@ -123,7 +135,6 @@ def handle_channelnew(
         channel_state_copy = copy.deepcopy(channel_state)
         channel_state_copy.our_state, channel_state_copy.partner_state = channel_state_copy.partner_state,channel_state_copy.our_state
         token_network_state.channelidentifiers_to_channels[partner_address][channel_identifier] = channel_state_copy
-
 
 
         addresses_to_ids = token_network_state.partneraddresses_to_channelidentifiers
