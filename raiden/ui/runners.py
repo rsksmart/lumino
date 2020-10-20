@@ -309,7 +309,7 @@ class UDPRunner(NodeRunner):
         return app
 
 
-class MatrixRunner(NodeRunner):
+class LuminoRunner(NodeRunner):
     def run(self):
         super().run()
         self._options["mapped_socket"] = None

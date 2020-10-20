@@ -41,7 +41,7 @@ from raiden.utils.cli import (
     validate_option_dependencies,
 )
 
-from .runners import EchoNodeRunner, MatrixRunner, UDPRunner
+from .runners import EchoNodeRunner, LuminoRunner
 
 log = structlog.get_logger(__name__)
 
@@ -150,9 +150,9 @@ def options(func):
         option("--console", help="Start the interactive raiden console", is_flag=True),
         option(
             "--transport",
-            help="Transport system to use. UDP is not recommended",
-            type=click.Choice(["udp", "matrix"]),
-            default="matrix",
+            help="Transport system to use",
+            type=click.Choice(["rif-comms", "matrix"]),
+            default="rif-comms",
             show_default=True,
         ),
         option(
@@ -474,13 +474,7 @@ def run(ctx, **kwargs):
         ctx.obj = kwargs
         return
 
-    if kwargs["transport"] == "udp":
-        runner = UDPRunner(kwargs, ctx)
-    elif kwargs["transport"] == "matrix":
-        runner = MatrixRunner(kwargs, ctx)
-    else:
-        # Shouldn't happen
-        raise RuntimeError(f"Invalid transport type '{kwargs['transport']}'")
+    runner = LuminoRunner(kwargs, ctx)
 
     click.secho(runner.welcome_string, fg="green")
     click.secho(
