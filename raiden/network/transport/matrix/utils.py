@@ -6,7 +6,6 @@ from enum import Enum
 from operator import attrgetter, itemgetter
 from random import Random
 from typing import (
-    Any,
     Callable,
     Dict,
     Iterable,
