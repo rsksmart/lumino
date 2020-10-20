@@ -36,5 +36,5 @@ class RifCommsNode(TransportNode):
 
 class RifCommsLightClientNode(RifCommsNode):
 
-    def __init__(self, address: Address, config: dict):
+    def __init__(self, address: Address, config: dict, auth_params: dict):
         RifCommsNode.__init__(self, address, config)
