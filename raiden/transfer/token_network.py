@@ -123,7 +123,7 @@ def handle_channelnew(
             if partner_address not in token_network_state.channelidentifiers_to_channels:
                 token_network_state.channelidentifiers_to_channels[partner_address] = dict()
             channel_state_copy = copy.deepcopy(channel_state)
-            channel_state_copy.our_state, channel_state_copy.partner_state = channel_state_copy.partner_state,channel_state_copy.our_state
+            channel_state_copy.our_state, channel_state_copy.partner_state = channel_state_copy.partner_state, channel_state_copy.our_state
             token_network_state.channelidentifiers_to_channels[partner_address][channel_identifier] = channel_state_copy
 
 
