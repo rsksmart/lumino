@@ -12,7 +12,7 @@ from definitions import ROOT_DIR
 import json
 from eth_utils import encode_hex
 
-from raiden.network.transport.matrix.layer import MatrixLayer as MatrixTransportLayer
+from transport.factory import factory as transport_factory
 
 from raiden.accounts import AccountManager
 from raiden.constants import (
@@ -251,12 +251,9 @@ def run_app(
     #  check_network_params(running_network)
 
     discovery = None
-    if transport == "udp":
-        transport, discovery = setup_udp_or_exit(
-            config, blockchain_service, address, contracts, endpoint_registry_contract_address
-        )
-    elif transport == "matrix":
-        transport = MatrixTransportLayer(config)  # this should be replaced by structured or consistent config use
+    transport_layer = None
+    if transport:
+        transport_layer = transport_factory.create(transport, config)
     else:
         raise RuntimeError(f'Unknown transport type "{transport}" given')
 
@@ -277,7 +274,7 @@ def run_app(
             default_registry=proxies.token_network_registry,
             default_secret_registry=proxies.secret_registry,
             default_service_registry=proxies.service_registry,
-            transport=transport,
+            transport=transport_layer,
             raiden_event_handler=raiden_event_handler,
             message_handler=message_handler,
             discovery=discovery,

@@ -42,7 +42,7 @@ class App:  # pylint: disable=too-few-public-methods
         "settle_timeout": DEFAULT_SETTLE_TIMEOUT,
         "contracts_path": contracts_precompiled_path(RED_EYES_CONTRACT_VERSION),
         "database_path": "",
-        "transport_type": "udp",
+        "transport_type": "rif-comms",
         "blockchain": {"confirmation_blocks": DEFAULT_NUMBER_OF_BLOCK_CONFIRMATIONS},
         "transport": {
             "udp": {

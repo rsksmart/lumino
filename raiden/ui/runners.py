@@ -286,29 +286,6 @@ class NodeRunner:
 
         return app_
 
-
-class UDPRunner(NodeRunner):
-    def run(self):
-        super().run()
-
-        (listen_host, listen_port) = split_endpoint(self._options["listen_address"])
-        try:
-            factory = SocketFactory(listen_host, listen_port, strategy=self._options["nat"])
-            with factory as mapped_socket:
-                self._options["mapped_socket"] = mapped_socket
-                app = self._start_services()
-
-        except RaidenServicePortInUseError:
-            click.secho(
-                "ERROR: Address %s:%s is in use. "
-                "Use --listen-address <host:port> to specify port to listen on."
-                % (listen_host, listen_port),
-                fg="red",
-            )
-            sys.exit(1)
-        return app
-
-
 class LuminoRunner(NodeRunner):
     def run(self):
         super().run()
