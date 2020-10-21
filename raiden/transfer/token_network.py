@@ -37,7 +37,7 @@ def subdispatch_to_channels_by_participant_address(
     block_hash: BlockHash,
     participant_address: AddressHex = None
 ) -> TransitionResult:
-    if participant_address is None:
+    if not participant_address:
         return TransitionResult(token_network_state, [])
     channel_states = get_channels_to_dispatch_statechange(
         participant_address, state_change, token_network_state
@@ -55,7 +55,7 @@ def subdispatch_to_channels(
     events = []
     ids_to_channels = token_network_state.channelidentifiers_to_channels
     for channel_state in channel_states:
-        result = channel.state_transition(
+        channel_result = channel.state_transition(
             channel_state=channel_state,
             state_change=state_change,
             block_number=block_number,
@@ -67,17 +67,16 @@ def subdispatch_to_channels(
         ]
 
         channel_identifier = state_change.channel_identifier
-        if result.new_state is None:
+        if channel_result.new_state is None:
             del ids_to_channels[channel_state.our_state.address][channel_identifier]
             partner_to_channelids.remove(channel_identifier)
         else:
-            ids_to_channels[channel_state.our_state.address][channel_identifier] = result.new_state
+            ids_to_channels[channel_state.our_state.address][channel_identifier] = channel_result.new_state
 
-        events.extend(result.events)
+        events.extend(channel_result.events)
     return TransitionResult(token_network_state, events)
 
 
-#  TODO: We should find another approach for ths function. It's "a bit" confusing
 def get_channels_to_dispatch_statechange(
     participant_address: AddressHex,
     state_change: StateChangeWithChannelID,
@@ -85,8 +84,8 @@ def get_channels_to_dispatch_statechange(
 ) -> List[NettingChannelState]:
     channel_states = []
     ids_to_channels = token_network_state.channelidentifiers_to_channels
-
-    if participant_address in ids_to_channels:
+    participant_is_ours = participant_address in ids_to_channels
+    if participant_is_ours:
         channel_state = ids_to_channels[participant_address].get(state_change.channel_identifier)
         channel_states.append(channel_state)
         if channel_state.both_participants_are_light_clients:
@@ -96,13 +95,12 @@ def get_channels_to_dispatch_statechange(
     else:
         lc_address = views.get_lc_address_by_channel_id_and_partner(token_network_state, participant_address,
                                                                     state_change.canonical_identifier)
-        if lc_address in ids_to_channels:
-            lc_channel = ids_to_channels[lc_address]
-            lc_channel_state = lc_channel.get(state_change.canonical_identifier.channel_identifier)
+        lc_is_ours = lc_address in ids_to_channels
+        if lc_is_ours:
+            lc_channel_state = ids_to_channels[lc_address].get(state_change.channel_identifier)
             channel_states.append(lc_channel_state)
 
     return channel_states
-
 
 def handle_channel_close(
     token_network_state: TokenNetworkState,
