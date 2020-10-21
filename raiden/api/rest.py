@@ -85,7 +85,6 @@ from raiden.api.v1.resources import (
     PaymentInvoiceResource,
     ChannelsResourceLight,
     LightChannelsResourceByTokenAndPartnerAddress,
-    LightClientMatrixCredentialsBuildResource,
     LightClientResource,
     PaymentLightResource,
     CreatePaymentLightResource,
@@ -255,10 +254,9 @@ URLS_HUB_V1 = [
     ("/payments_light", PaymentLightResource),
     ("/payments_light/create", CreatePaymentLightResource, "create_payment"),
     ("/payments_light/unlock/<hexaddress:token_address>", UnlockPaymentLightResource),
-    ('/payments_light/register_onchain_secret', RegisterSecretLightResource),
-    ('/light_clients/', LightClientResource),
-    ('/light_clients/matrix/credentials', LightClientMatrixCredentialsBuildResource,),
-    ("/light_client_messages", LightClientMessageResource, "Message polling"),
+    ("/payments_light/register_onchain_secret", RegisterSecretLightResource),
+    ("/light_clients/", LightClientResource),
+    ("/light_clients/messages", LightClientMessageResource, "Message polling"),
     ("/watchtower", WatchtowerResource),
 ]
 
@@ -2330,7 +2328,7 @@ class RestAPI:
                     status_code=HTTPStatus.CONFLICT,
                     log=log
                 )
-                
+
             LightClientMessageHandler.update_onchain_light_client_protocol_message_set_signed_transaction(
                 internal_msg_identifier=internal_msg_identifier,
                 signed_message=signed_tx,

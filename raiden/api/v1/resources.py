@@ -518,19 +518,6 @@ class InvoiceResource(BaseResource):
             expires=expires
         )
 
-
-class LightClientMatrixCredentialsBuildResource(BaseResource):
-    get_schema = LightClientMatrixCredentialsBuildSchema()
-
-    @use_kwargs(get_schema, locations=("query",))
-    def get(self,
-            address: typing.Address = None):
-        """
-        This method receives a registration request.
-        """
-        return self.rest_api.get_data_for_registration_request(address)
-
-
 class RegisterSecretLightResource(BaseResource):
     post_schema = RegisterSecretLightSchema()
 
@@ -540,7 +527,16 @@ class RegisterSecretLightResource(BaseResource):
 
 
 class LightClientResource(BaseResource):
+    get_schema = LightClientMatrixCredentialsBuildSchema()
     post_schema = LightClientSchema()
+
+    @use_kwargs(get_schema, locations=("query",))
+    def get(self,
+            address: typing.Address = None):
+        """
+        This method receives a registration request.
+        """
+        return self.rest_api.get_data_for_registration_request(address)
 
     @use_kwargs(post_schema, locations=("json",))
     def post(
