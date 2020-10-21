@@ -297,6 +297,7 @@ def create_apps(
         database_path = database_from_privatekey(base_dir=database_basedir, app_number=idx)
 
         config = {
+            "address": address,
             "chain_id": chain_id,
             "environment_type": environment_type,
             "unrecoverable_error_should_crash": unrecoverable_error_should_crash,
@@ -472,7 +473,7 @@ def wait_for_usable_channel(
     is reachable.
     """
     waiting.wait_for_newchannel(
-        app0.raiden, registry_address, token_address, app1.raiden.address, app0.raiden.address, retry_timeout
+        app0.raiden, registry_address, token_address, app0.raiden.address, app1.raiden.address, retry_timeout
     )
 
     waiting.wait_for_participant_newbalance(
@@ -486,7 +487,7 @@ def wait_for_usable_channel(
     )
 
     waiting.wait_for_participant_newbalance(
-        app0.raiden,
+        app1.raiden,
         registry_address,
         token_address,
         app0.raiden.address,
