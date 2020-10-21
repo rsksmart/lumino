@@ -117,12 +117,14 @@ def handle_channelnew(
 
         token_network_state.channelidentifiers_to_channels[our_address][channel_identifier] = channel_state
 
-        #if channel_state.test: ## mismo hub, 2 light clients
-        if partner_address not in token_network_state.channelidentifiers_to_channels:
-            token_network_state.channelidentifiers_to_channels[partner_address] = dict()
-        channel_state_copy = copy.deepcopy(channel_state)
-        channel_state_copy.our_state, channel_state_copy.partner_state = channel_state_copy.partner_state,channel_state_copy.our_state
-        token_network_state.channelidentifiers_to_channels[partner_address][channel_identifier] = channel_state_copy
+
+        if channel_state.both_participants_are_light_clients:
+            ## 2 light clients using the same Hub
+            if partner_address not in token_network_state.channelidentifiers_to_channels:
+                token_network_state.channelidentifiers_to_channels[partner_address] = dict()
+            channel_state_copy = copy.deepcopy(channel_state)
+            channel_state_copy.our_state, channel_state_copy.partner_state = channel_state_copy.partner_state, channel_state_copy.our_state
+            token_network_state.channelidentifiers_to_channels[partner_address][channel_identifier] = channel_state_copy
 
 
 
