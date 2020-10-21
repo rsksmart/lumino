@@ -29,63 +29,73 @@ StateChangeWithChannelID = Union[
     ContractReceiveUpdateTransfer,
 ]
 
-# State changes that should be duplicated in case there are two light clients
-DuplicableStateChanges = [
-    ContractReceiveChannelNewBalance
-]
-def subdispatch_to_channel_by_id_and_address(
+
+def subdispatch_to_channels_by_participant_address(
     token_network_state: TokenNetworkState,
     state_change: StateChangeWithChannelID,
     block_number: BlockNumber,
     block_hash: BlockHash,
-    node_address: AddressHex = None
+    participant_address: AddressHex = None
 ) -> TransitionResult:
-    events = list()
+    if participant_address is None:
+        return TransitionResult(token_network_state, [])
+    channel_states = get_channels_to_dispatch_statechange(
+        participant_address, state_change, token_network_state
+    )
+    return subdispatch_to_channels(block_hash, block_number, channel_states, state_change, token_network_state)
 
+
+def subdispatch_to_channels(block_hash, block_number, channel_states, state_change, token_network_state):
+    events = []
+    ids_to_channels = token_network_state.channelidentifiers_to_channels
+    for channel_state in channel_states:
+        result = channel.state_transition(
+            channel_state=channel_state,
+            state_change=state_change,
+            block_number=block_number,
+            block_hash=block_hash,
+        )
+
+        partner_to_channelids = token_network_state.partneraddresses_to_channelidentifiers[
+            channel_state.partner_state.address
+        ]
+
+        channel_identifier = state_change.channel_identifier
+        if result.new_state is None:
+            del ids_to_channels[channel_state.our_state.address][channel_identifier]
+            partner_to_channelids.remove(channel_identifier)
+        else:
+            ids_to_channels[channel_state.our_state.address][channel_identifier] = result.new_state
+
+        events.extend(result.events)
+    return TransitionResult(token_network_state, events)
+
+
+#  TODO: We should find another approach for ths function. It's "a bit" confusing
+def get_channels_to_dispatch_statechange(
+    participant_address: AddressHex,
+    state_change: StateChangeWithChannelID,
+    token_network_state: TokenNetworkState
+) -> List[NettingChannelState]:
+    channel_states = []
     ids_to_channels = token_network_state.channelidentifiers_to_channels
 
-    channel_states = []
-    if node_address is not None:
-        if node_address in ids_to_channels:
-            channel_state = ids_to_channels[node_address].get(state_change.channel_identifier)
-            channel_states.append(channel_state)
-            if channel_state.both_participants_are_light_clients\
-                and type(state_change) in DuplicableStateChanges:
-                partner_channel_state = token_network_state.channelidentifiers_to_channels[channel_state.partner_state.address].get(
-                    channel_state.identifier
-                )
-                channel_states.append(partner_channel_state)
-        else:
-            lc_address = views.get_lc_address_by_channel_id_and_partner(token_network_state, node_address,
+    if participant_address in ids_to_channels:
+        channel_state = ids_to_channels[participant_address].get(state_change.channel_identifier)
+        channel_states.append(channel_state)
+        if channel_state.both_participants_are_light_clients:
+            partner_channel = ids_to_channels[channel_state.partner_state.address]
+            partner_channel_state = partner_channel.get(channel_state.identifier)
+            channel_states.append(partner_channel_state)
+    else:
+        lc_address = views.get_lc_address_by_channel_id_and_partner(token_network_state, participant_address,
                                                                     state_change.canonical_identifier)
-            node_address = lc_address
-            if lc_address in token_network_state.channelidentifiers_to_channels:
-                channel_state = token_network_state.channelidentifiers_to_channels[lc_address].get(
-                    state_change.canonical_identifier.channel_identifier)
-                channel_states.append(channel_state)
+        if lc_address in ids_to_channels:
+            lc_channel = ids_to_channels[lc_address]
+            lc_channel_state = lc_channel.get(state_change.canonical_identifier.channel_identifier)
+            channel_states.append(lc_channel_state)
 
-        for channel_state in channel_states:
-            result = channel.state_transition(
-                channel_state=channel_state,
-                state_change=state_change,
-                block_number=block_number,
-                block_hash=block_hash,
-            )
-
-            partner_to_channelids = token_network_state.partneraddresses_to_channelidentifiers[
-                channel_state.partner_state.address
-            ]
-
-            channel_identifier = state_change.channel_identifier
-            if result.new_state is None:
-                del ids_to_channels[channel_state.our_state.address][channel_identifier]
-                partner_to_channelids.remove(channel_identifier)
-            else:
-                ids_to_channels[channel_state.our_state.address][channel_identifier] = result.new_state
-
-            events.extend(result.events)
-
-    return TransitionResult(token_network_state, events)
+    return channel_states
 
 
 def handle_channel_close(
@@ -94,12 +104,12 @@ def handle_channel_close(
     block_number: BlockNumber,
     block_hash: BlockHash,
 ) -> TransitionResult:
-    return subdispatch_to_channel_by_id_and_address(
+    return subdispatch_to_channels_by_participant_address(
         token_network_state=token_network_state,
         state_change=state_change,
         block_number=block_number,
         block_hash=block_hash,
-        node_address=state_change.participant1
+        participant_address=state_change.participant1
     )
 
 
@@ -151,12 +161,12 @@ def handle_balance(
     block_hash: BlockHash,
     participant: AddressHex
 ) -> TransitionResult:
-    return subdispatch_to_channel_by_id_and_address(
+    return subdispatch_to_channels_by_participant_address(
         token_network_state=token_network_state,
         state_change=state_change,
         block_number=block_number,
         block_hash=block_hash,
-        node_address=participant
+        participant_address=participant
     )
 
 
@@ -182,12 +192,12 @@ def handle_closed(
             ]
             node_address = participant1
 
-    return subdispatch_to_channel_by_id_and_address(
+    return subdispatch_to_channels_by_participant_address(
         token_network_state=token_network_state,
         state_change=state_change,
         block_number=block_number,
         block_hash=block_hash,
-        node_address=node_address
+        participant_address=node_address
     )
 
 
@@ -197,12 +207,12 @@ def handle_settled(
     block_number: BlockNumber,
     block_hash: BlockHash,
 ) -> TransitionResult:
-    return subdispatch_to_channel_by_id_and_address(
+    return subdispatch_to_channels_by_participant_address(
         token_network_state=token_network_state,
         state_change=state_change,
         block_number=block_number,
         block_hash=block_hash,
-        node_address=state_change.participant1
+        participant_address=state_change.participant1
     )
 
 
@@ -212,7 +222,7 @@ def handle_updated_transfer(
     block_number: BlockNumber,
     block_hash: BlockHash,
 ) -> TransitionResult:
-    return subdispatch_to_channel_by_id_and_address(
+    return subdispatch_to_channels_by_participant_address(
         token_network_state=token_network_state,
         state_change=state_change,
         block_number=block_number,
@@ -332,9 +342,7 @@ def state_transition(
         iteration = handle_settled(token_network_state, state_change, block_number, block_hash)
     elif type(state_change) == ContractReceiveUpdateTransfer:
         assert isinstance(state_change, ContractReceiveUpdateTransfer), MYPY_ANNOTATION
-        iteration = handle_updated_transfer(
-            token_network_state, state_change, block_number, block_hash
-        )
+        iteration = handle_updated_transfer(token_network_state, state_change, block_number, block_hash)
     elif type(state_change) == ContractReceiveChannelBatchUnlock:
         assert isinstance(state_change, ContractReceiveChannelBatchUnlock), MYPY_ANNOTATION
         iteration = handle_batch_unlock(
