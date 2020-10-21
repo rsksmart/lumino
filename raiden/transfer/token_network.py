@@ -45,7 +45,13 @@ def subdispatch_to_channels_by_participant_address(
     return subdispatch_to_channels(block_hash, block_number, channel_states, state_change, token_network_state)
 
 
-def subdispatch_to_channels(block_hash, block_number, channel_states, state_change, token_network_state):
+def subdispatch_to_channels(
+    block_hash: BlockHash,
+    block_number: BlockNumber,
+    channel_states: List[NettingChannelState],
+    state_change: StateChangeWithChannelID,
+    token_network_state: TokenNetworkState
+) -> TransitionResult:
     events = []
     ids_to_channels = token_network_state.channelidentifiers_to_channels
     for channel_state in channel_states:
