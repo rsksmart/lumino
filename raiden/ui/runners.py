@@ -26,10 +26,8 @@ from raiden.exceptions import (
     EthNodeCommunicationError,
     EthNodeInterfaceError,
     RaidenError,
-    RaidenServicePortInUseError,
 )
 from raiden.log_config import configure_logging
-from raiden.network.sockfactory import SocketFactory
 from raiden.tasks import check_gas_reserve, check_network_id, check_rdn_deposits, check_version
 from raiden.rns_constants import RNS_ADDRESS_ZERO
 from raiden.utils import get_system_spec, merge_dict, split_endpoint, typing

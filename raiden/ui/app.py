@@ -43,7 +43,6 @@ from raiden.ui.startup import (
     setup_contracts_or_exit,
     setup_environment,
     setup_proxies_or_exit,
-    setup_udp_or_exit,
 )
 from raiden.utils import BlockNumber, pex, split_endpoint
 from raiden.utils.typing import Address, Optional, PrivateKey, Tuple
@@ -251,11 +250,7 @@ def run_app(
     #  check_network_params(running_network)
 
     discovery = None
-    transport_layer = None
-    if transport:
-        transport_layer = Factory.create(transport, config)
-    else:
-        raise RuntimeError(f'Unknown transport type "{transport}" given')
+    transport_layer = Factory.create(transport, config)
 
     raiden_event_handler = RaidenEventHandler()
 
