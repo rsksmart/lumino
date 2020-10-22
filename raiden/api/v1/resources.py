@@ -33,11 +33,9 @@ from raiden.api.v1.encoding import (
     UnlockPaymentLightPostSchema,
     SettlementLightSchema
 )
-from raiden.messages import Unlock, LockedTransfer
-
-from raiden.utils import typing
-
 from raiden.constants import EMPTY_PAYMENT_HASH_INVOICE
+from raiden.messages import Unlock, LockedTransfer
+from raiden.utils import typing
 
 
 def create_blueprint():
@@ -163,6 +161,7 @@ class UnlockPaymentLightResource(BaseResource):
     def post(self, internal_msg_identifier: int, signed_tx: typing.SignedTransaction, **kwargs):
         return self.rest_api.post_unlock_payment_light(internal_msg_identifier, signed_tx, **kwargs)
 
+
 class SettlementLightResourceByTokenAndPartnerAddress(BaseResource):
     schema = SettlementLightSchema
 
@@ -252,6 +251,7 @@ class RegisterTokenResource(BaseResource):
         return self.rest_api.register_token(
             self.rest_api.raiden_api.raiden.default_registry.address, token_address
         )
+
 
 class GetTokenResource(BaseResource):
     def get(self, token_network):
@@ -518,6 +518,7 @@ class InvoiceResource(BaseResource):
             expires=expires
         )
 
+
 class RegisterSecretLightResource(BaseResource):
     post_schema = RegisterSecretLightSchema()
 
@@ -573,7 +574,7 @@ class WatchtowerResource(BaseResource):
             token_network_address: typing.TokenNetworkAddress,
             lc_bp_signature: typing.Signature,
             partner_balance_proof: Union[Unlock, LockedTransfer]
-    ):
+            ):
         """
         put a signed balance proof to be used by the hub, submitting it when the channel between a light client
         and a partner is closed by the partner. The signed balance proof is submitted as a tokenNetwork.updateNonClosingBalanceProf transaction.

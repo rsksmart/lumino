@@ -1,25 +1,28 @@
 import copy
+import hashlib
+import os
+import random
+from binascii import hexlify
+from datetime import datetime, date
 from http import HTTPStatus
 
-import gevent
-import structlog
-from gevent import Greenlet
-import random
-import string
-import hashlib
-from binascii import hexlify
-import os
 import dateutil.parser
-from datetime import datetime, date
+import gevent
+import string
+import structlog
 from dateutil.relativedelta import relativedelta
-from eth_utils import is_binary_address, to_checksum_address, to_canonical_address, to_normalized_address, encode_hex
-
 from ecies import encrypt
+from eth_utils import is_binary_address, to_checksum_address, to_canonical_address, to_normalized_address, encode_hex
+from gevent import Greenlet
 
 import raiden.blockchain.events as blockchain_events
 from raiden import waiting, routing
 from raiden.api.validations.api_error_builder import ApiErrorBuilder
 from raiden.api.validations.channel_validator import ChannelValidator
+from raiden.billing.invoices.decoder.invoice_decoder import decode_invoice
+from raiden.billing.invoices.encoder.invoice_encoder import parse_options, encode_invoice
+from raiden.billing.invoices.options_args import OptionsArgs
+from raiden.billing.invoices.util.time_util import get_utc_unix_time, get_utc_expiration_time
 from raiden.constants import (
     GENESIS_BLOCK_NUMBER,
     RED_EYES_PER_TOKEN_NETWORK_LIMIT,
@@ -53,15 +56,14 @@ from raiden.lightclient.models.light_client_payment import LightClientPayment, L
 from raiden.lightclient.models.light_client_protocol_message import LightClientProtocolMessageType
 from raiden.messages import RequestMonitoring, LockedTransfer, RevealSecret, Unlock, Delivered, SecretRequest, \
     Processed, LockExpired
+from raiden.rns_constants import RNS_ADDRESS_ZERO
 from raiden.settings import DEFAULT_RETRY_TIMEOUT, DEVELOPMENT_CONTRACT_VERSION
-
 from raiden.transfer import architecture, views, routes
 from raiden.transfer.events import (
     EventPaymentReceivedSuccess,
     EventPaymentSentFailed,
     EventPaymentSentSuccess,
 )
-
 from raiden.transfer.state import (
     BalanceProofSignedState,
     InitiatorTask,
@@ -70,10 +72,11 @@ from raiden.transfer.state import (
     TargetTask,
     TransferTask,
     ChainState)
-
 from raiden.transfer.state_change import ActionChannelClose
 from raiden.utils import pex, typing
+from raiden.utils import random_secret, sha3
 from raiden.utils.gas_reserve import has_enough_gas_reserve
+from raiden.utils.rns import is_rns_address
 from raiden.utils.typing import (
     Address,
     Any,
@@ -99,15 +102,6 @@ from raiden.utils.typing import (
     SignedTransaction,
     InitiatorAddress)
 
-from raiden.rns_constants import RNS_ADDRESS_ZERO
-from raiden.utils.rns import is_rns_address
-
-from raiden.billing.invoices.options_args import OptionsArgs
-from raiden.billing.invoices.util.time_util import get_utc_unix_time, get_utc_expiration_time
-from raiden.billing.invoices.encoder.invoice_encoder import parse_options, encode_invoice
-from raiden.billing.invoices.decoder.invoice_decoder import decode_invoice
-from raiden.utils import random_secret, sha3
-
 log = structlog.get_logger(__name__)  # pylint: disable=invalid-name
 
 EVENTS_PAYMENT_HISTORY_RELATED = (
@@ -115,16 +109,6 @@ EVENTS_PAYMENT_HISTORY_RELATED = (
     EventPaymentSentFailed,
     EventPaymentReceivedSuccess,
 )
-
-from raiden.settings import (
-    DEFAULT_MATRIX_KNOWN_SERVERS
-)
-
-from raiden.utils.cli import get_matrix_servers
-
-from raiden.network.transport.matrix.utils import make_client
-
-from urllib.parse import urlparse
 
 
 def event_filter_for_payments(
@@ -1823,7 +1807,8 @@ class RaidenAPI:
                     {secrethash: copy.deepcopy(current_payment_task)}
                 )
                 possible_routes = routes.filter_acceptable_routes(
-                    route_states=possible_routes, blacklisted_channel_ids=current_payment_task.manager_state.cancelled_channels
+                    route_states=possible_routes,
+                    blacklisted_channel_ids=current_payment_task.manager_state.cancelled_channels
                 )
             if possible_routes:
                 # TODO marcosmartinez7 This can be improved using next_channel_from_routes in order to filter channels without capacity

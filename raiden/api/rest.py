@@ -2,45 +2,31 @@ import errno
 import json
 import logging
 import socket
-
+from datetime import datetime
 from http import HTTPStatus
 from typing import Dict, Union
 
 import gevent
 import gevent.pool
 import structlog
+from dateutil.relativedelta import relativedelta
 from eth_utils import encode_hex, decode_hex, to_checksum_address
+from eth_utils import (
+    to_canonical_address
+)
 from flask import Flask, make_response, send_from_directory, url_for, request
-
+from flask_cors import CORS
 from flask_restful import Api, abort
 from gevent.pywsgi import WSGIServer
 from hexbytes import HexBytes
-
-from raiden.api.validations.light_client_authorization import requires_api_key
-from raiden.lightclient.handlers.light_client_message_handler import LightClientMessageHandler
 from raiden_webui import RAIDEN_WEBUI_PATH
-
-from raiden.api.validations.api_error_builder import ApiErrorBuilder
-from raiden.api.validations.api_status_codes import ERROR_STATUS_CODES
-from raiden.api.validations.channel_validator import ChannelValidator
-from raiden.lightclient.handlers.light_client_service import LightClientService
-from raiden.lightclient.lightclientmessages.light_client_non_closing_balance_proof import \
-    LightClientNonClosingBalanceProof
-from raiden.lightclient.models.light_client_protocol_message import LightClientProtocolMessageType
-from raiden.messages import LockedTransfer, Delivered, RevealSecret, Unlock, SecretRequest, Processed, \
-    LockExpired
-from raiden.rns_constants import RNS_ADDRESS_ZERO
-from raiden.utils.rns import is_rns_address
-from webargs.flaskparser import parser
-from raiden.api.objects import DashboardGraphItem
-from raiden.api.objects import DashboardTableItem
-from raiden.api.objects import DashboardGeneralItem
-from flask_cors import CORS
-from raiden.schedulers.setup import setup_schedule_config
-from datetime import datetime
 from web3 import Web3
+from webargs.flaskparser import parser
 
 from raiden.api.objects import AddressList, PartnersPerTokenList
+from raiden.api.objects import DashboardGeneralItem
+from raiden.api.objects import DashboardGraphItem
+from raiden.api.objects import DashboardTableItem
 from raiden.api.v1.encoding import (
     AddressListSchema,
     ChannelStateSchema,
@@ -55,7 +41,6 @@ from raiden.api.v1.encoding import (
     DashboardDataResponseTableItemSchema,
     DashboardDataResponseGeneralItemSchema,
     LuminoAddressConverter)
-
 from raiden.api.v1.resources import (
     AddressResource,
     BlockchainEventsNetworkResource,
@@ -94,9 +79,16 @@ from raiden.api.v1.resources import (
     UnlockPaymentLightResource,
     SettlementLightResourceByTokenAndPartnerAddress
 )
-
+from raiden.api.validations.api_error_builder import ApiErrorBuilder
+from raiden.api.validations.api_status_codes import ERROR_STATUS_CODES
+from raiden.api.validations.channel_validator import ChannelValidator
+from raiden.api.validations.light_client_authorization import requires_api_key
+from raiden.billing.invoices.constants.errors import AUTO_PAY_INVOICE, INVOICE_EXPIRED, INVOICE_PAID
+from raiden.billing.invoices.constants.invoice_status import InvoiceStatus
+from raiden.billing.invoices.constants.invoice_type import InvoiceType
+from raiden.billing.invoices.decoder.invoice_decoder import get_tags_dict, get_unknown_tags_dict
+from raiden.billing.invoices.util.time_util import is_invoice_expired, UTC_FORMAT
 from raiden.constants import GENESIS_BLOCK_NUMBER, UINT256_MAX, Environment, EMPTY_PAYMENT_HASH_INVOICE
-
 from raiden.exceptions import (
     AddressWithoutCode,
     AlreadyRegisteredTokenAddress,
@@ -125,6 +117,15 @@ from raiden.exceptions import (
     RaidenRecoverableError,
     InvalidPaymentIdentifier
 )
+from raiden.lightclient.handlers.light_client_message_handler import LightClientMessageHandler
+from raiden.lightclient.handlers.light_client_service import LightClientService
+from raiden.lightclient.lightclientmessages.light_client_non_closing_balance_proof import \
+    LightClientNonClosingBalanceProof
+from raiden.lightclient.models.light_client_protocol_message import LightClientProtocolMessageType
+from raiden.messages import LockedTransfer, Delivered, RevealSecret, Unlock, SecretRequest, Processed, \
+    LockExpired
+from raiden.rns_constants import RNS_ADDRESS_ZERO
+from raiden.schedulers.setup import setup_schedule_config
 from raiden.transfer import channel, views
 from raiden.transfer.events import (
     EventPaymentReceivedSuccess,
@@ -138,20 +139,8 @@ from raiden.utils import (
     pex,
     sha3,
     typing)
+from raiden.utils.rns import is_rns_address
 from raiden.utils.runnable import Runnable
-
-from eth_utils import (
-    to_canonical_address
-)
-
-from raiden.billing.invoices.constants.invoice_type import InvoiceType
-from raiden.billing.invoices.constants.invoice_status import InvoiceStatus
-from raiden.billing.invoices.decoder.invoice_decoder import get_tags_dict, get_unknown_tags_dict
-
-from dateutil.relativedelta import relativedelta
-from raiden.billing.invoices.util.time_util import is_invoice_expired, UTC_FORMAT
-from raiden.billing.invoices.constants.errors import AUTO_PAY_INVOICE, INVOICE_EXPIRED, INVOICE_PAID
-
 from raiden.utils.signer import recover
 from transport.config import cfg as transport_config
 
@@ -232,7 +221,6 @@ URLS_FN_V1 = [
         InvoiceResource,
     ),
 ]
-
 
 URLS_COMMON_V1 = [
     ("/tokens", TokensResource),
@@ -923,8 +911,8 @@ class RestAPI:
         except (RawTransactionFailed, InvalidPaymentIdentifier) as e:
             return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.BAD_REQUEST, log=log)
         except Exception as e:
-            return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.INTERNAL_SERVER_ERROR, log=log)
-
+            return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.INTERNAL_SERVER_ERROR,
+                                                       log=log)
 
     def get_connection_managers_info(self, registry_address: typing.PaymentNetworkID):
         """Get a dict whose keys are token addresses and whose values are
@@ -1704,7 +1692,7 @@ class RestAPI:
         if not message:
             return ApiErrorBuilder.build_and_log_error(
                 errors="Light Client Message with internal_msg_identifier = {} not found"
-                       .format(internal_msg_identifier),
+                    .format(internal_msg_identifier),
                 status_code=HTTPStatus.BAD_REQUEST,
                 log=log
             )
@@ -2308,7 +2296,8 @@ class RestAPI:
         return api_response("Received, message should be sent to partner")
 
     @requires_api_key
-    def post_unlock_payment_light(self, internal_msg_identifier: int, signed_tx: typing.SignedTransaction, token_address: typing.TokenAddress):
+    def post_unlock_payment_light(self, internal_msg_identifier: int, signed_tx: typing.SignedTransaction,
+                                  token_address: typing.TokenAddress):
         try:
             message = LightClientMessageHandler.get_light_client_protocol_message_by_internal_identifier(
                 internal_msg_identifier=internal_msg_identifier,
@@ -2374,4 +2363,3 @@ class RestAPI:
             return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.NOT_FOUND, log=log)
         except UnhandledLightClient as e:
             return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.FORBIDDEN, log=log)
-
