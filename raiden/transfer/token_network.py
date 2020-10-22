@@ -82,8 +82,19 @@ def get_channels_to_dispatch_statechange(
     state_change: StateChangeWithChannelID,
     token_network_state: TokenNetworkState
 ) -> List[NettingChannelState]:
+    """
+    Retrieve which channels the state_change should be dispatched to.
+    In most situations, the state_change should be dispatched to this node's side of the channel.
+    If this node runs in hub mode, and both sides of the channel are light client handled by this hub,
+    then it's needed to dispatch the state_change to both channel_states (one per light client)
+    :param participant_address: address of the participan that fired the state_change
+    :param state_change: state_change to dispatch
+    :param token_network_state: token network where to look for channels
+    :return: Channel where  the state_change should be dispatched
+    """
     channel_states = []
     ids_to_channels = token_network_state.channelidentifiers_to_channels
+    # is a handled lc or is the node itself'
     participant_is_ours = participant_address in ids_to_channels
     if participant_is_ours:
         channel_state = ids_to_channels[participant_address].get(state_change.channel_identifier)
@@ -101,6 +112,7 @@ def get_channels_to_dispatch_statechange(
             channel_states.append(lc_channel_state)
 
     return channel_states
+
 
 def handle_channel_close(
     token_network_state: TokenNetworkState,
