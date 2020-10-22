@@ -4,8 +4,12 @@ from typing import List, Dict, Any
 from raiden.utils import Address
 from transport.node import Node as TransportNode
 
+from typing import TypeVar, Generic
 
-class Layer(ABC):
+TN = TypeVar('TN', bound=TransportNode)
+
+
+class Layer(ABC, Generic[TN]):
     """
     Layer is an abstraction which centralizes all the transport entities for a Lumino node; it is in effect the
     transport layer for the system.
@@ -13,43 +17,42 @@ class Layer(ABC):
     as well as any nodes registered as light clients to be managed.
     """
 
-    @abstractmethod
     def __init__(self, config: Dict[str, Any]):
         """
         Initialize the transport layer based on the received configuration in the form of an arbitrary dictionary.
-        This constructor should ultimately set the transport nodes for the running node and registered light clients
+        This constructor delegates the construction of the transport nodes for the running node and registered light clients
         in the transport layer.
         """
+        self._full_node = self.construct_full_node(config)
+        self._light_clients = self.construct_light_clients_nodes(config)
+
+    def add_light_client(self, light_client_transport: TN):
+        self.light_clients.append(light_client_transport)
+
+    def remove_light_client(self, light_client_transport: TN):
+        self.light_clients.remove(light_client_transport)
 
     @property
-    @abstractmethod
-    def full_node(self) -> TransportNode:
-        """
-        Return the transport node corresponding to the running Lumino node, acting as a full node or hub.
-        """
+    def full_node(self) -> TN:
+        return self._full_node
 
     @property
-    @abstractmethod
-    def light_clients(self) -> List[TransportNode]:
-        """
-        Return the transport nodes for every light client registered in the running Lumino node.
-        """
+    def light_clients(self) -> List[TN]:
+        return self._light_clients
 
     @staticmethod
     @abstractmethod
-    def new_light_client(address: Address, config: dict, auth_params: dict) -> TransportNode:
+    def new_light_client(address: Address, config: dict, auth_params: dict) -> TN:
+        """ TODO """
+
+    @abstractmethod
+    def construct_full_node(self, config):
         """
-        Instantiate a new transport node for a light client to be registered on the transport layer.
+         This function must return a subtype of TransportNode
         """
 
     @abstractmethod
-    def add_light_client(self, light_client_transport: TransportNode):
+    def construct_light_clients_nodes(self, config):
         """
-        Add a light client transport node to the layer.
-        """
-
-    @abstractmethod
-    def remove_light_client(self, light_client_transport: TransportNode):
-        """
-        Remove a light client transport node from the layer.
+         This function must return a list of objects that are subtype of TransportNode
         """

@@ -1,6 +1,6 @@
 import os
 import sys
-from typing import Dict, Any, List
+from typing import List
 
 import click
 
@@ -17,28 +17,14 @@ from transport.layer import Layer as TransportLayer
 from transport.node import Node as TransportNode
 
 
-class MatrixLayer(TransportLayer):
+class MatrixLayer(TransportLayer[MatrixTransportNode]):
 
-    def __init__(self, config: Dict[str, Any]):
-        from raiden.ui.app import log
+    def construct_full_node(self, config):
+        self._prepare_config(config)
+        return MatrixTransportNode(config["address"], config["transport"]["matrix"])
 
-        if config["transport"]["matrix"].get("available_servers") is None:
-            # fetch list of known servers from raiden-network/raiden-tranport repo
-            available_servers_url = DEFAULT_MATRIX_KNOWN_SERVERS[config["environment_type"]]
-            available_servers = get_matrix_servers(available_servers_url)
-            log.debug("Fetching available matrix servers", available_servers=available_servers)
-            config["transport"]["matrix"]["available_servers"] = available_servers
-
-        # TODO: This needs to be adjusted once #3735 gets implemented
-        # Add PFS broadcast room if enabled
-        if config["services"]["pathfinding_service_address"] is not None:
-            if PATH_FINDING_BROADCASTING_ROOM not in config["transport"]["matrix"]["global_rooms"]:
-                config["transport"]["matrix"]["global_rooms"].append(PATH_FINDING_BROADCASTING_ROOM)
-
-        # Add monitoring service broadcast room if enabled
-        if config["services"]["monitoring_enabled"] is True:
-            config["transport"]["matrix"]["global_rooms"].append(MONITORING_BROADCASTING_ROOM)
-
+    def construct_light_clients_nodes(self, config):
+        self._prepare_config(config)
         try:
 
             database_path = config["database_path"]
@@ -52,7 +38,7 @@ class MatrixLayer(TransportLayer):
 
             light_clients = storage.get_all_light_clients()
 
-            self._light_clients: List[TransportNode] = []
+            result: List[TransportNode] = []
 
             for light_client in light_clients:
                 current_server_name = None
@@ -83,28 +69,32 @@ class MatrixLayer(TransportLayer):
                     auth_params,
                 )
 
-                self._light_clients.append(light_client_transport)
-
-            self._full_node: TransportNode = MatrixTransportNode(config["address"], config["transport"]["matrix"])
-
+                result.append(light_client_transport)
+            return result
         except RaidenError as ex:
             click.secho(f"FATAL: {ex}", fg="red")
             sys.exit(1)
 
-    @property
-    def full_node(self) -> TransportNode:
-        return self._full_node
+    def _prepare_config(self, config):
+        from raiden.ui.app import log
 
-    @property
-    def light_clients(self) -> List[TransportNode]:
-        return self._light_clients
+        if config["transport"]["matrix"].get("available_servers") is None:
+            # fetch list of known servers from raiden-network/raiden-tranport repo
+            available_servers_url = DEFAULT_MATRIX_KNOWN_SERVERS[config["environment_type"]]
+            available_servers = get_matrix_servers(available_servers_url)
+            log.debug("Fetching available matrix servers", available_servers=available_servers)
+            config["transport"]["matrix"]["available_servers"] = available_servers
+
+        # TODO: This needs to be adjusted once #3735 gets implemented
+        # Add PFS broadcast room if enabled
+        if config["services"]["pathfinding_service_address"] is not None:
+            if PATH_FINDING_BROADCASTING_ROOM not in config["transport"]["matrix"]["global_rooms"]:
+                config["transport"]["matrix"]["global_rooms"].append(PATH_FINDING_BROADCASTING_ROOM)
+
+        # Add monitoring service broadcast room if enabled
+        if config["services"]["monitoring_enabled"] is True:
+            config["transport"]["matrix"]["global_rooms"].append(MONITORING_BROADCASTING_ROOM)
 
     @staticmethod
     def new_light_client(address: Address, config: dict, auth_params: dict) -> TransportNode:
         return MatrixLightClientTransportNode(address, config, auth_params)
-
-    def add_light_client(self, light_client_transport: TransportNode):
-        self._light_clients.append(light_client_transport)
-
-    def remove_light_client(self, light_client_transport: TransportNode):
-        self._light_clients.remove(light_client_transport)

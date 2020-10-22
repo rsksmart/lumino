@@ -12,8 +12,6 @@ from definitions import ROOT_DIR
 import json
 from eth_utils import encode_hex
 
-from transport.factory import factory as transport_factory
-
 from raiden.accounts import AccountManager
 from raiden.constants import (
     RAIDEN_DB_VERSION,
@@ -51,6 +49,8 @@ from raiden.utils import BlockNumber, pex, split_endpoint
 from raiden.utils.typing import Address, Optional, PrivateKey, Tuple
 from raiden_contracts.constants import ID_TO_NETWORKNAME
 from raiden_contracts.contract_manager import ContractManager
+
+from transport.factory import Factory
 
 log = structlog.get_logger(__name__)
 
@@ -253,7 +253,7 @@ def run_app(
     discovery = None
     transport_layer = None
     if transport:
-        transport_layer = transport_factory.create(transport, config)
+        transport_layer = Factory.create(transport, config)
     else:
         raise RuntimeError(f'Unknown transport type "{transport}" given')
 

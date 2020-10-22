@@ -29,6 +29,7 @@ from raiden.lightclient.lightclientmessages.light_client_non_closing_balance_pro
 from raiden.lightclient.models.light_client_protocol_message import LightClientProtocolMessageType
 from raiden.messages import LockedTransfer, Delivered, RevealSecret, Unlock, SecretRequest, Processed, \
     LockExpired
+from raiden.network.transport.matrix.layer import MatrixLayer
 from raiden.rns_constants import RNS_ADDRESS_ZERO
 from raiden.utils.rns import is_rns_address
 from webargs.flaskparser import parser
@@ -154,7 +155,6 @@ from raiden.billing.invoices.util.time_util import is_invoice_expired, UTC_FORMA
 from raiden.billing.invoices.constants.errors import AUTO_PAY_INVOICE, INVOICE_EXPIRED, INVOICE_PAID
 
 from raiden.utils.signer import recover
-from transport.factory import factory as transport_factory
 
 log = structlog.get_logger(__name__)
 
@@ -2189,7 +2189,7 @@ class RestAPI:
                 "light_client_display_name": light_client["encrypt_signed_display_name"],
                 "light_client_seed_retry": light_client["encrypt_signed_seed_retry"]
             }
-            light_client_transport = transport_factory.transport_layer.new_light_client(
+            light_client_transport = MatrixLayer.new_light_client(
                 address=light_client["address"],
                 config=config,
                 auth_params=auth_params,
