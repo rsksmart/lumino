@@ -4,7 +4,7 @@ from typing import Dict, Any, List
 from urllib.parse import urlparse
 
 import click
-from eth_utils import to_normalized_address
+from eth_utils import to_normalized_address, decode_hex
 
 from raiden.constants import PATH_FINDING_BROADCASTING_ROOM, MONITORING_BROADCASTING_ROOM
 from raiden.exceptions import RaidenError
@@ -13,8 +13,10 @@ from raiden.network.transport.matrix import MatrixLightClientNode as MatrixLight
 from raiden.network.transport.matrix.utils import get_available_servers_from_config, server_is_available, make_client
 from raiden.settings import DEFAULT_MATRIX_KNOWN_SERVERS
 from raiden.storage import sqlite, serialize
-from raiden.utils import Address, typing
+from raiden.transfer import views
+from raiden.utils import typing
 from raiden.utils.cli import get_matrix_servers
+from raiden.utils.signer import recover
 from transport.layer import Layer as TransportLayer
 from transport.node import Node as TransportNode
 
@@ -95,7 +97,15 @@ class MatrixLayer(TransportLayer):
             click.secho(f"FATAL: {ex}", fg="red")
             sys.exit(1)
 
-    def light_client_onboarding_data(self, address: typing.Address) -> {}:
+    @property
+    def full_node(self) -> TransportNode:
+        return self._full_node
+
+    @property
+    def light_clients(self) -> List[TransportNode]:
+        return self._light_clients
+
+    def light_client_onboarding_data(self, address: typing.Address) -> dict:
         # fetch list of known servers from raiden-network/raiden-tranport repo
         available_servers_url = DEFAULT_MATRIX_KNOWN_SERVERS[self.environment_type]
         available_servers = get_matrix_servers(available_servers_url)
@@ -109,17 +119,67 @@ class MatrixLayer(TransportLayer):
             "seed_retry": "seed",
         }
 
-    @property
-    def full_node(self) -> TransportNode:
-        return self._full_node
+    def register_light_client(self, config: dict, registration_data: dict) -> TransportNode:
+        config = config["matrix"]
 
-    @property
-    def light_clients(self) -> List[TransportNode]:
-        return self._light_clients
+        password = registration_data["password"]
+        signed_password, signed_display_name = registration_data["signed_password"], registration_data[
+            "signed_display_name"]
 
-    @staticmethod
-    def new_light_client(address: Address, config: dict, auth_params: dict) -> TransportNode:
-        return MatrixLightClientTransportNode(address, config, auth_params)
+        # Recover light client address from password and signed_password
+        address_recovered_from_signed_password = recover(
+            data=password.encode(),
+            signature=decode_hex(signed_password)
+        )
+
+        display_name = registration_data["display_name"]
+        # Recover light client address from display and signed_display_name
+        address_recovered_from_signed_display_name = recover(
+            data=display_name.encode(),
+            signature=decode_hex(signed_display_name)
+        )
+
+        seed_retry, signed_seed_retry = registration_data["seed_retry"], registration_data["signed_seed_retry"]
+        # Recover light client address from seed retry and signed_seed_retry
+        address_recovered_from_signed_seed_retry = recover(
+            data=seed_retry.encode(),
+            signature=decode_hex(signed_seed_retry)
+        )
+
+        address = registration_data['address']
+        if address_recovered_from_signed_password != address or \
+            address_recovered_from_signed_display_name != address or \
+            address_recovered_from_signed_seed_retry != address:
+            return None
+
+        light_client = self.raiden_api.save_light_client(
+            address,
+            signed_password,
+            password,
+            signed_display_name,
+            signed_seed_retry
+        )
+
+        if light_client and light_client["result_code"] == 200:
+            auth_params = {
+                "light_client_password": light_client["encrypt_signed_password"],
+                "light_client_display_name": light_client["encrypt_signed_display_name"],
+                "light_client_seed_retry": light_client["encrypt_signed_seed_retry"]
+            }
+            light_client_transport = MatrixLightClientTransportNode(
+                address=light_client["address"],
+                config=config,
+                auth_params=auth_params,
+            )
+
+            self.raiden_api.raiden.start_transport_in_runtime(
+                transport=light_client_transport,
+                chain_state=views.state_from_raiden(self.raiden_api.raiden)
+            )
+
+            self.add_light_client(light_client_transport)
+
+        return light_client
 
     def add_light_client(self, light_client_transport: TransportNode):
         self._light_clients.append(light_client_transport)

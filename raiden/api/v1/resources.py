@@ -535,9 +535,9 @@ class LightClientResource(BaseResource):
     def get(self,
             address: typing.Address = None):
         """
-        This method receives a registration request.
+        This method receives a light client request for onboarding data.
         """
-        return self.rest_api.get_data_for_registration_request(address)
+        return self.rest_api.light_client_onboarding_data(address)
 
     @use_kwargs(post_schema, locations=("json",))
     def post(

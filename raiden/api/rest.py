@@ -2119,74 +2119,19 @@ class RestAPI:
 
         return api_response(invoice)
 
-    def get_data_for_registration_request(self, address):
+    def light_client_onboarding_data(self, address):
         data_to_sign = self.raiden_api.raiden.transport.light_client_onboarding_data(address)
         return api_response(data_to_sign)
 
-    def register_light_client(
-        self,
-        address,
-        signed_password,
-        signed_display_name,
-        signed_seed_retry,
-        password,
-        display_name,
-        seed_retry
-    ):
-        config = self.raiden_api.raiden.config["transport"]["matrix"]
+    def register_light_client(self, registration_data: dict):
+        config = self.raiden_api.raiden.config["transport"]
 
-        # Recover light client address from password and signed_password
-        address_recovered_from_signed_password = recover(
-            data=password.encode(),
-            signature=decode_hex(signed_password)
-        )
-
-        # Recover light client address from display and signed_display_name
-        address_recovered_from_signed_display_name = recover(
-            data=display_name.encode(),
-            signature=decode_hex(signed_display_name)
-        )
-
-        # Recover light client address from seed retry and signed_seed_retry
-        address_recovered_from_signed_seed_retry = recover(
-            data=seed_retry.encode(),
-            signature=decode_hex(signed_seed_retry)
-        )
-
-        if address_recovered_from_signed_password != address or \
-            address_recovered_from_signed_display_name != address or \
-            address_recovered_from_signed_seed_retry != address:
+        light_client = self.raiden_api.raiden.transport.register_light_client(config, registration_data)
+        if not light_client:
             return api_error(
                 errors="The signed data provided is not valid.",
                 status_code=HTTPStatus.CONFLICT,
             )
-
-        light_client = self.raiden_api.register_light_client(
-            address,
-            signed_password,
-            password,
-            signed_display_name,
-            signed_seed_retry
-        )
-
-        if light_client and light_client["result_code"] == 200:
-            auth_params = {
-                "light_client_password": light_client["encrypt_signed_password"],
-                "light_client_display_name": light_client["encrypt_signed_display_name"],
-                "light_client_seed_retry": light_client["encrypt_signed_seed_retry"]
-            }
-            light_client_transport = transport_config.transport_layer.new_light_client(
-                address=light_client["address"],
-                config=config,
-                auth_params=auth_params,
-            )
-
-            self.raiden_api.raiden.start_transport_in_runtime(
-                transport=light_client_transport,
-                chain_state=views.state_from_raiden(self.raiden_api.raiden)
-            )
-
-            self.raiden_api.raiden.transport.add_light_client(light_client_transport)
 
         return api_response(light_client)
 

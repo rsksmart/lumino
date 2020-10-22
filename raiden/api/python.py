@@ -1711,12 +1711,12 @@ class RaidenAPI:
         light_clients = self.raiden.wal.storage.get_all_light_clients()
         return light_clients
 
-    def register_light_client(self,
-                              address,
-                              signed_password,
-                              server_name,
-                              signed_display_name,
-                              signed_seed_retry):
+    def save_light_client(self,
+                          address,
+                          signed_password,
+                          server_name,
+                          signed_display_name,
+                          signed_seed_retry):
 
         address = to_checksum_address(address)
 
