@@ -266,7 +266,7 @@ class MatrixTransport(Runnable):
 
     def __init__(self, address: Address, config: dict, current_server_name: str = None):
         super().__init__()
-        self.address =address
+        self.address = address
         self._config = config
         self._raiden_service: Optional[RaidenService] = None
 
