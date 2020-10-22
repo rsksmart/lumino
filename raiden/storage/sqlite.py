@@ -1,8 +1,9 @@
+import datetime
 import sqlite3
 import threading
 from contextlib import contextmanager
-import datetime
 
+from dateutil.relativedelta import relativedelta
 from eth_utils import to_checksum_address
 
 from raiden.constants import RAIDEN_DB_VERSION, SQLITE_MIN_REQUIRED_VERSION
@@ -11,8 +12,7 @@ from raiden.lightclient.models.client_model import ClientType
 from raiden.storage.serialize import SerializationBase
 from raiden.storage.utils import DB_SCRIPT_CREATE_TABLES, TimestampedEvent
 from raiden.utils import get_system_spec
-from raiden.utils.typing import Any, Dict, Iterator, List, NamedTuple, Optional, Tuple, Union
-from dateutil.relativedelta import relativedelta
+from raiden.utils.typing import Any, Dict, Iterator, List, NamedTuple, Optional, Tuple, Union, SignedTransaction
 
 
 class EventRecord(NamedTuple):
@@ -212,8 +212,22 @@ class SQLiteStorage:
             last_id = cursor.lastrowid
         return last_id
 
+    def is_message_already_stored(self, light_client_address, message_type, unsigned_message):
+        cursor = self.conn.cursor()
+        cursor.execute(
+            """
+            SELECT *
+                FROM light_client_protocol_message lcpm
+                WHERE (lcpm.sender_light_client_address == ? OR lcpm.receiver_light_client_address == ?)
+                AND lcpm.message_type == ?
+                AND lcpm.unsigned_message == ?
+            """,
+            (to_checksum_address(light_client_address), to_checksum_address(light_client_address), str(message_type), str(unsigned_message)))
+
+        return cursor.fetchone()
+
     def is_light_client_protocol_message_already_stored(self, payment_id: int, order: int,
-                                                        message_type: str, message_protocol_type:str):
+                                                        message_type: str, message_protocol_type: str):
         cursor = self.conn.cursor()
         cursor.execute(
             """
@@ -1363,15 +1377,24 @@ class SQLiteStorage:
     def get_light_client_messages(self, from_message, light_client):
         cursor = self.conn.cursor()
         cursor.execute(
-            "SELECT identifier, message_order, unsigned_message, signed_message, light_client_payment_id, internal_msg_identifier, message_type" +
-            " FROM light_client_protocol_message A INNER JOIN light_client_payment B" +
-            " ON A.light_client_payment_id = B.payment_id" +
-            " WHERE A.internal_msg_identifier >= ?" +
-            " AND (A.sender_light_client_address = ?" +
-            " OR A.receiver_light_client_Address = ?)" +
-            "ORDER BY light_client_payment_id, message_order ASC",
+            """
+            SELECT identifier,
+                   message_order,
+                   unsigned_message,
+                   signed_message,
+                   light_client_payment_id,
+                   internal_msg_identifier,
+                   message_type
+            FROM light_client_protocol_message
+            WHERE internal_msg_identifier >= ?
+            AND (sender_light_client_address = ? OR receiver_light_client_Address = ?)
+            AND (
+                message_type NOT IN ('SettlementRequired', 'RequestRegisterSecret', 'UnlockLightRequest')
+                OR signed_message IS NULL
+            )
+            ORDER BY light_client_payment_id, message_order ASC
+            """,
             (from_message, light_client, light_client),
-
         )
         return cursor.fetchall()
 
@@ -1386,6 +1409,27 @@ class SQLiteStorage:
             ORDER BY message_order ASC
             """,
             (str(identifier),),
+        )
+        return cursor.fetchone()
+
+    def get_light_client_protocol_message_by_internal_identifier(self, internal_msg_identifier: int):
+        cursor = self.conn.cursor()
+        cursor.execute(
+            """
+            SELECT identifier,
+                   message_order,
+                   unsigned_message,
+                   signed_message,
+                   light_client_payment_id,
+                   message_type,
+                   internal_msg_identifier,
+                   sender_light_client_address,
+                   receiver_light_client_address
+            FROM light_client_protocol_message
+            WHERE internal_msg_identifier = ?
+            ORDER BY message_order ASC
+            """,
+            (str(internal_msg_identifier),),
         )
         return cursor.fetchone()
 
@@ -1450,7 +1494,7 @@ class SerializedSQLiteStorage(SQLiteStorage):
                      serialized_signed_msg, message[0], message[5], message[6]))
         return result
 
-    def update_light_client_protocol_message_set_signed_data(self, payment_id, msg_order, signed_message, message_type):
+    def update_offchain_light_client_protocol_message_set_signed_message(self, payment_id, msg_order, signed_message, message_type):
         with self.write_lock, self.conn:
             cursor = self.conn.cursor()
             cursor.execute(
@@ -1462,6 +1506,18 @@ class SerializedSQLiteStorage(SQLiteStorage):
 
             last_id = cursor.lastrowid
         return last_id
+
+    def update_onchain_light_client_protocol_message_set_signed_transaction(self,
+                                                                            internal_msg_identifier: int,
+                                                                            signed_message: "SignedTransaction"):
+        return self.update(
+            """
+                UPDATE light_client_protocol_message
+                SET signed_message = ?
+                WHERE internal_msg_identifier = ?;
+            """,
+            (self.serializer.serialize(signed_message), internal_msg_identifier)
+        )
 
     def query_invoice(self, payment_hash_invoice):
         return super().query_invoice(payment_hash_invoice)
@@ -1476,6 +1532,10 @@ class SerializedSQLiteStorage(SQLiteStorage):
         else:
             msg_dto.unsigned_message = serialized_data
         return super().write_light_client_protocol_message(msg_dto)
+
+    def is_message_already_stored(self, light_client_address, message_type, unsigned_message):
+        unsigned_message_string = self.serializer.serialize(unsigned_message)
+        return super().is_message_already_stored(light_client_address, message_type, unsigned_message_string)
 
     def write_state_change(self, state_change, log_time):
         serialized_data = self.serializer.serialize(state_change)
@@ -1600,4 +1660,12 @@ class SerializedSQLiteStorage(SQLiteStorage):
             cursor = self.conn.execute("UPDATE client SET pending_for_deletion = TRUE WHERE address = ?", (address,))
             last_id = cursor.lastrowid
 
+        return last_id
+
+    def update(self, update_sql: str, params: Any) -> int:
+        """ Aux method to generalize the update calls """
+        with self.write_lock, self.conn:
+            cursor = self.conn.cursor()
+            cursor.execute(update_sql, params)
+            last_id = cursor.lastrowid
         return last_id

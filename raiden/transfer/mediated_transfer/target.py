@@ -67,7 +67,7 @@ def events_for_onchain_secretreveal(
     target_state: TargetTransferState,
     channel_state: NettingChannelState,
     block_number: BlockNumber,
-    block_hash: BlockHash,
+    block_hash: BlockHash
 ) -> List[Event]:
     """ Emits the event for revealing the secret on-chain if the transfer
     can not be settled off-chain.
@@ -90,6 +90,7 @@ def events_for_onchain_secretreveal(
             secret=secret,
             expiration=expiration,
             block_hash=block_hash,
+            target_state=target_state
         )
 
     return list()
@@ -181,8 +182,7 @@ def handle_inittarget_light(
     is_valid, channel_events, errormsg, handle_invoice_result = channel.handle_receive_lockedtransfer_light(
         channel_state, transfer, storage
     )
-    print("ESVALIDO LCOKED TRANSFER")
-    print(is_valid)
+
     if is_valid:
         # A valid balance proof does not mean the payment itself is still valid.
         # e.g. the lock may be near expiration or have expired. This is fine. The
@@ -444,6 +444,12 @@ def handle_offchain_secretreveal_light(
     )
 
     if valid_secret and not has_transfer_expired:
+        # TODO the secret should be encrypted with LC's public key
+        channel.register_offchain_secret(
+            channel_state=channel_state,
+            secret=state_change.secret,
+            secrethash=state_change.secrethash,
+        )
 
         route = target_state.route
         target_state.state = TargetTransferState.OFFCHAIN_SECRET_REVEAL
@@ -585,7 +591,7 @@ def handle_block(
     target_state: TargetTransferState,
     channel_state: NettingChannelState,
     block_number: BlockNumber,
-    block_hash: BlockHash,
+    block_hash: BlockHash
 ) -> TransitionResult[TargetTransferState]:
     """ After Raiden learns about a new block this function must be called to
     handle expiration of the hash time lock.
@@ -721,7 +727,7 @@ def state_transition(
             target_state=target_state,
             channel_state=channel_state,
             block_number=state_change.block_number,
-            block_hash=state_change.block_hash,
+            block_hash=state_change.block_hash
         )
     elif type(state_change) == ReceiveSecretReveal:
         assert isinstance(state_change, ReceiveSecretReveal), MYPY_ANNOTATION

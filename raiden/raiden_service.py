@@ -1336,18 +1336,18 @@ class RaidenService(Runnable):
         receiver_is_light_client = self.get_light_client_transport(to_checksum_address(receiver_address)) is not None
         if lc_transport:
             exists = LightClientMessageHandler.is_light_client_protocol_message_already_stored_message_id(
-                delivered.delivered_message_identifier,payment_id, msg_order, self.wal)
+                delivered.delivered_message_identifier, payment_id, msg_order, self.wal)
             if not exists:
                 LightClientMessageHandler.store_light_client_protocol_message(
                     delivered.delivered_message_identifier,
                     delivered,
                     True,
-                    payment_id,
                     sender_address,
                     receiver_address if receiver_is_light_client else None,
                     msg_order,
                     message_type,
-                    self.wal
+                    self.wal,
+                    payment_id
                 )
                 lc_transport.send_for_light_client_with_retry(receiver_address, delivered)
 
@@ -1362,12 +1362,12 @@ class RaidenService(Runnable):
                 processed.message_identifier,
                 processed,
                 True,
-                payment_id,
                 sender_address,
                 receiver_address if receiver_is_light_client else None,
                 msg_order,
                 message_type,
-                self.wal
+                self.wal,
+                payment_id
             )
             lc_transport.send_for_light_client_with_retry(receiver_address, processed)
 
