@@ -3,7 +3,6 @@ from typing import Any
 
 from raiden.message_handler import MessageHandler
 from raiden.messages import Message
-from raiden.raiden_service import RaidenService
 from raiden.utils import Address
 
 
@@ -25,7 +24,7 @@ class Node(ABC):
         self.address = address
 
     @abstractmethod
-    def start(self, raiden_service: RaidenService, message_handler: MessageHandler, prev_auth_data: str):
+    def start(self, raiden_service: 'RaidenService', message_handler: MessageHandler, prev_auth_data: str):
         """
         Start the transport node.
         """
