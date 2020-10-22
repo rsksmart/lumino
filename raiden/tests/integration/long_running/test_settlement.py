@@ -88,7 +88,7 @@ def run_test_settle_is_automatically_called(raiden_network, token_addresses):
     )
 
     channel_state = views.get_channelstate_for(
-        views.state_from_raiden(app0.raiden), registry_address, token_address, app1.raiden.address
+        views.state_from_raiden(app0.raiden), registry_address, token_address, app0.raiden.address, app1.raiden.address
     )
 
     assert channel_state.close_transaction.finished_block_number

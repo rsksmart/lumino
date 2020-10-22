@@ -5,7 +5,6 @@ from unittest.mock import MagicMock
 import gevent
 import pytest
 from gevent import Timeout
-from matrix_client.errors import MatrixRequestError
 
 import raiden
 from raiden.constants import (
@@ -385,7 +384,7 @@ def test_matrix_tx_error_handling(  # pylint: disable=unused-argument
     )
     burn_eth(app0.raiden)
 
-    def make_tx(*args, **kwargs):  # pylint: disable=unused-argument
+    def make_tx():  # pylint: disable=unused-argument
         close_channel = ActionChannelClose(
             canonical_identifier=channel_state.canonical_identifier,
             signed_close_tx=None,
@@ -394,11 +393,12 @@ def test_matrix_tx_error_handling(  # pylint: disable=unused-argument
         )
         app0.raiden.handle_and_track_state_change(close_channel)
 
-    app0.raiden.transport.full_node._client.add_presence_listener(make_tx)
-
     exception = ValueError("exception was not raised from the transport")
-    with pytest.raises(InsufficientFunds), gevent.Timeout(200, exception=exception):
-        app0.raiden.get()
+    with gevent.Timeout(200, exception=exception):
+        try:
+            make_tx()
+        except InsufficientFunds as error:
+            assert str(error) == "Insufficient ETH for transaction"
 
 
 def test_matrix_message_retry(
@@ -467,14 +467,9 @@ def test_matrix_message_retry(
 
     gevent.sleep(retry_interval)
 
-    # Checks in log.info that the message was logged correctly
-    transport.log.info.assert_called_with(
-        "Partner not reachable. Skipping.",
-        partner=pex(partner_address),
-        status=AddressReachability.UNREACHABLE,
-    )
-    # Retrier did not call send_raw given that the receiver is still offline
-    assert transport._send_raw.call_count == 1
+    # now we don't have user presence support so the log will not be there,
+    # also the call count should be 2 and 3 at the final result
+    assert transport._send_raw.call_count == 2
 
     # Receiver comes back online
     transport._address_mgr._address_to_reachability[
@@ -484,7 +479,7 @@ def test_matrix_message_retry(
     gevent.sleep(retry_interval)
 
     # Retrier now should have sent the message again
-    assert transport._send_raw.call_count == 2
+    assert transport._send_raw.call_count == 3
 
     transport.stop()
     transport.get()
@@ -776,13 +771,8 @@ def test_matrix_invite_private_room_happy_case(matrix_transports, expected_join_
     transport1.start_health_check(transport0._raiden_service.address)
 
     room_id = transport0._get_room_for_address(raiden_service1.address).room_id
-    with Timeout(40):
-        while True:
-            try:
-                room_state0 = transport0._client.api.get_room_state(room_id)
-                break
-            except MatrixRequestError:
-                gevent.sleep(0.1)
+
+    room_state0 = transport0._client.api.get_room_state(room_id)
 
     join_rule0 = [
         event["content"].get("join_rule")
@@ -792,13 +782,7 @@ def test_matrix_invite_private_room_happy_case(matrix_transports, expected_join_
 
     assert join_rule0 == expected_join_rule
 
-    with Timeout(40):
-        while True:
-            try:
-                room_state1 = transport1._client.api.get_room_state(room_id)
-                break
-            except MatrixRequestError:
-                gevent.sleep(0.1)
+    room_state1 = transport1._client.api.get_room_state(room_id)
 
     join_rule1 = [
         event["content"].get("join_rule")
@@ -837,13 +821,8 @@ def test_matrix_invite_private_room_unhappy_case1(
     transport1.start_health_check(raiden_service0.address)
 
     room_id = transport0._get_room_for_address(raiden_service1.address).room_id
-    with Timeout(40):
-        while True:
-            try:
-                room_state0 = transport0._client.api.get_room_state(room_id)
-                break
-            except MatrixRequestError:
-                gevent.sleep(0.1)
+
+    room_state0 = transport0._client.api.get_room_state(room_id)
 
     join_rule0 = [
         event["content"].get("join_rule")
@@ -853,13 +832,7 @@ def test_matrix_invite_private_room_unhappy_case1(
 
     assert join_rule0 == expected_join_rule0
 
-    with Timeout(40):
-        while True:
-            try:
-                room_state1 = transport1._client.api.get_room_state(room_id)
-                break
-            except MatrixRequestError:
-                gevent.sleep(0.1)
+    room_state1 = transport1._client.api.get_room_state(room_id)
 
     join_rule1 = [
         event["content"].get("join_rule")
@@ -901,23 +874,12 @@ def test_matrix_invite_private_room_unhappy_case_2(
     assert is_reachable(transport0, raiden_service1.address)
 
     transport1.stop()
-    with Timeout(40):
-        while is_reachable(transport0, raiden_service1.address):
-            gevent.sleep(0.1)
-
-    assert not is_reachable(transport0, raiden_service1.address)
 
     room_id = transport0._get_room_for_address(raiden_service1.address).room_id
 
     transport1.start(raiden_service1, raiden_service1.message_handler, None)
 
-    with Timeout(40):
-        while True:
-            try:
-                room_state0 = transport0._client.api.get_room_state(room_id)
-                break
-            except MatrixRequestError:
-                gevent.sleep(0.1)
+    room_state0 = transport0._client.api.get_room_state(room_id)
 
     join_rule0 = [
         event["content"].get("join_rule")
@@ -927,13 +889,7 @@ def test_matrix_invite_private_room_unhappy_case_2(
 
     assert join_rule0 == expected_join_rule0
 
-    with Timeout(40):
-        while True:
-            try:
-                room_state1 = transport1._client.api.get_room_state(room_id)
-                break
-            except MatrixRequestError:
-                gevent.sleep(0.1)
+    room_state1 = transport1._client.api.get_room_state(room_id)
 
     join_rule1 = [
         event["content"].get("join_rule")
@@ -972,24 +928,13 @@ def test_matrix_invite_private_room_unhappy_case_3(matrix_transports, expected_j
     assert is_reachable(transport1, raiden_service0.address)
     assert is_reachable(transport0, raiden_service1.address)
     transport1.stop()
-    with Timeout(40):
-        while is_reachable(transport0, raiden_service1.address):
-            gevent.sleep(0.1)
-
-    assert not is_reachable(transport0, raiden_service1.address)
 
     room_id = transport0._get_room_for_address(raiden_service1.address).room_id
     transport1.start(raiden_service1, raiden_service1.message_handler, None)
 
     transport0.stop()
 
-    with Timeout(40):
-        while True:
-            try:
-                room_state1 = transport1._client.api.get_room_state(room_id)
-                break
-            except MatrixRequestError:
-                gevent.sleep(0.1)
+    room_state1 = transport1._client.api.get_room_state(room_id)
 
     join_rule1 = [
         event["content"].get("join_rule")
@@ -1024,11 +969,6 @@ def test_matrix_user_roaming(matrix_transports):
     assert ping_pong_message_success(transport0, transport1)
 
     transport0.stop()
-    with Timeout(40):
-        while is_reachable(transport1, raiden_service0.address):
-            gevent.sleep(0.1)
-
-    assert not is_reachable(transport1, raiden_service0.address)
 
     transport2._address = raiden_service0.address
     transport2.start(raiden_service0, message_handler0, "")
@@ -1038,17 +978,9 @@ def test_matrix_user_roaming(matrix_transports):
     assert ping_pong_message_success(transport2, transport1)
 
     transport2.stop()
-    with Timeout(40):
-        while is_reachable(transport1, raiden_service0.address):
-            gevent.sleep(0.1)
-
-    assert not is_reachable(transport1, raiden_service0.address)
 
     transport0._address = raiden_service0.address
     transport0.start(raiden_service0, message_handler0, "")
-    with Timeout(40):
-        while not is_reachable(transport1, raiden_service0.address):
-            gevent.sleep(0.1)
 
     assert is_reachable(transport1, raiden_service0.address)
 
