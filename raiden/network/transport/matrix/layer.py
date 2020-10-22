@@ -1,17 +1,19 @@
 import os
 import sys
 from typing import Dict, Any, List
+from urllib.parse import urlparse
 
 import click
+from eth_utils import to_normalized_address
 
 from raiden.constants import PATH_FINDING_BROADCASTING_ROOM, MONITORING_BROADCASTING_ROOM
 from raiden.exceptions import RaidenError
 from raiden.network.transport import MatrixNode as MatrixTransportNode
 from raiden.network.transport.matrix import MatrixLightClientNode as MatrixLightClientTransportNode
-from raiden.network.transport.matrix.utils import get_available_servers_from_config, server_is_available
+from raiden.network.transport.matrix.utils import get_available_servers_from_config, server_is_available, make_client
 from raiden.settings import DEFAULT_MATRIX_KNOWN_SERVERS
 from raiden.storage import sqlite, serialize
-from raiden.utils import Address
+from raiden.utils import Address, typing
 from raiden.utils.cli import get_matrix_servers
 from transport.layer import Layer as TransportLayer
 from transport.node import Node as TransportNode
@@ -22,9 +24,11 @@ class MatrixLayer(TransportLayer):
     def __init__(self, config: Dict[str, Any]):
         from raiden.ui.app import log
 
+        self.environment_type = config["environment_type"]
+
         if config["transport"]["matrix"].get("available_servers") is None:
             # fetch list of known servers from raiden-network/raiden-tranport repo
-            available_servers_url = DEFAULT_MATRIX_KNOWN_SERVERS[config["environment_type"]]
+            available_servers_url = DEFAULT_MATRIX_KNOWN_SERVERS[self.environment_type]
             available_servers = get_matrix_servers(available_servers_url)
             log.debug("Fetching available matrix servers", available_servers=available_servers)
             config["transport"]["matrix"]["available_servers"] = available_servers
@@ -90,6 +94,20 @@ class MatrixLayer(TransportLayer):
         except RaidenError as ex:
             click.secho(f"FATAL: {ex}", fg="red")
             sys.exit(1)
+
+    def light_client_onboarding_data(self, address: typing.Address) -> {}:
+        # fetch list of known servers from raiden-network/raiden-tranport repo
+        available_servers_url = DEFAULT_MATRIX_KNOWN_SERVERS[self.environment_type]
+        available_servers = get_matrix_servers(available_servers_url)
+
+        client = make_client(available_servers)
+        server_url = client.api.base_url
+        server_name = urlparse(server_url).netloc
+        return {
+            "display_name_to_sign": "@" + to_normalized_address(address) + ":" + server_name,
+            "password_to_sign": server_name,
+            "seed_retry": "seed",
+        }
 
     @property
     def full_node(self) -> TransportNode:

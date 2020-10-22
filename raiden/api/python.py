@@ -1727,19 +1727,6 @@ class RaidenAPI:
         light_clients = self.raiden.wal.storage.get_all_light_clients()
         return light_clients
 
-    def get_data_for_registration_request(self, address):
-        # fetch list of known servers from raiden-network/raiden-tranport repo
-        available_servers_url = DEFAULT_MATRIX_KNOWN_SERVERS[self.raiden.config["environment_type"]]
-        available_servers = get_matrix_servers(available_servers_url)
-        client = make_client(available_servers)
-        server_url = client.api.base_url
-        server_name = urlparse(server_url).netloc
-        data_to_sign = {
-            "display_name_to_sign": "@" + to_normalized_address(address) + ":" + server_name,
-            "password_to_sign": server_name,
-            "seed_retry": "seed"}
-        return data_to_sign
-
     def register_light_client(self,
                               address,
                               signed_password,

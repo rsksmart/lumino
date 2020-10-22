@@ -98,6 +98,7 @@ from raiden.utils.typing import (
 from raiden.utils.upgrades import UpgradeManager
 from raiden_contracts.contract_manager import ContractManager
 from transport.message import Message as TransportMessage
+from transport.layer import Layer as TransportLayer
 
 log = structlog.get_logger(__name__)  # pylint: disable=invalid-name
 StatusesDict = Dict[TargetAddress, Dict[PaymentID, "PaymentStatus"]]
@@ -272,7 +273,7 @@ class RaidenService(Runnable):
         default_secret_registry: SecretRegistry,
         default_service_registry: Optional[ServiceRegistry],
         default_one_to_n_address: Optional[Address],
-        transport,
+        transport: TransportLayer,
         raiden_event_handler,
         message_handler,
         config,
@@ -294,7 +295,7 @@ class RaidenService(Runnable):
         self.signer: Signer = LocalSigner(self.chain.client.privkey)
         self.address = self.signer.address
         self.discovery = discovery
-        self.transport = transport
+        self.transport: TransportLayer = transport
 
         self.user_deposit = user_deposit
 
