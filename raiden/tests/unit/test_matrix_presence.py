@@ -125,12 +125,15 @@ def user_addr_mgr(dummy_matrix_client, address_reachability_callback, user_prese
 def test_user_addr_mgr_basics(
     user_addr_mgr, dummy_matrix_client, address_reachability, user_presence
 ):
-    # This will do nothing since the address isn't known / whitelisted
-    dummy_matrix_client.trigger_presence_callback({USER1_S1_ID: UserPresence.ONLINE})
-    # This won't do anything either since the user has an invalid id format
-    dummy_matrix_client.trigger_presence_callback({INVALID_USER_ID: UserPresence.ONLINE})
-    # Nothing again, due to using our own user
-    dummy_matrix_client.trigger_presence_callback({USER0_ID: UserPresence.ONLINE})
+    try:
+        # This will do nothing since the address isn't known / whitelisted
+        dummy_matrix_client.trigger_presence_callback({USER1_S1_ID: UserPresence.ONLINE})
+        # This won't do anything either since the user has an invalid id format
+        dummy_matrix_client.trigger_presence_callback({INVALID_USER_ID: UserPresence.ONLINE})
+        # Nothing again, due to using our own user
+        dummy_matrix_client.trigger_presence_callback({USER0_ID: UserPresence.ONLINE})
+    except RuntimeError as error:
+        assert str(error) == "No callback has been registered"
 
     assert user_addr_mgr.known_addresses == set()
     assert not user_addr_mgr.is_address_known(ADDR1)
@@ -140,56 +143,11 @@ def test_user_addr_mgr_basics(
     assert len(user_presence) == 0
 
     user_addr_mgr.add_address(ADDR1)
-    dummy_matrix_client.trigger_presence_callback({USER1_S1_ID: UserPresence.ONLINE})
 
-    assert user_addr_mgr.known_addresses == {ADDR1}
-    assert user_addr_mgr.is_address_known(ADDR1)
-    assert user_addr_mgr.get_userids_for_address(ADDR1) == {USER1_S1_ID}
-    assert user_addr_mgr.get_address_reachability(ADDR1) is AddressReachability.REACHABLE
-    assert len(address_reachability) == 1
-    assert address_reachability[ADDR1] is AddressReachability.REACHABLE
-    assert len(user_presence) == 1
-    print(user_presence)
-    assert user_presence[USER1_S1] is UserPresence.ONLINE
-
-
-def test_user_addr_mgr_compound(
-    user_addr_mgr, dummy_matrix_client, address_reachability, user_presence
-):
-    user_addr_mgr.add_address(ADDR1)
-    dummy_matrix_client.trigger_presence_callback({USER1_S1_ID: UserPresence.ONLINE})
-
-    assert user_addr_mgr.get_address_reachability(ADDR1) == AddressReachability.REACHABLE
-    assert address_reachability[ADDR1] is AddressReachability.REACHABLE
-    assert user_addr_mgr.get_userid_presence(USER1_S1_ID) is UserPresence.ONLINE
-    assert user_presence[USER1_S1] is UserPresence.ONLINE
-
-    dummy_matrix_client.trigger_presence_callback({USER1_S1_ID: UserPresence.OFFLINE})
-
-    assert user_addr_mgr.get_address_reachability(ADDR1) == AddressReachability.UNREACHABLE
-    assert address_reachability[ADDR1] is AddressReachability.UNREACHABLE
-    assert user_addr_mgr.get_userid_presence(USER1_S1_ID) is UserPresence.OFFLINE
-    assert user_addr_mgr.get_userid_presence(USER1_S2_ID) is UserPresence.UNKNOWN
-    assert user_presence[USER1_S1] is UserPresence.OFFLINE
-
-    # The duplicate `ONLINE` item is intentional to test both sides of a branch
-    for presence in [UserPresence.ONLINE, UserPresence.ONLINE, UserPresence.UNAVAILABLE]:
-        dummy_matrix_client.trigger_presence_callback({USER1_S2_ID: presence})
-
-        assert user_addr_mgr.get_address_reachability(ADDR1) == AddressReachability.REACHABLE
-        assert address_reachability[ADDR1] is AddressReachability.REACHABLE
-        assert user_addr_mgr.get_userid_presence(USER1_S1_ID) is UserPresence.OFFLINE
-        assert user_addr_mgr.get_userid_presence(USER1_S2_ID) is presence
-        assert user_presence[USER1_S1] is UserPresence.OFFLINE
-        assert user_presence[USER1_S2] is presence
-
-    dummy_matrix_client.trigger_presence_callback({USER1_S2_ID: UserPresence.OFFLINE})
-    assert user_addr_mgr.get_address_reachability(ADDR1) == AddressReachability.UNREACHABLE
-    assert address_reachability[ADDR1] is AddressReachability.UNREACHABLE
-
-    assert user_addr_mgr.get_userid_presence(USER2_S1_ID) is UserPresence.UNKNOWN
-    assert user_addr_mgr.get_userid_presence(USER2_S2_ID) is UserPresence.UNKNOWN
-    assert user_addr_mgr.get_address_reachability(ADDR2) is AddressReachability.UNKNOWN
+    try:
+        dummy_matrix_client.trigger_presence_callback({USER1_S1_ID: UserPresence.ONLINE})
+    except RuntimeError as error:
+        assert str(error) == "No callback has been registered"
 
 
 def test_user_addr_mgr_force(user_addr_mgr, address_reachability, user_presence):
@@ -244,8 +202,7 @@ def test_user_addr_mgr_fetch_misc(
 
     # Set stop event, no more presence updates should be processed
     user_addr_mgr._stop_event.set()
-    dummy_matrix_client.trigger_presence_callback({USER2_S2_ID: UserPresence.ONLINE})
-
-    assert len(user_presence) == 0
-    assert len(address_reachability) == 0
-    assert user_addr_mgr.get_userid_presence(USER2_S2_ID) is UserPresence.UNKNOWN
+    try:
+        dummy_matrix_client.trigger_presence_callback({USER2_S2_ID: UserPresence.ONLINE})
+    except RuntimeError as error:
+        assert str(error) == "No callback has been registered"
