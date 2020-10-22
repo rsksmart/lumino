@@ -1,6 +1,8 @@
+from typing import Union
+
 from eth_utils import to_canonical_address, encode_hex, decode_hex
 
-from raiden.messages import Unlock
+from raiden.messages import Unlock, LockedTransfer
 from raiden.utils import typing
 from raiden.utils.typing import Signature
 
@@ -15,7 +17,7 @@ class LightClientNonClosingBalanceProof:
                  nonce: int,
                  channel_id: int,
                  token_network_address: typing.TokenNetworkAddress,
-                 light_client_balance_proof: Unlock,
+                 light_client_balance_proof: Union[Unlock, LockedTransfer],
                  lc_balance_proof_signature: Signature,
                  internal_bp_identifier: int = None):
         self.sender = sender

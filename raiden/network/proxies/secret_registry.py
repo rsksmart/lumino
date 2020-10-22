@@ -5,6 +5,8 @@ import structlog
 from eth_utils import encode_hex, event_abi_to_log_topic, is_binary_address, to_normalized_address
 from gevent.event import AsyncResult
 from gevent.lock import Semaphore
+from raiden_contracts.constants import CONTRACT_SECRET_REGISTRY, EVENT_SECRET_REVEALED
+from raiden_contracts.contract_manager import ContractManager
 
 from raiden.constants import (
     GAS_REQUIRED_PER_SECRET_IN_BATCH,
@@ -29,8 +31,6 @@ from raiden.utils.typing import (
     SecretHash,
     Union,
 )
-from raiden_contracts.constants import CONTRACT_SECRET_REGISTRY, EVENT_SECRET_REVEALED
-from raiden_contracts.contract_manager import ContractManager
 
 log = structlog.get_logger(__name__)  # pylint: disable=invalid-name
 

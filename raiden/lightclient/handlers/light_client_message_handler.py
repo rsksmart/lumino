@@ -13,7 +13,7 @@ from raiden.messages import Message, LockedTransfer, SecretRequest, RevealSecret
     LockExpired
 from raiden.storage.sqlite import SerializedSQLiteStorage
 from raiden.storage.wal import WriteAheadLog
-from raiden.utils.typing import AddressHex
+from raiden.utils.typing import AddressHex, SignedTransaction
 
 
 def build_light_client_protocol_message(identifier: int, message: Message, signed: bool, payment_id: int,
@@ -45,10 +45,11 @@ class LightClientMessageHandler:
     log = structlog.get_logger(__name__)  # pylint: disable=invalid-name
 
     @classmethod
-    def store_light_client_protocol_message(cls, identifier: int, message: Message, signed: bool, payment_id: int,
+    def store_light_client_protocol_message(cls, identifier: int, message: Message, signed: bool,
                                             sender_light_client_address: AddressHex,
                                             receiver_light_client_address: AddressHex, order: int,
-                                            message_type: LightClientProtocolMessageType, wal: WriteAheadLog):
+                                            message_type: LightClientProtocolMessageType, wal: WriteAheadLog,
+                                            payment_id: int = None):
         return wal.storage.write_light_client_protocol_message(
             message,
             build_light_client_protocol_message(identifier, message, signed,
@@ -57,15 +58,30 @@ class LightClientMessageHandler:
         )
 
     @classmethod
-    def update_stored_msg_set_signed_data(
+    def update_offchain_light_client_protocol_message_set_signed_message(
         cls, message: Message,
         payment_id: int,
         order: int,
         message_type: LightClientProtocolMessageType,
         wal: WriteAheadLog
     ):
-        return wal.storage.update_light_client_protocol_message_set_signed_data(payment_id, order, message,
-                                                                                str(message_type.value))
+        return wal.storage\
+            .update_offchain_light_client_protocol_message_set_signed_message(payment_id,
+                                                                              order,
+                                                                              message,
+                                                                              str(message_type.value))
+
+    @classmethod
+    def update_onchain_light_client_protocol_message_set_signed_transaction(
+        cls,
+        internal_msg_identifier: int,
+        signed_message: "SignedTransaction",
+        wal: WriteAheadLog
+    ):
+        return wal.storage.update_onchain_light_client_protocol_message_set_signed_transaction(
+            internal_msg_identifier=internal_msg_identifier,
+            signed_message=signed_message
+        )
 
     @classmethod
     def store_light_client_payment(cls, payment: LightClientPayment, storage: SerializedSQLiteStorage):
@@ -104,6 +120,18 @@ class LightClientMessageHandler:
         return existing_message
 
     @classmethod
+    def is_message_already_stored(cls,
+                                  light_client_address: AddressHex,
+                                  message_type: LightClientProtocolMessageType,
+                                  unsigned_message: Message,
+                                  wal: WriteAheadLog):
+
+        return message_type and light_client_address and unsigned_message and wal.storage\
+            .is_message_already_stored(light_client_address,
+                                       message_type.value,
+                                       unsigned_message)
+
+    @classmethod
     def is_light_client_protocol_message_already_stored_message_id(cls, message_id: int, payment_id: int, order: int,
                                                                    wal: WriteAheadLog):
         return wal.storage.is_light_client_protocol_message_already_stored_with_message_id(message_id, payment_id,
@@ -122,6 +150,21 @@ class LightClientMessageHandler:
                                           None,
                                           message[6],
                                           message[7])
+
+    @classmethod
+    def get_light_client_protocol_message_by_internal_identifier(cls, internal_msg_identifier: int, wal: WriteAheadLog):
+        message = wal.storage.get_light_client_protocol_message_by_internal_identifier(internal_msg_identifier)
+        if message:
+            return LightClientProtocolMessage(message[3] is not None,
+                                              message[1],
+                                              message[4],
+                                              message[0],
+                                              message[5],
+                                              message[2],
+                                              message[3],
+                                              message[7],
+                                              message[6])
+        return None
 
     @classmethod
     def get_light_client_payment_locked_transfer(cls, payment_identifier: int, wal: WriteAheadLog):
@@ -203,12 +246,12 @@ class LightClientMessageHandler:
                     message_identifier,
                     message,
                     True,
-                    protocol_message.light_client_payment_id,
                     protocol_message.sender_light_client_address,
                     protocol_message.receiver_light_client_address,
                     order,
                     message_type,
-                    wal
+                    wal,
+                    protocol_message.light_client_payment_id
                 )
             else:
                 cls.log.info("Message for lc already received, ignoring db storage")
@@ -279,9 +322,9 @@ class LightClientMessageHandler:
                 message_identifier, protocol_message.light_client_payment_id, order, wal)
             if not exists:
                 LightClientMessageHandler.store_light_client_protocol_message(
-                    message_identifier, message, True, protocol_message.light_client_payment_id,
+                    message_identifier, message, True,
                     protocol_message.sender_light_client_address, protocol_message.receiver_light_client_address, order,
-                    message_type, wal)
+                    message_type, wal, protocol_message.light_client_payment_id)
             else:
                 cls.log.info("Message for lc already received, ignoring db storage")
 
@@ -294,7 +337,10 @@ class LightClientMessageHandler:
     def get_latest_light_client_non_closing_balance_proof(cls, channel_id: int, storage: SerializedSQLiteStorage):
         latest_update_balance_proof_data = storage.get_latest_light_client_non_closing_balance_proof(channel_id)
         if latest_update_balance_proof_data:
-            balance_proof = Unlock.from_dict(json.loads(latest_update_balance_proof_data[7]))
+            balance_proof_dict = json.loads(latest_update_balance_proof_data[7])
+            balance_proof = Unlock.from_dict(balance_proof_dict) \
+                if balance_proof_dict["type"] == "Secret" \
+                else LockedTransfer.from_dict(balance_proof_dict)
             return LightClientNonClosingBalanceProof(latest_update_balance_proof_data[1],
                                                      latest_update_balance_proof_data[2],
                                                      latest_update_balance_proof_data[3],

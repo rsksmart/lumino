@@ -1,8 +1,13 @@
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 import gevent
 import structlog
 from eth_utils import to_checksum_address, encode_hex
+from raiden_contracts.constants import (
+    EVENT_SECRET_REVEALED,
+    EVENT_TOKEN_NETWORK_CREATED,
+    ChannelEvent,
+)
 
 from raiden.blockchain.events import Event
 from raiden.blockchain.state import get_channel_state
@@ -14,7 +19,7 @@ from raiden.network.proxies.utils import get_onchain_locksroots
 from raiden.transfer import views
 from raiden.transfer.architecture import StateChange
 from raiden.transfer.identifiers import CanonicalIdentifier
-from raiden.transfer.state import TokenNetworkState, TransactionChannelNewBalance
+from raiden.transfer.state import TokenNetworkState, TransactionChannelNewBalance, ChainState, NettingChannelState
 from raiden.transfer.state_change import (
     ContractReceiveChannelBatchUnlock,
     ContractReceiveChannelClosed,
@@ -26,17 +31,16 @@ from raiden.transfer.state_change import (
     ContractReceiveRouteNew,
     ContractReceiveSecretReveal,
     ContractReceiveUpdateTransfer,
-    ContractReceiveChannelClosedLight, ContractReceiveChannelSettledLight)
+    ContractReceiveChannelClosedLight,
+    ContractReceiveChannelSettledLight
+)
 from raiden.transfer.utils import (
     get_event_with_balance_proof_by_locksroot,
     get_state_change_with_balance_proof_by_locksroot,
 )
+from raiden.transfer.views import get_token_network_by_identifier
 from raiden.utils import pex, typing
-from raiden_contracts.constants import (
-    EVENT_SECRET_REVEALED,
-    EVENT_TOKEN_NETWORK_CREATED,
-    ChannelEvent,
-)
+from raiden.utils.typing import TokenNetworkID, AddressHex
 
 if TYPE_CHECKING:
     # pylint: disable=unused-import
@@ -327,15 +331,14 @@ def handle_channel_settled(raiden: "RaidenService", event: Event):
     transaction_hash = data["transaction_hash"]
 
     chain_state = views.state_from_raiden(raiden)
-    # TODO fixme mmartinez7 what about when is a light client?
-    channel_state = views.get_channelstate_by_canonical_identifier_and_address(
+    channel_state = get_channelstate_by_canonical_identifier(
         chain_state=chain_state,
         canonical_identifier=CanonicalIdentifier(
             chain_identifier=chain_state.chain_id,
             token_network_address=token_network_identifier,
             channel_identifier=channel_identifier,
         ),
-        address=raiden.address,
+        raiden=raiden
     )
 
     # This may happen for two reasons:
@@ -406,6 +409,27 @@ def handle_channel_settled(raiden: "RaidenService", event: Event):
         )
         raiden.handle_and_track_state_change(channel_settled)
 
+
+def get_our_address_by_canonical_identifier(
+    chain_state: ChainState, canonical_identifier: CanonicalIdentifier, raiden: "RaidenService") -> Optional[AddressHex]:
+    token_network = get_token_network_by_identifier(
+        chain_state, TokenNetworkID(canonical_identifier.token_network_address)
+    )
+    for address, channels in token_network.channelidentifiers_to_channels.items():
+        if canonical_identifier.channel_identifier in channels \
+                and (raiden.address == address or raiden.get_light_client_transport(to_checksum_address(address))):
+            return address
+    return None
+
+
+def get_channelstate_by_canonical_identifier(
+    chain_state: ChainState,
+    canonical_identifier: CanonicalIdentifier,
+    raiden: "RaidenService") -> Optional[NettingChannelState]:
+    address = get_our_address_by_canonical_identifier(chain_state, canonical_identifier, raiden)
+    if not address:
+        return None
+    return views.get_channelstate_by_canonical_identifier_and_address(chain_state,canonical_identifier, address)
 
 
 def handle_channel_batch_unlock(raiden: "RaidenService", event: Event):
