@@ -1356,7 +1356,8 @@ def events_for_close(
             canonical_identifier=channel_state.canonical_identifier,
             balance_proof=balance_proof,
             triggered_by_block_hash=block_hash,
-            signed_close_tx=signed_close_tx
+            signed_close_tx=signed_close_tx,
+            our_address=channel_state.our_state.address
         )
 
         events.append(close_event)
@@ -1561,11 +1562,12 @@ def handle_action_close(
 ) -> TransitionResult[NettingChannelState]:
     msg = "caller must make sure the ids match"
     assert channel_state.identifier == close.channel_identifier, msg
-
-    events = events_for_close(
-        channel_state=channel_state, block_number=block_number, block_hash=block_hash,
-        signed_close_tx=close.signed_close_tx
-    )
+    events = []
+    if close.participant1 == channel_state.our_state.address:
+        events = events_for_close(
+            channel_state=channel_state, block_number=block_number, block_hash=block_hash,
+            signed_close_tx=close.signed_close_tx
+        )
     return TransitionResult(channel_state, events)
 
 
@@ -1877,6 +1879,7 @@ def handle_channel_closed(
                 expiration=expiration,
                 balance_proof=balance_proof,
                 triggered_by_block_hash=state_change.block_hash,
+                our_address=channel_state.our_state.address
             )
             channel_state.update_transaction = TransactionExecutionStatus(
                 started_block_number=state_change.block_number,

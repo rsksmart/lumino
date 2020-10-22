@@ -102,6 +102,7 @@ def get_channels_to_dispatch_statechange(
 
     return channel_states
 
+
 def handle_channel_close(
     token_network_state: TokenNetworkState,
     state_change: ActionChannelClose,
@@ -142,14 +143,6 @@ def handle_channelnew(
     if channel_identifier not in token_network_state.channelidentifiers_to_channels[our_address]:
 
         token_network_state.channelidentifiers_to_channels[our_address][channel_identifier] = channel_state
-
-        #if channel_state.test: ## mismo hub, 2 light clients
-        if partner_address not in token_network_state.channelidentifiers_to_channels:
-            token_network_state.channelidentifiers_to_channels[partner_address] = dict()
-        channel_state_copy = copy.deepcopy(channel_state)
-        channel_state_copy.our_state, channel_state_copy.partner_state = channel_state_copy.partner_state,channel_state_copy.our_state
-        token_network_state.channelidentifiers_to_channels[partner_address][channel_identifier] = channel_state_copy
-
 
         addresses_to_ids = token_network_state.partneraddresses_to_channelidentifiers
         addresses_to_ids[our_address].append(channel_identifier)
@@ -314,14 +307,6 @@ def state_transition(
         assert isinstance(state_change, ActionChannelClose), MYPY_ANNOTATION
         iteration = handle_channel_close(
             token_network_state, state_change, block_number, block_hash
-        )
-    elif type(state_change) == ActionChannelSetFee:
-        assert isinstance(state_change, ActionChannelSetFee), MYPY_ANNOTATION
-        iteration = subdispatch_to_channel_by_id(
-            token_network_state=token_network_state,
-            state_change=state_change,
-            block_number=block_number,
-            block_hash=block_hash,
         )
     elif type(state_change) == ContractReceiveChannelNew:
         assert isinstance(state_change, ContractReceiveChannelNew), MYPY_ANNOTATION
