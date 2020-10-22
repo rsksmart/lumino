@@ -182,8 +182,7 @@ def handle_inittarget_light(
     is_valid, channel_events, errormsg, handle_invoice_result = channel.handle_receive_lockedtransfer_light(
         channel_state, transfer, storage
     )
-    print("ESVALIDO LCOKED TRANSFER")
-    print(is_valid)
+
     if is_valid:
         # A valid balance proof does not mean the payment itself is still valid.
         # e.g. the lock may be near expiration or have expired. This is fine. The

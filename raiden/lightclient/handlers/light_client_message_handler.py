@@ -162,8 +162,9 @@ class LightClientMessageHandler:
                                               message[5],
                                               message[2],
                                               message[3],
+                                              message[6],
                                               message[7],
-                                              message[6])
+                                              message[8])
         return None
 
     @classmethod

@@ -218,16 +218,16 @@ class SQLiteStorage:
             """
             SELECT *
                 FROM light_client_protocol_message lcpm
-                WHERE lcpm.light_client_address == ?
+                WHERE (lcpm.sender_light_client_address == ? OR lcpm.receiver_light_client_address == ?)
                 AND lcpm.message_type == ?
                 AND lcpm.unsigned_message == ?
             """,
-            (to_checksum_address(light_client_address), str(message_type), str(unsigned_message)))
+            (to_checksum_address(light_client_address), to_checksum_address(light_client_address), str(message_type), str(unsigned_message)))
 
         return cursor.fetchone()
 
     def is_light_client_protocol_message_already_stored(self, payment_id: int, order: int,
-                                                        message_type: str, message_protocol_type:str):
+                                                        message_type: str, message_protocol_type: str):
         cursor = self.conn.cursor()
         cursor.execute(
             """
@@ -1422,8 +1422,9 @@ class SQLiteStorage:
                    signed_message,
                    light_client_payment_id,
                    message_type,
-                   light_client_address,
-                   internal_msg_identifier
+                   internal_msg_identifier,
+                   sender_light_client_address,
+                   receiver_light_client_address
             FROM light_client_protocol_message
             WHERE internal_msg_identifier = ?
             ORDER BY message_order ASC
