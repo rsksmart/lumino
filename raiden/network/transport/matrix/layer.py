@@ -6,6 +6,7 @@ from urllib.parse import urlparse
 import click
 from eth_utils import to_normalized_address, decode_hex
 
+from raiden.api.python import RaidenAPI
 from raiden.constants import PATH_FINDING_BROADCASTING_ROOM, MONITORING_BROADCASTING_ROOM
 from raiden.exceptions import RaidenError
 from raiden.network.transport import MatrixNode as MatrixTransportNode
@@ -119,8 +120,8 @@ class MatrixLayer(TransportLayer):
             "seed_retry": "seed",
         }
 
-    def register_light_client(self, config: dict, registration_data: dict) -> TransportNode:
-        config = config["matrix"]
+    def register_light_client(self, raiden_api: RaidenAPI, registration_data: dict) -> TransportNode:
+        config = raiden_api.raiden.config["transport"]["matrix"]
 
         password = registration_data["password"]
         signed_password = registration_data["signed_password"]
@@ -152,7 +153,7 @@ class MatrixLayer(TransportLayer):
             address_recovered_from_signed_seed_retry != address:
             return None
 
-        light_client = self.raiden_api.save_light_client(
+        light_client = raiden_api.save_light_client(
             address,
             signed_password,
             password,
@@ -172,9 +173,9 @@ class MatrixLayer(TransportLayer):
                 auth_params=auth_params,
             )
 
-            self.raiden_api.raiden.start_transport_in_runtime(
+            raiden_api.raiden.start_transport_in_runtime(
                 transport=light_client_transport,
-                chain_state=views.state_from_raiden(self.raiden_api.raiden)
+                chain_state=views.state_from_raiden(raiden_api.raiden)
             )
 
             self.add_light_client(light_client_transport)

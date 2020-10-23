@@ -42,7 +42,7 @@ class Layer(ABC):
         """
 
     @abstractmethod
-    def register_light_client(self, config: dict, registration_data: dict) -> TransportNode:
+    def register_light_client(self, raiden_api: 'RaidenAPI', registration_data: dict) -> TransportNode:
         """
         Register a light client on the transport layer.
         """

@@ -2122,9 +2122,7 @@ class RestAPI:
         return api_response(data_to_sign)
 
     def register_light_client(self, registration_data: dict):
-        config = self.raiden_api.raiden.config["transport"]
-
-        new_light_client = self.raiden_api.raiden.transport.register_light_client(config, registration_data)
+        new_light_client = self.raiden_api.raiden.transport.register_light_client(self.raiden_api, registration_data)
         if not new_light_client:
             return api_error(
                 errors="The signed data provided is not valid.",
