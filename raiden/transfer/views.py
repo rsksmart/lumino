@@ -517,7 +517,10 @@ def get_transfer_role(chain_state: ChainState, node_address: AddressHex, secreth
     in a transfer. If a transfer task is not found for the secrethash then the
     function returns None
     """
-    task = chain_state.payment_mapping[node_address].secrethashes_to_task.get(secrethash)
+    task = None
+    if node_address in chain_state.payment_mapping.keys() \
+       and secrethash in chain_state.payment_mapping[node_address].secrethashes_to_task.keys():
+        task = chain_state.payment_mapping[node_address].secrethashes_to_task.get(secrethash)
     if not task:
         return None
     return role_from_transfer_task(task)

@@ -516,7 +516,8 @@ def subdispatch_targettask(
         if iteration.new_state:
             sub_task = TargetTask(channel_state.canonical_identifier, iteration.new_state)
             chain_state.payment_mapping.setdefault(node_address, PaymentMappingState()).secrethashes_to_task[secrethash] = sub_task
-        elif secrethash in chain_state.payment_mapping[node_address].secrethashes_to_task:
+        elif node_address in chain_state.payment_mapping.keys() and \
+                secrethash in chain_state.payment_mapping[node_address].secrethashes_to_task:
             del chain_state.payment_mapping[node_address].secrethashes_to_task[secrethash]
 
     return TransitionResult(chain_state, events)
