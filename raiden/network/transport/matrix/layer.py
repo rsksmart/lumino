@@ -123,8 +123,8 @@ class MatrixLayer(TransportLayer):
         config = config["matrix"]
 
         password = registration_data["password"]
-        signed_password, signed_display_name = registration_data["signed_password"], registration_data[
-            "signed_display_name"]
+        signed_password = registration_data["signed_password"]
+        signed_display_name = registration_data["signed_display_name"]
 
         # Recover light client address from password and signed_password
         address_recovered_from_signed_password = recover(

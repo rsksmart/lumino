@@ -141,8 +141,6 @@ from raiden.utils import (
     typing)
 from raiden.utils.rns import is_rns_address
 from raiden.utils.runnable import Runnable
-from raiden.utils.signer import recover
-from transport.config import cfg as transport_config
 
 log = structlog.get_logger(__name__)
 
@@ -2126,14 +2124,14 @@ class RestAPI:
     def register_light_client(self, registration_data: dict):
         config = self.raiden_api.raiden.config["transport"]
 
-        light_client = self.raiden_api.raiden.transport.register_light_client(config, registration_data)
-        if not light_client:
+        new_light_client = self.raiden_api.raiden.transport.register_light_client(config, registration_data)
+        if not new_light_client:
             return api_error(
                 errors="The signed data provided is not valid.",
                 status_code=HTTPStatus.CONFLICT,
             )
 
-        return api_response(light_client)
+        return api_response(new_light_client)
 
     def get_light_client_protocol_message(self, from_message: int):
         headers = request.headers

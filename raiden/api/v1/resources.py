@@ -532,32 +532,21 @@ class LightClientResource(BaseResource):
     post_schema = LightClientSchema()
 
     @use_kwargs(get_schema, locations=("query",))
-    def get(self,
-            address: typing.Address = None):
+    def get(self, address: typing.Address = None):
         """
         This method receives a light client request for onboarding data.
         """
-        return self.rest_api.light_client_onboarding_data(address)
+        return self.rest_api.light_client_onboarding_data(
+            address
+        )
 
     @use_kwargs(post_schema, locations=("json",))
-    def post(
-        self,
-        address: typing.Address = None,
-        signed_password: typing.ByteString = None,
-        signed_display_name: typing.ByteString = None,
-        signed_seed_retry: typing.ByteString = None,
-        password: typing.ByteString = None,
-        display_name: typing.ByteString = None,
-        seed_retry: typing.ByteString = None
-    ):
+    def post(self, registration_data: dict):
+        """
+        This method receives a light client request for registration.
+        """
         return self.rest_api.register_light_client(
-            address=address,
-            signed_password=signed_password,
-            signed_display_name=signed_display_name,
-            signed_seed_retry=signed_seed_retry,
-            password=password,
-            display_name=display_name,
-            seed_retry=seed_retry
+            registration_data=registration_data
         )
 
 
