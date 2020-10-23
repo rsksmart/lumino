@@ -151,7 +151,7 @@ class MatrixLayer(TransportLayer):
         if address_recovered_from_signed_password != address or \
             address_recovered_from_signed_display_name != address or \
             address_recovered_from_signed_seed_retry != address:
-            return None
+            return None  # an error has occurred, so no light client is returned
 
         light_client = raiden_api.save_light_client(
             address,
