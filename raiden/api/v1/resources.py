@@ -23,8 +23,8 @@ from raiden.api.v1.encoding import (
     PaymentInvoiceSchema,
     ChannelLightPutSchema,
     ChannelLightPatchSchema,
-    LightClientSchema,
-    LightClientMatrixCredentialsBuildSchema,
+    LightClientRegistrationSchema,
+    LightClientOnboardingDataSchema,
     PaymentLightPutSchema,
     CreatePaymentLightPostSchema,
     WatchtowerPutResource,
@@ -528,8 +528,8 @@ class RegisterSecretLightResource(BaseResource):
 
 
 class LightClientResource(BaseResource):
-    get_schema = LightClientMatrixCredentialsBuildSchema()
-    post_schema = LightClientSchema()
+    get_schema = LightClientOnboardingDataSchema()
+    post_schema = LightClientRegistrationSchema()
 
     @use_kwargs(get_schema, locations=("query",))
     def get(self, address: typing.Address = None):
