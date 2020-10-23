@@ -22,7 +22,7 @@ from raiden.settings import (
     DEFAULT_PATHFINDING_MAX_FEE,
     DEFAULT_PATHFINDING_MAX_PATHS,
     INITIAL_PORT,
-)
+    DEFAULT_RIF_COMMS_GRPC_ENDPOINT)
 from raiden.ui.startup import environment_type_to_contracts_version
 from raiden.utils import get_system_spec
 from raiden.utils.cli import (
@@ -52,10 +52,6 @@ OPTION_DEPENDENCIES: Dict[str, List[Tuple[str, Any]]] = {
     "pathfinding-iou-timeout": [("transport", "matrix"), ("routing-mode", RoutingMode.PFS)],
     "enable-monitoring": [("transport", "matrix")],
     "matrix-server": [("transport", "matrix")],
-    "listen-address": [("transport", "udp")],
-    "max-unresponsive-time": [("transport", "udp")],
-    "send-ping-time": [("transport", "udp")],
-    "nat": [("transport", "udp")],
 }
 
 
@@ -63,6 +59,7 @@ def options(func):
     """Having the common app options as a decorator facilitates reuse."""
     # Until https://github.com/pallets/click/issues/926 is fixed the options need to be re-defined
     # for every use
+
     options_ = [
         option(
             "--datadir",
@@ -343,6 +340,20 @@ def options(func):
             ),
         ),
         option_group(
+            "RIF Comms Transport Options",
+            option(
+                "--grpc-endpoint",
+                help=(
+                    "RIF Comms server to use for communication.\n"
+                    "Valid values:\n"
+                    "A URL pointing to a RIF Comms server"
+                ),
+                default=DEFAULT_RIF_COMMS_GRPC_ENDPOINT,
+                type=str,
+                show_default=True,
+            ),
+        ),
+        option_group(
             "Logging Options",
             option(
                 "--log-config",
@@ -452,7 +463,6 @@ def options(func):
             ),
         ),
     ]
-
     for option_ in reversed(options_):
         func = option_(func)
     return func

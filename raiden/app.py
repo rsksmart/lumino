@@ -28,7 +28,7 @@ from raiden.settings import (
     DEFAULT_TRANSPORT_UDP_RETRY_INTERVAL,
     INITIAL_PORT,
     RED_EYES_CONTRACT_VERSION,
-)
+    DEFAULT_RIF_COMMS_GRPC_ENDPOINT)
 from raiden.utils import pex, typing
 from raiden.utils.typing import Address, Any, Dict
 from raiden_contracts.contract_manager import contracts_precompiled_path
@@ -69,6 +69,9 @@ class App:  # pylint: disable=too-few-public-methods
                 "retry_interval": DEFAULT_TRANSPORT_MATRIX_RETRY_INTERVAL,
                 "server": "auto",
             },
+            "rif_comms": {
+                "grpc_endpoint": DEFAULT_RIF_COMMS_GRPC_ENDPOINT
+            }
         },
         "rpc": True,
         "console": False,

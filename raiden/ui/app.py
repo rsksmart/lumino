@@ -139,6 +139,7 @@ def run_app(
     resolver_endpoint: str,
     routing_mode: RoutingMode,
     config: Dict[str, Any],
+    grpc_endpoint: str,
     **kwargs: Any,  # FIXME: not used here, but still receives stuff in smoketest
 ):
     # pylint: disable=too-many-locals,too-many-branches,too-many-statements,unused-argument
@@ -193,6 +194,7 @@ def run_app(
     config["services"]["pathfinding_max_paths"] = pathfinding_max_paths
     config["services"]["monitoring_enabled"] = enable_monitoring
     config["chain_id"] = network_id
+    config["transport"]["rif_comms"]["grpc_endpoint"] = grpc_endpoint
 
     setup_environment(config, environment_type)
 

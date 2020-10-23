@@ -1,4 +1,5 @@
 from raiden.network.transport.matrix.layer import MatrixLayer as MatrixTransportLayer
+from raiden.network.transport.rif_comms.layer import RifCommsLayer as RifCommsTransportLayer
 
 
 class Factory:
@@ -9,7 +10,7 @@ class Factory:
     @staticmethod
     def create(transport_type : str, config : dict):
         if transport_type == "rif-comms":
-            raise Exception("not implemented yet!")
+            return RifCommsTransportLayer(config)
         elif transport_type == "matrix":
             return MatrixTransportLayer(config)
 
