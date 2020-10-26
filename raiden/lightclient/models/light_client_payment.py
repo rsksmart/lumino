@@ -2,7 +2,7 @@ import string
 from enum import Enum
 from eth_utils import to_checksum_address
 
-from raiden.utils.typing import AddressHex, TokenNetworkID
+from raiden.utils.typing import AddressHex, TokenNetworkID, Address
 
 
 class LightClientPaymentStatus(Enum):
@@ -15,8 +15,6 @@ class LightClientPaymentStatus(Enum):
 
 
 class LightClientPayment:
-    """ Representation of light client message send or received. """
-
     def __init__(
         self,
         partner_address: AddressHex,
@@ -26,10 +24,7 @@ class LightClientPayment:
         created_on: string,
         payment_status: LightClientPaymentStatus,
         identifier: string,
-        # this is only to get easy access to the client, we only query this from DB but is not needed
-        # to create a payment
-        sender_light_client_address: AddressHex = None,
-        receiver_light_client_address: AddressHex = None
+        light_client_address: Address
     ):
         self.payment_id = int(identifier)
         self.partner_address = to_checksum_address(partner_address)
@@ -38,7 +33,8 @@ class LightClientPayment:
         self.amount = amount
         self.created_on = created_on
         self.payment_status = payment_status
-        self.sender_light_client_address = sender_light_client_address
-        self.receiver_light_client_address = receiver_light_client_address
+        self.light_client_address = light_client_address
+
+    """ Representation of light client payment send or received. """
 
 
