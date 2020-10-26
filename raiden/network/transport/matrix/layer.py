@@ -4,7 +4,7 @@ from typing import Dict, Any, List
 from urllib.parse import urlparse
 
 import click
-from eth_utils import to_normalized_address, decode_hex
+from eth_utils import to_normalized_address, decode_hex, remove_0x_prefix
 
 from raiden.api.python import RaidenAPI
 from raiden.constants import PATH_FINDING_BROADCASTING_ROOM, MONITORING_BROADCASTING_ROOM
@@ -147,7 +147,7 @@ class MatrixLayer(TransportLayer):
             signature=decode_hex(signed_seed_retry)
         )
 
-        address = registration_data['address']
+        address = bytearray.fromhex(remove_0x_prefix(registration_data['address']))
         if address_recovered_from_signed_password != address or \
             address_recovered_from_signed_display_name != address or \
             address_recovered_from_signed_seed_retry != address:
