@@ -35,11 +35,16 @@ class Layer(ABC):
         Return the transport nodes for every light client registered in the running Lumino node.
         """
 
-    @staticmethod
     @abstractmethod
-    def new_light_client(address: Address, config: dict, auth_params: dict) -> TransportNode:
+    def light_client_onboarding_data(self, address: Address) -> dict:
         """
-        Instantiate a new transport node for a light client to be registered on the transport layer.
+        Return the onboarding info necessary for registering light clients on the transport layer.
+        """
+
+    @abstractmethod
+    def register_light_client(self, raiden_api: 'RaidenAPI', registration_data: dict) -> TransportNode:
+        """
+        Register a light client on the transport layer.
         """
 
     @abstractmethod
