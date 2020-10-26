@@ -12,6 +12,4 @@ class RifCommsLayer(TransportLayer[RifCommsNode]):
     def construct_light_clients_nodes(self, config):
         pass
 
-    @staticmethod
-    def new_light_client(address: Address, config: dict, auth_params: dict) -> TransportNode:
-        return RifCommsLightClientNode(address, config, auth_params)
+

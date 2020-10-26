@@ -10,7 +10,7 @@ import structlog
 from eth_utils import is_binary_address, to_canonical_address, to_checksum_address
 from gevent import Greenlet
 from gevent.event import AsyncResult, Event
-from raiden.transfer.identifiers import CanonicalIdentifier
+from raiden_contracts.contract_manager import ContractManager
 
 from raiden import constants, routing
 from raiden.blockchain.events import BlockchainEvents
@@ -48,6 +48,7 @@ from raiden.storage import serialize, sqlite, wal
 from raiden.tasks import AlarmTask
 from raiden.transfer import node, views
 from raiden.transfer.architecture import Event as RaidenEvent, StateChange
+from raiden.transfer.identifiers import CanonicalIdentifier
 from raiden.transfer.identifiers import QueueIdentifier
 from raiden.transfer.mediated_transfer.events import SendLockedTransfer, SendLockedTransferLight, \
     CHANNEL_IDENTIFIER_GLOBAL_QUEUE
@@ -94,9 +95,8 @@ from raiden.utils.typing import (
     TokenNetworkAddress,
     TokenNetworkID,
     PaymentHashInvoice, ChannelID)
-
 from raiden.utils.upgrades import UpgradeManager
-from raiden_contracts.contract_manager import ContractManager
+from transport.layer import Layer as TransportLayer
 from transport.message import Message as TransportMessage
 
 log = structlog.get_logger(__name__)  # pylint: disable=invalid-name
@@ -272,7 +272,7 @@ class RaidenService(Runnable):
         default_secret_registry: SecretRegistry,
         default_service_registry: Optional[ServiceRegistry],
         default_one_to_n_address: Optional[Address],
-        transport,
+        transport: TransportLayer,
         raiden_event_handler,
         message_handler,
         config,
@@ -294,7 +294,7 @@ class RaidenService(Runnable):
         self.signer: Signer = LocalSigner(self.chain.client.privkey)
         self.address = self.signer.address
         self.discovery = discovery
-        self.transport = transport
+        self.transport: TransportLayer = transport
 
         self.user_deposit = user_deposit
 

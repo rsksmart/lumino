@@ -40,10 +40,16 @@ class Layer(ABC, Generic[TN]):
     def light_clients(self) -> List[TN]:
         return self._light_clients
 
-    @staticmethod
+    def light_client_onboarding_data(self, address: Address) -> dict:
+        """
+        Return the onboarding info necessary for registering light clients on the transport layer.
+        """
+
     @abstractmethod
-    def new_light_client(address: Address, config: dict, auth_params: dict) -> TN:
-        """ TODO """
+    def register_light_client(self, raiden_api: 'RaidenAPI', registration_data: dict) -> TransportNode:
+        """
+        Register a light client on the transport layer.
+        """
 
     @abstractmethod
     def construct_full_node(self, config):

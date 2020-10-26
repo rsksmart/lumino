@@ -551,14 +551,8 @@ class InvoiceCreateSchema(BaseSchema):
         decoding_class = dict
 
 
-class LightClientSchema(BaseSchema):
-    address = AddressField(required=True)
-    signed_password = fields.String(required=True)
-    signed_display_name = fields.String(required=True)
-    signed_seed_retry = fields.String(required=True)
-    password = fields.String(required=True)
-    display_name = fields.String(required=True)
-    seed_retry = fields.String(required=True)
+class LightClientRegistrationSchema(BaseSchema):
+    registration_data = fields.Dict(required=True)
 
     class Meta:
         strict = True
@@ -575,7 +569,7 @@ class TokenActionRequestSchema(BaseSchema):
         decoding_class = dict
 
 
-class LightClientMatrixCredentialsBuildSchema(BaseSchema):
+class LightClientOnboardingDataSchema(BaseSchema):
     address = AddressField()
 
     class Meta:
