@@ -1,0 +1,13 @@
+============================= test session starts ==============================
+platform linux -- Python 3.7.7, pytest-5.2.0, py-1.9.0, pluggy-0.13.1
+hypothesis profile 'default' -> database=DirectoryBasedExampleDatabase('/home/marcos/rsk/RLP-797/raiden/tests/.hypothesis/examples')
+rootdir: /home/marcos/rsk/RLP-797, inifile: setup.cfg
+plugins: cov-2.5.1, hypothesis-3.88.3, random-0.2, select-0.1.2, timeout-1.3.3
+timeout: 540.0s
+timeout method: signal
+timeout func_only: False
+collected 654 items
+
+test_message_delivered.py .                                              [  0%]
+fuzz/test_state_changes.py FsFF.FFF                                      [  1%]
+integration/test_balance_proof_check.py 

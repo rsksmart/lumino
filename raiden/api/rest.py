@@ -4,7 +4,7 @@ import logging
 import socket
 from datetime import datetime
 from http import HTTPStatus
-from typing import Dict
+from typing import Dict, Union
 
 import gevent
 import gevent.pool
@@ -124,7 +124,6 @@ from raiden.lightclient.lightclientmessages.light_client_non_closing_balance_pro
 from raiden.lightclient.models.light_client_protocol_message import LightClientProtocolMessageType
 from raiden.messages import LockedTransfer, Delivered, RevealSecret, Unlock, SecretRequest, Processed, \
     LockExpired
-from raiden.network.transport.matrix.layer import MatrixLayer
 from raiden.rns_constants import RNS_ADDRESS_ZERO
 from raiden.schedulers.setup import setup_schedule_config
 from raiden.transfer import channel, views
