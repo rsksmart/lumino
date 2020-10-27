@@ -244,6 +244,7 @@ class RaidenEventHandler(EventHandler):
             # payment related message
             existing_message = LightClientMessageHandler.get_message_already_stored_for_payment(
                 message_id=store_message_event.message_id,
+                light_client_address=store_message_event.light_client_address,
                 payment_id=store_message_event.payment_id,
                 order=store_message_event.message_order,
                 message_type=store_message_event.message_type,
@@ -444,6 +445,7 @@ class RaidenEventHandler(EventHandler):
         message = RequestRegisterSecret(raiden.default_secret_registry.address)
         existing_message = LightClientMessageHandler.get_message_already_stored_for_payment(
             message_id=channel_reveal_secret_event.message_id,
+            light_client_address=channel_reveal_secret_event.light_client_address,
             payment_id=channel_reveal_secret_event.payment_identifier,
             order=0,
             message_type=LightClientProtocolMessageType.RequestRegisterSecret,

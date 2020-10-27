@@ -31,15 +31,15 @@ def build_light_client_protocol_message(identifier: int,
         signed_msg = None
         unsigned_msg = message
     return LightClientProtocolMessage(
-        signed,
-        order,
-        payment_id,
-        identifier,
-        message_type,
-        unsigned_msg,
-        signed_msg,
-        None,
-        light_client_address
+        is_signed=signed,
+        message_order=order,
+        light_client_payment_id=payment_id,
+        identifier=identifier,
+        message_type=message_type,
+        unsigned_message=unsigned_msg,
+        signed_message=signed_msg,
+        internal_msg_identifier=None,
+        light_client_address=light_client_address
     )
 
 
@@ -113,6 +113,7 @@ class LightClientMessageHandler:
     @classmethod
     def get_message_already_stored_for_payment(cls,
                                                message_id: int,
+                                               light_client_address: AddressHex,
                                                payment_id: int,
                                                order: int,
                                                message_type: LightClientProtocolMessageType,
@@ -123,7 +124,8 @@ class LightClientMessageHandler:
             payment_id=payment_id,
             order=order,
             message_type=str(message_type.value),
-            message_protocol_type=message_protocol_type
+            message_protocol_type=message_protocol_type,
+            light_client_address=light_client_address
         )
         cls.map_message_from_result(result)
 

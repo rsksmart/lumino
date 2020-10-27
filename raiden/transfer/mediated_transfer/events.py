@@ -21,7 +21,8 @@ from raiden.utils.typing import (
     Secret,
     SecretHash,
     TokenAddress,
-    Optional, AddressHex)
+    Optional
+)
 
 # According to the smart contracts as of 07/08:
 # https://github.com/raiden-network/raiden-contracts/blob/fff8646ebcf2c812f40891c2825e12ed03cc7628/raiden_contracts/contracts/TokenNetwork.sol#L213
