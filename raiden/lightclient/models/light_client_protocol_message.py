@@ -5,7 +5,7 @@ from typing import Any, Dict
 from eth_utils import to_checksum_address, to_canonical_address
 
 from raiden.messages import Message
-from raiden.utils.typing import Address
+from raiden.utils.typing import AddressHex
 
 
 class LightClientProtocolMessageType(Enum):
@@ -28,7 +28,7 @@ class LightClientProtocolMessage:
         light_client_payment_id: int,
         identifier: string,
         message_type: LightClientProtocolMessageType,
-        light_client_address: Address,
+        light_client_address: AddressHex,
         unsigned_message: Message,
         signed_message: Message = None,
         internal_msg_identifier: int = None

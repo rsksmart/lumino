@@ -197,7 +197,7 @@ class SQLiteStorage:
                 "signed_message, "
                 "light_client_payment_id, "
                 "light_client_address)"
-                "VALUES(?, ?, ?, ?, ?, ?, ?, ?)",
+                "VALUES(?, ?, ?, ?, ?, ?, ?)",
                 (str(msg_dto.identifier),
                  msg_dto.message_order,
                  str(msg_dto.message_type.value),
