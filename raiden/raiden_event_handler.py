@@ -250,7 +250,7 @@ class RaidenEventHandler(EventHandler):
                 message_type=store_message_event.message_type,
                 message_protocol_type=store_message_event.message.to_dict()["type"],
                 wal=raiden.wal
-            ) is not None
+            )
         else:
             existing_message = LightClientMessageHandler.get_message_already_stored_by_content(
                 light_client_address=store_message_event.light_client_address,

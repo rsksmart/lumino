@@ -127,7 +127,7 @@ class LightClientMessageHandler:
             message_protocol_type=message_protocol_type,
             light_client_address=light_client_address
         )
-        cls.map_message_from_result(result)
+        return cls.map_message_from_result(result)
 
     @classmethod
     def get_message_already_stored_by_content(cls,
@@ -149,6 +149,7 @@ class LightClientMessageHandler:
                                                                    payment_id: int,
                                                                    order: int,
                                                                    wal: WriteAheadLog):
+        # TODO: Agregar chequeo por lc address o en su defecto por la address que no sea la del sender
         return wal.storage.is_light_client_protocol_message_already_stored_with_message_id(
             message_id=message_id,
             payment_id=payment_id,
@@ -156,10 +157,14 @@ class LightClientMessageHandler:
         )
 
     @classmethod
-    def get_light_client_protocol_message_by_identifier(cls,
-                                                        message_identifier: int,
-                                                        wal: WriteAheadLog):
-        result = wal.storage.get_light_client_protocol_message_by_identifier(message_identifier)
+    def get_message_by_identifier_from_sender(cls,
+                                              message_identifier: int,
+                                              sender_light_client_address: AddressHex,
+                                              wal: WriteAheadLog):
+        result = wal.storage.get_message_by_identifier_from_sender(
+            message_identifier,
+            sender_light_client_address
+        )
         return cls.map_message_from_result(result)
 
     @classmethod
@@ -232,8 +237,11 @@ class LightClientMessageHandler:
         # If exists for that payment, the same message by the order, then discard it.
         message_identifier = message.message_identifier
         # get first principal message by message identifier
-        protocol_message = LightClientMessageHandler.get_light_client_protocol_message_by_identifier(
-            message_identifier, wal)
+        protocol_message = LightClientMessageHandler.get_message_by_identifier_from_sender(
+            message_identifier=message_identifier,
+            sender_light_client_address=message.sender,
+            wal=wal
+        )
         json_message = None
         if protocol_message.signed_message is None:
             json_message = protocol_message.unsigned_message
@@ -294,12 +302,17 @@ class LightClientMessageHandler:
                 return to_checksum_address(delivered_sender) != payment_initiator
 
     @classmethod
-    def store_lc_delivered(cls, message: Delivered, wal: WriteAheadLog):
+    def store_lc_delivered(cls,
+                           message: Delivered,
+                           wal: WriteAheadLog):
         # If exists for that payment, the same message by the order, then discard it.
         message_identifier = message.delivered_message_identifier
         # get first by message identifier
-        protocol_message = LightClientMessageHandler.get_light_client_protocol_message_by_identifier(
-            message_identifier, wal)
+        protocol_message = LightClientMessageHandler.get_message_by_identifier_from_sender(
+            message_identifier=message_identifier,
+            sender_light_client_address=message.sender,
+            wal=wal
+        )
         if protocol_message.signed_message is None:
             json_message = protocol_message.unsigned_message
         else:

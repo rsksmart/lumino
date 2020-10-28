@@ -1414,7 +1414,9 @@ class SQLiteStorage:
         )
         return cursor.fetchall()
 
-    def get_light_client_protocol_message_by_identifier(self, identifier):
+    def get_message_by_identifier_from_sender(self,
+                                              identifier,
+                                              sender_light_client_address):
         cursor = self.conn.cursor()
         cursor.execute(
             """
@@ -1427,10 +1429,10 @@ class SQLiteStorage:
                    light_client_address,
                    internal_msg_identifier
             FROM light_client_protocol_message
-            WHERE identifier = ?
+            WHERE identifier = ? AND light_client_address <> ?
             ORDER BY message_order ASC
             """,
-            (str(identifier),),
+            (str(identifier), to_checksum_address(sender_light_client_address)),
         )
         return cursor.fetchone()
 
