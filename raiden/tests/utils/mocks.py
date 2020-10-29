@@ -3,6 +3,7 @@ from unittest.mock import Mock, patch
 
 import requests
 
+from raiden.messages import Message
 from raiden.storage.serialize import JSONSerializer
 from raiden.storage.sqlite import SerializedSQLiteStorage
 from raiden.storage.wal import WriteAheadLog
@@ -144,9 +145,9 @@ class MockRaidenService:
 
         self.wal.log_and_dispatch(state_change)
 
-    def on_message(self, message):
+    def on_message(self, message: Message, address: Address, is_light_client: bool = False):
         if self.message_handler:
-            self.message_handler.on_message(self, message)
+            self.message_handler.on_message(self, message, address, is_light_client)
 
     def handle_and_track_state_change(self, state_change):
         pass

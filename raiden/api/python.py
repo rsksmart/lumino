@@ -200,7 +200,7 @@ def transfer_tasks_view(
     view = list()
 
     for node_address in payment_mapping.keys():
-        for secrethash, transfer_task in payment_mapping[node_address].items():
+        for secrethash, transfer_task in payment_mapping[node_address].secrethashes_to_task.items():
             transfer, role = get_transfer_from_task(secrethash, transfer_task)
             if transfer is None:
                 continue
