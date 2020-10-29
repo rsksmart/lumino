@@ -471,13 +471,13 @@ def handle_offchain_secretreveal_light(
             light_client_address=target_state.transfer.target
         )
         store_reveal_to_send = StoreMessageEvent(
-            message_identifier,
-            target_state.transfer.payment_identifier,
-            9,
-            reveal_secret_to_send_msg,
-            False,
-            LightClientProtocolMessageType.PaymentSuccessful,
-            target_state.transfer.target
+            message_id=message_identifier,
+            payment_id=target_state.transfer.payment_identifier,
+            message_order=9,
+            message=reveal_secret_to_send_msg,
+            is_signed=False,
+            message_type=LightClientProtocolMessageType.PaymentSuccessful,
+            light_client_address=target_state.transfer.target
         )
 
         iteration = TransitionResult(target_state, [store_received_reveal, store_reveal_to_send])
