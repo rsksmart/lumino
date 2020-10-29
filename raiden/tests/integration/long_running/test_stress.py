@@ -347,7 +347,6 @@ def test_stress(
     port_generator,
     skip_if_not_udp,  # pylint: disable=unused-argument
 ):
-
     config_converter = LogLevelConfigType()
     logging_levels = config_converter.convert(
         value=request.config.option.log_config or "", param=None, ctx=None

@@ -6,10 +6,10 @@ from gevent import server
 from raiden.constants import UINT64_MAX
 from raiden.messages import SecretRequest
 from raiden.network.throttle import TokenBucket
-from transport.udp.udp_transport import UDPTransport
 from raiden.tests.utils.factories import ADDR, UNIT_SECRETHASH, make_address
 from raiden.tests.utils.mocks import MockRaidenService
 from raiden.tests.utils.transport import MockDiscovery
+from transport.udp.udp_transport import UDPTransport
 
 pytestmark = pytest.mark.usefixtures("skip_if_not_udp")
 

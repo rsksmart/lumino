@@ -12,12 +12,6 @@ from raiden import constants
 from raiden.exceptions import InvalidAddress, InvalidProtocolMessage, UnknownAddress
 from raiden.message_handler import MessageHandler
 from raiden.messages import Delivered, Message, Ping, Pong, SignedRetrieableMessage, decode
-from transport.udp import healthcheck
-from transport.udp.udp_utils import (
-    event_first_of,
-    retry_with_recovery,
-    timeout_exponential_backoff,
-)
 from raiden.raiden_service import RaidenService
 from raiden.settings import CACHE_TTL
 from raiden.transfer.identifiers import QueueIdentifier
@@ -36,12 +30,19 @@ from raiden.utils.typing import (
     Tuple,
     UDPMessageID,
 )
+from transport.udp import healthcheck
+from transport.udp.udp_utils import (
+    event_first_of,
+    retry_with_recovery,
+    timeout_exponential_backoff,
+)
 
 log = structlog.get_logger(__name__)  # pylint: disable=invalid-name
 log_healthcheck = structlog.get_logger(__name__ + ".healthcheck")  # pylint: disable=invalid-name
 
 QueueItem_T = Tuple[bytes, MessageID]
 Queue_T = List[QueueItem_T]
+
 
 # GOALS:
 # - Each netting channel must have the messages processed in-order, the

@@ -11,6 +11,8 @@ from matrix_client.user import User
 import transport.matrix.client
 import transport.matrix.utils
 from raiden.exceptions import TransportError
+from raiden.tests.utils.factories import make_signer
+from raiden.utils.signer import recover
 from transport.matrix.utils import (
     join_global_room,
     login_or_register,
@@ -19,8 +21,6 @@ from transport.matrix.utils import (
     sort_servers_closest,
     validate_userid_signature,
 )
-from raiden.tests.utils.factories import make_signer
-from raiden.utils.signer import recover
 
 
 def test_join_global_room():

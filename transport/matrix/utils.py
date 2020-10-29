@@ -277,7 +277,6 @@ def join_global_room(client: GMatrixClient, name: str, servers: Sequence[str] = 
 
 
 def login_or_register_light_client(client: GMatrixClient, **kwargs):
-
     if kwargs['encrypted_light_client_password_signature'] is not None:
         descrypt_light_client_password_signature = \
             decrypt(kwargs['private_key_hub'],
@@ -322,7 +321,6 @@ def _check_previous_login(client: GMatrixClient,
                           prev_access_token: str = None,
                           base_username: str = None,
                           server_name: str = None):
-
     # log.info("User: " + prev_user_id)
     # log.info("Access Token: " + prev_access_token)
 
@@ -364,7 +362,6 @@ def _try_login_or_register(client: GMatrixClient,
                            server_name: str,
                            server_url,
                            seed):
-
     rand = None
     # try login and register on first 5 possible accounts
     for i in range(JOIN_RETRIES):
@@ -413,7 +410,6 @@ def login_or_register(
     prev_user_id: str = None,
     prev_access_token: str = None
 ) -> User:
-
     """Login to a Raiden matrix server with password and displayname proof-of-keys
     - Username is in the format: 0x<eth_address>(.<suffix>)?, where the suffix is not required,
     but a deterministic (per-account) random 8-hex string to prevent DoS by other users registering
@@ -688,5 +684,5 @@ def get_server_url(server_name, available_servers: list):
     """
     for available_server_url in available_servers:
         if ((HTTP_PREFIX + URL_STARTER_PREFIX + server_name) == available_server_url) or \
-           ((HTTPS_PREFIX + URL_STARTER_PREFIX + server_name) == available_server_url):
+            ((HTTPS_PREFIX + URL_STARTER_PREFIX + server_name) == available_server_url):
             return available_server_url
