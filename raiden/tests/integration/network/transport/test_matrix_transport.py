@@ -20,12 +20,10 @@ from raiden.transfer import views
 from raiden.transfer.identifiers import QueueIdentifier
 from raiden.transfer.mediated_transfer.events import CHANNEL_IDENTIFIER_GLOBAL_QUEUE
 from raiden.transfer.state_change import ActionChannelClose, ActionUpdateTransportAuthData
-from raiden.utils import pex
 from raiden.utils.signer import LocalSigner
 from raiden.utils.typing import Address, List, Optional, Union
 from transport.matrix.client import Room
-from transport.matrix.layer import MatrixTransportNode
-from transport.matrix.transport import _RetryQueue
+from transport.matrix.transport import MatrixNode as MatrixTransportNode, _RetryQueue
 from transport.matrix.utils import AddressReachability, make_room_alias
 from transport.message import Message as TransportMessage
 
