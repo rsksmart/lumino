@@ -13,25 +13,25 @@ class RifCommsNode(TransportNode):
         TransportNode.__init__(self, address)
 
     def start(self, raiden_service: RaidenService, message_handler: MessageHandler, prev_auth_data: str):
-        pass
+        raise NotImplementedError
 
     def stop(self):
-        pass
+        raise NotImplementedError
 
     def send_message(self, message: Message, recipient: Address):
-        pass
+        raise NotImplementedError
 
     def start_health_check(self, address: Address):
-        pass
+        raise NotImplementedError
 
     def whitelist(self, address: Address):
-        pass
+        raise NotImplementedError
 
     def link_exception(self, callback: Any):
-        pass
+        raise NotImplementedError
 
     def join(self, timeout=None):
-        pass
+        raise NotImplementedError
 
 
 class RifCommsLightClientNode(RifCommsNode):

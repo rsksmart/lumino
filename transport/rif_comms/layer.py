@@ -8,7 +8,7 @@ from transport.rif_comms.node import RifCommsLightClientNode as RifCommsLightCli
 
 class RifCommsLayer(TransportLayer):
     def __init__(self, config: Dict[str, Any]):
-        pass
+        raise NotImplementedError
 
     @property
     def full_node(self) -> TransportNode:
