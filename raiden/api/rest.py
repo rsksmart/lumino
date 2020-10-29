@@ -893,7 +893,7 @@ class RestAPI:
     @requires_api_key
     def register_secret_light(self, internal_msg_identifier: int, signed_tx: typing.SignedTransaction):
         try:
-            message = LightClientMessageHandler.get_light_client_protocol_message_by_internal_identifier(
+            message = LightClientMessageHandler.get_message_by_internal_identifier(
                 internal_msg_identifier=internal_msg_identifier,
                 wal=self.raiden_api.raiden.wal
             )
@@ -1698,7 +1698,7 @@ class RestAPI:
             )
             return result
 
-        message = LightClientMessageHandler.get_light_client_protocol_message_by_internal_identifier(
+        message = LightClientMessageHandler.get_message_by_internal_identifier(
             internal_msg_identifier=internal_msg_identifier,
             wal=self.raiden_api.raiden.wal
         )
@@ -2298,7 +2298,7 @@ class RestAPI:
     @requires_api_key
     def post_unlock_payment_light(self, internal_msg_identifier: int, signed_tx: typing.SignedTransaction, token_address: typing.TokenAddress):
         try:
-            message = LightClientMessageHandler.get_light_client_protocol_message_by_internal_identifier(
+            message = LightClientMessageHandler.get_message_by_internal_identifier(
                 internal_msg_identifier=internal_msg_identifier,
                 wal=self.raiden_api.raiden.wal
             )
@@ -2316,7 +2316,7 @@ class RestAPI:
                     status_code=HTTPStatus.CONFLICT,
                     log=log
                 )
-                
+
             LightClientMessageHandler.update_onchain_light_client_protocol_message_set_signed_transaction(
                 internal_msg_identifier=internal_msg_identifier,
                 signed_message=signed_tx,

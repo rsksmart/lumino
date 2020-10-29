@@ -73,13 +73,16 @@ class LightClientMessageHandler:
         payment_id: int,
         order: int,
         message_type: LightClientProtocolMessageType,
+        light_client_address: AddressHex,
         wal: WriteAheadLog
     ):
-        return wal.storage\
-            .update_offchain_light_client_protocol_message_set_signed_message(payment_id,
-                                                                              order,
-                                                                              message,
-                                                                              str(message_type.value))
+        return wal.storage.update_offchain_light_client_protocol_message_set_signed_message(
+            payment_id=payment_id,
+            msg_order=order,
+            signed_message=message,
+            message_type=str(message_type.value),
+            light_client_address=light_client_address
+        )
 
     @classmethod
     def update_onchain_light_client_protocol_message_set_signed_transaction(
@@ -111,68 +114,67 @@ class LightClientMessageHandler:
             storage.update_light_client_payment_status(light_client_payment_id=payment_id, status=status)
 
     @classmethod
-    def get_message_already_stored_for_payment(cls,
-                                               message_id: int,
-                                               light_client_address: AddressHex,
-                                               payment_id: int,
-                                               order: int,
-                                               message_type: LightClientProtocolMessageType,
-                                               message_protocol_type: str,
-                                               wal: WriteAheadLog):
-        result = wal.storage.is_light_client_protocol_message_already_stored(
+    def get_message_for_payment(cls,
+                                message_id: int,
+                                light_client_address: AddressHex,
+                                payment_id: int,
+                                order: int,
+                                message_type: LightClientProtocolMessageType,
+                                message_protocol_type: str,
+                                wal: WriteAheadLog):
+        return cls.map_message_from_result(wal.storage.get_message_for_payment(
             message_id=message_id,
             payment_id=payment_id,
             order=order,
             message_type=str(message_type.value),
             message_protocol_type=message_protocol_type,
             light_client_address=light_client_address
-        )
-        return cls.map_message_from_result(result)
+        ))
 
     @classmethod
-    def get_message_already_stored_by_content(cls,
-                                              light_client_address: AddressHex,
-                                              message_type: LightClientProtocolMessageType,
-                                              message: Message,
-                                              wal: WriteAheadLog):
+    def get_message_by_content(cls,
+                               light_client_address: AddressHex,
+                               message_type: LightClientProtocolMessageType,
+                               message: Message,
+                               wal: WriteAheadLog):
 
         if message_type and light_client_address and message:
-            result = wal.storage.is_message_already_stored(light_client_address=light_client_address,
-                                                           message_type=message_type.value,
-                                                           message=message)
-            cls.map_message_from_result(result)
+            cls.map_message_from_result(wal.storage.get_message_by_content(
+                light_client_address=light_client_address,
+                message_type=message_type.value,
+                message=message
+            ))
         return None
 
     @classmethod
-    def is_light_client_protocol_message_already_stored_message_id(cls,
-                                                                   message_id: int,
-                                                                   payment_id: int,
-                                                                   order: int,
-                                                                   wal: WriteAheadLog):
-        # TODO: Agregar chequeo por lc address o en su defecto por la address que no sea la del sender
-        return wal.storage.is_light_client_protocol_message_already_stored_with_message_id(
+    def get_message_for_payment_and_order(cls,
+                                          message_id: int,
+                                          payment_id: int,
+                                          order: int,
+                                          light_client_address: AddressHex,
+                                          wal: WriteAheadLog):
+        return cls.map_message_from_result(wal.storage.get_message_for_payment_and_order(
             message_id=message_id,
             payment_id=payment_id,
-            order=order
-        )
+            order=order,
+            light_client_address=light_client_address
+        ))
 
     @classmethod
-    def get_message_by_identifier_from_sender(cls,
-                                              message_identifier: int,
-                                              sender_light_client_address: AddressHex,
-                                              wal: WriteAheadLog):
-        result = wal.storage.get_message_by_identifier_from_sender(
-            message_identifier,
-            sender_light_client_address
-        )
-        return cls.map_message_from_result(result)
+    def get_message_by_identifier_for_lc(cls,
+                                         message_identifier: int,
+                                         light_client_address: AddressHex,
+                                         wal: WriteAheadLog):
+        return cls.map_message_from_result(wal.storage.get_message_by_identifier_for_lc(
+            identifier=message_identifier,
+            light_client_address=light_client_address
+        ))
 
     @classmethod
-    def get_light_client_protocol_message_by_internal_identifier(cls,
-                                                                 internal_msg_identifier: int,
-                                                                 wal: WriteAheadLog):
-        result = wal.storage.get_light_client_protocol_message_by_internal_identifier(internal_msg_identifier)
-        return cls.map_message_from_result(result)
+    def get_message_by_internal_identifier(cls,
+                                           internal_msg_identifier: int,
+                                           wal: WriteAheadLog):
+        return cls.map_message_from_result(wal.storage.get_message_by_internal_identifier(internal_msg_identifier))
 
     @classmethod
     def map_message_from_result(cls, result: Any) -> Any:
@@ -205,8 +207,7 @@ class LightClientMessageHandler:
 
     @classmethod
     def get_light_client_payment_locked_transfer(cls, payment_identifier: int, wal: WriteAheadLog):
-        result = wal.storage.get_light_client_payment_locked_transfer(payment_identifier)
-        return cls.map_message_from_result(result)
+        return cls.map_message_from_result(wal.storage.get_light_client_payment_locked_transfer(payment_identifier))
 
     @staticmethod
     def get_order_for_ack(ack_parent_type: string, ack_type: string, is_received_delivered: bool = False):
@@ -233,13 +234,13 @@ class LightClientMessageHandler:
         return wal.storage.exists_payment(payment_id)
 
     @classmethod
-    def store_lc_processed(cls, message: Processed, wal: WriteAheadLog):
+    def store_lc_processed(cls, message: Processed, light_client_address: AddressHex, wal: WriteAheadLog):
         # If exists for that payment, the same message by the order, then discard it.
         message_identifier = message.message_identifier
         # get first principal message by message identifier
-        protocol_message = LightClientMessageHandler.get_message_by_identifier_from_sender(
+        protocol_message = LightClientMessageHandler.get_message_by_identifier_for_lc(
             message_identifier=message_identifier,
-            sender_light_client_address=message.sender,
+            light_client_address=light_client_address,
             wal=wal
         )
         json_message = None
@@ -261,10 +262,11 @@ class LightClientMessageHandler:
             cls.log.error("Unable to find principal message for {} {}: ".format(message.__class__.__name__,
                                                                                 message_identifier))
         else:
-            exists = LightClientMessageHandler.is_light_client_protocol_message_already_stored_message_id(
+            exists = LightClientMessageHandler.get_message_for_payment_and_order(
                 message_id=message_identifier,
                 payment_id=protocol_message.light_client_payment_id,
                 order=order,
+                light_client_address=light_client_address,
                 wal=wal
             )
             if not exists:
@@ -272,7 +274,7 @@ class LightClientMessageHandler:
                     identifier=message_identifier,
                     message=message,
                     signed=True,
-                    light_client_address=protocol_message.light_client_address,
+                    light_client_address=light_client_address,
                     order=order,
                     message_type=message_type,
                     wal=wal,
@@ -304,13 +306,14 @@ class LightClientMessageHandler:
     @classmethod
     def store_lc_delivered(cls,
                            message: Delivered,
+                           light_client_address: AddressHex,
                            wal: WriteAheadLog):
         # If exists for that payment, the same message by the order, then discard it.
         message_identifier = message.delivered_message_identifier
         # get first by message identifier
-        protocol_message = LightClientMessageHandler.get_message_by_identifier_from_sender(
+        protocol_message = LightClientMessageHandler.get_message_by_identifier_for_lc(
             message_identifier=message_identifier,
-            sender_light_client_address=message.sender,
+            light_client_address=light_client_address,
             wal=wal
         )
         if protocol_message.signed_message is None:
@@ -348,10 +351,11 @@ class LightClientMessageHandler:
             cls.log.error("Unable to find principal message for {} {}: ".format(message.__class__.__name__,
                                                                                 message_identifier))
         else:
-            exists = LightClientMessageHandler.is_light_client_protocol_message_already_stored_message_id(
+            exists = LightClientMessageHandler.get_message_for_payment_and_order(
                 message_id=message_identifier,
                 payment_id=protocol_message.light_client_payment_id,
                 order=order,
+                light_client_address=light_client_address,
                 wal=wal
             )
             if not exists:
@@ -359,7 +363,7 @@ class LightClientMessageHandler:
                     identifier=message_identifier,
                     message=message,
                     signed=True,
-                    light_client_address=protocol_message.light_client_address,
+                    light_client_address=light_client_address,
                     order=order,
                     message_type=message_type,
                     wal=wal,

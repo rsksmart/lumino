@@ -123,7 +123,7 @@ def unlock_light(raiden: "RaidenService",
         sender=partner,
         merkle_tree_leaves=leaves_packed
     )
-    if not LightClientMessageHandler.get_message_already_stored_by_content(
+    if not LightClientMessageHandler.get_message_by_content(
         light_client_address=channel_unlock_event.client,
         message_type=LightClientProtocolMessageType.UnlockLightRequest,
         message=message,
@@ -242,7 +242,7 @@ class RaidenEventHandler(EventHandler):
         existing_message: LightClientProtocolMessage
         if store_message_event.payment_id:
             # payment related message
-            existing_message = LightClientMessageHandler.get_message_already_stored_for_payment(
+            existing_message = LightClientMessageHandler.get_message_for_payment(
                 message_id=store_message_event.message_id,
                 light_client_address=store_message_event.light_client_address,
                 payment_id=store_message_event.payment_id,
@@ -252,7 +252,7 @@ class RaidenEventHandler(EventHandler):
                 wal=raiden.wal
             )
         else:
-            existing_message = LightClientMessageHandler.get_message_already_stored_by_content(
+            existing_message = LightClientMessageHandler.get_message_by_content(
                 light_client_address=store_message_event.light_client_address,
                 message_type=store_message_event.message_type,
                 message=store_message_event.message,
@@ -266,6 +266,7 @@ class RaidenEventHandler(EventHandler):
                     payment_id=store_message_event.payment_id,
                     order=store_message_event.message_order,
                     message_type=store_message_event.message_type,
+                    light_client_address=store_message_event.light_client_address,
                     wal=raiden.wal
                 )
             else:
@@ -443,7 +444,7 @@ class RaidenEventHandler(EventHandler):
         raiden: "RaidenService", channel_reveal_secret_event: ContractSendSecretRevealLight
     ):
         message = RequestRegisterSecret(raiden.default_secret_registry.address)
-        existing_message = LightClientMessageHandler.get_message_already_stored_for_payment(
+        existing_message = LightClientMessageHandler.get_message_for_payment(
             message_id=channel_reveal_secret_event.message_id,
             light_client_address=channel_reveal_secret_event.light_client_address,
             payment_id=channel_reveal_secret_event.payment_identifier,
@@ -827,7 +828,7 @@ class RaidenEventHandler(EventHandler):
 
         log.debug("Storing light client message to require settle")
 
-        message_already_stored = LightClientMessageHandler.get_message_already_stored_by_content(
+        message_already_stored = LightClientMessageHandler.get_message_by_content(
             light_client_address=payment_channel.participant1,
             message_type=LightClientProtocolMessageType.SettlementRequired,
             message=message,

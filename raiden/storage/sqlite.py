@@ -209,10 +209,10 @@ class SQLiteStorage:
             last_id = cursor.lastrowid
         return last_id
 
-    def is_message_already_stored(self,
-                                  light_client_address,
-                                  message_type,
-                                  unsigned_message):
+    def get_message_by_content(self,
+                               light_client_address,
+                               message_type,
+                               unsigned_message):
         cursor = self.conn.cursor()
         cursor.execute(
             """
@@ -226,13 +226,13 @@ class SQLiteStorage:
 
         return cursor.fetchone()
 
-    def is_light_client_protocol_message_already_stored(self,
-                                                        message_id: int,
-                                                        payment_id: int,
-                                                        order: int,
-                                                        message_type: str,
-                                                        message_protocol_type: str,
-                                                        light_client_address: Any):
+    def get_message_for_payment(self,
+                                message_id: int,
+                                payment_id: int,
+                                order: int,
+                                message_type: str,
+                                message_protocol_type: str,
+                                light_client_address: str):
         cursor = self.conn.cursor()
         cursor.execute(
             """
@@ -266,10 +266,11 @@ class SQLiteStorage:
 
         return cursor.fetchone()
 
-    def is_light_client_protocol_message_already_stored_with_message_id(self,
-                                                                        message_id: int,
-                                                                        payment_id: int,
-                                                                        order: int):
+    def get_message_for_payment_and_order(self,
+                                          message_id: int,
+                                          payment_id: int,
+                                          order: int,
+                                          light_client_address: str):
         cursor = self.conn.cursor()
         cursor.execute(
             """
@@ -277,9 +278,10 @@ class SQLiteStorage:
                 FROM light_client_protocol_message
                 WHERE identifier = ?
                 AND light_client_payment_id = ?
-                AND message_order = ?;
+                AND message_order = ?
+                AND light_client_address = ?;
             """,
-            (str(message_id), str(payment_id), order)
+            (str(message_id), str(payment_id), order, to_checksum_address(light_client_address))
         )
 
         return cursor.fetchone()
@@ -1414,9 +1416,9 @@ class SQLiteStorage:
         )
         return cursor.fetchall()
 
-    def get_message_by_identifier_from_sender(self,
-                                              identifier,
-                                              sender_light_client_address):
+    def get_message_by_identifier_for_lc(self,
+                                         identifier,
+                                         light_client_address):
         cursor = self.conn.cursor()
         cursor.execute(
             """
@@ -1429,14 +1431,14 @@ class SQLiteStorage:
                    light_client_address,
                    internal_msg_identifier
             FROM light_client_protocol_message
-            WHERE identifier = ? AND light_client_address <> ?
+            WHERE identifier = ? AND light_client_address = ?
             ORDER BY message_order ASC
             """,
-            (str(identifier), to_checksum_address(sender_light_client_address)),
+            (str(identifier), to_checksum_address(light_client_address)),
         )
         return cursor.fetchone()
 
-    def get_light_client_protocol_message_by_internal_identifier(self, internal_msg_identifier: int):
+    def get_message_by_internal_identifier(self, internal_msg_identifier: int):
         cursor = self.conn.cursor()
         cursor.execute(
             """
@@ -1536,7 +1538,8 @@ class SerializedSQLiteStorage(SQLiteStorage):
                                                                          payment_id,
                                                                          msg_order,
                                                                          signed_message,
-                                                                         message_type):
+                                                                         message_type,
+                                                                         light_client_address):
         with self.write_lock, self.conn:
             cursor = self.conn.cursor()
             cursor.execute(
@@ -1545,9 +1548,14 @@ class SerializedSQLiteStorage(SQLiteStorage):
                 SET signed_message = ?
                 WHERE light_client_payment_id = ?
                 AND message_order = ?
-                AND message_type = ?;
+                AND message_type = ?
+                AND light_client_address = ?;
                 """,
-                (self.serializer.serialize(signed_message), str(payment_id), msg_order, message_type)
+                (self.serializer.serialize(signed_message),
+                 str(payment_id),
+                 msg_order,
+                 message_type,
+                 to_checksum_address(light_client_address))
             )
 
             last_id = cursor.lastrowid
@@ -1579,9 +1587,9 @@ class SerializedSQLiteStorage(SQLiteStorage):
             msg_dto.unsigned_message = serialized_data
         return super().write_light_client_protocol_message(msg_dto)
 
-    def is_message_already_stored(self, light_client_address, message_type, message):
+    def get_message_by_content(self, light_client_address, message_type, message):
         message_string = self.serializer.serialize(message)
-        return super().is_message_already_stored(light_client_address, message_type, message_string)
+        return super().get_message_by_content(light_client_address, message_type, message_string)
 
     def write_state_change(self, state_change, log_time):
         serialized_data = self.serializer.serialize(state_change)

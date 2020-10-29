@@ -1330,10 +1330,11 @@ class RaidenService(Runnable):
         lc_transport = self.get_light_client_transport(to_checksum_address(sender_address))
         # check if receiver is a handled light client too
         if lc_transport:
-            exists = LightClientMessageHandler.is_light_client_protocol_message_already_stored_message_id(
+            exists = LightClientMessageHandler.get_message_for_payment_and_order(
                 message_id=delivered.delivered_message_identifier,
                 payment_id=payment_id,
                 order=msg_order,
+                light_client_address=sender_address,
                 wal=self.wal
             )
             if not exists:

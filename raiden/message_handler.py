@@ -67,11 +67,11 @@ class MessageHandler:
 
         elif type(message) == Delivered:
             assert isinstance(message, Delivered), MYPY_ANNOTATION
-            self.handle_message_delivered(raiden, message, is_light_client)
+            self.handle_message_delivered(raiden, message, node_address, is_light_client)
 
         elif type(message) == Processed:
             assert isinstance(message, Processed), MYPY_ANNOTATION
-            self.handle_message_processed(raiden, message, is_light_client)
+            self.handle_message_processed(raiden, message, node_address, is_light_client)
         else:
             log.error("Unknown message cmdid {}".format(message.cmdid))
 
@@ -225,15 +225,15 @@ class MessageHandler:
             raiden.mediate_mediated_transfer(message)
 
     @classmethod
-    def handle_message_processed(cls, raiden: RaidenService, message: Processed, is_light_client: bool = False) -> None:
+    def handle_message_processed(cls, raiden: RaidenService, message: Processed, address: Address, is_light_client: bool = False) -> None:
         processed = ReceiveProcessed(message.sender, message.message_identifier)
         raiden.handle_and_track_state_change(processed)
         if is_light_client:
-            LightClientMessageHandler.store_lc_processed(message, raiden.wal)
+            LightClientMessageHandler.store_lc_processed(message, address, raiden.wal)
 
     @classmethod
-    def handle_message_delivered(cls, raiden: RaidenService, message: Delivered, is_light_client: bool = False) -> None:
+    def handle_message_delivered(cls, raiden: RaidenService, message: Delivered, address: Address, is_light_client: bool = False) -> None:
         delivered = ReceiveDelivered(message.sender, message.delivered_message_identifier)
         raiden.handle_and_track_state_change(delivered)
         if is_light_client:
-            LightClientMessageHandler.store_lc_delivered(message, raiden.wal)
+            LightClientMessageHandler.store_lc_delivered(message, address, raiden.wal)
