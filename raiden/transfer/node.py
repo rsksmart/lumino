@@ -214,19 +214,10 @@ def subdispatch_to_paymenttask(
     block_hash = chain_state.block_hash
     sub_task = None
 
-    for address in chain_state.payment_mapping.keys():
-        print(f"ADDRESS WITH PAYMENT MAPPING {to_checksum_address(address)}")
-        for hash_value in chain_state.payment_mapping[address].secrethashes_to_task.keys():
-            print(f"HASH WITH TASK {hash_value}")
-
-    print(f"NODE ADDRESS TO USE {to_checksum_address(node_address)}")
-
     node_payment_mapping = chain_state.payment_mapping.get(node_address)
 
     if node_payment_mapping:
         sub_task = chain_state.payment_mapping[node_address].secrethashes_to_task.get(secrethash)
-
-    print(f"subtask = {sub_task}")
 
     events: List[Event] = list()
     if sub_task:
