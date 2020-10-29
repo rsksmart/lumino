@@ -1483,7 +1483,9 @@ class SQLiteStorage:
         with self.write_lock, self.conn:
             self.conn.execute("DELETE FROM light_client_balance_proof WHERE channel_id = ?", (channel_id,))
 
-    def get_light_client_payment_locked_transfer(self, payment_identifier):
+    def get_light_client_payment_locked_transfer(self,
+                                                 payment_identifier,
+                                                 light_client_address):
         cursor = self.conn.cursor()
         cursor.execute(
             """
@@ -1495,12 +1497,12 @@ class SQLiteStorage:
                    message_type,
                    light_client_address,
                    internal_msg_identifier
-            FROM light_client_protocol_message A
-            INNER JOIN light_client_payment B ON A.light_client_payment_id = B.payment_id
-            WHERE A.message_order = 1
-            AND B.payment_id = ?
+            FROM light_client_protocol_message
+            WHERE message_order = 1
+            AND light_client_payment_id = ?
+            AND light_client_address = ?
             """,
-            (str(payment_identifier),),
+            (str(payment_identifier), to_checksum_address(light_client_address)),
         )
         return cursor.fetchone()
 

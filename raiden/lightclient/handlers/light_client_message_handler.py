@@ -206,8 +206,14 @@ class LightClientMessageHandler:
         return None
 
     @classmethod
-    def get_light_client_payment_locked_transfer(cls, payment_identifier: int, wal: WriteAheadLog):
-        return cls.map_message_from_result(wal.storage.get_light_client_payment_locked_transfer(payment_identifier))
+    def get_light_client_payment_locked_transfer(cls,
+                                                 payment_identifier: int,
+                                                 light_client_address: AddressHex,
+                                                 wal: WriteAheadLog):
+        return cls.map_message_from_result(wal.storage.get_light_client_payment_locked_transfer(
+            payment_identifier=payment_identifier,
+            light_client_address=light_client_address
+        ))
 
     @staticmethod
     def get_order_for_ack(ack_parent_type: string, ack_type: string, is_received_delivered: bool = False):
@@ -337,7 +343,10 @@ class LightClientMessageHandler:
         if not first_message_is_lt:
             # get lt to get the payment identifier
             locked_transfer = LightClientMessageHandler.get_light_client_payment_locked_transfer(
-                protocol_message.light_client_payment_id, wal)
+                payment_identifier=protocol_message.light_client_payment_id,
+                light_client_address=light_client_address,
+                wal=wal
+            )
             received_delivered = cls.is_received_delivered(locked_transfer, delivered_sender)
         else:
             # message is the lt

@@ -423,6 +423,7 @@ def handle_offchain_secretreveal_light(
     target_state: TargetTransferState,
     state_change: ReceiveSecretRevealLight,
     channel_state: NettingChannelState,
+    pseudo_random_generator: random.Random,
     block_number: BlockNumber,
 ) -> TransitionResult[TargetTransferState]:
     """ Validates and handles a ReceiveSecretReveal state change. """
@@ -443,12 +444,22 @@ def handle_offchain_secretreveal_light(
             secrethash=state_change.secrethash,
         )
 
+        route = target_state.route
+        message_identifier = message_identifier_from_prng(pseudo_random_generator)
         target_state.state = TargetTransferState.OFFCHAIN_SECRET_REVEAL
         target_state.secret = state_change.secret
+        recipient = route.node_address
 
         # Store reveal secret 7, create reveal secret 9 and store it for LC signing.
 
         received_reveal_secret = state_change.secret_reveal_message
+        reveal_secret_to_send_event = SendSecretReveal(
+            recipient=recipient,
+            channel_identifier=CHANNEL_IDENTIFIER_GLOBAL_QUEUE,
+            message_identifier=message_identifier,
+            secret=target_state.secret,
+        )
+        reveal_secret_to_send_msg = message_from_sendevent(reveal_secret_to_send_event)
 
         store_received_reveal = StoreMessageEvent(
             message_id=received_reveal_secret.message_identifier,
@@ -459,8 +470,17 @@ def handle_offchain_secretreveal_light(
             message_type=LightClientProtocolMessageType.PaymentSuccessful,
             light_client_address=target_state.transfer.target
         )
+        store_reveal_to_send = StoreMessageEvent(
+            message_identifier,
+            target_state.transfer.payment_identifier,
+            9,
+            reveal_secret_to_send_msg,
+            False,
+            LightClientProtocolMessageType.PaymentSuccessful,
+            target_state.transfer.target
+        )
 
-        iteration = TransitionResult(target_state, [store_received_reveal])
+        iteration = TransitionResult(target_state, [store_received_reveal, store_reveal_to_send])
 
     else:
         # TODO: event for byzantine behavior
@@ -730,7 +750,8 @@ def state_transition(
             target_state=target_state,
             state_change=state_change,
             channel_state=channel_state,
-            block_number=block_number
+            pseudo_random_generator=pseudo_random_generator,
+            block_number=block_number,
         )
     elif type(state_change) == ContractReceiveSecretReveal:
         assert isinstance(state_change, ContractReceiveSecretReveal), MYPY_ANNOTATION
