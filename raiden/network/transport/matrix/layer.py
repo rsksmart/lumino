@@ -77,8 +77,8 @@ class MatrixLayer(TransportLayer):
                                  light_client["address"])
                         continue
 
-                config = config["transport"]["matrix"]
-                config["current_server_name"] = current_server_name
+                matrix_config = config["transport"]["matrix"]
+                matrix_config["current_server_name"] = current_server_name
                 auth_params = {
                     "light_client_password": light_client["password"],
                     "light_client_display_name": light_client["display_name"],
@@ -86,7 +86,7 @@ class MatrixLayer(TransportLayer):
                 }
                 light_client_transport = MatrixLightClientTransportNode(
                     light_client['address'],
-                    config,
+                    matrix_config,
                     auth_params,
                 )
 
