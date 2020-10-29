@@ -582,8 +582,8 @@ def run_test_clear_closed_queue(raiden_network, token_addresses, network_wait):
         secret=secret,
     )
 
-    app1.raiden.transport.hub_transport.stop()
-    app1.raiden.transport.hub_transport.get()
+    app1.raiden.transport.full_node.stop()
+    app1.raiden.transport.full_node.get()
 
     # make sure to wait until the queue is created
     def has_initiator_events():

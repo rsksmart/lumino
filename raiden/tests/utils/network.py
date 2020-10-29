@@ -10,7 +10,8 @@ from raiden.app import App
 from raiden.network.blockchain_service import BlockChainService
 from raiden.network.rpc.client import JSONRPCClient
 from raiden.network.throttle import TokenBucket
-from raiden.network.transport import MatrixTransport, UDPTransport
+from raiden.network.transport import UDPTransport
+from raiden.network.transport.matrix.layer import MatrixLayer as MatrixTransportLayer
 from raiden.raiden_event_handler import RaidenEventHandler
 from raiden.settings import DEFAULT_NUMBER_OF_BLOCK_CONFIRMATIONS, DEFAULT_RETRY_TIMEOUT
 from raiden.tests.utils.app import database_from_privatekey
@@ -18,7 +19,6 @@ from raiden.tests.utils.factories import UNIT_CHAIN_ID
 from raiden.tests.utils.protocol import HoldRaidenEventHandler, WaitForMessage
 from raiden.transfer.identifiers import CanonicalIdentifier
 from raiden.transfer.views import state_from_raiden
-from raiden.ui.app import _setup_matrix
 from raiden.utils import BlockNumber, merge_dict, pex
 from raiden.utils.typing import Address, Optional
 from raiden.waiting import wait_for_payment_network
@@ -297,6 +297,7 @@ def create_apps(
         database_path = database_from_privatekey(base_dir=database_basedir, app_number=idx)
 
         config = {
+            "address": address,
             "chain_id": chain_id,
             "environment_type": environment_type,
             "unrecoverable_error_should_crash": unrecoverable_error_should_crash,
@@ -363,7 +364,7 @@ def create_apps(
             user_deposit = blockchain.user_deposit(user_deposit_address)
 
         if use_matrix:
-            transport = _setup_matrix(config)
+            transport = MatrixTransportLayer(config)
         else:
             throttle_policy = TokenBucket(
                 config["transport"]["udp"]["throttle_capacity"],

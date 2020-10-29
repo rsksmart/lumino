@@ -1,7 +1,7 @@
 import pytest
 
 from raiden.constants import DISCOVERY_DEFAULT_ROOM, PATH_FINDING_BROADCASTING_ROOM
-from raiden.network.transport import MatrixTransport
+from raiden.network.transport import MatrixNode as MatrixTransportNode
 from raiden.tests.fixtures.variables import TransportProtocol
 from raiden.tests.utils.transport import generate_synapse_config, matrix_server_starter
 
@@ -62,7 +62,8 @@ def matrix_transports(
     for transport_index in range(number_of_transports):
         server = local_matrix_servers[transport_index % len(local_matrix_servers)]
         transports.append(
-            MatrixTransport(
+            MatrixTransportNode(
+                bytearray(),  # must be set before starting the transport
                 {
                     "global_rooms": global_rooms,
                     "retries_before_backoff": retries_before_backoff,

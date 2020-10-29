@@ -1,5 +1,3 @@
-
-
 import random
 
 import gevent
@@ -90,7 +88,7 @@ def run_test_settle_is_automatically_called(raiden_network, token_addresses):
     )
 
     channel_state = views.get_channelstate_for(
-        views.state_from_raiden(app0.raiden), registry_address, token_address, app1.raiden.address
+        views.state_from_raiden(app0.raiden), registry_address, token_address, app0.raiden.address, app1.raiden.address
     )
 
     assert channel_state.close_transaction.finished_block_number
@@ -563,7 +561,7 @@ def run_test_automatic_secret_registration(raiden_chain, token_addresses):
 
     # Stop app0 to avoid sending the unlock, this must be done after the locked
     # transfer is sent.
-    app0.raiden.transport.hub_transport.stop()
+    app0.raiden.transport.full_node.stop()
 
     reveal_secret = RevealSecret(message_identifier=random.randint(0, UINT64_MAX), secret=secret)
     app0.raiden.sign(reveal_secret)
@@ -947,4 +945,3 @@ def run_test_batch_unlock_after_restart(raiden_network, token_addresses, deposit
             participant=alice_bob_channel_state.partner_state.address,
             partner=alice_bob_channel_state.our_state.address,
         )
-

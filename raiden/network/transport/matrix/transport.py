@@ -10,13 +10,12 @@ from gevent.event import Event
 from gevent.lock import Semaphore
 from gevent.queue import JoinableQueue
 from matrix_client.errors import MatrixRequestError
-
 from raiden.constants import DISCOVERY_DEFAULT_ROOM
 from raiden.exceptions import InvalidAddress, UnknownAddress, UnknownTokenAddress
 from raiden.message_handler import MessageHandler
 from raiden.messages import (
-    Delivered,
     Message,
+    Delivered,
     Ping,
     Pong,
     Processed,
@@ -74,6 +73,8 @@ from raiden.utils.typing import (
     Union,
     cast,
 )
+from transport.node import Node as TransportNode
+from transport.message import Message as TransportMessage
 
 log = structlog.get_logger(__name__)
 
@@ -92,7 +93,7 @@ class _RetryQueue(Runnable):
         # generator that tells if the message should be sent now
         expiration_generator: Iterator[bool]
 
-    def __init__(self, transport: "MatrixTransport", receiver: Address):
+    def __init__(self, transport: "MatrixNode", receiver: Address):
         self.transport = transport
         self.receiver = receiver
         self._message_queue: List[_RetryQueue._MessageData] = list()
@@ -154,15 +155,6 @@ class _RetryQueue(Runnable):
                 )
             )
         self.notify()
-
-    def enqueue_global(self, message: Message):
-        """ Helper to enqueue a message in the global queue (e.g. Delivered) """
-        self.enqueue(
-            queue_identifier=QueueIdentifier(
-                recipient=self.receiver, channel_identifier=CHANNEL_IDENTIFIER_GLOBAL_QUEUE
-            ),
-            message=message,
-        )
 
     def notify(self):
         """ Notify main loop to check if anything needs to be sent """
@@ -259,16 +251,18 @@ class _RetryQueue(Runnable):
         return f"<{self.__class__.__name__} for {to_normalized_address(self.receiver)}>"
 
 
-class MatrixTransport(Runnable):
+class MatrixNode(TransportNode, Runnable):
     _room_prefix = "raiden"
     _room_sep = "_"
     log = log
 
-    def __init__(self, config: dict, current_server_name: str = None):
-        super().__init__()
+    def __init__(self, address: Address, config: dict):
+        TransportNode.__init__(self, address)
+        Runnable.__init__(self)
         self._config = config
         self._raiden_service: Optional[RaidenService] = None
 
+        current_server_name = config.get("current_server_name")
         available_servers = get_available_servers_from_config(self._config)
 
         def _http_retry_delay() -> Iterable[float]:
@@ -322,7 +316,7 @@ class MatrixTransport(Runnable):
         self._message_handler: Optional[MessageHandler] = None
 
     def start_greenlet_for_light_client(self):
-        super().start()
+        Runnable.start(self)
 
     def __repr__(self):
         if self._raiden_service is not None:
@@ -390,7 +384,7 @@ class MatrixTransport(Runnable):
                 retrier.start()
 
         self.log.debug("Matrix started", config=self._config)
-        super().start()  # start greenlet
+        Runnable.start(self)  # start greenlet
         self._started = True
 
     def _run(self):
@@ -498,33 +492,32 @@ class MatrixTransport(Runnable):
             # representing the target node
             self._address_mgr.refresh_address_presence(node_address)
 
-    def send_async(self, queue_identifier: QueueIdentifier, message: Message):
+    def send_message(self, message: TransportMessage, recipient: Address):
         """Queue the message for sending to recipient in the queue_identifier
 
         It may be called before transport is started, to initialize message queues
         The actual sending is started only when the transport is started
         """
+        raiden_message, queue_identifier = TransportMessage.unwrap(message)
 
         # even if transport is not started, can run to enqueue messages to send when it starts
-        receiver_address = queue_identifier.recipient
-
-        if not is_binary_address(receiver_address):
-            raise ValueError("Invalid address {}".format(pex(receiver_address)))
+        if not is_binary_address(recipient):
+            raise ValueError("Invalid address {}".format(pex(recipient)))
 
         # These are not protocol messages, but transport specific messages
-        if isinstance(message, (Delivered, Ping, Pong)):
+        if isinstance(raiden_message, (Ping, Pong)):
             raise ValueError(
-                "Do not use send_async for {} messages".format(message.__class__.__name__)
+                "Do not use send_message for {} messages".format(raiden_message.__class__.__name__)
             )
 
         self.log.info(
-            "Send async",
-            receiver_address=pex(receiver_address),
-            message=message,
+            "Send message",
+            recipient=pex(recipient),
+            message=raiden_message,
             queue_identifier=queue_identifier,
         )
 
-        self._send_with_retry(queue_identifier, message)
+        self._send_with_retry(queue_identifier, raiden_message)
 
     def send_global(self, room: str, message: Message) -> None:
         """Sends a message to one of the global rooms
@@ -848,8 +841,11 @@ class MatrixTransport(Runnable):
             #       See: https://matrix.org/docs/spec/client_server/r0.3.0.html#id57
             delivered_message = Delivered(delivered_message_identifier=message.message_identifier)
             self._raiden_service.sign(delivered_message)
-            retrier = self._get_retrier(message.sender)
-            retrier.enqueue_global(delivered_message)
+
+            queue_identifier = QueueIdentifier(
+                recipient=message.sender, channel_identifier=CHANNEL_IDENTIFIER_GLOBAL_QUEUE
+            )
+            self.send_message(*TransportMessage.wrap(queue_identifier, delivered_message))
             self._raiden_service.on_message(message)
 
         except (InvalidAddress, UnknownAddress, UnknownTokenAddress):
@@ -1340,21 +1336,20 @@ class MatrixTransport(Runnable):
 
         return True
 
+    def link_exception(self, callback: Any):
+        self.greenlet.link_exception(callback)
 
-class MatrixLightClientTransport(MatrixTransport):
+    def join(self, timeout=None):
+        self.greenlet.join(timeout)
 
-    def __init__(self,
-                 config: dict,
-                 _encrypted_light_client_password_signature: str,
-                 _encrypted_light_client_display_name_signature: str,
-                 _encrypted_light_client_seed_for_retry_signature: str,
-                 _address: str,
-                 current_server_name: str = None):
-        super().__init__(config, current_server_name)
-        self._encrypted_light_client_password_signature = _encrypted_light_client_password_signature
-        self._encrypted_light_client_display_name_signature = _encrypted_light_client_display_name_signature
-        self._encrypted_light_client_seed_for_retry_signature = _encrypted_light_client_seed_for_retry_signature
-        self._address = _address
+
+class MatrixLightClientNode(MatrixNode):
+
+    def __init__(self, address: Address, config: dict, auth_params: dict):
+        MatrixNode.__init__(self, address, config)
+        self._encrypted_light_client_password_signature = auth_params["light_client_password"]
+        self._encrypted_light_client_display_name_signature = auth_params["light_client_display_name"]
+        self._encrypted_light_client_seed_for_retry_signature = auth_params["light_client_seed_retry"]
 
     def start(  # type: ignore
         self,
@@ -1384,7 +1379,7 @@ class MatrixLightClientTransport(MatrixTransport):
             encrypted_light_client_display_name_signature=self._encrypted_light_client_display_name_signature,
             encrypted_light_client_seed_for_retry_signature=self._encrypted_light_client_seed_for_retry_signature,
             private_key_hub=self._raiden_service.config["privatekey"].hex(),
-            light_client_address=self._address
+            light_client_address=self.address
         )
 
         self.log = log.bind(current_user=self._user_id, node=pex(self._raiden_service.address))
@@ -1422,14 +1417,14 @@ class MatrixLightClientTransport(MatrixTransport):
                 retrier.start()
 
         self.log.debug("Matrix started", config=self._config)
-        super().start_greenlet_for_light_client()
+        MatrixNode.start_greenlet_for_light_client(self)
         self._started = True
 
     def _run(self):
         """ Runnable main method, perform wait on long-running subtasks """
         # dispatch auth data on first scheduling after start
-        state_change = ActionUpdateTransportAuthData(f"{self._user_id}/{self._client.api.token}", self._address)
-        self.greenlet.name = f"MatrixLightClientTransport._run light_client:{to_canonical_address(self._address)}"
+        state_change = ActionUpdateTransportAuthData(f"{self._user_id}/{self._client.api.token}", self.address)
+        self.greenlet.name = f"MatrixLightClientTransport._run light_client:{to_canonical_address(self.address)}"
         self._raiden_service.handle_and_track_state_change(state_change)
         try:
             # waits on _stop_event.ready()
@@ -1480,7 +1475,7 @@ class MatrixLightClientTransport(MatrixTransport):
 
         assert self._raiden_service is not None
         address_pair = sorted(
-            [to_normalized_address(address) for address in [address, to_canonical_address(self._address)]]
+            [to_normalized_address(address) for address in [address, to_canonical_address(self.address)]]
         )
 
         room_name = make_room_alias(self.network_id, *address_pair)
@@ -1601,9 +1596,6 @@ class MatrixLightClientTransport(MatrixTransport):
             )
 
         return room
-
-    def get_address(self):
-        return self._address
 
     def _handle_message(self, room, event) -> bool:
         """ Handle text messages sent to listening rooms """
@@ -1738,13 +1730,4 @@ class MatrixLightClientTransport(MatrixTransport):
             self.log.warning("Exception while processing message", exc_info=True)
             return
 
-    def send_for_light_client_with_retry(self, receiver: Address, message: Message):
-        retrier = self._get_retrier(receiver)
-        retrier.enqueue_global(message)
 
-
-class NodeTransport:
-
-    def __init__(self, hub_transport: MatrixTransport, light_client_transports: List[MatrixTransport]):
-        self.hub_transport = hub_transport
-        self.light_client_transports = light_client_transports
