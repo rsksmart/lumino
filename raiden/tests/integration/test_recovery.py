@@ -21,7 +21,7 @@ from raiden.transfer.state_change import (
     ContractReceiveChannelSettled,
 )
 from raiden.utils import create_default_identifier
-from transport.udp.udp_transport import UDPTransport
+from transport.udp.transport import UDPTransport
 
 
 @pytest.mark.parametrize("deposit", [10])

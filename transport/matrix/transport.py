@@ -75,7 +75,7 @@ from transport.matrix.utils import (
     get_available_servers_from_config, get_server_url)
 from transport.message import Message as TransportMessage
 from transport.node import Node as TransportNode
-from transport.udp import udp_utils
+from transport.udp import utils as udp_utils
 
 log = structlog.get_logger(__name__)
 

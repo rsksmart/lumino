@@ -31,7 +31,7 @@ from raiden.utils.typing import (
     UDPMessageID,
 )
 from transport.udp import healthcheck
-from transport.udp.udp_utils import (
+from transport.udp.utils import (
     event_first_of,
     retry_with_recovery,
     timeout_exponential_backoff,

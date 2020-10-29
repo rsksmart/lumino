@@ -22,7 +22,7 @@ from raiden.ui.startup import (
     setup_proxies_or_exit,
     setup_udp_or_exit,
 )
-from transport.udp.udp_transport import UDPTransport
+from transport.udp.transport import UDPTransport
 
 
 def test_check_network_id_raises_with_mismatching_ids():

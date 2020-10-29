@@ -21,7 +21,7 @@ from raiden.utils import BlockNumber, merge_dict, pex
 from raiden.utils.typing import Address, Optional
 from raiden.waiting import wait_for_payment_network
 from transport.matrix.layer import MatrixLayer as MatrixTransportLayer
-from transport.udp.udp_transport import UDPTransport
+from transport.udp.transport import UDPTransport
 
 CHAIN = object()  # Flag used by create a network does make a loop with the channels
 BlockchainServices = namedtuple(

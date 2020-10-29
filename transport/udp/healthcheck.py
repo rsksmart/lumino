@@ -14,11 +14,11 @@ from raiden.transfer.state import (
 )
 from raiden.utils import pex
 from raiden.utils.typing import Address, Dict, Nonce
-from transport.udp import udp_utils
+from transport.udp import utils as udp_utils
 
 if TYPE_CHECKING:
     # pylint: disable=unused-import
-    from transport.udp.udp_transport import UDPTransport
+    from transport.udp.transport import UDPTransport
 
 log = structlog.get_logger(__name__)  # pylint: disable=invalid-name
 

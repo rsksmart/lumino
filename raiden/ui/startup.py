@@ -34,7 +34,7 @@ from raiden.ui.checks import (
     check_smart_contract_addresses,
 )
 from raiden.utils.typing import Address
-from transport.udp.udp_transport import UDPTransport
+from transport.udp.transport import UDPTransport
 
 
 def environment_type_to_contracts_version(environment_type: Environment) -> str:
