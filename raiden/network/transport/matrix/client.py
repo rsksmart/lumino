@@ -390,10 +390,6 @@ class GMatrixClient(MatrixClient):
             self._post_hook_func(self.sync_token)
 
     def _handle_response(self, response, first_sync=False):
-        # Handle presence after rooms
-        for presence_update in response["presence"]["events"]:
-            for callback in self.presence_listeners.values():
-                self.call(callback, presence_update)
 
         for to_device_message in response["to_device"]["events"]:
             for listener in self.listeners:
