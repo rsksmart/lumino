@@ -398,10 +398,12 @@ def subdispatch_initiatortask(
             if iteration.new_state:
                 sub_task = InitiatorTask(token_network_identifier, iteration.new_state)
                 chain_state.payment_mapping.setdefault(node_address, PaymentMappingState()).secrethashes_to_task[secrethash] = sub_task
-            elif secrethash in chain_state.payment_mapping[node_address].secrethashes_to_task and not isinstance(state_change, ActionInitInitiatorLight):
+            elif node_address in chain_state.payment_mapping \
+                and secrethash in chain_state.payment_mapping[node_address].secrethashes_to_task \
+                    and not isinstance(state_change, ActionInitInitiatorLight):
                 ## We dont delete the payment task when is a light payment, thats because we need the previous payment task for refunds.
                 ## TODO marcosmartinez7, are the p2p payments being removed?
-                print("Deleted payment task "+ secrethash.hex())
+                print("Deleted payment task {}".format(secrethash.hex()))
                 del chain_state.payment_mapping[node_address].secrethashes_to_task[secrethash]
 
     return TransitionResult(chain_state, events)
@@ -514,7 +516,8 @@ def subdispatch_targettask(
         if iteration.new_state:
             sub_task = TargetTask(channel_state.canonical_identifier, iteration.new_state)
             chain_state.payment_mapping.setdefault(node_address, PaymentMappingState()).secrethashes_to_task[secrethash] = sub_task
-        elif secrethash in chain_state.payment_mapping[node_address].secrethashes_to_task:
+        elif node_address in chain_state.payment_mapping.keys() and \
+                secrethash in chain_state.payment_mapping[node_address].secrethashes_to_task:
             del chain_state.payment_mapping[node_address].secrethashes_to_task[secrethash]
 
     return TransitionResult(chain_state, events)

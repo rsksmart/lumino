@@ -26,7 +26,10 @@ from raiden.transfer.events import (
     EventInvalidReceivedTransferRefund,
     EventInvalidReceivedUnlock,
     SendProcessed,
-    ContractSendChannelUpdateTransferLight)
+    ContractSendChannelUpdateTransferLight,
+    ContractSendChannelBatchUnlockLight,
+    ContractSendChannelSettleLight
+)
 from raiden.transfer.identifiers import CanonicalIdentifier
 from raiden.transfer.mediated_transfer.events import (
     CHANNEL_IDENTIFIER_GLOBAL_QUEUE,
@@ -1835,12 +1838,21 @@ def handle_block(
             channel_state.settle_transaction = TransactionExecutionStatus(
                 state_change.block_number, None, None
             )
-            event = ContractSendChannelSettle(
-                canonical_identifier=channel_state.canonical_identifier,
-                triggered_by_block_hash=state_change.block_hash,
-                channel_state= channel_state
-            )
-            events.append(event)
+
+            if channel_state.is_light_channel:
+                event = ContractSendChannelSettleLight(
+                    canonical_identifier=channel_state.canonical_identifier,
+                    triggered_by_block_hash=state_change.block_hash,
+                    channel_state=channel_state
+                )
+                events.append(event)
+            else:
+                event = ContractSendChannelSettle(
+                    canonical_identifier=channel_state.canonical_identifier,
+                    triggered_by_block_hash=state_change.block_hash,
+                    channel_state=channel_state
+                )
+                events.append(event)
 
     while is_deposit_confirmed(channel_state, block_number):
         order_deposit_transaction = heapq.heappop(channel_state.deposit_transaction_queue)
@@ -1968,7 +1980,7 @@ def handle_channel_settled(
 
         channel_state.our_state.onchain_locksroot = our_locksroot
         channel_state.partner_state.onchain_locksroot = partner_locksroot
-
+        
         onchain_unlock = ContractSendChannelBatchUnlock(
             canonical_identifier=channel_state.canonical_identifier,
             participant=channel_state.partner_state.address,
@@ -2001,7 +2013,13 @@ def handle_channel_settled_light(
         channel_state.partner_state.onchain_locksroot = partner_locksroot
 
         #TODO mmartinez7 unlock for light clients
-
+        onchain_unlock = ContractSendChannelBatchUnlockLight(
+            canonical_identifier=channel_state.canonical_identifier,
+            client=channel_state.our_state.address,
+            participant=channel_state.partner_state.address,
+            triggered_by_block_hash=state_change.block_hash,
+        )
+        events.append(onchain_unlock)
     return TransitionResult(channel_state, events)
 
 def handle_channel_newbalance(

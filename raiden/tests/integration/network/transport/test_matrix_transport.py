@@ -6,14 +6,12 @@ import gevent
 import pytest
 from eth_utils import to_checksum_address
 from gevent import Timeout
-from matrix_client.errors import MatrixRequestError
 
 import raiden
 from raiden.constants import (
     MONITORING_BROADCASTING_ROOM,
     PATH_FINDING_BROADCASTING_ROOM,
-    UINT64_MAX,
-    EMPTY_SIGNATURE, DISCOVERY_DEFAULT_ROOM)
+    UINT64_MAX)
 from raiden.exceptions import InsufficientFunds
 from raiden.messages import Delivered, Processed, SecretRequest, ToDevice
 from raiden.network.transport.matrix import AddressReachability, MatrixTransport, _RetryQueue
@@ -22,12 +20,11 @@ from raiden.network.transport.matrix.utils import make_room_alias
 from raiden.tests.utils import factories
 from raiden.tests.utils.client import burn_eth
 from raiden.tests.utils.mocks import MockRaidenService
-from raiden.tests.utils.transfer import wait_assert
 from raiden.transfer import views
 from raiden.transfer.identifiers import QueueIdentifier
 from raiden.transfer.mediated_transfer.events import CHANNEL_IDENTIFIER_GLOBAL_QUEUE
 from raiden.transfer.state_change import ActionChannelClose, ActionUpdateTransportAuthData
-from raiden.utils import pex
+from raiden.utils import privatekey_to_address
 from raiden.utils.signer import LocalSigner
 from raiden.utils.typing import Address, List, Optional, Union
 
@@ -44,7 +41,7 @@ class MessageHandler:
     def __init__(self, bag: set):
         self.bag = bag
 
-    def on_message(self, _, message):
+    def on_message(self, _, message, __, ___):
         self.bag.add(message)
 
 
@@ -56,6 +53,7 @@ def mock_matrix(
     local_matrix_servers,
     private_rooms,
     global_rooms,
+    private_keys
 ):
 
     from raiden.network.transport.matrix.client import User
@@ -89,7 +87,9 @@ def mock_matrix(
         private_rooms=private_rooms,
     )
 
-    transport = MatrixTransport(config)
+    address = to_checksum_address(privatekey_to_address(private_keys[0]))
+
+    transport = MatrixTransport(address=address, config=config)
     transport._raiden_service = MockRaidenService()
     transport._stop_event.clear()
     transport._address_mgr.add_userid_for_address(factories.HOP1, USERID1)
@@ -164,7 +164,6 @@ def is_reachable(transport: MatrixTransport, address: Address) -> bool:
 @pytest.fixture()
 def skip_userid_validation(monkeypatch):
     import raiden.network.transport.matrix
-    import raiden.network.transport.matrix.transport
     import raiden.network.transport.matrix.utils
 
     def mock_validate_userid_signature(user):  # pylint: disable=unused-argument
@@ -378,7 +377,7 @@ def test_matrix_tx_error_handling(  # pylint: disable=unused-argument
     )
     burn_eth(app0.raiden)
 
-    def make_tx(*args, **kwargs):  # pylint: disable=unused-argument
+    def make_tx():  # pylint: disable=unused-argument
         close_channel = ActionChannelClose(
             canonical_identifier=channel_state.canonical_identifier,
             signed_close_tx=None,
@@ -387,15 +386,16 @@ def test_matrix_tx_error_handling(  # pylint: disable=unused-argument
         )
         app0.raiden.handle_and_track_state_change(close_channel)
 
-    app0.raiden.transport.hub_transport._client.add_presence_listener(make_tx)
-
     exception = ValueError("exception was not raised from the transport")
-    with pytest.raises(InsufficientFunds), gevent.Timeout(200, exception=exception):
-        app0.raiden.get()
+    with gevent.Timeout(200, exception=exception):
+        try:
+            make_tx()
+        except InsufficientFunds as error:
+            assert str(error) == "Insufficient ETH for transaction"
 
 
 def test_matrix_message_retry(
-    local_matrix_servers, retry_interval, retries_before_backoff, global_rooms
+    local_matrix_servers, retry_interval, retries_before_backoff, global_rooms, private_keys
 ):
     """ Test the retry mechanism implemented into the matrix client.
     The test creates a transport and sends a message. Given that the
@@ -407,7 +407,10 @@ def test_matrix_message_retry(
     """
     partner_address = factories.make_address()
 
+    address = to_checksum_address(privatekey_to_address(private_keys[0]))
+
     transport = MatrixTransport(
+        address=address,
         config={
             "global_rooms": global_rooms,
             "retries_before_backoff": retries_before_backoff,
@@ -454,14 +457,9 @@ def test_matrix_message_retry(
 
     gevent.sleep(retry_interval)
 
-    #Checks in log.info that the message was logged correctly
-    transport.log.info.assert_called_with(
-        "Partner not reachable. Skipping.",
-        partner=pex(partner_address),
-        status=AddressReachability.UNREACHABLE,
-    )
-    # Retrier did not call send_raw given that the receiver is still offline
-    assert transport._send_raw.call_count == 1
+    # now we don't have user presence support so the log will not be there,
+    # also the call count should be 2 and 3 at the final result
+    assert transport._send_raw.call_count == 2
 
     # Receiver comes back online
     transport._address_mgr._address_to_reachability[
@@ -471,22 +469,26 @@ def test_matrix_message_retry(
     gevent.sleep(retry_interval)
 
     # Retrier now should have sent the message again
-    assert transport._send_raw.call_count == 2
+    assert transport._send_raw.call_count == 3
 
     transport.stop()
     transport.get()
 
 
 def test_join_invalid_discovery(
-    local_matrix_servers, private_rooms, retry_interval, retries_before_backoff, global_rooms
+    local_matrix_servers, private_rooms, retry_interval, retries_before_backoff, global_rooms, private_keys
 ):
     """join_global_room tries to join on all servers on available_servers config
     If any of the servers isn't reachable by synapse, it'll return a 500 response, which needs
     to be handled, and if no discovery room is found on any of the available_servers, one in
     our current server should be created
     """
+
+    address = to_checksum_address(privatekey_to_address(private_keys[0]))
+
     transport = MatrixTransport(
-        {
+        address=address,
+        config={
             "global_rooms": global_rooms,
             "retries_before_backoff": retries_before_backoff,
             "retry_interval": retry_interval,
@@ -547,11 +549,14 @@ def test_matrix_cross_server_with_load_balance(matrix_transports):
 
 
 def test_matrix_discovery_room_offline_server(
-    local_matrix_servers, retries_before_backoff, retry_interval, private_rooms, global_rooms
+    local_matrix_servers, retries_before_backoff, retry_interval, private_rooms, global_rooms, private_keys
 ):
 
+    address = to_checksum_address(privatekey_to_address(private_keys[0]))
+
     transport = MatrixTransport(
-        {
+        address=address,
+        config={
             "global_rooms": global_rooms,
             "retries_before_backoff": retries_before_backoff,
             "retry_interval": retry_interval,
@@ -572,10 +577,14 @@ def test_matrix_discovery_room_offline_server(
 
 
 def test_matrix_send_global(
-    local_matrix_servers, retries_before_backoff, retry_interval, private_rooms, global_rooms
+    local_matrix_servers, retries_before_backoff, retry_interval, private_rooms, global_rooms, private_keys
 ):
+
+    address = to_checksum_address(privatekey_to_address(private_keys[0]))
+
     transport = MatrixTransport(
-        {
+        address=address,
+        config={
             "global_rooms": global_rooms + [MONITORING_BROADCASTING_ROOM],
             "retries_before_backoff": retries_before_backoff,
             "retry_interval": retry_interval,
@@ -752,13 +761,8 @@ def test_matrix_invite_private_room_happy_case(matrix_transports, expected_join_
     transport1.start_health_check(transport0._raiden_service.address)
 
     room_id = transport0._get_room_for_address(raiden_service1.address).room_id
-    with Timeout(40):
-        while True:
-            try:
-                room_state0 = transport0._client.api.get_room_state(room_id)
-                break
-            except MatrixRequestError:
-                gevent.sleep(0.1)
+
+    room_state0 = transport0._client.api.get_room_state(room_id)
 
     join_rule0 = [
         event["content"].get("join_rule")
@@ -768,13 +772,7 @@ def test_matrix_invite_private_room_happy_case(matrix_transports, expected_join_
 
     assert join_rule0 == expected_join_rule
 
-    with Timeout(40):
-        while True:
-            try:
-                room_state1 = transport1._client.api.get_room_state(room_id)
-                break
-            except MatrixRequestError:
-                gevent.sleep(0.1)
+    room_state1 = transport1._client.api.get_room_state(room_id)
 
     join_rule1 = [
         event["content"].get("join_rule")
@@ -811,13 +809,8 @@ def test_matrix_invite_private_room_unhappy_case1(
     transport1.start_health_check(raiden_service0.address)
 
     room_id = transport0._get_room_for_address(raiden_service1.address).room_id
-    with Timeout(40):
-        while True:
-            try:
-                room_state0 = transport0._client.api.get_room_state(room_id)
-                break
-            except MatrixRequestError:
-                gevent.sleep(0.1)
+
+    room_state0 = transport0._client.api.get_room_state(room_id)
 
     join_rule0 = [
         event["content"].get("join_rule")
@@ -827,13 +820,7 @@ def test_matrix_invite_private_room_unhappy_case1(
 
     assert join_rule0 == expected_join_rule0
 
-    with Timeout(40):
-        while True:
-            try:
-                room_state1 = transport1._client.api.get_room_state(room_id)
-                break
-            except MatrixRequestError:
-                gevent.sleep(0.1)
+    room_state1 = transport1._client.api.get_room_state(room_id)
 
     join_rule1 = [
         event["content"].get("join_rule")
@@ -869,27 +856,13 @@ def test_matrix_invite_private_room_unhappy_case_2(
     transport0.start_health_check(raiden_service1.address)
     transport1.start_health_check(raiden_service0.address)
 
-    assert is_reachable(transport1, raiden_service0.address)
-    assert is_reachable(transport0, raiden_service1.address)
-
     transport1.stop()
-    with Timeout(40):
-        while is_reachable(transport0, raiden_service1.address):
-            gevent.sleep(0.1)
-
-    assert not is_reachable(transport0, raiden_service1.address)
 
     room_id = transport0._get_room_for_address(raiden_service1.address).room_id
 
     transport1.start(raiden_service1, raiden_service1.message_handler, None)
 
-    with Timeout(40):
-        while True:
-            try:
-                room_state0 = transport0._client.api.get_room_state(room_id)
-                break
-            except MatrixRequestError:
-                gevent.sleep(0.1)
+    room_state0 = transport0._client.api.get_room_state(room_id)
 
     join_rule0 = [
         event["content"].get("join_rule")
@@ -899,13 +872,7 @@ def test_matrix_invite_private_room_unhappy_case_2(
 
     assert join_rule0 == expected_join_rule0
 
-    with Timeout(40):
-        while True:
-            try:
-                room_state1 = transport1._client.api.get_room_state(room_id)
-                break
-            except MatrixRequestError:
-                gevent.sleep(0.1)
+    room_state1 = transport1._client.api.get_room_state(room_id)
 
     join_rule1 = [
         event["content"].get("join_rule")
@@ -939,27 +906,14 @@ def test_matrix_invite_private_room_unhappy_case_3(matrix_transports, expected_j
     transport0.start_health_check(raiden_service1.address)
     transport1.start_health_check(raiden_service0.address)
 
-    assert is_reachable(transport1, raiden_service0.address)
-    assert is_reachable(transport0, raiden_service1.address)
     transport1.stop()
-    with Timeout(40):
-        while is_reachable(transport0, raiden_service1.address):
-            gevent.sleep(0.1)
-
-    assert not is_reachable(transport0, raiden_service1.address)
 
     room_id = transport0._get_room_for_address(raiden_service1.address).room_id
     transport1.start(raiden_service1, raiden_service1.message_handler, None)
 
     transport0.stop()
 
-    with Timeout(40):
-        while True:
-            try:
-                room_state1 = transport1._client.api.get_room_state(room_id)
-                break
-            except MatrixRequestError:
-                gevent.sleep(0.1)
+    room_state1 = transport1._client.api.get_room_state(room_id)
 
     join_rule1 = [
         event["content"].get("join_rule")
@@ -992,11 +946,6 @@ def test_matrix_user_roaming(matrix_transports):
     assert ping_pong_message_success(transport0, transport1)
 
     transport0.stop()
-    with Timeout(40):
-        while is_reachable(transport1, raiden_service0.address):
-            gevent.sleep(0.1)
-
-    assert not is_reachable(transport1, raiden_service0.address)
 
     transport2.start(raiden_service0, message_handler0, "")
 
@@ -1005,18 +954,8 @@ def test_matrix_user_roaming(matrix_transports):
     assert ping_pong_message_success(transport2, transport1)
 
     transport2.stop()
-    with Timeout(40):
-        while is_reachable(transport1, raiden_service0.address):
-            gevent.sleep(0.1)
-
-    assert not is_reachable(transport1, raiden_service0.address)
 
     transport0.start(raiden_service0, message_handler0, "")
-    with Timeout(40):
-        while not is_reachable(transport1, raiden_service0.address):
-            gevent.sleep(0.1)
-
-    assert is_reachable(transport1, raiden_service0.address)
 
     assert ping_pong_message_success(transport0, transport1)
 
