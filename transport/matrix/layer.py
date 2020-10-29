@@ -18,8 +18,7 @@ from raiden.utils.signer import recover
 from transport.layer import Layer as TransportLayer
 from transport.matrix.transport import MatrixLightClientNode as MatrixLightClientTransportNode, \
     MatrixNode as MatrixTransportNode
-from transport.matrix.utils import get_available_servers_from_config, server_is_available
-from transport.matrix.utils import make_client
+from transport.matrix.utils import get_available_servers_from_config, server_is_available, make_client
 from transport.node import Node as TransportNode
 
 
@@ -78,8 +77,8 @@ class MatrixLayer(TransportLayer):
                                  light_client["address"])
                         continue
 
-                config = config["transport"]["matrix"]
-                config["current_server_name"] = current_server_name
+                matrix_config = config["transport"]["matrix"]
+                matrix_config["current_server_name"] = current_server_name
                 auth_params = {
                     "light_client_password": light_client["password"],
                     "light_client_display_name": light_client["display_name"],
@@ -87,7 +86,7 @@ class MatrixLayer(TransportLayer):
                 }
                 light_client_transport = MatrixLightClientTransportNode(
                     light_client['address'],
-                    config,
+                    matrix_config,
                     auth_params,
                 )
 
