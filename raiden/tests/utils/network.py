@@ -10,8 +10,6 @@ from raiden.app import App
 from raiden.network.blockchain_service import BlockChainService
 from raiden.network.rpc.client import JSONRPCClient
 from raiden.network.throttle import TokenBucket
-from raiden.network.transport import UDPTransport
-from raiden.network.transport.matrix.layer import MatrixLayer as MatrixTransportLayer
 from raiden.raiden_event_handler import RaidenEventHandler
 from raiden.settings import DEFAULT_NUMBER_OF_BLOCK_CONFIRMATIONS, DEFAULT_RETRY_TIMEOUT
 from raiden.tests.utils.app import database_from_privatekey
@@ -22,6 +20,8 @@ from raiden.transfer.views import state_from_raiden
 from raiden.utils import BlockNumber, merge_dict, pex
 from raiden.utils.typing import Address, Optional
 from raiden.waiting import wait_for_payment_network
+from transport.matrix.layer import MatrixLayer as MatrixTransportLayer
+from transport.udp.transport import UDPTransport
 
 CHAIN = object()  # Flag used by create a network does make a loop with the channels
 BlockchainServices = namedtuple(

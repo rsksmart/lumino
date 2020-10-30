@@ -13,9 +13,6 @@ from raiden.constants import (
     UINT64_MAX)
 from raiden.exceptions import InsufficientFunds
 from raiden.messages import Delivered, Processed, SecretRequest, ToDevice
-from raiden.network.transport.matrix import AddressReachability, MatrixNode as MatrixTransportNode, _RetryQueue
-from raiden.network.transport.matrix.client import Room
-from raiden.network.transport.matrix.utils import make_room_alias
 from raiden.tests.utils import factories
 from raiden.tests.utils.client import burn_eth
 from raiden.tests.utils.mocks import MockRaidenService
@@ -23,9 +20,11 @@ from raiden.transfer import views
 from raiden.transfer.identifiers import QueueIdentifier
 from raiden.transfer.mediated_transfer.events import CHANNEL_IDENTIFIER_GLOBAL_QUEUE
 from raiden.transfer.state_change import ActionChannelClose, ActionUpdateTransportAuthData
-from raiden.utils import pex
 from raiden.utils.signer import LocalSigner
 from raiden.utils.typing import Address, List, Optional, Union
+from transport.matrix.client import Room
+from transport.matrix.transport import MatrixNode as MatrixTransportNode, _RetryQueue
+from transport.matrix.utils import AddressReachability, make_room_alias
 from transport.message import Message as TransportMessage
 
 USERID0 = "@Arthur:RestaurantAtTheEndOfTheUniverse"
@@ -53,7 +52,7 @@ def mock_matrix(
     private_rooms,
     global_rooms,
 ):
-    from raiden.network.transport.matrix.client import User
+    from transport.matrix.client import User
 
     monkeypatch.setattr(User, "get_display_name", lambda _: "random_display_name")
 
@@ -164,24 +163,19 @@ def is_reachable(transport: MatrixTransportNode, address: Address) -> bool:
 
 @pytest.fixture()
 def skip_userid_validation(monkeypatch):
-    import raiden.network.transport.matrix
-    import raiden.network.transport.matrix.utils
+    import transport.matrix
+    import transport.matrix.utils
 
     def mock_validate_userid_signature(user):  # pylint: disable=unused-argument
         return factories.HOP1
 
     monkeypatch.setattr(
-        raiden.network.transport.matrix,
+        transport.matrix.transport,
         "validate_userid_signature",
         mock_validate_userid_signature,
     )
     monkeypatch.setattr(
-        raiden.network.transport.matrix.transport,
-        "validate_userid_signature",
-        mock_validate_userid_signature,
-    )
-    monkeypatch.setattr(
-        raiden.network.transport.matrix.utils,
+        transport.matrix.utils,
         "validate_userid_signature",
         mock_validate_userid_signature,
     )

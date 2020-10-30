@@ -6,7 +6,6 @@ import structlog
 from gevent.event import Event
 
 from raiden.exceptions import UnknownAddress
-from raiden.network.transport.udp import udp_utils
 from raiden.transfer import views
 from raiden.transfer.state import (
     NODE_NETWORK_REACHABLE,
@@ -15,13 +14,13 @@ from raiden.transfer.state import (
 )
 from raiden.utils import pex
 from raiden.utils.typing import Address, Dict, Nonce
+from transport.udp import utils as udp_utils
 
 if TYPE_CHECKING:
     # pylint: disable=unused-import
-    from raiden.network.transport.udp.udp_transport import UDPTransport
+    from transport.udp.transport import UDPTransport
 
 log = structlog.get_logger(__name__)  # pylint: disable=invalid-name
-
 
 HealthEvents = namedtuple("HealthEvents", ("event_healthy", "event_unhealthy"))
 

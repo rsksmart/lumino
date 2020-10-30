@@ -1,6 +1,5 @@
-from raiden.network.transport.matrix.layer import MatrixLayer as MatrixTransportLayer
-
 from transport.layer import Layer as TransportLayer
+from transport.matrix.layer import MatrixLayer as MatrixTransportLayer
 
 
 class Config:
