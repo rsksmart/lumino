@@ -1,5 +1,5 @@
-from raiden.network.transport.matrix.layer import MatrixLayer as MatrixTransportLayer
-from raiden.network.transport.rif_comms.layer import RifCommsLayer as RifCommsTransportLayer
+from transport.matrix.layer import MatrixLayer as MatrixTransportLayer
+from transport.rif_comms.layer import RifCommsLayer as RifCommsTransportLayer
 
 
 class Factory:

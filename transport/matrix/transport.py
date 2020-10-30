@@ -70,7 +70,7 @@ from transport.matrix.utils import (
     make_room_alias,
     validate_and_parse_message,
     validate_userid_signature,
-    get_available_servers_from_config, get_server_url)
+    get_available_servers_from_config, get_server_url, UserAddressManager)
 from transport.message import Message as TransportMessage
 from transport.node import Node as TransportNode
 from transport.udp import utils as udp_utils
