@@ -24,7 +24,8 @@ class LightClientPayment:
         created_on: string,
         payment_status: LightClientPaymentStatus,
         identifier: string,
-        light_client_address: Address
+        # this is only for mapping query data from database, not used to save the payment
+        creator_address: Address = None
     ):
         self.payment_id = int(identifier)
         self.partner_address = to_checksum_address(partner_address)
@@ -33,7 +34,7 @@ class LightClientPayment:
         self.amount = amount
         self.created_on = created_on
         self.payment_status = payment_status
-        self.light_client_address = light_client_address
+        self.creator_address = creator_address
 
     """ Representation of light client payment send or received. """
 

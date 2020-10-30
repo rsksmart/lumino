@@ -214,8 +214,7 @@ def handle_inittarget_light(
                 amount=transfer.lock.amount,
                 created_on=str(date.today()),
                 payment_status=LightClientPaymentStatus.Pending,
-                identifier=transfer.payment_identifier,
-                light_client_address=transfer.target
+                identifier=transfer.payment_identifier
             )
 
             payment_exists = LightClientService.get_light_client_payment(payment.payment_id, storage)
@@ -262,8 +261,7 @@ def handle_inittarget_light(
                 amount=transfer.lock.amount,
                 created_on=str(date.today()),
                 payment_status=LightClientPaymentStatus.Expired,
-                identifier=transfer.payment_identifier,
-                light_client_address=transfer.target
+                identifier=transfer.payment_identifier
             )
             LightClientMessageHandler.store_light_client_payment(payment, storage)
             store_expired_locked_transfer_event = StoreMessageEvent(

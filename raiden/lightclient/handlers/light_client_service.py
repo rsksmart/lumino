@@ -65,7 +65,7 @@ class LightClientService:
         payment = storage.get_light_client_payment(payment_id)
         if payment:
             payment = LightClientPayment(identifier=payment[0],
-                                         light_client_address=payment[1],
+                                         creator_address=payment[1],
                                          partner_address=payment[2],
                                          is_lc_initiator=payment[3],
                                          token_network_id=payment[4],

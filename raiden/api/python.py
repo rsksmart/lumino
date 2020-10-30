@@ -1859,15 +1859,13 @@ class RaidenAPI:
             )
 
             # Create the light_client_payment
-            is_lc_initiator = 1
             payment = LightClientPayment(partner_address=partner_address,
-                                         is_lc_initiator=is_lc_initiator,
+                                         is_lc_initiator=1,
                                          token_network_id=channel_state.token_network_identifier,
                                          amount=amount,
                                          created_on=str(date.today()),
                                          payment_status=LightClientPaymentStatus.Pending,
-                                         identifier=locked_transfer.payment_identifier,
-                                         light_client_address=creator_address)
+                                         identifier=locked_transfer.payment_identifier)
 
             # Persist the light_client_protocol_message associated
             order = 1
