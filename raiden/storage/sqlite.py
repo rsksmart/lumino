@@ -266,7 +266,7 @@ class SQLiteStorage:
 
         return cursor.fetchone()
 
-    def get_message_for_payment_and_order(self,
+    def get_message_for_order_and_address(self,
                                           message_id: int,
                                           payment_id: int,
                                           order: int,

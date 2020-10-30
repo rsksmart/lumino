@@ -147,13 +147,13 @@ class LightClientMessageHandler:
         return None
 
     @classmethod
-    def get_message_for_payment_and_order(cls,
+    def get_message_for_order_and_address(cls,
                                           message_id: int,
                                           payment_id: int,
                                           order: int,
                                           light_client_address: AddressHex,
                                           wal: WriteAheadLog):
-        return cls.map_message_from_result(wal.storage.get_message_for_payment_and_order(
+        return cls.map_message_from_result(wal.storage.get_message_for_order_and_address(
             message_id=message_id,
             payment_id=payment_id,
             order=order,
@@ -268,7 +268,7 @@ class LightClientMessageHandler:
             cls.log.error("Unable to find principal message for {} {}: ".format(message.__class__.__name__,
                                                                                 message_identifier))
         else:
-            exists = LightClientMessageHandler.get_message_for_payment_and_order(
+            exists = LightClientMessageHandler.get_message_for_order_and_address(
                 message_id=message_identifier,
                 payment_id=protocol_message.light_client_payment_id,
                 order=order,
@@ -360,7 +360,7 @@ class LightClientMessageHandler:
             cls.log.error("Unable to find principal message for {} {}: ".format(message.__class__.__name__,
                                                                                 message_identifier))
         else:
-            exists = LightClientMessageHandler.get_message_for_payment_and_order(
+            exists = LightClientMessageHandler.get_message_for_order_and_address(
                 message_id=message_identifier,
                 payment_id=protocol_message.light_client_payment_id,
                 order=order,
