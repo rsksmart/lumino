@@ -213,7 +213,9 @@ def subdispatch_to_paymenttask(
     block_number = chain_state.block_number
     block_hash = chain_state.block_hash
     sub_task = None
+
     node_payment_mapping = chain_state.payment_mapping.get(node_address)
+
     if node_payment_mapping:
         sub_task = chain_state.payment_mapping[node_address].secrethashes_to_task.get(secrethash)
 
@@ -314,11 +316,13 @@ def handle_init_unlock_light(
     if channel_state:
         balance_proof = channel.create_send_balance_proof_light(channel_state, state_change.unlock,
                                                                 state_change.sender, state_change.receiver)
-        receiver_light_client_address = state_change.receiver if channel_state.both_participants_are_light_clients else None
-        store_signed_bp = StoreMessageEvent(balance_proof.message_identifier, balance_proof.payment_identifier, 11,
-                                            state_change.unlock, True, LightClientProtocolMessageType.PaymentSuccessful,
-                                            balance_proof.sender,
-                                            receiver_light_client_address=receiver_light_client_address)
+        store_signed_bp = StoreMessageEvent(message_id=balance_proof.message_identifier,
+                                            payment_id=balance_proof.payment_identifier,
+                                            message_order=11,
+                                            message=state_change.unlock,
+                                            is_signed=True,
+                                            message_type=LightClientProtocolMessageType.PaymentSuccessful,
+                                            light_client_address=balance_proof.sender)
         events.append(balance_proof)
         events.append(store_signed_bp)
     return TransitionResult(chain_state, events)
@@ -327,33 +331,27 @@ def handle_init_unlock_light(
 def handle_init_send_lock_expired_light(
     chain_state: ChainState, state_change: ActionSendLockExpiredLight
 ) -> TransitionResult[ChainState]:
-    channel_state = views.get_channelstate_by_canonical_identifier_and_address(
-        chain_state=chain_state,
-        canonical_identifier=CanonicalIdentifier(
-            chain_identifier=chain_state.chain_id,
-            token_network_address=state_change.signed_lock_expired.token_network_address,
-            channel_identifier=state_change.signed_lock_expired.channel_identifier,
-        ),
-        address=state_change.sender
-    )
-
     signed_lock_expired = state_change.signed_lock_expired
     send_lock_expired_light = SendLockExpiredLight(state_change.receiver, signed_lock_expired.message_identifier,
                                                    signed_lock_expired, state_change.signed_lock_expired.secrethash,
                                                    state_change.payment_id)
-    receiver_light_client_address = send_lock_expired_light.recipient if channel_state.both_participants_are_light_clients else None
-    store_lock_expired_light = StoreMessageEvent(signed_lock_expired.message_identifier, state_change.payment_id,
-                                                 1, signed_lock_expired, True,
-                                                 LightClientProtocolMessageType.PaymentExpired,
-                                                 sender_light_client_address=signed_lock_expired.sender,
-                                                 receiver_light_client_address=receiver_light_client_address)
+    store_lock_expired_light = StoreMessageEvent(message_id=signed_lock_expired.message_identifier,
+                                                 payment_id=state_change.payment_id,
+                                                 message_order=1,
+                                                 message=signed_lock_expired,
+                                                 is_signed=True,
+                                                 message_type=LightClientProtocolMessageType.PaymentExpired,
+                                                 light_client_address=signed_lock_expired.sender)
     events = [send_lock_expired_light, store_lock_expired_light]
     return TransitionResult(chain_state, events)
 
 
-def handle_store_refund_transfer_light( chain_state: ChainState, state_change: StoreRefundTransferLight
-                                        ) -> TransitionResult[ChainState]:
-    return subdispatch_to_paymenttask(chain_state, state_change, state_change.transfer.initiator, state_change.transfer.lock.secrethash)
+def handle_store_refund_transfer_light(chain_state: ChainState,
+                                       state_change: StoreRefundTransferLight) -> TransitionResult[ChainState]:
+    return subdispatch_to_paymenttask(chain_state,
+                                      state_change,
+                                      state_change.transfer.initiator,
+                                      state_change.transfer.lock.secrethash)
 
 
 def subdispatch_initiatortask(
@@ -398,10 +396,12 @@ def subdispatch_initiatortask(
             if iteration.new_state:
                 sub_task = InitiatorTask(token_network_identifier, iteration.new_state)
                 chain_state.payment_mapping.setdefault(node_address, PaymentMappingState()).secrethashes_to_task[secrethash] = sub_task
-            elif secrethash in chain_state.payment_mapping[node_address].secrethashes_to_task and not isinstance(state_change, ActionInitInitiatorLight):
+            elif node_address in chain_state.payment_mapping \
+                and secrethash in chain_state.payment_mapping[node_address].secrethashes_to_task \
+                    and not isinstance(state_change, ActionInitInitiatorLight):
                 ## We dont delete the payment task when is a light payment, thats because we need the previous payment task for refunds.
                 ## TODO marcosmartinez7, are the p2p payments being removed?
-                print("Deleted payment task "+ secrethash.hex())
+                print("Deleted payment task {}".format(secrethash.hex()))
                 del chain_state.payment_mapping[node_address].secrethashes_to_task[secrethash]
 
     return TransitionResult(chain_state, events)
@@ -514,7 +514,8 @@ def subdispatch_targettask(
         if iteration.new_state:
             sub_task = TargetTask(channel_state.canonical_identifier, iteration.new_state)
             chain_state.payment_mapping.setdefault(node_address, PaymentMappingState()).secrethashes_to_task[secrethash] = sub_task
-        elif secrethash in chain_state.payment_mapping[node_address].secrethashes_to_task:
+        elif node_address in chain_state.payment_mapping.keys() and \
+                secrethash in chain_state.payment_mapping[node_address].secrethashes_to_task:
             del chain_state.payment_mapping[node_address].secrethashes_to_task[secrethash]
 
     return TransitionResult(chain_state, events)

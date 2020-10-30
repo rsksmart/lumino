@@ -1632,7 +1632,7 @@ class NettingChannelState(State):
             and self.settle_transaction == other.settle_transaction
             and self.update_transaction == other.update_transaction
             and self.is_light_channel == other.is_light_channel
-            and self.both_participants_are_light_clients == both_participants_are_light_clients
+            and self.both_participants_are_light_clients == other.both_participants_are_light_clients
         )
 
     @property

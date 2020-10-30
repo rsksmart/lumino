@@ -266,7 +266,7 @@ class MatrixTransport(Runnable):
 
     def __init__(self, address: Address, config: dict, current_server_name: str = None):
         super().__init__()
-        self.address =address
+        self.address = address
         self._config = config
         self._raiden_service: Optional[RaidenService] = None
 
@@ -1445,6 +1445,11 @@ class MatrixLightClientTransport(MatrixTransport):
             self.stop()  # ensure cleanup and wait on subtasks
             raise
 
+    def send_async(self, queue_identifier: QueueIdentifier, message: Message):
+        self.log.info(f"----------------->>> Sending Message from LC with address {self.get_address()}")
+        self.log.info(f"----------------->>> Message Content {str(message)}")
+        super().send_async(queue_identifier=queue_identifier, message=message)
+
     def _send_raw(self, receiver_address: Address, data: str):
         with self._getroom_lock:
             room = self._get_room_for_address(receiver_address)
@@ -1456,8 +1461,6 @@ class MatrixLightClientTransport(MatrixTransport):
         self.log.info(
             "Send raw", receiver=pex(receiver_address), room=room, data=data.replace("\n", "\\n")
         )
-        print("---- Matrix Send Message " + data)
-
         room.send_text(data)
 
     def _get_room_for_address(self, address: Address, allow_missing_peers=False) -> Optional[Room]:
@@ -1717,6 +1720,8 @@ class MatrixLightClientTransport(MatrixTransport):
         return True
 
     def _receive_delivered_to_lc(self, delivered: Delivered):
+        self.log.info(f"<<<----------------- Receiving Delivered Message for LC with address {self.get_address()}")
+        self.log.info(f"<<<----------------- Message Content {str(delivered)}")
         self.log.debug(
             "Delivered message received", sender=pex(delivered.sender), message=delivered
         )
@@ -1725,7 +1730,8 @@ class MatrixLightClientTransport(MatrixTransport):
         self._raiden_service.on_message(delivered, self.get_address(), True)
 
     def _receive_message_to_lc(self, message: Union[SignedRetrieableMessage, Processed]):
-        print("<<---- Matrix Received Message LC transport" + str(message))
+        self.log.info(f"<<<----------------- Receiving Message for LC with address {self.get_address()}")
+        self.log.info(f"<<<----------------- Message Content {str(message)}")
         assert self._raiden_service is not None
         self.log.debug(
             "Message received",

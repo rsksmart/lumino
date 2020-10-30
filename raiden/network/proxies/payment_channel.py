@@ -181,6 +181,17 @@ class PaymentChannel:
             signed_deposit_tx=signed_deposit_tx
         )
 
+    def settle_channel_light(self,
+                             block_identifier: BlockSpecification,
+                             signed_settle_tx: SignedTransaction):
+        self.token_network.settle_light(
+            given_block_identifier=block_identifier,
+            channel_identifier=self.channel_identifier,
+            creator=self.participant1,
+            partner=self.participant2,
+            signed_settle_tx=signed_settle_tx
+        )
+
     def close(
         self,
         nonce: Nonce,

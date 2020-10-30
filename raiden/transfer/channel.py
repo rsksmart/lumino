@@ -26,7 +26,10 @@ from raiden.transfer.events import (
     EventInvalidReceivedTransferRefund,
     EventInvalidReceivedUnlock,
     SendProcessed,
-    ContractSendChannelUpdateTransferLight)
+    ContractSendChannelUpdateTransferLight,
+    ContractSendChannelBatchUnlockLight,
+    ContractSendChannelSettleLight
+)
 from raiden.transfer.identifiers import CanonicalIdentifier
 from raiden.transfer.mediated_transfer.events import (
     CHANNEL_IDENTIFIER_GLOBAL_QUEUE,
@@ -1456,15 +1459,13 @@ def events_for_expired_lock(
 
         if channel_state.is_light_channel:
             # Store the send lock expired light message
-            receiver_light_client_address = recipient if channel_state.both_participants_are_light_clients else None
-            store_lock_expired = StoreMessageEvent(send_lock_expired.message_identifier,
-                                                   send_lock_expired.payment_identifier,
-                                                   1,
-                                                   LockExpired.from_event(send_lock_expired),
-                                                   False,
-                                                   LightClientProtocolMessageType.PaymentExpired,
-                                                   send_lock_expired.sender,
-                                                   receiver_light_client_address=receiver_light_client_address)
+            store_lock_expired = StoreMessageEvent(message_id=send_lock_expired.message_identifier,
+                                                   payment_id=send_lock_expired.payment_identifier,
+                                                   message_order=1,
+                                                   message=LockExpired.from_event(send_lock_expired),
+                                                   is_signed=False,
+                                                   message_type=LightClientProtocolMessageType.PaymentExpired,
+                                                   light_client_address=send_lock_expired.sender)
             events.append(store_lock_expired)
         events.append(send_lock_expired)
 
@@ -1665,24 +1666,22 @@ def handle_receive_lock_expired_light(
         block_number=block_number,
     )
 
-    events: List[Event] = list()
+    events: List[Event]
     if is_valid:
         assert merkletree, "is_valid_lock_expired should return merkletree if valid"
         channel_state.partner_state.balance_proof = state_change.balance_proof
         channel_state.partner_state.merkletree = merkletree
 
         _del_unclaimed_lock(channel_state.partner_state, state_change.secrethash)
-        sender_light_client_address = state_change.lock_expired.sender if channel_state.both_participants_are_light_clients else None
 
         store_lock_expired = StoreMessageEvent(
-            state_change.lock_expired.message_identifier,
-            payment_id,
-            1,
-            state_change.lock_expired,
-            True,
-            LightClientProtocolMessageType.PaymentExpired,
-            sender_light_client_address=sender_light_client_address,
-            receiver_light_client_address=state_change.lock_expired.recipient
+            message_id=state_change.lock_expired.message_identifier,
+            payment_id=payment_id,
+            message_order=1,
+            message=state_change.lock_expired,
+            is_signed=True,
+            message_type=LightClientProtocolMessageType.PaymentExpired,
+            light_client_address=state_change.lock_expired.recipient
         )
         events = [store_lock_expired]
     else:
@@ -1837,12 +1836,21 @@ def handle_block(
             channel_state.settle_transaction = TransactionExecutionStatus(
                 state_change.block_number, None, None
             )
-            event = ContractSendChannelSettle(
-                canonical_identifier=channel_state.canonical_identifier,
-                triggered_by_block_hash=state_change.block_hash,
-                channel_state= channel_state
-            )
-            events.append(event)
+
+            if channel_state.is_light_channel:
+                event = ContractSendChannelSettleLight(
+                    canonical_identifier=channel_state.canonical_identifier,
+                    triggered_by_block_hash=state_change.block_hash,
+                    channel_state=channel_state
+                )
+                events.append(event)
+            else:
+                event = ContractSendChannelSettle(
+                    canonical_identifier=channel_state.canonical_identifier,
+                    triggered_by_block_hash=state_change.block_hash,
+                    channel_state=channel_state
+                )
+                events.append(event)
 
     while is_deposit_confirmed(channel_state, block_number):
         order_deposit_transaction = heapq.heappop(channel_state.deposit_transaction_queue)
@@ -1971,7 +1979,7 @@ def handle_channel_settled(
 
         channel_state.our_state.onchain_locksroot = our_locksroot
         channel_state.partner_state.onchain_locksroot = partner_locksroot
-
+        
         onchain_unlock = ContractSendChannelBatchUnlock(
             canonical_identifier=channel_state.canonical_identifier,
             participant=channel_state.partner_state.address,
@@ -2004,7 +2012,13 @@ def handle_channel_settled_light(
         channel_state.partner_state.onchain_locksroot = partner_locksroot
 
         #TODO mmartinez7 unlock for light clients
-
+        onchain_unlock = ContractSendChannelBatchUnlockLight(
+            canonical_identifier=channel_state.canonical_identifier,
+            client=channel_state.our_state.address,
+            participant=channel_state.partner_state.address,
+            triggered_by_block_hash=state_change.block_hash,
+        )
+        events.append(onchain_unlock)
     return TransitionResult(channel_state, events)
 
 def handle_channel_newbalance(

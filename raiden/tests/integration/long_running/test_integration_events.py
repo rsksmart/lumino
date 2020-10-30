@@ -151,8 +151,8 @@ def wait_both_channel_deposit(
         app_partner.raiden,
         registry_address,
         token_address,
-        app_partner.raiden.address,
         app_deposit.raiden.address,
+        app_partner.raiden.address,
         total_deposit,
         retry_timeout,
     )
@@ -228,10 +228,6 @@ def run_test_channel_deposit(raiden_chain, deposit, retry_timeout, token_address
         registry_address, token_address, app0.raiden.address, app1.raiden.address, deposit
     )
 
-    wait_both_channel_deposit(app0, app1, registry_address, token_address, deposit, retry_timeout)
-
-    assert_synced_channel_state(token_network_identifier, app0, deposit, [], app1, 0, [])
-
     RaidenAPI(app1.raiden).set_total_channel_deposit(
         registry_address, token_address, app1.raiden.address, app0.raiden.address, deposit
     )
@@ -239,7 +235,6 @@ def run_test_channel_deposit(raiden_chain, deposit, retry_timeout, token_address
     wait_both_channel_deposit(app1, app0, registry_address, token_address, deposit, retry_timeout)
 
     assert_synced_channel_state(token_network_identifier, app0, deposit, [], app1, deposit, [])
-
 
 @pytest.mark.parametrize("number_of_nodes", [2])
 @pytest.mark.parametrize("channels_per_node", [0])
