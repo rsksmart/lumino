@@ -60,5 +60,6 @@ class Layer(ABC, Generic[TN]):
     @abstractmethod
     def construct_light_clients_nodes(self, config):
         """
-         This function must return a list of objects that are subtype of TransportNode
+         This function must return a list of objects that are subtype of TransportNode and correspond to light client
+         transport nodes
         """

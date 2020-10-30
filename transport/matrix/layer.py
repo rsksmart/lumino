@@ -4,6 +4,7 @@ from typing import List
 from urllib.parse import urlparse
 
 import click
+import structlog
 from eth_utils import to_normalized_address, decode_hex, remove_0x_prefix
 from raiden.api.python import RaidenAPI
 from raiden.constants import PATH_FINDING_BROADCASTING_ROOM, MONITORING_BROADCASTING_ROOM
@@ -20,15 +21,19 @@ from raiden.utils.signer import recover
 from transport.layer import Layer as TransportLayer
 from transport.node import Node as TransportNode
 
+log = structlog.get_logger(__name__)
+
 
 class MatrixLayer(TransportLayer[MatrixTransportNode]):
 
-    def construct_full_node(self, config):
+    def __init__(self, config):
         self._prepare_config(config)
+        TransportLayer.__init__(self, config)
+
+    def construct_full_node(self, config):
         return MatrixTransportNode(config["address"], config["transport"]["matrix"])
 
     def construct_light_clients_nodes(self, config):
-        self._prepare_config(config)
         try:
 
             database_path = config["database_path"]
@@ -60,8 +65,8 @@ class MatrixLayer(TransportLayer[MatrixTransportNode]):
                                  light_client["address"])
                         continue
 
-                config = config["transport"]["matrix"]
-                config["current_server_name"] = current_server_name
+                matrix_config = config["transport"]["matrix"]
+                matrix_config["current_server_name"] = current_server_name
                 auth_params = {
                     "light_client_password": light_client["password"],
                     "light_client_display_name": light_client["display_name"],
@@ -69,7 +74,7 @@ class MatrixLayer(TransportLayer[MatrixTransportNode]):
                 }
                 light_client_transport = MatrixLightClientTransportNode(
                     light_client['address'],
-                    config,
+                    matrix_config,
                     auth_params,
                 )
 
