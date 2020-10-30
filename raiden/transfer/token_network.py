@@ -30,50 +30,88 @@ StateChangeWithChannelID = Union[
 ]
 
 
-def subdispatch_to_channel_by_id_and_address(
+def subdispatch_to_channels_by_participant_address(
     token_network_state: TokenNetworkState,
     state_change: StateChangeWithChannelID,
     block_number: BlockNumber,
     block_hash: BlockHash,
-    node_address: AddressHex = None
+    participant_address: AddressHex = None
 ) -> TransitionResult:
-    events = list()
+    if not participant_address:
+        return TransitionResult(token_network_state, [])
+    channel_states = get_channels_to_dispatch_statechange(
+        participant_address, state_change, token_network_state
+    )
+    return subdispatch_to_channels(block_hash, block_number, channel_states, state_change, token_network_state)
 
+
+def subdispatch_to_channels(
+    block_hash: BlockHash,
+    block_number: BlockNumber,
+    channel_states: List[NettingChannelState],
+    state_change: StateChangeWithChannelID,
+    token_network_state: TokenNetworkState
+) -> TransitionResult:
+    events = []
     ids_to_channels = token_network_state.channelidentifiers_to_channels
+    for channel_state in channel_states:
+        channel_result = channel.state_transition(
+            channel_state=channel_state,
+            state_change=state_change,
+            block_number=block_number,
+            block_hash=block_hash,
+        )
 
-    channel_state = None
-    if node_address is not None:
-        if node_address in ids_to_channels:
-            channel_state = ids_to_channels[node_address].get(state_change.channel_identifier)
+        partner_to_channelids = token_network_state.partneraddresses_to_channelidentifiers[
+            channel_state.partner_state.address
+        ]
+
+        channel_identifier = state_change.channel_identifier
+        if channel_result.new_state is None:
+            del ids_to_channels[channel_state.our_state.address][channel_identifier]
+            partner_to_channelids.remove(channel_identifier)
         else:
-            lc_address = views.get_lc_address_by_channel_id_and_partner(token_network_state, node_address,
-                                                                    state_change.canonical_identifier)
-            node_address = lc_address
-            if lc_address in token_network_state.channelidentifiers_to_channels:
-                channel_state = token_network_state.channelidentifiers_to_channels[lc_address].get(
-                    state_change.canonical_identifier.channel_identifier)
-        if channel_state:
-            result = channel.state_transition(
-                channel_state=channel_state,
-                state_change=state_change,
-                block_number=block_number,
-                block_hash=block_hash,
-            )
+            ids_to_channels[channel_state.our_state.address][channel_identifier] = channel_result.new_state
 
-            partner_to_channelids = token_network_state.partneraddresses_to_channelidentifiers[
-                channel_state.partner_state.address
-            ]
-
-            channel_identifier = state_change.channel_identifier
-            if result.new_state is None:
-                del ids_to_channels[node_address][channel_identifier]
-                partner_to_channelids.remove(channel_identifier)
-            else:
-                ids_to_channels[node_address][channel_identifier] = result.new_state
-
-            events.extend(result.events)
-
+        events.extend(channel_result.events)
     return TransitionResult(token_network_state, events)
+
+
+def get_channels_to_dispatch_statechange(
+    participant_address: AddressHex,
+    state_change: StateChangeWithChannelID,
+    token_network_state: TokenNetworkState
+) -> List[NettingChannelState]:
+    """
+    Retrieve which channels the state_change should be dispatched to.
+    In most situations, the state_change should be dispatched to this node's side of the channel.
+    If this node runs in hub mode, and both sides of the channel are light client handled by this hub,
+    then it's needed to dispatch the state_change to both channel_states (one per light client)
+    :param participant_address: address of the participant that fired the state_change
+    :param state_change: state_change to dispatch
+    :param token_network_state: token network where to look for channels
+    :return: Channel where the state_change should be dispatched
+    """
+    channel_states = []
+    ids_to_channels = token_network_state.channelidentifiers_to_channels
+    # is a handled lc or is the node itself?
+    participant_is_ours = participant_address in ids_to_channels
+    if participant_is_ours:
+        channel_state = ids_to_channels[participant_address].get(state_change.channel_identifier)
+        channel_states.append(channel_state)
+        if channel_state.both_participants_are_light_clients:
+            partner_channel = ids_to_channels[channel_state.partner_state.address]
+            partner_channel_state = partner_channel.get(channel_state.identifier)
+            channel_states.append(partner_channel_state)
+    else:
+        lc_address = views.get_lc_address_by_channel_id_and_partner(token_network_state, participant_address,
+                                                                    state_change.canonical_identifier)
+        lc_is_ours = lc_address in ids_to_channels
+        if lc_is_ours:
+            lc_channel_state = ids_to_channels[lc_address].get(state_change.channel_identifier)
+            channel_states.append(lc_channel_state)
+
+    return channel_states
 
 
 def handle_channel_close(
@@ -82,12 +120,12 @@ def handle_channel_close(
     block_number: BlockNumber,
     block_hash: BlockHash,
 ) -> TransitionResult:
-    return subdispatch_to_channel_by_id_and_address(
+    return subdispatch_to_channels_by_participant_address(
         token_network_state=token_network_state,
         state_change=state_change,
         block_number=block_number,
         block_hash=block_hash,
-        node_address=state_change.participant1
+        participant_address=state_change.participant1
     )
 
 
@@ -127,7 +165,6 @@ def handle_channelnew(
             token_network_state.channelidentifiers_to_channels[partner_address][channel_identifier] = channel_state_copy
 
 
-
         addresses_to_ids = token_network_state.partneraddresses_to_channelidentifiers
         addresses_to_ids[our_address].append(channel_identifier)
         addresses_to_ids[partner_address].append(channel_identifier)
@@ -142,12 +179,12 @@ def handle_balance(
     block_hash: BlockHash,
     participant: AddressHex
 ) -> TransitionResult:
-    return subdispatch_to_channel_by_id_and_address(
+    return subdispatch_to_channels_by_participant_address(
         token_network_state=token_network_state,
         state_change=state_change,
         block_number=block_number,
         block_hash=block_hash,
-        node_address=participant
+        participant_address=participant
     )
 
 
@@ -173,12 +210,12 @@ def handle_closed(
             ]
             node_address = participant1
 
-    return subdispatch_to_channel_by_id_and_address(
+    return subdispatch_to_channels_by_participant_address(
         token_network_state=token_network_state,
         state_change=state_change,
         block_number=block_number,
         block_hash=block_hash,
-        node_address=node_address
+        participant_address=node_address
     )
 
 
@@ -188,12 +225,12 @@ def handle_settled(
     block_number: BlockNumber,
     block_hash: BlockHash,
 ) -> TransitionResult:
-    return subdispatch_to_channel_by_id_and_address(
+    return subdispatch_to_channels_by_participant_address(
         token_network_state=token_network_state,
         state_change=state_change,
         block_number=block_number,
         block_hash=block_hash,
-        node_address=state_change.participant1
+        participant_address=state_change.participant1
     )
 
 
@@ -203,7 +240,7 @@ def handle_updated_transfer(
     block_number: BlockNumber,
     block_hash: BlockHash,
 ) -> TransitionResult:
-    return subdispatch_to_channel_by_id_and_address(
+    return subdispatch_to_channels_by_participant_address(
         token_network_state=token_network_state,
         state_change=state_change,
         block_number=block_number,
@@ -323,9 +360,7 @@ def state_transition(
         iteration = handle_settled(token_network_state, state_change, block_number, block_hash)
     elif type(state_change) == ContractReceiveUpdateTransfer:
         assert isinstance(state_change, ContractReceiveUpdateTransfer), MYPY_ANNOTATION
-        iteration = handle_updated_transfer(
-            token_network_state, state_change, block_number, block_hash
-        )
+        iteration = handle_updated_transfer(token_network_state, state_change, block_number, block_hash)
     elif type(state_change) == ContractReceiveChannelBatchUnlock:
         assert isinstance(state_change, ContractReceiveChannelBatchUnlock), MYPY_ANNOTATION
         iteration = handle_batch_unlock(
