@@ -239,25 +239,10 @@ class RaidenEventHandler(EventHandler):
 
     @staticmethod
     def handle_store_message(raiden: "RaidenService", store_message_event: StoreMessageEvent):
-        existing_message: LightClientProtocolMessage
-        if store_message_event.payment_id:
-            # payment related message
-            existing_message = LightClientMessageHandler.get_message_for_payment(
-                message_id=store_message_event.message_id,
-                light_client_address=store_message_event.light_client_address,
-                payment_id=store_message_event.payment_id,
-                order=store_message_event.message_order,
-                message_type=store_message_event.message_type,
-                message_protocol_type=store_message_event.message.to_dict()["type"],
-                wal=raiden.wal
-            )
-        else:
-            existing_message = LightClientMessageHandler.get_message_by_content(
-                light_client_address=store_message_event.light_client_address,
-                message_type=store_message_event.message_type,
-                message=store_message_event.message,
-                wal=raiden.wal
-            )
+        existing_message = RaidenEventHandler.get_existing_lc_message_from_store_event(
+            raiden=raiden,
+            store_message_event=store_message_event
+        )
         if existing_message:
             if not existing_message.is_signed and store_message_event.is_signed:
                 # Update messages that were created by the hub and now are received signed by the light client
@@ -282,6 +267,30 @@ class RaidenEventHandler(EventHandler):
                 wal=raiden.wal,
                 payment_id=store_message_event.payment_id
             )
+
+    @staticmethod
+    def get_existing_lc_message_from_store_event(raiden: "RaidenService",
+                                                 store_message_event: StoreMessageEvent) -> LightClientProtocolMessage:
+        existing_message: LightClientProtocolMessage
+        if store_message_event.payment_id:
+            # payment related message
+            existing_message = LightClientMessageHandler.get_message_for_payment(
+                message_id=store_message_event.message_id,
+                light_client_address=store_message_event.light_client_address,
+                payment_id=store_message_event.payment_id,
+                order=store_message_event.message_order,
+                message_type=store_message_event.message_type,
+                message_protocol_type=store_message_event.message.to_dict()["type"],
+                wal=raiden.wal
+            )
+        else:
+            existing_message = LightClientMessageHandler.get_message_by_content(
+                light_client_address=store_message_event.light_client_address,
+                message_type=store_message_event.message_type,
+                message=store_message_event.message,
+                wal=raiden.wal
+            )
+        return existing_message
 
     @staticmethod
     def handle_send_lockexpired(raiden: "RaidenService", send_lock_expired: SendLockExpired):
