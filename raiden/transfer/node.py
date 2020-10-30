@@ -90,7 +90,7 @@ from raiden.utils.typing import (
     Union,
     Address, AddressHex)
 
-from eth_utils import to_canonical_address, to_checksum_address
+from eth_utils import to_canonical_address
 
 # All State changes that are subdispatched as token network actions
 TokenNetworkStateChange = Union[
@@ -920,7 +920,6 @@ def handle_receive_unlock_light(
     chain_state: ChainState, state_change: ReceiveUnlockLight
 ) -> TransitionResult[ChainState]:
     secrethash = state_change.secrethash
-    print("HANDLE RECEIVE UNLOCK LIGHT")
     return subdispatch_to_paymenttask(chain_state, state_change, state_change.recipient, secrethash)
 
 
