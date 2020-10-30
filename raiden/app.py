@@ -28,7 +28,8 @@ from raiden.settings import (
     DEFAULT_TRANSPORT_UDP_RETRY_INTERVAL,
     INITIAL_PORT,
     RED_EYES_CONTRACT_VERSION,
-    DEFAULT_RIF_COMMS_GRPC_ENDPOINT)
+    DEFAULT_RIF_COMMS_GRPC_ENDPOINT
+)
 from raiden.utils import pex, typing
 from raiden.utils.typing import Address, Any, Dict
 from raiden_contracts.contract_manager import contracts_precompiled_path
