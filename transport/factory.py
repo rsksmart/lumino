@@ -4,7 +4,7 @@ from transport.rif_comms.layer import RifCommsLayer as RifCommsTransportLayer
 
 class Factory:
     """
-    Factory is a class used to choose between transport layer implementations for Lumino.
+    Factory is a class used to choose between transport layer implementations for Lumino and create an instance.
     """
 
     @staticmethod
