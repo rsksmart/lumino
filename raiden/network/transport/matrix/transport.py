@@ -519,11 +519,9 @@ class MatrixTransport(Runnable):
             )
 
         self.log.info(
-            "Send async",
-            receiver_address=pex(receiver_address),
-            message=message,
-            queue_identifier=queue_identifier,
+            f"----------------->>> Sending Message from {self.get_address()} to {to_checksum_address(receiver_address)}"
         )
+        self.log.info(f"----------------->>> Message Content {str(message)}")
 
         self._send_with_retry(queue_identifier, message)
 
@@ -808,6 +806,9 @@ class MatrixTransport(Runnable):
         for message in messages:
             if not isinstance(message, (SignedRetrieableMessage, SignedMessage)):
                 self.log.warning("Received invalid message", message=message)
+            self.log.info(f"<<<----------------- Receiving Message "
+                          f"from {to_checksum_address(message.sender)} to {self.get_address()}")
+            self.log.info(f"<<<----------------- Message Content {str(message)}")
             if isinstance(message, Delivered):
                 self._receive_delivered(message)
             elif isinstance(message, Processed):
@@ -817,6 +818,9 @@ class MatrixTransport(Runnable):
                 self._receive_message(message)
 
         return True
+
+    def get_address(self):
+        return self.address
 
     def _receive_delivered(self, delivered: Delivered):
         self.log.info(
@@ -1445,11 +1449,6 @@ class MatrixLightClientTransport(MatrixTransport):
             self.stop()  # ensure cleanup and wait on subtasks
             raise
 
-    def send_async(self, queue_identifier: QueueIdentifier, message: Message):
-        self.log.info(f"----------------->>> Sending Message from LC with address {self.get_address()}")
-        self.log.info(f"----------------->>> Message Content {str(message)}")
-        super().send_async(queue_identifier=queue_identifier, message=message)
-
     def _send_raw(self, receiver_address: Address, data: str):
         with self._getroom_lock:
             room = self._get_room_for_address(receiver_address)
@@ -1569,9 +1568,6 @@ class MatrixLightClientTransport(MatrixTransport):
                         error_code=error.code,
                     )
             else:
-                print("////VOY A INVITAR /////")
-                print("invitados")
-                print(invitees)
                 # Invite users to existing room
                 member_ids = {user.user_id for user in room.get_joined_members(force_resync=True)}
                 users_to_invite = set(invitees_uids) - member_ids
@@ -1709,6 +1705,9 @@ class MatrixLightClientTransport(MatrixTransport):
         for message in messages:
             if not isinstance(message, (SignedRetrieableMessage, SignedMessage)):
                 self.log.warning("Received invalid message", message=message)
+            self.log.info(f"<<<----------------- Receiving Message "
+                          f"from {to_checksum_address(message.sender)} to {self.get_address()}")
+            self.log.info(f"<<<----------------- Message Content {str(message)}")
             if isinstance(message, Delivered):
                 self._receive_delivered_to_lc(message)
             elif isinstance(message, Processed):
@@ -1720,8 +1719,6 @@ class MatrixLightClientTransport(MatrixTransport):
         return True
 
     def _receive_delivered_to_lc(self, delivered: Delivered):
-        self.log.info(f"<<<----------------- Receiving Delivered Message for LC with address {self.get_address()}")
-        self.log.info(f"<<<----------------- Message Content {str(delivered)}")
         self.log.debug(
             "Delivered message received", sender=pex(delivered.sender), message=delivered
         )
@@ -1730,8 +1727,6 @@ class MatrixLightClientTransport(MatrixTransport):
         self._raiden_service.on_message(delivered, self.get_address(), True)
 
     def _receive_message_to_lc(self, message: Union[SignedRetrieableMessage, Processed]):
-        self.log.info(f"<<<----------------- Receiving Message for LC with address {self.get_address()}")
-        self.log.info(f"<<<----------------- Message Content {str(message)}")
         assert self._raiden_service is not None
         self.log.debug(
             "Message received",

@@ -1874,7 +1874,7 @@ class RaidenAPI:
                 identifier=locked_transfer.message_identifier,
                 message=locked_transfer,
                 signed=False,
-                light_client_address=payment.light_client_address,
+                light_client_address=creator_address,
                 order=order,
                 message_type=LightClientProtocolMessageType.PaymentSuccessful,
                 wal=self.raiden.wal,
