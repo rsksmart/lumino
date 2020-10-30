@@ -12,9 +12,6 @@ from raiden.constants import (
     UINT64_MAX)
 from raiden.exceptions import InsufficientFunds
 from raiden.messages import Delivered, Processed, SecretRequest, ToDevice
-from raiden.network.transport.matrix import AddressReachability, MatrixNode as MatrixTransportNode, _RetryQueue
-from raiden.network.transport.matrix.client import Room
-from raiden.network.transport.matrix.utils import make_room_alias
 from raiden.tests.utils import factories
 from raiden.tests.utils.client import burn_eth
 from raiden.tests.utils.mocks import MockRaidenService

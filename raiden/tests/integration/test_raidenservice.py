@@ -8,7 +8,6 @@ from raiden.constants import (
     PATH_FINDING_BROADCASTING_ROOM,
 )
 from raiden.message_handler import MessageHandler
-from raiden.network.transport import MatrixNode as MatrixTransportNode
 from raiden.raiden_event_handler import RaidenEventHandler
 from raiden.settings import DEFAULT_NUMBER_OF_BLOCK_CONFIRMATIONS
 from raiden.tests.utils.detect_failure import raise_on_failure

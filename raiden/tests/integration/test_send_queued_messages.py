@@ -5,7 +5,6 @@ from raiden import waiting
 from raiden.app import App
 from raiden.constants import EMPTY_PAYMENT_HASH_INVOICE
 from raiden.message_handler import MessageHandler
-from raiden.network.transport import MatrixNode as MatrixTransportNode
 from raiden.raiden_event_handler import RaidenEventHandler
 from raiden.tests.utils.detect_failure import raise_on_failure
 from raiden.tests.utils.events import raiden_events_search_for_item
