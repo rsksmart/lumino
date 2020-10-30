@@ -139,7 +139,7 @@ class LightClientMessageHandler:
                                wal: WriteAheadLog):
 
         if message_type and light_client_address and message:
-            cls.map_message_from_result(wal.storage.get_message_by_content(
+            return cls.map_message_from_result(wal.storage.get_message_by_content(
                 light_client_address=light_client_address,
                 message_type=message_type.value,
                 message=message
