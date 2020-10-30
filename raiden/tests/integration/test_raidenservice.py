@@ -1,7 +1,6 @@
 from unittest.mock import Mock
 
 import pytest
-
 from raiden.app import App
 from raiden.constants import (
     DISCOVERY_DEFAULT_ROOM,
@@ -17,6 +16,7 @@ from raiden.tests.utils.events import search_for_item
 from raiden.tests.utils.network import CHAIN
 from raiden.tests.utils.transfer import transfer
 from raiden.transfer.state_change import Block
+from transport.matrix.transport import MatrixNode as MatrixTransportNode
 
 
 @pytest.mark.parametrize("number_of_nodes", [1])

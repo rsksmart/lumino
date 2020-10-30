@@ -5,7 +5,6 @@ from urllib.parse import urlparse
 
 import click
 from eth_utils import to_normalized_address, decode_hex, remove_0x_prefix
-
 from raiden.api.python import RaidenAPI
 from raiden.constants import PATH_FINDING_BROADCASTING_ROOM, MONITORING_BROADCASTING_ROOM
 from raiden.exceptions import RaidenError
@@ -175,5 +174,3 @@ class MatrixLayer(TransportLayer[MatrixTransportNode]):
             self.add_light_client(light_client_transport)
 
         return light_client
-
-

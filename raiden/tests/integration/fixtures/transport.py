@@ -4,6 +4,7 @@ from raiden.constants import DISCOVERY_DEFAULT_ROOM, PATH_FINDING_BROADCASTING_R
 from raiden.network.transport import MatrixNode as MatrixTransportNode
 from raiden.tests.fixtures.variables import TransportProtocol
 from raiden.tests.utils.transport import generate_synapse_config, matrix_server_starter
+from transport.matrix.transport import MatrixNode as MatrixTransportNode
 
 
 @pytest.fixture

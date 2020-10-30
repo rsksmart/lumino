@@ -24,21 +24,6 @@ from raiden.messages import (
     SignedRetrieableMessage,
     ToDevice,
 )
-from raiden.network.transport.matrix.client import GMatrixClient, Room, User
-from raiden.network.transport.matrix.utils import (
-    JOIN_RETRIES,
-    AddressReachability,
-    UserAddressManager,
-    UserPresence,
-    join_global_room,
-    login_or_register,
-    login_or_register_light_client,
-    make_client,
-    make_room_alias,
-    validate_and_parse_message,
-    validate_userid_signature,
-    get_available_servers_from_config, get_server_url)
-from raiden.network.transport.udp import udp_utils
 from raiden.raiden_service import RaidenService
 from raiden.transfer import views
 from raiden.transfer.identifiers import QueueIdentifier
@@ -73,8 +58,22 @@ from raiden.utils.typing import (
     Union,
     cast,
 )
-from transport.node import Node as TransportNode
+from transport.matrix.client import Room, User
+from transport.matrix.utils import (
+    JOIN_RETRIES,
+    AddressReachability,
+    UserPresence,
+    join_global_room,
+    login_or_register,
+    login_or_register_light_client,
+    make_client,
+    make_room_alias,
+    validate_and_parse_message,
+    validate_userid_signature,
+    get_available_servers_from_config, get_server_url)
 from transport.message import Message as TransportMessage
+from transport.node import Node as TransportNode
+from transport.udp import utils as udp_utils
 
 log = structlog.get_logger(__name__)
 
@@ -1729,5 +1728,3 @@ class MatrixLightClientNode(MatrixNode):
         except (InvalidAddress, UnknownAddress, UnknownTokenAddress):
             self.log.warning("Exception while processing message", exc_info=True)
             return
-
-

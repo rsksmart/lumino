@@ -1,7 +1,5 @@
-from raiden.network.transport.rif_comms import RifCommsNode, RifCommsLightClientNode
-from raiden.utils import Address
+from transport.rif_comms.node import RifCommsNode
 from transport.layer import Layer as TransportLayer
-from transport.node import Node as TransportNode
 
 
 class RifCommsLayer(TransportLayer[RifCommsNode]):

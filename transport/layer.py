@@ -1,10 +1,9 @@
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any
+from typing import TypeVar, Generic
 
 from raiden.utils import Address
 from transport.node import Node as TransportNode
-
-from typing import TypeVar, Generic
 
 TN = TypeVar('TN', bound=TransportNode)
 
@@ -40,6 +39,7 @@ class Layer(ABC, Generic[TN]):
     def light_clients(self) -> List[TN]:
         return self._light_clients
 
+    @abstractmethod
     def light_client_onboarding_data(self, address: Address) -> dict:
         """
         Return the onboarding info necessary for registering light clients on the transport layer.

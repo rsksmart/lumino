@@ -19,6 +19,7 @@ from raiden.transfer import views
 from raiden.transfer.events import EventPaymentSentSuccess
 from raiden.transfer.mediated_transfer.events import SendSecretReveal
 from raiden.utils import BlockNumber
+from transport.matrix.transport import MatrixNode as MatrixTransportNode
 
 
 @pytest.mark.parametrize("deposit", [10])
