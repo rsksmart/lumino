@@ -1,7 +1,6 @@
 from unittest.mock import Mock
 
 import pytest
-
 from raiden.app import App
 from raiden.constants import (
     DISCOVERY_DEFAULT_ROOM,

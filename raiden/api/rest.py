@@ -19,10 +19,6 @@ from flask_cors import CORS
 from flask_restful import Api, abort
 from gevent.pywsgi import WSGIServer
 from hexbytes import HexBytes
-from raiden_webui import RAIDEN_WEBUI_PATH
-from web3 import Web3
-from webargs.flaskparser import parser
-
 from raiden.api.objects import AddressList, PartnersPerTokenList
 from raiden.api.objects import DashboardGeneralItem
 from raiden.api.objects import DashboardGraphItem
@@ -141,6 +137,9 @@ from raiden.utils import (
     typing)
 from raiden.utils.rns import is_rns_address
 from raiden.utils.runnable import Runnable
+from raiden_webui import RAIDEN_WEBUI_PATH
+from web3 import Web3
+from webargs.flaskparser import parser
 
 log = structlog.get_logger(__name__)
 
@@ -2128,7 +2127,6 @@ class RestAPI:
                 errors="The signed data provided is not valid.",
                 status_code=HTTPStatus.CONFLICT,
             )
-
         return api_response(new_light_client)
 
     def get_light_client_protocol_message(self, from_message: int):

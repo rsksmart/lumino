@@ -7,13 +7,9 @@ from urllib.parse import urlparse
 import click
 import filelock
 import structlog
+from definitions import ROOT_DIR
 from eth_utils import encode_hex
 from eth_utils import to_canonical_address, to_normalized_address
-from raiden_contracts.constants import ID_TO_NETWORKNAME
-from raiden_contracts.contract_manager import ContractManager
-from web3 import HTTPProvider, Web3
-
-from definitions import ROOT_DIR
 from raiden.accounts import AccountManager
 from raiden.constants import (
     RAIDEN_DB_VERSION,
@@ -45,11 +41,13 @@ from raiden.ui.startup import (
     setup_contracts_or_exit,
     setup_environment,
     setup_proxies_or_exit,
-    setup_udp_or_exit,
 )
 from raiden.utils import BlockNumber, pex, split_endpoint
 from raiden.utils.typing import Address, Optional, PrivateKey, Tuple
-from transport.matrix.layer import MatrixLayer as MatrixTransportLayer
+from raiden_contracts.constants import ID_TO_NETWORKNAME
+from raiden_contracts.contract_manager import ContractManager
+from transport.factory import Factory
+from web3 import HTTPProvider, Web3
 
 log = structlog.get_logger(__name__)
 
@@ -139,6 +137,7 @@ def run_app(
     resolver_endpoint: str,
     routing_mode: RoutingMode,
     config: Dict[str, Any],
+    grpc_endpoint: str,
     **kwargs: Any,  # FIXME: not used here, but still receives stuff in smoketest
 ):
     # pylint: disable=too-many-locals,too-many-branches,too-many-statements,unused-argument
@@ -193,6 +192,7 @@ def run_app(
     config["services"]["pathfinding_max_paths"] = pathfinding_max_paths
     config["services"]["monitoring_enabled"] = enable_monitoring
     config["chain_id"] = network_id
+    config["transport"]["rif_comms"]["grpc_endpoint"] = grpc_endpoint
 
     setup_environment(config, environment_type)
 
@@ -250,15 +250,7 @@ def run_app(
     #  check_network_params(running_network)
 
     discovery = None
-    if transport == "udp":
-        transport, discovery = setup_udp_or_exit(
-            config, blockchain_service, address, contracts, endpoint_registry_contract_address
-        )
-    elif transport == "matrix":
-        transport = MatrixTransportLayer(config)  # this should be replaced by structured or consistent config use
-    else:
-        raise RuntimeError(f'Unknown transport type "{transport}" given')
-
+    transport_layer = Factory.create(transport, config)
     raiden_event_handler = RaidenEventHandler()
 
     message_handler = MessageHandler()
@@ -276,7 +268,7 @@ def run_app(
             default_registry=proxies.token_network_registry,
             default_secret_registry=proxies.secret_registry,
             default_service_registry=proxies.service_registry,
-            transport=transport,
+            transport=transport_layer,
             raiden_event_handler=raiden_event_handler,
             message_handler=message_handler,
             discovery=discovery,

@@ -21,8 +21,8 @@ _OPTION_DEPENDENCY_TEST_VALUES = {
     "max-unresponsive-time": 100,
     "send-ping-time": 100,
     "nat": "stun",
-    ("transport", "matrix"): "udp",
-    ("transport", "udp"): "matrix",
+    ("transport", "matrix"): "rif-comms",
+    ("transport", "rif-comms"): "matrix",
 }
 
 

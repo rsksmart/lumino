@@ -22,7 +22,7 @@ from raiden.settings import (
     DEFAULT_PATHFINDING_MAX_FEE,
     DEFAULT_PATHFINDING_MAX_PATHS,
     INITIAL_PORT,
-)
+    DEFAULT_RIF_COMMS_GRPC_ENDPOINT)
 from raiden.ui.startup import environment_type_to_contracts_version
 from raiden.utils import get_system_spec
 from raiden.utils.cli import (
@@ -41,7 +41,7 @@ from raiden.utils.cli import (
     validate_option_dependencies,
 )
 
-from .runners import EchoNodeRunner, MatrixRunner, UDPRunner
+from .runners import EchoNodeRunner, LuminoRunner
 
 log = structlog.get_logger(__name__)
 
@@ -52,10 +52,6 @@ OPTION_DEPENDENCIES: Dict[str, List[Tuple[str, Any]]] = {
     "pathfinding-iou-timeout": [("transport", "matrix"), ("routing-mode", RoutingMode.PFS)],
     "enable-monitoring": [("transport", "matrix")],
     "matrix-server": [("transport", "matrix")],
-    "listen-address": [("transport", "udp")],
-    "max-unresponsive-time": [("transport", "udp")],
-    "send-ping-time": [("transport", "udp")],
-    "nat": [("transport", "udp")],
 }
 
 
@@ -63,6 +59,7 @@ def options(func):
     """Having the common app options as a decorator facilitates reuse."""
     # Until https://github.com/pallets/click/issues/926 is fixed the options need to be re-defined
     # for every use
+
     options_ = [
         option(
             "--datadir",
@@ -150,9 +147,9 @@ def options(func):
         option("--console", help="Start the interactive raiden console", is_flag=True),
         option(
             "--transport",
-            help="Transport system to use. UDP is not recommended",
-            type=click.Choice(["udp", "matrix"]),
-            default="matrix",
+            help="Transport system to use",
+            type=click.Choice(["rif-comms", "matrix"]),
+            default="rif-comms",
             show_default=True,
         ),
         option(
@@ -343,6 +340,20 @@ def options(func):
             ),
         ),
         option_group(
+            "RIF Comms Transport Options",
+            option(
+                "--grpc-endpoint",
+                help=(
+                    "RIF Comms server to use for communication.\n"
+                    "Valid values:\n"
+                    "A URL pointing to a RIF Comms server"
+                ),
+                default=DEFAULT_RIF_COMMS_GRPC_ENDPOINT,
+                type=str,
+                show_default=True,
+            ),
+        ),
+        option_group(
             "Logging Options",
             option(
                 "--log-config",
@@ -452,7 +463,6 @@ def options(func):
             ),
         ),
     ]
-
     for option_ in reversed(options_):
         func = option_(func)
     return func
@@ -474,13 +484,7 @@ def run(ctx, **kwargs):
         ctx.obj = kwargs
         return
 
-    if kwargs["transport"] == "udp":
-        runner = UDPRunner(kwargs, ctx)
-    elif kwargs["transport"] == "matrix":
-        runner = MatrixRunner(kwargs, ctx)
-    else:
-        # Shouldn't happen
-        raise RuntimeError(f"Invalid transport type '{kwargs['transport']}'")
+    runner = LuminoRunner(kwargs, ctx)
 
     click.secho(runner.welcome_string, fg="green")
     click.secho(

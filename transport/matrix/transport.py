@@ -10,7 +10,6 @@ from gevent.event import Event
 from gevent.lock import Semaphore
 from gevent.queue import JoinableQueue
 from matrix_client.errors import MatrixRequestError
-
 from raiden.constants import DISCOVERY_DEFAULT_ROOM
 from raiden.exceptions import InvalidAddress, UnknownAddress, UnknownTokenAddress
 from raiden.message_handler import MessageHandler
@@ -59,11 +58,10 @@ from raiden.utils.typing import (
     Union,
     cast,
 )
-from transport.matrix.client import GMatrixClient, Room, User
+from transport.matrix.client import Room, User
 from transport.matrix.utils import (
     JOIN_RETRIES,
     AddressReachability,
-    UserAddressManager,
     UserPresence,
     join_global_room,
     login_or_register,
@@ -72,7 +70,10 @@ from transport.matrix.utils import (
     make_room_alias,
     validate_and_parse_message,
     validate_userid_signature,
-    get_available_servers_from_config, get_server_url)
+    get_available_servers_from_config,
+    get_server_url,
+    UserAddressManager
+)
 from transport.message import Message as TransportMessage
 from transport.node import Node as TransportNode
 from transport.udp import utils as udp_utils

@@ -1,29 +1,20 @@
-from typing import Any, Dict, List
-
 from raiden.utils import Address
-from transport.layer import Layer as TransportLayer
 from transport.node import Node as TransportNode
-from transport.rif_comms.node import RifCommsLightClientNode as RifCommsLightClientTransportNode
+from transport.rif_comms.node import RifCommsNode
+from transport.layer import Layer as TransportLayer
 
 
-class RifCommsLayer(TransportLayer):
-    def __init__(self, config: Dict[str, Any]):
-        raise NotImplementedError
+class RifCommsLayer(TransportLayer[RifCommsNode]):
 
-    @property
-    def full_node(self) -> TransportNode:
-        return self._full_node
+    def construct_full_node(self, config):
+        return RifCommsNode(config["address"], config["transport"]["rif_comms"])
 
-    @property
-    def light_clients(self) -> List[TransportNode]:
-        return self._light_clients
+    def construct_light_clients_nodes(self, config):
+        pass
 
-    @staticmethod
-    def new_light_client(address: Address, config: dict, auth_params: dict) -> TransportNode:
-        return RifCommsLightClientTransportNode(address, config, auth_params)
+    def light_client_onboarding_data(self, address: Address) -> dict:
+        pass
 
-    def add_light_client(self, light_client_transport: TransportNode):
-        self._light_clients.append(light_client_transport)
+    def register_light_client(self, raiden_api: 'RaidenAPI', registration_data: dict) -> TransportNode:
+        pass
 
-    def remove_light_client(self, light_client_transport: TransportNode):
-        self._light_clients.remove(light_client_transport)

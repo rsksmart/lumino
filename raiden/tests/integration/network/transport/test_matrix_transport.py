@@ -4,9 +4,8 @@ from unittest.mock import MagicMock
 
 import gevent
 import pytest
-from gevent import Timeout
-
 import raiden
+from gevent import Timeout
 from raiden.constants import (
     MONITORING_BROADCASTING_ROOM,
     PATH_FINDING_BROADCASTING_ROOM,

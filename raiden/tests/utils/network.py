@@ -4,7 +4,6 @@ from copy import deepcopy
 
 import gevent
 from gevent import server
-
 from raiden import waiting
 from raiden.app import App
 from raiden.network.blockchain_service import BlockChainService
