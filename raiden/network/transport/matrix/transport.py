@@ -518,11 +518,6 @@ class MatrixTransport(Runnable):
                 "Do not use send_async for {} messages".format(message.__class__.__name__)
             )
 
-        self.log.info(
-            f"----------------->>> Sending Message from {self.get_address()} to {to_checksum_address(receiver_address)}"
-        )
-        self.log.info(f"----------------->>> Message Content {str(message)}")
-
         self._send_with_retry(queue_identifier, message)
 
     def send_global(self, room: str, message: Message) -> None:
@@ -806,8 +801,8 @@ class MatrixTransport(Runnable):
         for message in messages:
             if not isinstance(message, (SignedRetrieableMessage, SignedMessage)):
                 self.log.warning("Received invalid message", message=message)
-            self.log.info(f"<<<----------------- Receiving Message "
-                          f"from {to_checksum_address(message.sender)} to {self.get_address()}")
+            self.log.info(f"<<<----------------- Receiving Message from"
+                          f" {to_checksum_address(message.sender)} to {to_checksum_address(self.get_address())}")
             self.log.info(f"<<<----------------- Message Content {str(message)}")
             if isinstance(message, Delivered):
                 self._receive_delivered(message)
@@ -890,8 +885,11 @@ class MatrixTransport(Runnable):
         self.log.debug(
             "Send raw", receiver=pex(receiver_address), room=room, data=data.replace("\n", "\\n")
         )
-        print("---->> Matrix Send Message " + data)
-
+        self.log.info(
+            f"----------------->>> Sending Message from {to_checksum_address(self.get_address())} "
+            f"to {to_checksum_address(receiver_address)}"
+        )
+        self.log.info(f"----------------->>> Message Content {data}")
         room.send_text(data)
 
     def _get_room_for_address(self, address: Address, allow_missing_peers=False) -> Optional[Room]:
@@ -1460,6 +1458,11 @@ class MatrixLightClientTransport(MatrixTransport):
         self.log.info(
             "Send raw", receiver=pex(receiver_address), room=room, data=data.replace("\n", "\\n")
         )
+        self.log.info(
+            f"----------------->>> Sending LC Message from {to_checksum_address(self.get_address())} "
+            f"to {to_checksum_address(receiver_address)}"
+        )
+        self.log.info(f"----------------->>> Message Content {data}")
         room.send_text(data)
 
     def _get_room_for_address(self, address: Address, allow_missing_peers=False) -> Optional[Room]:
@@ -1505,9 +1508,8 @@ class MatrixLightClientTransport(MatrixTransport):
         else:
             room = self._get_public_room(room_name, invitees=peers)
 
-        peer_ids = self._address_mgr.get_userids_for_address(address)
         member_ids = {member.user_id for member in room.get_joined_members(force_resync=True)}
-        room_is_empty = not bool(peer_ids & member_ids)
+        room_is_empty = not bool(member_ids)
         if room_is_empty:
             last_ex: Optional[Exception] = None
             retry_interval = 0.1
@@ -1517,7 +1519,7 @@ class MatrixLightClientTransport(MatrixTransport):
                     member_ids = {member.user_id for member in room.get_joined_members()}
                 except MatrixRequestError as e:
                     last_ex = e
-                room_is_empty = not bool(peer_ids & member_ids)
+                    room_is_empty = not bool(member_ids)
                 if room_is_empty or last_ex:
                     if self._stop_event.wait(retry_interval):
                         break
@@ -1705,8 +1707,8 @@ class MatrixLightClientTransport(MatrixTransport):
         for message in messages:
             if not isinstance(message, (SignedRetrieableMessage, SignedMessage)):
                 self.log.warning("Received invalid message", message=message)
-            self.log.info(f"<<<----------------- Receiving Message "
-                          f"from {to_checksum_address(message.sender)} to {self.get_address()}")
+            self.log.info(f"<<<----------------- Receiving LC Message from "
+                          f"{to_checksum_address(message.sender)} to {to_checksum_address(self.get_address())}")
             self.log.info(f"<<<----------------- Message Content {str(message)}")
             if isinstance(message, Delivered):
                 self._receive_delivered_to_lc(message)
