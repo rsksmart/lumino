@@ -87,14 +87,14 @@ def get_channels_to_dispatch_statechange(
     In most situations, the state_change should be dispatched to this node's side of the channel.
     If this node runs in hub mode, and both sides of the channel are light client handled by this hub,
     then it's needed to dispatch the state_change to both channel_states (one per light client)
-    :param participant_address: address of the participan that fired the state_change
+    :param participant_address: address of the participant that fired the state_change
     :param state_change: state_change to dispatch
     :param token_network_state: token network where to look for channels
-    :return: Channel where  the state_change should be dispatched
+    :return: Channel where the state_change should be dispatched
     """
     channel_states = []
     ids_to_channels = token_network_state.channelidentifiers_to_channels
-    # is a handled lc or is the node itself'
+    # is a handled lc or is the node itself?
     participant_is_ours = participant_address in ids_to_channels
     if participant_is_ours:
         channel_state = ids_to_channels[participant_address].get(state_change.channel_identifier)
@@ -154,6 +154,16 @@ def handle_channelnew(
     if channel_identifier not in token_network_state.channelidentifiers_to_channels[our_address]:
 
         token_network_state.channelidentifiers_to_channels[our_address][channel_identifier] = channel_state
+
+
+        if channel_state.both_participants_are_light_clients:
+            ## 2 light clients using the same Hub
+            if partner_address not in token_network_state.channelidentifiers_to_channels:
+                token_network_state.channelidentifiers_to_channels[partner_address] = dict()
+            channel_state_copy = copy.deepcopy(channel_state)
+            channel_state_copy.our_state, channel_state_copy.partner_state = channel_state_copy.partner_state, channel_state_copy.our_state
+            token_network_state.channelidentifiers_to_channels[partner_address][channel_identifier] = channel_state_copy
+
 
         addresses_to_ids = token_network_state.partneraddresses_to_channelidentifiers
         addresses_to_ids[our_address].append(channel_identifier)
