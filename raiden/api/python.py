@@ -632,6 +632,7 @@ class RaidenAPI:
         channel_state = channel_list[0]
 
         channel_proxy = self.raiden.chain.payment_channel(
+            participant1=creator_address,
             canonical_identifier=channel_state.canonical_identifier
         )
 
@@ -1874,7 +1875,7 @@ class RaidenAPI:
                 identifier=locked_transfer.message_identifier,
                 message=locked_transfer,
                 signed=False,
-                light_client_address=payment.light_client_address,
+                light_client_address=creator_address,
                 order=order,
                 message_type=LightClientProtocolMessageType.PaymentSuccessful,
                 wal=self.raiden.wal,

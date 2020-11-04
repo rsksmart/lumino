@@ -557,19 +557,17 @@ class RaidenEventHandler(EventHandler):
         balance_proof = channel_update_event.balance_proof
 
         # checking that this balance proof exists on the database
-        db_balance_proof = raiden.wal.storage.get_latest_light_client_non_closing_balance_proof(channel_id=balance_proof.channel_identifier)
+        db_balance_proof = raiden.wal.storage.get_latest_light_client_non_closing_balance_proof(
+            channel_id=balance_proof.channel_identifier,
+            non_closing_participant=channel_update_event.lc_address
+        )
 
         if db_balance_proof:
             canonical_identifier = balance_proof.canonical_identifier
             channel = raiden.chain.payment_channel(participant1=channel_update_event.lc_address,
                                                    canonical_identifier=canonical_identifier)
-            if channel_update_event.lc_address == channel.participant2:
-                partner_address = channel.participant1
-            else:
-                partner_address = channel.participant2
+            partner_address = channel.participant2
             channel.update_transfer_light(
-                lc_address=channel_update_event.lc_address,
-                partner_address=partner_address,
                 nonce=balance_proof.nonce,
                 balance_hash=balance_proof.balance_hash,
                 additional_hash=balance_proof.message_hash,
@@ -755,8 +753,10 @@ class RaidenEventHandler(EventHandler):
     ):
         """ Handles settlement for normal node. """
 
+        our_address = channel_settle_event.channel_state.our_state.address
         settlement_parameters = RaidenEventHandler.process_data_and_get_settlement_parameters(
             raiden,
+            our_address,
             channel_settle_event.token_network_identifier,
             channel_settle_event.channel_identifier,
             channel_settle_event.triggered_by_block_hash
@@ -769,6 +769,7 @@ class RaidenEventHandler(EventHandler):
         )
 
         payment_channel: PaymentChannel = raiden.chain.payment_channel(
+            participant1=our_address,
             canonical_identifier=canonical_identifier
         )
 
@@ -789,8 +790,10 @@ class RaidenEventHandler(EventHandler):
 
         log.debug("Handling channel settle light")
 
+        our_address = channel_settle_light_event.channel_state.our_state.address
         settlement_parameters = RaidenEventHandler.process_data_and_get_settlement_parameters(
             raiden,
+            our_address,
             channel_settle_light_event.token_network_identifier,
             channel_settle_light_event.channel_identifier,
             channel_settle_light_event.triggered_by_block_hash
@@ -803,6 +806,7 @@ class RaidenEventHandler(EventHandler):
         )
 
         payment_channel: PaymentChannel = raiden.chain.payment_channel(
+            participant1=our_address,
             canonical_identifier=canonical_identifier
         )
 
@@ -868,6 +872,7 @@ class RaidenEventHandler(EventHandler):
 
     @staticmethod
     def process_data_and_get_settlement_parameters(raiden: "RaidenService",
+                                                   our_address: Address,
                                                    token_network_identifier: TokenNetworkID,
                                                    channel_identifier: ChannelID,
                                                    triggered_by_block_hash: BlockHash) -> SettlementParameters:
@@ -881,6 +886,7 @@ class RaidenEventHandler(EventHandler):
             channel_identifier=channel_identifier,
         )
         payment_channel: PaymentChannel = raiden.chain.payment_channel(
+            participant1=our_address,
             canonical_identifier=canonical_identifier
         )
         token_network_proxy: TokenNetwork = payment_channel.token_network

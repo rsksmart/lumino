@@ -1928,7 +1928,7 @@ def handle_channel_closed_light(
             # The channel was closed by our partner, if there is a balance
             # proof available update this node half of the state
             update = ContractSendChannelUpdateTransferLight(
-                lc_address=state_change.light_client_address,
+                lc_address=state_change.non_closing_participant,
                 expiration=expiration,
                 balance_proof=balance_proof,
                 triggered_by_block_hash=state_change.block_hash,
@@ -1979,7 +1979,7 @@ def handle_channel_settled(
 
         channel_state.our_state.onchain_locksroot = our_locksroot
         channel_state.partner_state.onchain_locksroot = partner_locksroot
-        
+
         onchain_unlock = ContractSendChannelBatchUnlock(
             canonical_identifier=channel_state.canonical_identifier,
             participant=channel_state.partner_state.address,
