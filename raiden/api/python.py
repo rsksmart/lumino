@@ -632,7 +632,7 @@ class RaidenAPI:
         channel_state = channel_list[0]
 
         channel_proxy = self.raiden.chain.payment_channel(
-            participant1=creator_address,
+            creator_address=creator_address,
             canonical_identifier=channel_state.canonical_identifier
         )
 

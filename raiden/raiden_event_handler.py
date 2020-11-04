@@ -496,7 +496,7 @@ class RaidenEventHandler(EventHandler):
             message_hash = EMPTY_MESSAGE_HASH
 
         channel_proxy = raiden.chain.payment_channel(
-            participant1=channel_close_event.our_address,
+            creator_address=channel_close_event.our_address,
             canonical_identifier=CanonicalIdentifier(
                 chain_identifier=chain_state.chain_id,
                 token_network_address=channel_close_event.token_network_identifier,
@@ -528,7 +528,7 @@ class RaidenEventHandler(EventHandler):
         if balance_proof:
             canonical_identifier = balance_proof.canonical_identifier
             channel = raiden.chain.payment_channel(
-                participant1=channel_update_event.our_address,
+                creator_address=channel_update_event.our_address,
                 canonical_identifier=canonical_identifier
             )
 
@@ -564,7 +564,7 @@ class RaidenEventHandler(EventHandler):
 
         if db_balance_proof:
             canonical_identifier = balance_proof.canonical_identifier
-            channel = raiden.chain.payment_channel(participant1=channel_update_event.lc_address,
+            channel = raiden.chain.payment_channel(creator_address=channel_update_event.lc_address,
                                                    canonical_identifier=canonical_identifier)
             partner_address = channel.participant2
             channel.update_transfer_light(
@@ -591,7 +591,7 @@ class RaidenEventHandler(EventHandler):
         participant = channel_unlock_event.participant
 
         payment_channel: PaymentChannel = raiden.chain.payment_channel(
-            participant1=participant,
+            creator_address=participant,
             canonical_identifier=canonical_identifier
         )
 
@@ -769,7 +769,7 @@ class RaidenEventHandler(EventHandler):
         )
 
         payment_channel: PaymentChannel = raiden.chain.payment_channel(
-            participant1=our_address,
+            creator_address=our_address,
             canonical_identifier=canonical_identifier
         )
 
@@ -806,7 +806,7 @@ class RaidenEventHandler(EventHandler):
         )
 
         payment_channel: PaymentChannel = raiden.chain.payment_channel(
-            participant1=our_address,
+            creator_address=our_address,
             canonical_identifier=canonical_identifier
         )
 
@@ -886,7 +886,7 @@ class RaidenEventHandler(EventHandler):
             channel_identifier=channel_identifier,
         )
         payment_channel: PaymentChannel = raiden.chain.payment_channel(
-            participant1=our_address,
+            creator_address=our_address,
             canonical_identifier=canonical_identifier
         )
         token_network_proxy: TokenNetwork = payment_channel.token_network

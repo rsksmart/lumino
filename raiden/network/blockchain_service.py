@@ -213,7 +213,7 @@ class BlockChainService:
 
         return self.address_to_service_registry[address]
 
-    def payment_channel(self, participant1: Address, canonical_identifier: CanonicalIdentifier) -> PaymentChannel:
+    def payment_channel(self, creator_address: Address, canonical_identifier: CanonicalIdentifier) -> PaymentChannel:
 
         token_network_address = TokenNetworkAddress(canonical_identifier.token_network_address)
         channel_id = canonical_identifier.channel_identifier
@@ -224,10 +224,10 @@ class BlockChainService:
             raise ValueError("channel identifier must be of type T_ChannelID")
 
         with self._payment_channel_creation_lock:
-            dict_key = (token_network_address, channel_id)
-            if participant1 not in self.identifier_to_payment_channel:
-                self.identifier_to_payment_channel[participant1] = dict()
-            if dict_key not in self.identifier_to_payment_channel[participant1]:
+            channel_identifier = (token_network_address, channel_id)
+            if creator_address not in self.identifier_to_payment_channel:
+                self.identifier_to_payment_channel[creator_address] = dict()
+            if channel_identifier not in self.identifier_to_payment_channel[creator_address]:
                 token_network = self.token_network(token_network_address)
 
                 channel_proxy = PaymentChannel(
@@ -235,10 +235,10 @@ class BlockChainService:
                     channel_identifier=channel_id,
                     contract_manager=self.contract_manager,
                 )
-                channel_proxy.swap_participants(participant1)
-                self.identifier_to_payment_channel[participant1][dict_key] = channel_proxy
+                channel_proxy.swap_participants(creator_address)
+                self.identifier_to_payment_channel[creator_address][channel_identifier] = channel_proxy
 
-        return self.identifier_to_payment_channel[participant1][dict_key]
+        return self.identifier_to_payment_channel[creator_address][channel_identifier]
 
     def user_deposit(self, address: Address) -> UserDeposit:
         if not is_binary_address(address):

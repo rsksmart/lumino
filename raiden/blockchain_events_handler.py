@@ -93,27 +93,35 @@ def handle_channel_new(raiden: "RaidenService", event: Event):
     participant1 = args["participant1"]
     participant2 = args["participant2"]
 
+
     # Check if at least one of the implied participants is a LC handled by the node
     is_participant1_handled_lc = LightClientService.is_handled_lc(to_checksum_address(encode_hex(participant1)),
                                                                   raiden.wal)
     is_participant2_handled_lc = LightClientService.is_handled_lc(to_checksum_address(encode_hex(participant2)),
                                                                   raiden.wal)
     is_light_channel = is_participant1_handled_lc or is_participant2_handled_lc
-    if is_light_channel:
-        if is_participant1_handled_lc:
-            create_light_channel(block_hash, block_number, channel_identifier,
-                                 participant1, participant2, token_network_identifier,
-                                 transaction_hash, raiden)
-        if is_participant2_handled_lc:
-            create_light_channel(block_hash, block_number, channel_identifier,
-                                 participant2, participant1, token_network_identifier,
-                                 transaction_hash, raiden)
-    elif raiden.address == participant1:
-        create_channel(block_hash, block_number, channel_identifier, participant1, participant2, raiden,
-                       token_network_identifier, transaction_hash)
-    elif raiden.address == participant2:
-        create_channel(block_hash, block_number, channel_identifier, participant2, participant1, raiden,
-                       token_network_identifier, transaction_hash)
+    if is_light_channel or raiden.address in (participant1, participant2):
+        if raiden.address == participant1 or is_participant1_handled_lc:
+            create_channel(
+                block_hash,
+                block_number,
+                channel_identifier,
+                participant1,
+                participant2,
+                token_network_identifier,
+                transaction_hash,
+                raiden
+            )
+        if raiden.address == participant2 or is_participant2_handled_lc:
+            create_channel(
+                block_hash,
+                block_number,
+                channel_identifier,
+                participant2,
+                participant1,
+                token_network_identifier,
+                transaction_hash,
+                raiden)
     # Raiden node is not participant of channel. Lc are not participants
     else:
         new_route = ContractReceiveRouteNew(
@@ -137,26 +145,8 @@ def handle_channel_new(raiden: "RaidenService", event: Event):
     raiden.add_pending_greenlet(retry_connect)
 
 
-def create_light_channel(
-    block_hash,
-    block_number,
-    channel_identifier,
-    participant1,
-    participant2,
-    token_network_identifier,
-    transaction_hash,
-    raiden):
-    channel_state = create_channel(block_hash, block_number, channel_identifier, participant1, participant2, raiden,
-                                   token_network_identifier, transaction_hash)
-
-    partner_address = channel_state.partner_state.address
-
-    if ConnectionManager.BOOTSTRAP_ADDR != partner_address:
-        raiden.start_health_check_for(partner_address, participant1)
-
-
-def create_channel(block_hash, block_number, channel_identifier, participant1, participant2, raiden,
-                   token_network_identifier, transaction_hash):
+def create_channel(block_hash, block_number, channel_identifier, participant1, participant2,
+                   token_network_identifier, transaction_hash, raiden):
     channel_state = create_channel_state_and_proxy(block_number,
                                                    channel_identifier,
                                                    token_network_identifier,
@@ -170,6 +160,12 @@ def create_channel(block_hash, block_number, channel_identifier, participant1, p
         block_hash=block_hash,
     )
     raiden.handle_and_track_state_change(new_channel)
+
+    partner_address = channel_state.partner_state.address
+
+    if ConnectionManager.BOOTSTRAP_ADDR != partner_address:
+        raiden.start_health_check_for(partner_address, participant1)
+
     return channel_state
 
 
@@ -183,11 +179,9 @@ def create_channel_state_and_proxy(block_number,
                                                                   raiden.wal)
     is_participant2_handled_lc = LightClientService.is_handled_lc(to_checksum_address(encode_hex(participant2)),
                                                                   raiden.wal)
-    is_light_channel = is_participant1_handled_lc or is_participant2_handled_lc
-    both_participants_are_light_clients = is_participant1_handled_lc and is_participant2_handled_lc
 
     channel_proxy = raiden.chain.payment_channel(
-        participant1=participant1,
+        creator_address=participant1,
         canonical_identifier=CanonicalIdentifier(
             chain_identifier=views.state_from_raiden(raiden).chain_id,
             token_network_address=token_network_identifier,
@@ -195,17 +189,16 @@ def create_channel_state_and_proxy(block_number,
         )
     )
     token_address = channel_proxy.token_address()
-    channel_state = get_channel_state(
+    return get_channel_state(
         token_address=typing.TokenAddress(token_address),
         payment_network_identifier=raiden.default_registry.address,
         token_network_address=token_network_identifier,
         reveal_timeout=raiden.config["reveal_timeout"],
         payment_channel_proxy=channel_proxy,
         opened_block_number=block_number,
-        is_light_channel=is_light_channel,
-        both_participants_are_light_clients=both_participants_are_light_clients
+        is_light_channel=is_participant1_handled_lc or is_participant2_handled_lc,
+        both_participants_are_light_clients=is_participant1_handled_lc and is_participant2_handled_lc
     )
-    return channel_state
 
 
 def handle_channel_new_balance(raiden: "RaidenService", event: Event):
