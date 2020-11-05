@@ -95,33 +95,62 @@ def handle_channel_new(raiden: "RaidenService", event: Event):
 
 
     # Check if at least one of the implied participants is a LC handled by the node
-    is_participant1_handled_lc = LightClientService.is_handled_lc(to_checksum_address(encode_hex(participant1)),
-                                                                  raiden.wal)
-    is_participant2_handled_lc = LightClientService.is_handled_lc(to_checksum_address(encode_hex(participant2)),
-                                                                  raiden.wal)
+    is_participant1_handled_lc = LightClientService.is_handled_lc(
+        client_address=to_checksum_address(encode_hex(participant1)),
+        wal=raiden.wal
+    )
+    is_participant2_handled_lc = LightClientService.is_handled_lc(
+        client_address=to_checksum_address(encode_hex(participant2)),
+        wal=raiden.wal
+    )
     is_light_channel = is_participant1_handled_lc or is_participant2_handled_lc
-    if is_light_channel or raiden.address in (participant1, participant2):
-        if raiden.address == participant1 or is_participant1_handled_lc:
+    if is_light_channel:
+        if is_participant1_handled_lc:
             create_channel(
-                block_hash,
-                block_number,
-                channel_identifier,
-                participant1,
-                participant2,
-                token_network_identifier,
-                transaction_hash,
-                raiden
+                block_hash=block_hash,
+                block_number=block_number,
+                channel_identifier=channel_identifier,
+                participant1=participant1,
+                participant2=participant2,
+                token_network_identifier=token_network_identifier,
+                transaction_hash=transaction_hash,
+                raiden=raiden,
+                creator_address_for_health_check=participant1
             )
-        if raiden.address == participant2 or is_participant2_handled_lc:
+        if is_participant2_handled_lc:
             create_channel(
-                block_hash,
-                block_number,
-                channel_identifier,
-                participant2,
-                participant1,
-                token_network_identifier,
-                transaction_hash,
-                raiden)
+                block_hash=block_hash,
+                block_number=block_number,
+                channel_identifier=channel_identifier,
+                participant1=participant2,
+                participant2=participant1,
+                token_network_identifier=token_network_identifier,
+                transaction_hash=transaction_hash,
+                raiden=raiden,
+                creator_address_for_health_check=participant2
+            )
+    elif raiden.address == participant1:
+        create_channel(
+            block_hash=block_hash,
+            block_number=block_number,
+            channel_identifier=channel_identifier,
+            participant1=participant1,
+            participant2=participant2,
+            token_network_identifier=token_network_identifier,
+            transaction_hash=transaction_hash,
+            raiden=raiden
+        )
+    elif raiden.address == participant2:
+        create_channel(
+            block_hash=block_hash,
+            block_number=block_number,
+            channel_identifier=channel_identifier,
+            participant1=participant2,
+            participant2=participant1,
+            token_network_identifier=token_network_identifier,
+            transaction_hash=transaction_hash,
+            raiden=raiden
+        )
     # Raiden node is not participant of channel. Lc are not participants
     else:
         new_route = ContractReceiveRouteNew(
@@ -145,8 +174,15 @@ def handle_channel_new(raiden: "RaidenService", event: Event):
     raiden.add_pending_greenlet(retry_connect)
 
 
-def create_channel(block_hash, block_number, channel_identifier, participant1, participant2,
-                   token_network_identifier, transaction_hash, raiden):
+def create_channel(block_hash,
+                   block_number,
+                   channel_identifier,
+                   participant1,
+                   participant2,
+                   token_network_identifier,
+                   transaction_hash,
+                   raiden,
+                   creator_address_for_health_check=None):
     channel_state = create_channel_state_and_proxy(block_number,
                                                    channel_identifier,
                                                    token_network_identifier,
@@ -164,7 +200,7 @@ def create_channel(block_hash, block_number, channel_identifier, participant1, p
     partner_address = channel_state.partner_state.address
 
     if ConnectionManager.BOOTSTRAP_ADDR != partner_address:
-        raiden.start_health_check_for(partner_address, participant1)
+        raiden.start_health_check_for(partner_address, creator_address_for_health_check)
 
     return channel_state
 
