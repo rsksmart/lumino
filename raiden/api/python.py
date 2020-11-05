@@ -1859,28 +1859,26 @@ class RaidenAPI:
             )
 
             # Create the light_client_payment
-            is_lc_initiator = 1
-            payment = LightClientPayment(partner_address,
-                                         is_lc_initiator, channel_state.token_network_identifier,
-                                         amount,
-                                         str(date.today()),
-                                         LightClientPaymentStatus.Pending,
-                                         locked_transfer.payment_identifier,
-                                         creator_address, partner_address)
+            payment = LightClientPayment(partner_address=partner_address,
+                                         is_lc_initiator=1,
+                                         token_network_id=channel_state.token_network_identifier,
+                                         amount=amount,
+                                         created_on=str(date.today()),
+                                         payment_status=LightClientPaymentStatus.Pending,
+                                         identifier=locked_transfer.payment_identifier)
+
             # Persist the light_client_protocol_message associated
             order = 1
             LightClientMessageHandler.store_light_client_payment(payment, self.raiden.wal.storage)
-            receiver_light_client_address = payment.receiver_light_client_address if channel_state.both_participants_are_light_clients else None
             lcpm_id = LightClientMessageHandler.store_light_client_protocol_message(
-                locked_transfer.message_identifier,
-                locked_transfer,
-                False,
-                payment.sender_light_client_address,
-                receiver_light_client_address,
-                order,
-                LightClientProtocolMessageType.PaymentSuccessful,
-                self.raiden.wal,
-                payment.payment_id
+                identifier=locked_transfer.message_identifier,
+                message=locked_transfer,
+                signed=False,
+                light_client_address=creator_address,
+                order=order,
+                message_type=LightClientProtocolMessageType.PaymentSuccessful,
+                wal=self.raiden.wal,
+                payment_id=payment.payment_id
             )
             payment_hub_message = PaymentHubMessage(payment_id=payment.payment_id,
                                                     message_order=order,

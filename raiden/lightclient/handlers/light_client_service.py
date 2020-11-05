@@ -64,6 +64,12 @@ class LightClientService:
     def get_light_client_payment(cls, payment_id, storage: SerializedSQLiteStorage):
         payment = storage.get_light_client_payment(payment_id)
         if payment:
-            payment = LightClientPayment(payment[3], payment[4], payment[5], int(payment[6]), payment[7],
-                                         payment[8], payment[0], payment[1], payment[2])
+            payment = LightClientPayment(identifier=payment[0],
+                                         creator_address=payment[1],
+                                         partner_address=payment[2],
+                                         is_lc_initiator=payment[3],
+                                         token_network_id=payment[4],
+                                         amount=int(payment[5]),
+                                         created_on=payment[6],
+                                         payment_status=payment[7])
         return payment

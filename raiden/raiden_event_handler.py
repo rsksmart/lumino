@@ -10,7 +10,8 @@ from raiden.billing.invoices.handlers.invoice_handler import handle_receive_even
 from raiden.constants import EMPTY_BALANCE_HASH, EMPTY_HASH, EMPTY_MESSAGE_HASH, EMPTY_SIGNATURE
 from raiden.exceptions import ChannelOutdatedError, RaidenUnrecoverableError
 from raiden.lightclient.handlers.light_client_message_handler import LightClientMessageHandler
-from raiden.lightclient.models.light_client_protocol_message import LightClientProtocolMessageType
+from raiden.lightclient.models.light_client_protocol_message import LightClientProtocolMessageType, \
+    LightClientProtocolMessage
 from raiden.message_event_convertor import message_from_sendevent
 from raiden.messages import RequestRegisterSecret, UnlockLightRequest, SettlementRequiredLightMessage
 from raiden.network.proxies.payment_channel import PaymentChannel
@@ -122,10 +123,10 @@ def unlock_light(raiden: "RaidenService",
         sender=partner,
         merkle_tree_leaves=leaves_packed
     )
-    if not LightClientMessageHandler.is_message_already_stored(
+    if not LightClientMessageHandler.get_message_by_content(
         light_client_address=channel_unlock_event.client,
         message_type=LightClientProtocolMessageType.UnlockLightRequest,
-        unsigned_message=message,
+        message=message,
         wal=raiden.wal
     ):
         LightClientMessageHandler.store_light_client_protocol_message(
@@ -138,6 +139,7 @@ def unlock_light(raiden: "RaidenService",
             light_client_address=channel_unlock_event.client,
             message=message
         )
+
 
 class EventHandler(ABC):
     @abstractmethod
@@ -237,34 +239,58 @@ class RaidenEventHandler(EventHandler):
 
     @staticmethod
     def handle_store_message(raiden: "RaidenService", store_message_event: StoreMessageEvent):
-        existing_message = LightClientMessageHandler.is_light_client_protocol_message_already_stored(
-            store_message_event.payment_id,
-            store_message_event.message_order,
-            store_message_event.message_type,
-            store_message_event.message.to_dict()["type"],
-            raiden.wal)
-        if not existing_message:
-            LightClientMessageHandler.store_light_client_protocol_message(store_message_event.message_id,
-                                                                          store_message_event.message,
-                                                                          store_message_event.is_signed,
-                                                                          store_message_event.sender_light_client_address,
-                                                                          store_message_event.receiver_light_client_address,
-                                                                          store_message_event.message_order,
-                                                                          store_message_event.message_type,
-                                                                          raiden.wal,
-                                                                          store_message_event.payment_id)
-        else:
-            stored_but_unsigned = existing_message.signed_message is None
-            if stored_but_unsigned and store_message_event.is_signed:
+        existing_message = RaidenEventHandler.get_existing_lc_message_from_store_event(
+            raiden=raiden,
+            store_message_event=store_message_event
+        )
+        if existing_message:
+            if not existing_message.is_signed and store_message_event.is_signed:
                 # Update messages that were created by the hub and now are received signed by the light client
-                LightClientMessageHandler\
-                    .update_offchain_light_client_protocol_message_set_signed_message(store_message_event.message,
-                                                                                      store_message_event.payment_id,
-                                                                                      store_message_event.message_order,
-                                                                                      store_message_event.message_type,
-                                                                                      raiden.wal)
+                LightClientMessageHandler.update_offchain_light_client_protocol_message_set_signed_message(
+                    message=store_message_event.message,
+                    payment_id=store_message_event.payment_id,
+                    order=store_message_event.message_order,
+                    message_type=store_message_event.message_type,
+                    light_client_address=store_message_event.light_client_address,
+                    wal=raiden.wal
+                )
             else:
                 log.info("Message for lc already received, ignoring db storage")
+        else:
+            LightClientMessageHandler.store_light_client_protocol_message(
+                identifier=store_message_event.message_id,
+                message=store_message_event.message,
+                signed=store_message_event.is_signed,
+                light_client_address=store_message_event.light_client_address,
+                order=store_message_event.message_order,
+                message_type=store_message_event.message_type,
+                wal=raiden.wal,
+                payment_id=store_message_event.payment_id
+            )
+
+    @staticmethod
+    def get_existing_lc_message_from_store_event(raiden: "RaidenService",
+                                                 store_message_event: StoreMessageEvent) -> LightClientProtocolMessage:
+        existing_message: LightClientProtocolMessage
+        if store_message_event.payment_id:
+            # payment related message
+            existing_message = LightClientMessageHandler.get_message_for_payment(
+                message_id=store_message_event.message_id,
+                light_client_address=store_message_event.light_client_address,
+                payment_id=store_message_event.payment_id,
+                order=store_message_event.message_order,
+                message_type=store_message_event.message_type,
+                message_protocol_type=store_message_event.message.to_dict()["type"],
+                wal=raiden.wal
+            )
+        else:
+            existing_message = LightClientMessageHandler.get_message_by_content(
+                light_client_address=store_message_event.light_client_address,
+                message_type=store_message_event.message_type,
+                message=store_message_event.message,
+                wal=raiden.wal
+            )
+        return existing_message
 
     @staticmethod
     def handle_send_lockexpired(raiden: "RaidenService", send_lock_expired: SendLockExpired):
@@ -427,23 +453,28 @@ class RaidenEventHandler(EventHandler):
         raiden: "RaidenService", channel_reveal_secret_event: ContractSendSecretRevealLight
     ):
         message = RequestRegisterSecret(raiden.default_secret_registry.address)
-        existing_message = LightClientMessageHandler.is_light_client_protocol_message_already_stored(
+        existing_message = LightClientMessageHandler.get_message_for_payment(
+            message_id=channel_reveal_secret_event.message_id,
+            light_client_address=channel_reveal_secret_event.light_client_address,
             payment_id=channel_reveal_secret_event.payment_identifier,
             order=0,
             message_type=LightClientProtocolMessageType.RequestRegisterSecret,
             message_protocol_type=message.to_dict()["type"],
-            wal=raiden.wal)
+            wal=raiden.wal
+        )
         # Do not store the RegisterSecretRequest twice for same payment
         if not existing_message:
 
-            LightClientMessageHandler.store_light_client_protocol_message(identifier=channel_reveal_secret_event.message_id,
-                                                                          message=message,
-                                                                          signed=False,
-                                                                          payment_id=channel_reveal_secret_event.payment_identifier,
-                                                                          light_client_address=channel_reveal_secret_event.light_client_address,
-                                                                          order=0,
-                                                                          message_type=LightClientProtocolMessageType.RequestRegisterSecret,
-                                                                          wal=raiden.wal)
+            LightClientMessageHandler.store_light_client_protocol_message(
+                identifier=channel_reveal_secret_event.message_id,
+                message=message,
+                signed=False,
+                payment_id=channel_reveal_secret_event.payment_identifier,
+                light_client_address=channel_reveal_secret_event.light_client_address,
+                order=0,
+                message_type=LightClientProtocolMessageType.RequestRegisterSecret,
+                wal=raiden.wal
+            )
     @staticmethod
     def handle_contract_send_channelclose(
         raiden: "RaidenService",
@@ -806,10 +837,10 @@ class RaidenEventHandler(EventHandler):
 
         log.debug("Storing light client message to require settle")
 
-        message_already_stored = LightClientMessageHandler.is_message_already_stored(
+        message_already_stored = LightClientMessageHandler.get_message_by_content(
             light_client_address=payment_channel.participant1,
             message_type=LightClientProtocolMessageType.SettlementRequired,
-            unsigned_message=message,
+            message=message,
             wal=raiden.wal)
 
         if message_already_stored:

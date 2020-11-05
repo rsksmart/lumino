@@ -284,16 +284,24 @@ def get_channelstate_for(
 
     channel_state = None
     if token_network:
-        channels = [
-            token_network.channelidentifiers_to_channels[creator_address].get(channel_id)
-            for channel_id in token_network.partneraddresses_to_channelidentifiers[partner_address]
-        ]
+        channel_ids = list(filter(
+            lambda channel_id:
+            creator_address in token_network.channelidentifiers_to_channels
+            and channel_id in token_network.channelidentifiers_to_channels[creator_address],
+            token_network.partneraddresses_to_channelidentifiers[partner_address]
+        ))
+        channels = list(map(
+            lambda channel_id:
+            token_network.channelidentifiers_to_channels[creator_address].get(channel_id),
+            channel_ids
+        ))
         states = filter_channels_by_status(channels, [CHANNEL_STATE_UNUSABLE])
         # If multiple channel states are found, return the last one.
         if states:
             channel_state = states[-1]
 
     return channel_state
+
 
 def get_channelstate_for_close_channel(
     chain_state: ChainState,
