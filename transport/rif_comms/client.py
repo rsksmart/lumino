@@ -18,8 +18,8 @@ class RifCommsClient:
         :param grpc_api_endpoint: http uri of the RIF Communications pub-sub node
         """
         self.node_address = RskAddress(address=node_address)
-        self.grpc_channel = insecure_channel(grpc_api_endpoint)
-        self.stub = CommunicationsApiStub(self.grpc_channel)
+        grpc_channel = insecure_channel(grpc_api_endpoint)
+        self.stub = CommunicationsApiStub(grpc_channel)
 
     def connect(self) -> Notification:
         """
@@ -71,7 +71,9 @@ class RifCommsClient:
         Invokes the EndCommunication grpc api endpoint.
         :return: void
         """
-        self.grpc_channel.unsubscribe()
+        def close(channel):
+            channel.close()
+        self.grpc_channel.unsubscribe(close)
 
     def locate_peer_id(self, node_address: Address) -> str:
         """
