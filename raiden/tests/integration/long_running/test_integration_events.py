@@ -500,7 +500,8 @@ def run_test_secret_revealed_on_chain(
         canonical_identifier=channel_state2_1.canonical_identifier,
         balance_proof=channel_state2_1.partner_state.balance_proof,
         triggered_by_block_hash=app0.raiden.chain.block_hash(),
-        signed_close_tx= None
+        signed_close_tx=None,
+        our_address=app2.raiden.address
     )
     current_state = app2.raiden.wal.state_manager.current_state
     app2.raiden.raiden_event_handler.on_raiden_event(

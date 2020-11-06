@@ -29,6 +29,7 @@ def test_payment_channel_proxy_basics(
     assert channel_identifier is not None
 
     channel_proxy_1 = chain.payment_channel(
+        creator_address=privatekey_to_address(private_keys[1]),
         canonical_identifier=CanonicalIdentifier(
             chain_identifier=chain_id,
             token_network_address=token_network_address,
@@ -89,6 +90,7 @@ def test_payment_channel_proxy_basics(
     assert new_channel_identifier is not None
 
     channel_proxy_2 = chain.payment_channel(
+        creator_address=privatekey_to_address(private_keys[1]),
         canonical_identifier=CanonicalIdentifier(
             chain_identifier=chain_id,
             token_network_address=token_network_address,
