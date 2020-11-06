@@ -1734,10 +1734,11 @@ class RestAPI:
                 signed_settle_tx=signed_settle_tx
             )
             return self.update_channel_state(registry_address, channel_state)
-        except ChannelNotFound as e:
-            return api_error(
-                errors="Channel is already settled.",
-                status_code=HTTPStatus.NOT_FOUND
+        except ChannelNotFound:
+            return ApiErrorBuilder.build_and_log_error(
+                errors="Failed trying to settle a channel that's already settled",
+                status_code=HTTPStatus.NOT_FOUND,
+                log=log
             )
         except Exception as e:
             return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.BAD_REQUEST, log=log)
