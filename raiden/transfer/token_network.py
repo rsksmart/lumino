@@ -16,7 +16,7 @@ from raiden.transfer.state_change import (
     ContractReceiveRouteNew,
     ContractReceiveUpdateTransfer,
     ContractReceiveChannelClosedLight, ContractReceiveChannelSettledLight)
-from raiden.utils.typing import MYPY_ANNOTATION, BlockHash, BlockNumber, List, Union, Dict, AddressHex
+from raiden.utils.typing import MYPY_ANNOTATION, BlockHash, BlockNumber, List, Union, AddressHex
 
 # TODO: The proper solution would be to introduce a marker for state changes
 # that contains channel IDs and other specific channel attributes

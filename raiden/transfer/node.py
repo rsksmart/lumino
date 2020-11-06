@@ -1,5 +1,4 @@
 import copy
-from itertools import chain
 
 from raiden.lightclient.models.light_client_protocol_message import LightClientProtocolMessageType
 from raiden.transfer import channel, token_network, views
