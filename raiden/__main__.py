@@ -1,9 +1,4 @@
 # make it possible to run raiden with 'python -m raiden'
-import grpc
-
-from transport.rif_comms.proto import api_pb2_grpc
-from transport.rif_comms.proto.api_pb2 import RskAddress
-from transport.rif_comms.proto.api_pb2_grpc import CommunicationsApiStub
 
 
 def main():
