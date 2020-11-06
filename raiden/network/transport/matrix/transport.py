@@ -1447,6 +1447,11 @@ class MatrixLightClientTransport(MatrixTransport):
             self.stop()  # ensure cleanup and wait on subtasks
             raise
 
+    def send_async(self, queue_identifier: QueueIdentifier, message: Message):
+        self.log.info(f"----------------->>> Sending Message from LC with address {self.get_address()}")
+        self.log.info(f"----------------->>> Message Content {str(message)}")
+        super().send_async(queue_identifier=queue_identifier, message=message)
+
     def _send_raw(self, receiver_address: Address, data: str):
         with self._getroom_lock:
             room = self._get_room_for_address(receiver_address)
@@ -1721,6 +1726,8 @@ class MatrixLightClientTransport(MatrixTransport):
         return True
 
     def _receive_delivered_to_lc(self, delivered: Delivered):
+        self.log.info(f"<<<----------------- Receiving Delivered Message for LC with address {self.get_address()}")
+        self.log.info(f"<<<----------------- Message Content {str(delivered)}")
         self.log.debug(
             "Delivered message received", sender=pex(delivered.sender), message=delivered
         )

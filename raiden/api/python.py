@@ -632,6 +632,7 @@ class RaidenAPI:
         channel_state = channel_list[0]
 
         channel_proxy = self.raiden.chain.payment_channel(
+            creator_address=creator_address,
             canonical_identifier=channel_state.canonical_identifier
         )
 
@@ -699,10 +700,9 @@ class RaidenAPI:
         )
 
         channel_proxy = self.raiden.chain.payment_channel(
+            creator_address,
             canonical_identifier=channel_state.canonical_identifier
         )
-
-        channel_proxy.swap_participants(creator_address)
 
         channel_proxy.set_total_deposit_light(
             total_deposit=total_deposit,
@@ -766,6 +766,7 @@ class RaidenAPI:
         )
 
         channel_proxy = self.raiden.chain.payment_channel(
+            creator_address,
             canonical_identifier=channel_state.canonical_identifier
         )
 

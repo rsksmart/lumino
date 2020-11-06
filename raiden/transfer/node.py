@@ -1022,7 +1022,7 @@ def handle_state_change(
         iteration = handle_contract_receive_channel_closed(chain_state, state_change, chain_state.our_address)
     elif type(state_change) == ContractReceiveChannelClosedLight:
         assert isinstance(state_change, ContractReceiveChannelClosedLight), MYPY_ANNOTATION
-        iteration = handle_contract_receive_channel_closed(chain_state, state_change, state_change.light_client_address)
+        iteration = handle_contract_receive_channel_closed(chain_state, state_change, state_change.closing_participant)
     elif type(state_change) == ContractReceiveChannelNewBalance:
         assert isinstance(state_change, ContractReceiveChannelNewBalance), MYPY_ANNOTATION
         iteration = handle_token_network_action(chain_state, state_change)
