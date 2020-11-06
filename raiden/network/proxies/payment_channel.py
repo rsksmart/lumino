@@ -234,6 +234,8 @@ class PaymentChannel:
 
     def update_transfer_light(
         self,
+        lc_address: Address,
+        partner_address: Address,
         nonce: Nonce,
         balance_hash: BalanceHash,
         additional_hash: AdditionalHash,
@@ -245,8 +247,8 @@ class PaymentChannel:
         """ Updates the channel using the provided balance proof. """
         self.token_network.update_transfer_light(
             channel_identifier=self.channel_identifier,
-            our_address=self.participant1,
-            partner_address=self.participant2,
+            lc_address=lc_address,
+            partner=partner_address,
             balance_hash=balance_hash,
             nonce=nonce,
             additional_hash=additional_hash,

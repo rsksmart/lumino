@@ -329,6 +329,14 @@ def state_transition(
         iteration = handle_channel_close(
             token_network_state, state_change, block_number, block_hash
         )
+    elif type(state_change) == ActionChannelSetFee:
+        assert isinstance(state_change, ActionChannelSetFee), MYPY_ANNOTATION
+        iteration = subdispatch_to_channel_by_id(
+            token_network_state=token_network_state,
+            state_change=state_change,
+            block_number=block_number,
+            block_hash=block_hash,
+        )
     elif type(state_change) == ContractReceiveChannelNew:
         assert isinstance(state_change, ContractReceiveChannelNew), MYPY_ANNOTATION
         iteration = handle_channelnew(token_network_state, state_change)

@@ -2,7 +2,6 @@ from typing import TYPE_CHECKING, Optional
 
 import gevent
 import structlog
-from eth_typing import ChecksumAddress
 from eth_utils import to_checksum_address, encode_hex
 from raiden_contracts.constants import (
     EVENT_SECRET_REVEALED,
@@ -92,65 +91,67 @@ def handle_channel_new(raiden: "RaidenService", event: Event):
     channel_identifier = args["channel_identifier"]
     participant1 = args["participant1"]
     participant2 = args["participant2"]
-
+    is_participant = raiden.address in (participant1, participant2)
 
     # Check if at least one of the implied participants is a LC handled by the node
-    is_participant1_handled_lc = LightClientService.is_handled_lc(
-        client_address=to_checksum_address(encode_hex(participant1)),
-        wal=raiden.wal
-    )
-    is_participant2_handled_lc = LightClientService.is_handled_lc(
-        client_address=to_checksum_address(encode_hex(participant2)),
-        wal=raiden.wal
-    )
+    is_participant1_handled_lc = LightClientService.is_handled_lc(to_checksum_address(encode_hex(participant1)),
+                                                                  raiden.wal)
+    is_participant2_handled_lc = LightClientService.is_handled_lc(to_checksum_address(encode_hex(participant2)),
+                                                                  raiden.wal)
     is_light_channel = is_participant1_handled_lc or is_participant2_handled_lc
-    if is_light_channel:
+    if is_participant or is_light_channel:
+        channel_proxy = raiden.chain.payment_channel(
+            canonical_identifier=CanonicalIdentifier(
+                chain_identifier=views.state_from_raiden(raiden).chain_id,
+                token_network_address=token_network_identifier,
+                channel_identifier=channel_identifier,
+            )
+        )
+        token_address = channel_proxy.token_address()
+        channel_state = get_channel_state(
+            token_address=typing.TokenAddress(token_address),
+            payment_network_identifier=raiden.default_registry.address,
+            token_network_address=token_network_identifier,
+            reveal_timeout=raiden.config["reveal_timeout"],
+            payment_channel_proxy=channel_proxy,
+            opened_block_number=block_number,
+            is_light_channel=is_light_channel,
+            both_participants_are_light_clients=is_participant1_handled_lc and is_participant2_handled_lc
+        )
+
+        if is_participant1_handled_lc or is_participant2_handled_lc:
+            if is_participant1_handled_lc:
+                if participant1 != channel_state.our_state.address:
+                    # Swap our_state and partner_state in order to have the LC from our_side of the channel
+                    channel_state.our_state, channel_state.partner_state = channel_state.partner_state, channel_state.our_state
+                # swap channel proxy to ensure proxy.participant1 is the light client
+                channel_proxy.swap_participants(participant1)
+            else:
+                if participant2 != channel_state.our_state.address:
+                    # Swap our_state and partner_state in order to have the LC from our_side of the channel
+                    channel_state.our_state, channel_state.partner_state = channel_state.partner_state, channel_state.our_state
+                # swap channel proxy to ensure proxy.participant1 is the light client
+                channel_proxy.swap_participants(participant2)
+
+        new_channel = ContractReceiveChannelNew(
+            transaction_hash=transaction_hash,
+            channel_state=channel_state,
+            block_number=block_number,
+            block_hash=block_hash,
+        )
+        raiden.handle_and_track_state_change(new_channel)
+
+        partner_address = channel_state.partner_state.address
+
+        light_client_address = None
         if is_participant1_handled_lc:
-            create_channel(
-                block_hash=block_hash,
-                block_number=block_number,
-                channel_identifier=channel_identifier,
-                participant1=participant1,
-                participant2=participant2,
-                token_network_identifier=token_network_identifier,
-                transaction_hash=transaction_hash,
-                raiden=raiden,
-                creator_address_for_health_check=participant1
-            )
-        if is_participant2_handled_lc:
-            create_channel(
-                block_hash=block_hash,
-                block_number=block_number,
-                channel_identifier=channel_identifier,
-                participant1=participant2,
-                participant2=participant1,
-                token_network_identifier=token_network_identifier,
-                transaction_hash=transaction_hash,
-                raiden=raiden,
-                creator_address_for_health_check=participant2
-            )
-    elif raiden.address == participant1:
-        create_channel(
-            block_hash=block_hash,
-            block_number=block_number,
-            channel_identifier=channel_identifier,
-            participant1=participant1,
-            participant2=participant2,
-            token_network_identifier=token_network_identifier,
-            transaction_hash=transaction_hash,
-            raiden=raiden
-        )
-    elif raiden.address == participant2:
-        create_channel(
-            block_hash=block_hash,
-            block_number=block_number,
-            channel_identifier=channel_identifier,
-            participant1=participant2,
-            participant2=participant1,
-            token_network_identifier=token_network_identifier,
-            transaction_hash=transaction_hash,
-            raiden=raiden
-        )
+            light_client_address = participant1
+        elif is_participant2_handled_lc:
+            light_client_address = participant2
+
+        if ConnectionManager.BOOTSTRAP_ADDR != partner_address:
+            raiden.start_health_check_for(partner_address, light_client_address)
+
     # Raiden node is not participant of channel. Lc are not participants
     else:
         new_route = ContractReceiveRouteNew(
@@ -172,69 +173,6 @@ def handle_channel_new(raiden: "RaidenService", event: Event):
     connection_manager = raiden.connection_manager_for_token_network(token_network_identifier)
     retry_connect = gevent.spawn(connection_manager.retry_connect)
     raiden.add_pending_greenlet(retry_connect)
-
-
-def create_channel(block_hash,
-                   block_number,
-                   channel_identifier,
-                   participant1,
-                   participant2,
-                   token_network_identifier,
-                   transaction_hash,
-                   raiden,
-                   creator_address_for_health_check=None):
-    channel_state = create_channel_state_and_proxy(block_number,
-                                                   channel_identifier,
-                                                   token_network_identifier,
-                                                   participant1,
-                                                   participant2,
-                                                   raiden)
-    new_channel = ContractReceiveChannelNew(
-        transaction_hash=transaction_hash,
-        channel_state=channel_state,
-        block_number=block_number,
-        block_hash=block_hash,
-    )
-    raiden.handle_and_track_state_change(new_channel)
-
-    partner_address = channel_state.partner_state.address
-
-    if ConnectionManager.BOOTSTRAP_ADDR != partner_address:
-        raiden.start_health_check_for(partner_address, creator_address_for_health_check)
-
-    return channel_state
-
-
-def create_channel_state_and_proxy(block_number,
-                                   channel_identifier,
-                                   token_network_identifier,
-                                   participant1: ChecksumAddress,
-                                   participant2: ChecksumAddress,
-                                   raiden):
-    is_participant1_handled_lc = LightClientService.is_handled_lc(to_checksum_address(encode_hex(participant1)),
-                                                                  raiden.wal)
-    is_participant2_handled_lc = LightClientService.is_handled_lc(to_checksum_address(encode_hex(participant2)),
-                                                                  raiden.wal)
-
-    channel_proxy = raiden.chain.payment_channel(
-        creator_address=participant1,
-        canonical_identifier=CanonicalIdentifier(
-            chain_identifier=views.state_from_raiden(raiden).chain_id,
-            token_network_address=token_network_identifier,
-            channel_identifier=channel_identifier,
-        )
-    )
-    token_address = channel_proxy.token_address()
-    return get_channel_state(
-        token_address=typing.TokenAddress(token_address),
-        payment_network_identifier=raiden.default_registry.address,
-        token_network_address=token_network_identifier,
-        reveal_timeout=raiden.config["reveal_timeout"],
-        payment_channel_proxy=channel_proxy,
-        opened_block_number=block_number,
-        is_light_channel=is_participant1_handled_lc or is_participant2_handled_lc,
-        both_participants_are_light_clients=is_participant1_handled_lc and is_participant2_handled_lc
-    )
 
 
 def handle_channel_new_balance(raiden: "RaidenService", event: Event):
@@ -327,16 +265,14 @@ def handle_channel_closed(raiden: "RaidenService", event: Event):
         else:
             # Must be a light client
             latest_non_closing_balance_proof = LightClientMessageHandler.get_latest_light_client_non_closing_balance_proof(
-                channel_state.identifier, channel_state.partner_state.address, raiden.wal.storage
-            )
+                channel_state.identifier, raiden.wal.storage)
             channel_closed = ContractReceiveChannelClosedLight(
                 transaction_hash=transaction_hash,
                 transaction_from=args["closing_participant"],
                 canonical_identifier=channel_state.canonical_identifier,
                 block_number=block_number,
                 block_hash=block_hash,
-                closing_participant=channel_state.our_state.address,
-                non_closing_participant=channel_state.partner_state.address,
+                light_client_address=channel_state.our_state.address,
                 latest_update_non_closing_balance_proof_data=latest_non_closing_balance_proof
             )
             raiden.handle_and_track_state_change(channel_closed)

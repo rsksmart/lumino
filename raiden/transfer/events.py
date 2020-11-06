@@ -46,26 +46,23 @@ class ContractSendChannelClose(ContractSendEvent):
         canonical_identifier: CanonicalIdentifier,
         balance_proof: Optional["BalanceProofSignedState"],
         triggered_by_block_hash: BlockHash,
-        signed_close_tx: str,
-        our_address: Address
+        signed_close_tx: str
     ) -> None:
         super().__init__(triggered_by_block_hash)
         self.canonical_identifier = canonical_identifier
         self.balance_proof = balance_proof
         self.signed_close_tx = signed_close_tx
-        self.our_address = our_address
 
     def __repr__(self) -> str:
         return (
             "<ContractSendChannelClose channel:{} token_network:{} "
-            "balance_proof:{} triggered_by_block_hash:{} signed_close_tx:{} our_address:{}>"
+            "balance_proof:{} triggered_by_block_hash:{} signed_close_tx:{}>"
         ).format(
             self.canonical_identifier.channel_identifier,
             pex(self.canonical_identifier.token_network_address),
             self.balance_proof,
             pex(self.triggered_by_block_hash),
-            self.signed_close_tx,
-            pex(self.our_address)
+            self.signed_close_tx
         )
 
     def __eq__(self, other: Any) -> bool:
@@ -75,7 +72,6 @@ class ContractSendChannelClose(ContractSendEvent):
             and self.canonical_identifier == other.canonical_identifier
             and self.balance_proof == other.balance_proof
             and self.signed_close_tx == other.signed_close_tx
-            and self.our_address == other.our_address
         )
 
     def __ne__(self, other: Any) -> bool:
@@ -94,8 +90,7 @@ class ContractSendChannelClose(ContractSendEvent):
             "canonical_identifier": self.canonical_identifier.to_dict(),
             "balance_proof": self.balance_proof,
             "triggered_by_block_hash": serialize_bytes(self.triggered_by_block_hash),
-            "signed_close_tx": self.signed_close_tx,
-            "our_address": to_normalized_address(self.our_address)
+            "signed_close_tx": self.signed_close_tx
         }
         return result
 
@@ -108,8 +103,7 @@ class ContractSendChannelClose(ContractSendEvent):
             canonical_identifier=CanonicalIdentifier.from_dict(data["canonical_identifier"]),
             balance_proof=data["balance_proof"],
             triggered_by_block_hash=BlockHash(deserialize_bytes(data["triggered_by_block_hash"])),
-            signed_close_tx=data["signed_close_tx"],
-            our_address=to_canonical_address(data["our_address"])
+            signed_close_tx=data["signed_close_tx"]
         )
 
         return restored
@@ -195,11 +189,9 @@ class ContractSendChannelUpdateTransfer(ContractSendExpirableEvent):
         expiration: BlockExpiration,
         balance_proof: "BalanceProofSignedState",
         triggered_by_block_hash: BlockHash,
-        our_address: Address
     ) -> None:
         super().__init__(triggered_by_block_hash, expiration)
         self.balance_proof = balance_proof
-        self.our_address = our_address
 
     @property
     def token_network_identifier(self) -> TokenNetworkAddress:

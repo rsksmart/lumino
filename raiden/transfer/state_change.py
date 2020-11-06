@@ -445,16 +445,14 @@ class ContractReceiveChannelClosedLight(ContractReceiveStateChange):
         canonical_identifier: CanonicalIdentifier,
         block_number: BlockNumber,
         block_hash: BlockHash,
-        closing_participant: Address,
-        non_closing_participant: Address,
+        light_client_address: Address,
         latest_update_non_closing_balance_proof_data: LightClientNonClosingBalanceProof
     ) -> None:
         super().__init__(transaction_hash, block_number, block_hash)
 
         self.transaction_from = transaction_from
         self.canonical_identifier = canonical_identifier
-        self.closing_participant = closing_participant
-        self.non_closing_participant = non_closing_participant
+        self.light_client_address = light_client_address
         self.latest_update_non_closing_balance_proof_data = latest_update_non_closing_balance_proof_data
 
     @property
@@ -468,14 +466,13 @@ class ContractReceiveChannelClosedLight(ContractReceiveStateChange):
     def __repr__(self) -> str:
         return (
             "<ContractReceiveChannelClosedLight"
-            " token_network:{} channel:{} closer:{} closing_participant:{} non_closing_participant:{} closed_at:{}"
+            " token_network:{} channel:{} closer:{} light_client:{} closed_at:{}"
             ">"
         ).format(
             pex(self.token_network_identifier),
             self.channel_identifier,
             pex(self.transaction_from),
-            pex(self.closing_participant),
-            pex(self.non_closing_participant),
+            pex(self.light_client_address),
             self.block_number,
         )
 
@@ -484,8 +481,7 @@ class ContractReceiveChannelClosedLight(ContractReceiveStateChange):
             isinstance(other, ContractReceiveChannelClosedLight)
             and self.transaction_from == other.transaction_from
             and self.canonical_identifier == other.canonical_identifier
-            and self.closing_participant == other.closing_participant
-            and self.non_closing_participant == other.non_closing_participant
+            and self.light_client_address == other.light_client_address
             and super().__eq__(other)
         )
 
@@ -502,8 +498,7 @@ class ContractReceiveChannelClosedLight(ContractReceiveStateChange):
             "canonical_identifier": self.canonical_identifier.to_dict(),
             "block_number": str(self.block_number),
             "block_hash": serialize_bytes(self.block_hash),
-            "closing_participant": to_checksum_address(self.closing_participant),
-            "non_closing_participant": to_checksum_address(self.non_closing_participant),
+            "light_client_address": to_checksum_address(self.light_client_address),
             "latest_update_non_closing_balance_proof_data": latest_update_non_closing_balance_proof_data
         }
 
@@ -518,8 +513,7 @@ class ContractReceiveChannelClosedLight(ContractReceiveStateChange):
             canonical_identifier=CanonicalIdentifier.from_dict(data["canonical_identifier"]),
             block_number=BlockNumber(int(data["block_number"])),
             block_hash=BlockHash(deserialize_bytes(data["block_hash"])),
-            closing_participant=to_canonical_address(data["closing_participant"]),
-            non_closing_participant=to_canonical_address(data["non_closing_participant"]),
+            light_client_address=to_canonical_address(data["light_client_address"]),
             latest_update_non_closing_balance_proof_data=latest_update_non_closing_balance_proof_data
         )
 

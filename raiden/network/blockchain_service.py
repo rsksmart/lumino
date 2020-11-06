@@ -43,9 +43,8 @@ class BlockChainService:
         self.address_to_token_network_registry: Dict[Address, TokenNetworkRegistry] = dict()
         self.address_to_user_deposit: Dict[Address, UserDeposit] = dict()
         self.address_to_service_registry: Dict[Address, ServiceRegistry] = dict()
-        self.identifier_to_payment_channel: Dict[Address, Dict[
-                Tuple[TokenNetworkAddress, ChannelID], PaymentChannel
-            ]
+        self.identifier_to_payment_channel: Dict[
+            Tuple[TokenNetworkAddress, ChannelID], PaymentChannel
         ] = dict()
 
         self.client = jsonrpc_client
@@ -213,7 +212,7 @@ class BlockChainService:
 
         return self.address_to_service_registry[address]
 
-    def payment_channel(self, creator_address: Address, canonical_identifier: CanonicalIdentifier) -> PaymentChannel:
+    def payment_channel(self, canonical_identifier: CanonicalIdentifier) -> PaymentChannel:
 
         token_network_address = TokenNetworkAddress(canonical_identifier.token_network_address)
         channel_id = canonical_identifier.channel_identifier
@@ -224,21 +223,18 @@ class BlockChainService:
             raise ValueError("channel identifier must be of type T_ChannelID")
 
         with self._payment_channel_creation_lock:
-            channel_identifier = (token_network_address, channel_id)
-            if creator_address not in self.identifier_to_payment_channel:
-                self.identifier_to_payment_channel[creator_address] = dict()
-            if channel_identifier not in self.identifier_to_payment_channel[creator_address]:
+            dict_key = (token_network_address, channel_id)
+
+            if dict_key not in self.identifier_to_payment_channel:
                 token_network = self.token_network(token_network_address)
 
-                channel_proxy = PaymentChannel(
+                self.identifier_to_payment_channel[dict_key] = PaymentChannel(
                     token_network=token_network,
                     channel_identifier=channel_id,
                     contract_manager=self.contract_manager,
                 )
-                channel_proxy.swap_participants(creator_address)
-                self.identifier_to_payment_channel[creator_address][channel_identifier] = channel_proxy
 
-        return self.identifier_to_payment_channel[creator_address][channel_identifier]
+        return self.identifier_to_payment_channel[dict_key]
 
     def user_deposit(self, address: Address) -> UserDeposit:
         if not is_binary_address(address):

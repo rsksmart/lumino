@@ -1458,7 +1458,7 @@ class SQLiteStorage:
         )
         return cursor.fetchone()
 
-    def get_latest_light_client_non_closing_balance_proof(self, channel_id, non_closing_participant):
+    def get_latest_light_client_non_closing_balance_proof(self, channel_id):
         cursor = self.conn.cursor()
         cursor.execute(
             """
@@ -1472,10 +1472,10 @@ class SQLiteStorage:
                    balance_proof,
                    lc_balance_proof_signature
             FROM light_client_balance_proof
-            WHERE channel_id  = ? AND sender = ?
+            WHERE channel_id  = ?
             ORDER BY nonce DESC
             """,
-            (channel_id, to_checksum_address(non_closing_participant)),
+            (channel_id,),
         )
         return cursor.fetchone()
 

@@ -14,7 +14,7 @@ from raiden.messages import Message, LockedTransfer, SecretRequest, RevealSecret
     LockExpired
 from raiden.storage.sqlite import SerializedSQLiteStorage
 from raiden.storage.wal import WriteAheadLog
-from raiden.utils.typing import AddressHex, SignedTransaction, Address
+from raiden.utils.typing import AddressHex, SignedTransaction
 
 
 def build_light_client_protocol_message(identifier: int,
@@ -386,8 +386,8 @@ class LightClientMessageHandler:
         return storage.write_light_client_non_closing_balance_proof(non_closing_balance_proof_data)
 
     @classmethod
-    def get_latest_light_client_non_closing_balance_proof(cls, channel_id: int, non_closing_participant: Address, storage: SerializedSQLiteStorage):
-        latest_update_balance_proof_data = storage.get_latest_light_client_non_closing_balance_proof(channel_id, non_closing_participant)
+    def get_latest_light_client_non_closing_balance_proof(cls, channel_id: int, storage: SerializedSQLiteStorage):
+        latest_update_balance_proof_data = storage.get_latest_light_client_non_closing_balance_proof(channel_id)
         if latest_update_balance_proof_data:
             balance_proof_dict = json.loads(latest_update_balance_proof_data[7])
             balance_proof = Unlock.from_dict(balance_proof_dict) \
