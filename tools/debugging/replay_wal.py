@@ -128,19 +128,21 @@ def replay_wal(storage, token_network_identifier, partner_address, translator=No
     all_state_changes = storage.get_statechanges_by_identifier(
         from_identifier=0, to_identifier="latest"
     )
-
-    state_manager = StateManager(state_transition=node.state_transition, current_state=None)
+    state_manager = StateManager(
+        state_transition=node.state_transition,
+        current_state=None
+    )
     wal = WriteAheadLog(state_manager, storage)
-
     for _, state_change in enumerate(all_state_changes):
-        events = wal.state_manager.dispatch(state_change)
+        events = wal.state_manager.dispatch(state_change, storage)
 
         chain_state = wal.state_manager.current_state
 
         channel_state = views.get_channelstate_by_token_network_and_partner(
-            chain_state,
-            to_canonical_address(token_network_identifier),
-            to_canonical_address(partner_address),
+            chain_state=chain_state,
+            token_network_id=to_canonical_address(token_network_identifier),
+            partner_address=to_canonical_address(partner_address),
+            creator_address=None
         )
 
         if not channel_state:
