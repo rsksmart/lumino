@@ -11,13 +11,13 @@ class RifCommsClient:
     Class to connect and operate against a RIF Communications pub-sub node.
     """
 
-    def __init__(self, node_address: Address, grpc_api_endpoint: str):
+    def __init__(self, rsk_address: Address, grpc_api_endpoint: str):
         """
-        Constructs the RifCommsClient
-        :param node_address: address of the node that wants to use the RIF Comms server
-        :param grpc_api_endpoint: http uri of the RIF Communications pub-sub node
+        Constructs the Rif Communications Client
+        :param rsk_address: address of the node that wants to use the RIF Comms server
+        :param grpc_api_endpoint: grpc uri of the RIF Communications pub-sub node
         """
-        self.node_address = RskAddress(address=node_address)
+        self.rsk_address = RskAddress(address=rsk_address)
         self.grpc_channel = insecure_channel(grpc_api_endpoint)
         self.stub = CommunicationsApiStub(self.grpc_channel)
 
@@ -27,17 +27,17 @@ class RifCommsClient:
         Invokes ConnectToCommunicationsNode grpc api endpoint.
         :return: Notification stream
         """
-        return self.stub.ConnectToCommunicationsNode(self.node_address)
+        return self.stub.ConnectToCommunicationsNode(self.rsk_address)
 
-    def create_topic(self, partner_address: Address) -> Notification:
+    def create_topic(self, rsk_address: Address) -> Notification:
         """
-        Creates a pub-sub topic between self.node_address and partner_address.
+        Creates a pub-sub topic between self.rsk_address and partner_address.
         Invokes CreateTopicWithRskAddress grpc api endpoint.
-        :param partner_address:
+        :param rsk_address:
         :return: Notification stream
         """
         # TODO catch already subscribed and any error
-        return self.stub.CreateTopicWithRskAddress(RskAddress(address=partner_address))
+        return self.stub.CreateTopicWithRskAddress(RskAddress(address=rsk_address))
 
     def send_message(self, topic_id: Address, message: Message) -> Void:
         """
@@ -58,7 +58,7 @@ class RifCommsClient:
 
     def close_topic(self, topic_id: str) -> Void:
         """
-        Closes the topic identified as topic_id.
+        Closes the topic identified as topic_id, this unsubscribe the node from the topic.
         Invokes the CloseTopic grpc api endpoint.
         :param topic_id: topic identifier
         :return: void
@@ -75,10 +75,10 @@ class RifCommsClient:
             channel.close()
         self.grpc_channel.unsubscribe(close)
 
-    def locate_peer_id(self, node_address: Address) -> str:
+    def locate_peer_id(self, rsk_address: Address) -> str:
         """
-        Gets the peer id associated with a node address
-        :param node_address: the node address to locate
-        :return: a string that represents the peer id
+        Gets the peer ID associated with a node address
+        :param rsk_address: the node address to locate
+        :return: a string that represents the peer ID
         """
-        return self.stub.LocatePeerId(RskAddress(address=node_address)).address
+        return self.stub.LocatePeerId(RskAddress(address=rsk_address)).address
