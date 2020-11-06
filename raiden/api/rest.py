@@ -1733,10 +1733,14 @@ class RestAPI:
                 channel_identifier=channel_identifier,
                 signed_settle_tx=signed_settle_tx
             )
+            return self.update_channel_state(registry_address, channel_state)
+        except ChannelNotFound as e:
+            return api_error(
+                errors="Channel is already settled.",
+                status_code=HTTPStatus.NOT_FOUND
+            )
         except Exception as e:
             return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.BAD_REQUEST, log=log)
-
-        return self.update_channel_state(registry_address, channel_state)
 
     def _deposit_light(
         self,
