@@ -8,7 +8,7 @@ from transport.rif_comms.proto.api_pb2_grpc import CommunicationsApiStub
 
 class RifCommsClient:
     """
-    Client like class to connect and operate against a RIF Communications pub-sub node.
+    Class to connect and operate against a RIF Communications pub-sub node.
     """
 
     def __init__(self, node_address: Address, grpc_api_endpoint: str):
@@ -18,8 +18,8 @@ class RifCommsClient:
         :param grpc_api_endpoint: http uri of the RIF Communications pub-sub node
         """
         self.node_address = RskAddress(address=node_address)
-        grpc_channel = insecure_channel(grpc_api_endpoint)
-        self.stub = CommunicationsApiStub(grpc_channel)
+        self.grpc_channel = insecure_channel(grpc_api_endpoint)
+        self.stub = CommunicationsApiStub(self.grpc_channel)
 
     def connect(self) -> Notification:
         """

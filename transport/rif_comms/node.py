@@ -20,6 +20,8 @@ class RifCommsNode(TransportNode, Runnable):
         self._client.connect()
         self._client.locate_peer_id("0x5Ec92458ACD047f3B583E09C243a480Ef54A68D4")
         print("RifCommsNode init on grpc endpoint: {}".format(self._config["grpc_endpoint"]))
+        self._client.disconnect()
+        print("Disconnected")
 
     def start(self, raiden_service: RaidenService, message_handler: MessageHandler, prev_auth_data: str):
         raise NotImplementedError
