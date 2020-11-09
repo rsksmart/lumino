@@ -1,35 +1,14 @@
 import json
 import time
+from typing import NamedTuple, Iterator, List, Iterable, Callable
 
 import gevent
-import structlog
 from eth_utils import to_normalized_address
-from gevent.event import Event
-from gevent.lock import Semaphore
-from raiden.messages import (
-    Message,
-    Delivered,
-    Ping,
-    Pong,
-    RetrieableMessage,
-)
+from raiden.messages import Message, RetrieableMessage, Delivered, Ping, Pong
 from raiden.transfer.identifiers import QueueIdentifier
-from raiden.utils import pex
+from raiden.utils import Address, pex
 from raiden.utils.runnable import Runnable
-from raiden.utils.typing import (
-    Address,
-    Callable,
-    Iterable,
-    Iterator,
-    List,
-    NamedTuple,
-    NewType,
-)
 from transport.udp import utils as udp_utils
-
-log = structlog.get_logger(__name__)
-
-_RoomID = NewType("_RoomID", str)
 
 
 class _RetryQueue(Runnable):

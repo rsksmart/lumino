@@ -22,7 +22,7 @@ from raiden.transfer.state_change import ActionChannelClose, ActionUpdateTranspo
 from raiden.utils.signer import LocalSigner
 from raiden.utils.typing import Address, List, Optional, Union
 from transport.matrix.client import Room
-from transport.matrix.transport import _RetryQueue
+from transport.utils import _RetryQueue
 from transport.matrix.node import MatrixNode as MatrixTransportNode
 from transport.matrix.utils import AddressReachability, make_room_alias
 from transport.message import Message as TransportMessage
