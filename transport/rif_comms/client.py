@@ -13,9 +13,9 @@ class RifCommsClient:
 
     def __init__(self, rsk_address: Address, grpc_api_endpoint: str):
         """
-        Constructs the Rif Communications Client
-        :param rsk_address: address of the node that wants to use the RIF Comms server
-        :param grpc_api_endpoint: grpc uri of the RIF Communications pub-sub node
+        Constructs the RIF Communications Client.
+        :param rsk_address: address of the node that wants to use the RIF Communications server
+        :param grpc_api_endpoint: GRPC URI of the RIF Communications pub-sub node
         """
         self.rsk_address = RskAddress(address=rsk_address)
         self.grpc_channel = insecure_channel(grpc_api_endpoint)
