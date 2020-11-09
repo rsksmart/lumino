@@ -80,5 +80,10 @@ class RifCommsClient:
         Gets the peer ID associated with a node address
         :param rsk_address: the node address to locate
         :return: a string that represents the peer ID
+        :raises:
+            - No peers from routing table:
+                exception: _InactiveRpcError
+                status = StatusCode.UNKNOWN
+                details = "Failed to lookup key! No peers from routing table!"
         """
         return self.stub.LocatePeerId(RskAddress(address=rsk_address)).address
