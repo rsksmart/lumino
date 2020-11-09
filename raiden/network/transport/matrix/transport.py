@@ -518,6 +518,14 @@ class MatrixTransport(Runnable):
                 "Do not use send_async for {} messages".format(message.__class__.__name__)
             )
 
+<<<<<<< HEAD
+=======
+        self.log.info(
+            f"----------------->>> Sending Message from {self.get_address()} to {to_checksum_address(receiver_address)}"
+        )
+        self.log.info(f"----------------->>> Message Content {str(message)}")
+
+>>>>>>> 9d646ee3503ace879f961663c43d9055e04f0076
         self._send_with_retry(queue_identifier, message)
 
     def send_global(self, room: str, message: Message) -> None:
@@ -801,8 +809,13 @@ class MatrixTransport(Runnable):
         for message in messages:
             if not isinstance(message, (SignedRetrieableMessage, SignedMessage)):
                 self.log.warning("Received invalid message", message=message)
+<<<<<<< HEAD
             self.log.info(f"<<<----------------- Receiving Message from"
                           f" {to_checksum_address(message.sender)} to {to_checksum_address(self.get_address())}")
+=======
+            self.log.info(f"<<<----------------- Receiving Message "
+                          f"from {to_checksum_address(message.sender)} to {self.get_address()}")
+>>>>>>> 9d646ee3503ace879f961663c43d9055e04f0076
             self.log.info(f"<<<----------------- Message Content {str(message)}")
             if isinstance(message, Delivered):
                 self._receive_delivered(message)
@@ -1447,11 +1460,6 @@ class MatrixLightClientTransport(MatrixTransport):
             self.stop()  # ensure cleanup and wait on subtasks
             raise
 
-    def send_async(self, queue_identifier: QueueIdentifier, message: Message):
-        self.log.info(f"----------------->>> Sending Message from LC with address {self.get_address()}")
-        self.log.info(f"----------------->>> Message Content {str(message)}")
-        super().send_async(queue_identifier=queue_identifier, message=message)
-
     def _send_raw(self, receiver_address: Address, data: str):
         with self._getroom_lock:
             room = self._get_room_for_address(receiver_address)
@@ -1712,8 +1720,13 @@ class MatrixLightClientTransport(MatrixTransport):
         for message in messages:
             if not isinstance(message, (SignedRetrieableMessage, SignedMessage)):
                 self.log.warning("Received invalid message", message=message)
+<<<<<<< HEAD
             self.log.info(f"<<<----------------- Receiving LC Message from "
                           f"{to_checksum_address(message.sender)} to {to_checksum_address(self.get_address())}")
+=======
+            self.log.info(f"<<<----------------- Receiving Message "
+                          f"from {to_checksum_address(message.sender)} to {self.get_address()}")
+>>>>>>> 9d646ee3503ace879f961663c43d9055e04f0076
             self.log.info(f"<<<----------------- Message Content {str(message)}")
             if isinstance(message, Delivered):
                 self._receive_delivered_to_lc(message)
@@ -1726,8 +1739,6 @@ class MatrixLightClientTransport(MatrixTransport):
         return True
 
     def _receive_delivered_to_lc(self, delivered: Delivered):
-        self.log.info(f"<<<----------------- Receiving Delivered Message for LC with address {self.get_address()}")
-        self.log.info(f"<<<----------------- Message Content {str(delivered)}")
         self.log.debug(
             "Delivered message received", sender=pex(delivered.sender), message=delivered
         )
