@@ -22,6 +22,3 @@ coverage==4.5.1
 bump2version==0.5.8
 # Test support
 matrix-synapse==1.5.1
-# RIF Comms protobuffer
-grpcio-tools==1.33.2
-grpcio==1.33.2
