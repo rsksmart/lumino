@@ -1666,7 +1666,7 @@ class RestAPI:
         return None
 
     def settlement_light(self,
-                         registry_address: typing.PaymentNetworkID,
+                         registry_address: typing.Address,
                          internal_msg_identifier: int,
                          token_address: typing.TokenAddress,
                          creator_address: typing.Address,
@@ -1713,7 +1713,7 @@ class RestAPI:
 
         if message.is_signed:
             return ApiErrorBuilder.build_and_log_error(
-                errors="Message already signed",
+                errors="MESSAGE_ALREADY_SIGNED",
                 status_code=HTTPStatus.CONFLICT,
                 log=log
             )
@@ -1736,7 +1736,7 @@ class RestAPI:
             return self.update_channel_state(registry_address, channel_state)
         except ChannelNotFound:
             return ApiErrorBuilder.build_and_log_error(
-                errors="Failed trying to settle a channel that's already settled",
+                errors="CHANNEL_ALREADY_SETTLED",
                 status_code=HTTPStatus.NOT_FOUND,
                 log=log
             )

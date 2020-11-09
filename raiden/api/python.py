@@ -625,9 +625,9 @@ class RaidenAPI:
                                                         and channel.identifier == channel_identifier, settled_channels)
             filtered_settled_channels_list = list(filtered_settled_channels_iterator)
             if filtered_settled_channels_list:
-                raise RaidenRecoverableError("Failed trying to settle a channel that's already settled")
+                raise RaidenRecoverableError("CHANNEL_ALREADY_SETTLED")
             else:
-                raise RaidenRecoverableError("Failed trying to settle a channel that's not in waiting_for_settle state")
+                raise RaidenRecoverableError("CHANNEL_NOT_WAITING_FOR_SETTLE")
 
         channel_state = channel_list[0]
 
@@ -827,7 +827,7 @@ class RaidenAPI:
 
     def channel_settle_light(
         self,
-        registry_address: PaymentNetworkID,
+        registry_address: Address,
         token_address: TokenAddress,
         creator_address: Address,
         partner_address: Address,
