@@ -566,7 +566,6 @@ class RaidenEventHandler(EventHandler):
             canonical_identifier = balance_proof.canonical_identifier
             channel = raiden.chain.payment_channel(creator_address=channel_update_event.lc_address,
                                                    canonical_identifier=canonical_identifier)
-            partner_address = channel.participant2
             channel.update_transfer_light(
                 nonce=balance_proof.nonce,
                 balance_hash=balance_proof.balance_hash,

@@ -1,14 +1,14 @@
-from eth_utils import to_checksum_address
 from eth_utils.typing import ChecksumAddress
 
-from raiden.lightclient.models.client_model import ClientModel, ClientType
 from raiden.lightclient.lightclientmessages.hub_response_message import HubResponseMessage
-from raiden.lightclient.models.light_client_payment import LightClientPayment
-from raiden.lightclient.models.light_client_protocol_message import LightClientProtocolMessage, LightClientProtocolMessageType
 from raiden.lightclient.lightclientmessages.payment_hub_message import PaymentHubMessage
+from raiden.lightclient.models.client_model import ClientModel, ClientType
+from raiden.lightclient.models.light_client_payment import LightClientPayment
+from raiden.lightclient.models.light_client_protocol_message import LightClientProtocolMessage, \
+    LightClientProtocolMessageType
 from raiden.storage.sqlite import SerializedSQLiteStorage
 from raiden.storage.wal import WriteAheadLog
-from raiden.utils.typing import List, Optional, AnyStr
+from raiden.utils.typing import List, Optional
 
 
 class LightClientService:
