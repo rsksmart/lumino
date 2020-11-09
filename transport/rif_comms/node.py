@@ -6,6 +6,7 @@ from raiden.raiden_service import RaidenService
 from raiden.utils.runnable import Runnable
 from raiden.utils.typing import Address
 from transport.node import Node as TransportNode
+from transport.rif_comms.client import RifCommsClient
 
 
 class RifCommsNode(TransportNode, Runnable):
@@ -14,7 +15,13 @@ class RifCommsNode(TransportNode, Runnable):
         TransportNode.__init__(self, address)
         Runnable.__init__(self)
         self._config = config
+
+        self._client = RifCommsClient("0x5Ec92458ACD047f3B583E09C243a480Ef54A68D4", self._config["grpc_endpoint"])
+        self._client.connect()
+        self._client.locate_peer_id("0x5Ec92458ACD047f3B583E09C243a480Ef54A68D4")
         print("RifCommsNode init on grpc endpoint: {}".format(self._config["grpc_endpoint"]))
+        self._client.disconnect()
+        print("Disconnected")
 
     def start(self, raiden_service: RaidenService, message_handler: MessageHandler, prev_auth_data: str):
         raise NotImplementedError

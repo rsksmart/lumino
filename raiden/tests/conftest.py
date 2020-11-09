@@ -1,7 +1,12 @@
 # pylint: disable=wrong-import-position,redefined-outer-name,unused-wildcard-import,wildcard-import
 from gevent import monkey  # isort:skip # noqa
-
 monkey.patch_all()  # isort:skip # noqa
+
+# the following lines are needed to use grpc with monkey patched gevent. see:
+# - https://github.com/grpc/grpc/pull/14561
+# - https://github.com/vinays/grpc-gevent-mokey
+import grpc._cython.cygrpc
+grpc._cython.cygrpc.init_grpc_gevent()
 
 import datetime
 import os
