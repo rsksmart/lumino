@@ -2417,9 +2417,9 @@ class TokenNetwork:
             channel_identifier=channel_identifier,
         )
         if channel_data.state == ChannelState.SETTLED:
-            raise RaidenRecoverableError(ErrorCode.CHANNEL_ALREADY_SETTLED)
+            raise RaidenRecoverableError(ErrorCode.Settlement.CHANNEL_ALREADY_SETTLED)
         elif channel_data.state == ChannelState.REMOVED:
-            raise RaidenRecoverableError(ErrorCode.CHANNEL_UNLOCKED)
+            raise RaidenRecoverableError(ErrorCode.Settlement.CHANNEL_UNLOCKED)
         elif channel_data.state == ChannelState.OPENED:
             raise RaidenUnrecoverableError("Channel is still open. It cannot be settled")
         elif channel_data.state == ChannelState.CLOSED:

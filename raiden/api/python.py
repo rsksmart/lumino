@@ -626,14 +626,14 @@ class RaidenAPI:
                                                         and channel.identifier == channel_identifier, settled_channels)
             filtered_settled_channels_list = list(filtered_settled_channels_iterator)
             if filtered_settled_channels_list:
-                raise RaidenRecoverableError(ErrorCode.CHANNEL_ALREADY_SETTLED)
+                raise RaidenRecoverableError(ErrorCode.Settlement.CHANNEL_ALREADY_SETTLED)
             else:
                 log.debug("Settlement Light: channel is not in waiting_for_settle state, "
                           "it was probably settled by the counterparty and removed from memory before this call.")
                 # channel not found, this could be because it was settled and the hub detected that
                 # it doesn't have anything else to unlock so deletes the channel from the memory or
                 # could be a bug, in both cases we assume that the channel is settled so we raise this exception.
-                raise RaidenRecoverableError(ErrorCode.CHANNEL_ALREADY_SETTLED)
+                raise RaidenRecoverableError(ErrorCode.Settlement.CHANNEL_ALREADY_SETTLED)
 
         channel_state = channel_list[0]
 
