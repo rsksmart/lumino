@@ -7,15 +7,14 @@ from gevent.event import Event
 from greenlet import GreenletExit
 
 from raiden.message_handler import MessageHandler
-from raiden.messages import Message
+from transport.message import Message as TransportMessage
 from raiden.raiden_service import RaidenService
 from raiden.utils.runnable import Runnable
 from raiden.utils import Address, pex
 from transport.matrix.utils import _RetryQueue
 from transport.node import Node as TransportNode
 from transport.rif_comms.client import RifCommsClient
-from eth_utils import to_checksum_address
-
+from eth_utils import to_checksum_address, is_binary_address
 
 _RoomID = NewType("_RoomID", str)
 log = structlog.get_logger(__name__)
@@ -126,20 +125,45 @@ class RifCommsNode(TransportNode, Runnable):
         # we don't call it here to avoid deadlock when self crashes and calls stop() on finally
 
 
-    def send_message(self, message: Message, recipient: Address):
-        raise NotImplementedError
+    def send_message(self, message: TransportMessage, recipient: Address):
+        """Queue the message for sending to recipient in the queue_identifier
+
+        It may be called before transport is started, to initialize message queues
+        The actual sending is started only when the transport is started
+        """
+        raiden_message, queue_identifier = TransportMessage.unwrap(message)
+
+        # even if transport is not started, can run to enqueue messages to send when it starts
+        if not is_binary_address(recipient):
+            raise ValueError("Invalid address {}".format(pex(recipient)))
+
+        # These are not protocol messages, but transport specific messages
+        if isinstance(raiden_message, (Ping, Pong)):
+            raise ValueError(
+                "Do not use send_message for {} messages".format(raiden_message.__class__.__name__)
+            )
+
+        self.log.info(
+            "Send message",
+            recipient=pex(recipient),
+            message=raiden_message,
+            queue_identifier=queue_identifier,
+        )
+
+        self._send_with_retry(queue_identifier, raiden_message)
 
     def start_health_check(self, address: Address):
-        raise NotImplementedError
+        self.log.debug("Healthcheck", peer_address=pex(address))
+
 
     def whitelist(self, address: Address):
-        raise NotImplementedError
+        self.log.debug("Whitelist", peer_address=pex(address))
 
     def link_exception(self, callback: Any):
-        raise NotImplementedError
+        self.greenlet.link_exception(callback)
 
     def join(self, timeout=None):
-        raise NotImplementedError
+        self.greenlet.join(timeout)
 
 
 
