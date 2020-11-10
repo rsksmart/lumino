@@ -67,7 +67,7 @@ class MockChain:
         self.node_address = node_address
         self.client = MockJSONRPCClient()
 
-    def payment_channel(self, canonical_identifier: CanonicalIdentifier):
+    def payment_channel(self, creator_address: Address, canonical_identifier: CanonicalIdentifier):
         return MockPaymentChannel(self.token_network, canonical_identifier.channel_identifier)
 
     def token_network_registry(  # pylint: disable=unused-argument, no-self-use
