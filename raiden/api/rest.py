@@ -96,7 +96,13 @@ from raiden.api.v1.resources import (
     SettlementLightResourceByTokenAndPartnerAddress
 )
 
-from raiden.constants import GENESIS_BLOCK_NUMBER, UINT256_MAX, Environment, EMPTY_PAYMENT_HASH_INVOICE
+from raiden.constants import (
+    GENESIS_BLOCK_NUMBER,
+    UINT256_MAX,
+    Environment,
+    EMPTY_PAYMENT_HASH_INVOICE,
+    ErrorCode
+)
 
 from raiden.exceptions import (
     AddressWithoutCode,
@@ -1713,7 +1719,7 @@ class RestAPI:
 
         if message.is_signed:
             return ApiErrorBuilder.build_and_log_error(
-                errors="MESSAGE_ALREADY_SIGNED",
+                errors=ErrorCode.MESSAGE_ALREADY_SIGNED,
                 status_code=HTTPStatus.CONFLICT,
                 log=log
             )
@@ -1736,7 +1742,7 @@ class RestAPI:
             return self.update_channel_state(registry_address, channel_state)
         except ChannelNotFound:
             return ApiErrorBuilder.build_and_log_error(
-                errors="CHANNEL_ALREADY_SETTLED",
+                errors=ErrorCode.CHANNEL_ALREADY_SETTLED,
                 status_code=HTTPStatus.NOT_FOUND,
                 log=log
             )
