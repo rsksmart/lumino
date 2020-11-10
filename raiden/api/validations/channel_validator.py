@@ -141,6 +141,7 @@ class ChannelValidator:
 
         channels_to_settle: List[NettingChannelState] = []
 
+        # we look for the waiting_for_settle channels that we have created with our partner
         channels = filter(lambda channel: channel.partner_state.address == partner_address,
                           views.get_channelstate_settling(
                               chain_state=chain_state,
@@ -151,8 +152,7 @@ class ChannelValidator:
 
         channels_to_settle.extend(channels)
 
-        # we look for the same but with the creator as the partner since we can
-        # be in the other side and the creator of the channel isn't our address
+        # we look for the waiting_for_settle channels that our partner has created with us
         channels = filter(lambda channel: channel.partner_state.address == partner_address,
                           views.get_channelstate_settling(
                               chain_state=chain_state,
