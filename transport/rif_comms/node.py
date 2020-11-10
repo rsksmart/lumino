@@ -1,12 +1,17 @@
-from typing import Any
+from typing import Any, List, Dict
+
+from gevent import Greenlet
+from gevent.event import Event
 
 from raiden.message_handler import MessageHandler
 from raiden.messages import Message
 from raiden.raiden_service import RaidenService
 from raiden.utils.runnable import Runnable
 from raiden.utils.typing import Address
+from transport.matrix.utils import _RetryQueue
 from transport.node import Node as TransportNode
 from transport.rif_comms.client import RifCommsClient
+from eth_utils import to_checksum_address
 
 
 class RifCommsNode(TransportNode, Runnable):
@@ -15,16 +20,28 @@ class RifCommsNode(TransportNode, Runnable):
         TransportNode.__init__(self, address)
         Runnable.__init__(self)
         self._config = config
+        self._raiden_service: RaidenService = None# TODO initialization?
+        self._message_handler: MessageHandler = None# TODO Initialization?
 
-        self._client = RifCommsClient("0x5Ec92458ACD047f3B583E09C243a480Ef54A68D4", self._config["grpc_endpoint"])
-        self._client.connect()
-        self._client.locate_peer_id("0x5Ec92458ACD047f3B583E09C243a480Ef54A68D4")
+        self._client = RifCommsClient(to_checksum_address(address), self._config["grpc_endpoint"])
         print("RifCommsNode init on grpc endpoint: {}".format(self._config["grpc_endpoint"]))
-        self._client.disconnect()
-        print("Disconnected")
+
+        self._greenlets: List[Greenlet] = list()# TODO why we need this? how it works the _spawn
+        self._address_to_retrier: Dict[Address, _RetryQueue] = dict() # TODO RetryQueue is on matrix package
+
+        self._stop_event = Event() # TODO used on handle message and another points, pending review
+        self._stop_event.set()
 
     def start(self, raiden_service: RaidenService, message_handler: MessageHandler, prev_auth_data: str):
-        raise NotImplementedError
+        if not self._stop_event.ready():
+            raise RuntimeError(f"{self!r} already started")
+        self._stop_event.clear()
+        self._raiden_service = raiden_service
+        self._message_handler = message_handler
+        self._client.connect()
+        self._client.locate_peer_id(to_checksum_address(raiden_service.address)) # TODO remove when blocking grpc api bug solved
+
+        # TODO matrix node here invokes inventory_rooms that sets the handle_message callback
 
     def stop(self):
         raise NotImplementedError
