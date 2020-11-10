@@ -169,12 +169,12 @@ def skip_userid_validation(monkeypatch):
         return factories.HOP1
 
     monkeypatch.setattr(
-        transport.matrix.utils,
+        transport.matrix.node,
         "validate_userid_signature",
         mock_validate_userid_signature,
     )
     monkeypatch.setattr(
-        transport.matrix.utils,
+        transport.matrix.node,
         "validate_userid_signature",
         mock_validate_userid_signature,
     )
