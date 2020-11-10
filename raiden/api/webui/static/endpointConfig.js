@@ -7,7 +7,3 @@ window.luminoUrl = backendUrl;
 window.nodeAddress= nodeAddress;
 window.rnsDomain = rnsDomain;
 window.chainEndpoint = chainEndpoint;
-
-
-
-
