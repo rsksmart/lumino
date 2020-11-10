@@ -15,7 +15,7 @@ from raiden.tests.utils.events import search_for_item
 from raiden.tests.utils.network import CHAIN
 from raiden.tests.utils.transfer import transfer
 from raiden.transfer.state_change import Block
-from transport.matrix.transport import MatrixNode as MatrixTransportNode
+from transport.matrix.node import MatrixNode as MatrixTransportNode
 
 
 @pytest.mark.parametrize("number_of_nodes", [1])

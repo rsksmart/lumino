@@ -9,8 +9,8 @@ from eth_utils import to_normalized_address, decode_hex, remove_0x_prefix
 from raiden.api.python import RaidenAPI
 from raiden.constants import PATH_FINDING_BROADCASTING_ROOM, MONITORING_BROADCASTING_ROOM
 from raiden.exceptions import RaidenError
-from transport.matrix.transport import MatrixNode as MatrixTransportNode
-from transport.matrix.transport import MatrixLightClientNode as MatrixLightClientTransportNode
+from transport.matrix.node import MatrixNode as MatrixTransportNode, \
+    MatrixLightClientNode as MatrixLightClientTransportNode
 from transport.matrix.utils import get_available_servers_from_config, server_is_available, make_client
 from raiden.settings import DEFAULT_MATRIX_KNOWN_SERVERS
 from raiden.storage import sqlite, serialize
