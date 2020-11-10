@@ -647,9 +647,26 @@ def handle_token_network_action(
 
 
 def handle_contract_receive_channel_closed(
-    chain_state: ChainState, state_change: ContractReceiveChannelClosed, our_side_address: AddressHex
+    chain_state: ChainState,
+    state_change: ContractReceiveChannelClosed,
+    participant1: AddressHex
 ) -> TransitionResult[ChainState]:
-    # cleanup queue for channel
+    cleanup_queue_for_channel(participant1, chain_state, state_change)
+
+    return handle_token_network_action(chain_state=chain_state, state_change=state_change)
+
+
+def handle_contract_receive_channel_closed_light(
+    chain_state: ChainState,
+    state_change: ContractReceiveChannelClosedLight
+) -> TransitionResult[ChainState]:
+    cleanup_queue_for_channel(state_change.closing_participant, chain_state, state_change)
+    cleanup_queue_for_channel(state_change.non_closing_participant, chain_state, state_change)
+
+    return handle_token_network_action(chain_state=chain_state, state_change=state_change)
+
+
+def cleanup_queue_for_channel(participant, chain_state, state_change):
     channel_state = views.get_channelstate_by_canonical_identifier_and_address(
         chain_state=chain_state,
         canonical_identifier=CanonicalIdentifier(
@@ -658,7 +675,7 @@ def handle_contract_receive_channel_closed(
             channel_identifier=state_change.channel_identifier,
         ),
 
-        address=our_side_address
+        address=participant
     )
     if channel_state:
         queue_id = QueueIdentifier(
@@ -667,8 +684,6 @@ def handle_contract_receive_channel_closed(
         )
         if queue_id in chain_state.queueids_to_queues:
             chain_state.queueids_to_queues.pop(queue_id)
-
-    return handle_token_network_action(chain_state=chain_state, state_change=state_change)
 
 
 def handle_delivered(
@@ -1021,7 +1036,7 @@ def handle_state_change(
         iteration = handle_contract_receive_channel_closed(chain_state, state_change, chain_state.our_address)
     elif type(state_change) == ContractReceiveChannelClosedLight:
         assert isinstance(state_change, ContractReceiveChannelClosedLight), MYPY_ANNOTATION
-        iteration = handle_contract_receive_channel_closed(chain_state, state_change, state_change.closing_participant)
+        iteration = handle_contract_receive_channel_closed_light(chain_state, state_change)
     elif type(state_change) == ContractReceiveChannelNewBalance:
         assert isinstance(state_change, ContractReceiveChannelNewBalance), MYPY_ANNOTATION
         iteration = handle_token_network_action(chain_state, state_change)
