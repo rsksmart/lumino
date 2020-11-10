@@ -13,13 +13,7 @@ class Runnable:
     In the future, when proper restart is implemented, may be replaced by actual greenlet
     """
 
-    args: Sequence = tuple()  # args for _run()
-    kwargs: dict = dict()  # kwargs for _run()
-
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        self.args = args
-        self.kwargs = kwargs
-
+    def __init__(self) -> None:
         self._set_greenlet()
 
     def start(self) -> None:
@@ -30,17 +24,12 @@ class Runnable:
         """
         if self.greenlet:
             raise RuntimeError(f"Greenlet {self.greenlet!r} already started")
-        pristine = (
-            not self.greenlet.dead
-            and tuple(self.greenlet.args) == tuple(self.args)
-            and self.greenlet.kwargs == self.kwargs
-        )
-        if not pristine:
+        if self.greenlet.dead:
             self._set_greenlet()
         self.greenlet.start()
 
     def _set_greenlet(self):
-        self.greenlet = Greenlet(self._run, *self.args, **self.kwargs)
+        self.greenlet = Greenlet(self._run)
         self.greenlet.name = f"{self.__class__.__name__}|{self.greenlet.name}"
 
     def _run(self, *args: Any, **kwargs: Any) -> None:
