@@ -13,7 +13,6 @@ class Runnable:
     In the future, when proper restart is implemented, may be replaced by actual greenlet
     """
 
-    greenlet: Greenlet = None
     args: Sequence = tuple()  # args for _run()
     kwargs: dict = dict()  # kwargs for _run()
 
@@ -21,8 +20,7 @@ class Runnable:
         self.args = args
         self.kwargs = kwargs
 
-        self.greenlet = Greenlet(self._run, *self.args, **self.kwargs)
-        self.greenlet.name = f"{self.__class__.__name__}|{self.greenlet.name}"
+        self._set_greenlet()
 
     def start(self) -> None:
         """ Synchronously start task
@@ -38,9 +36,12 @@ class Runnable:
             and self.greenlet.kwargs == self.kwargs
         )
         if not pristine:
-            self.greenlet = Greenlet(self._run, *self.args, **self.kwargs)
-            self.greenlet.name = f"{self.__class__.__name__}|{self.greenlet.name}"
+            self._set_greenlet()
         self.greenlet.start()
+
+    def _set_greenlet(self):
+        self.greenlet = Greenlet(self._run, *self.args, **self.kwargs)
+        self.greenlet.name = f"{self.__class__.__name__}|{self.greenlet.name}"
 
     def _run(self, *args: Any, **kwargs: Any) -> None:
         """ Reimplements in children to busy wait here
@@ -68,9 +69,8 @@ class Runnable:
             subtask=subtask,
             exc=subtask.exception,
         )
-        if not self.greenlet:
-            return
-        self.greenlet.kill(subtask.exception)
+        if self.greenlet:
+            self.greenlet.kill(subtask.exception)
 
     # redirect missing members to underlying greenlet for compatibility
     # but better use greenlet directly for now, to make use of the c extension optimizations
