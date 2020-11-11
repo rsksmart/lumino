@@ -4,7 +4,7 @@
 
 # Resolves
 
-`Point here the jira issue`
+Add a reference to the JIRA issue here.
 
 # Impact
 
@@ -12,21 +12,17 @@
 
 # Changelog
 
-`A bullets list of changes`
+A bullet list of changes.
 
-```
-1. added foo bar
-2. refactored Foo class
-3. moved foo to bar folder
-```
+1. add foo bar
+2. refactor Foo class
+3. move foo to bar folder
 
 
-# TODO's
+# TODOs
 
-`You can use this section as TODO list. Use this space for when the PR is on draft state. `
+You can use this section as TODO list. Use this space for when the PR is on draft state.
 
-```
-1. review FOO class 
-2. fix pending bug about bar 
-3. document foo bar workflow
-```
+- [x] review FOO class 
+- [ ] fix pending bug about bar 
+- [ ] document foo bar workflow
