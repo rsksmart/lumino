@@ -1,6 +1,6 @@
 # Description
 
-`Describe the objective of the PR and a brief description of the changes introduced`
+Describe the objective of the PR and a brief description of the changes introduced
 
 # Resolves
 
@@ -8,7 +8,7 @@ Add a reference to the JIRA issue here.
 
 # Impact
 
-`Describe the impact of the PR and the components of Lumino that it affects`
+Describe the impact of the PR and the components of Lumino that it affects
 
 # Changelog
 
