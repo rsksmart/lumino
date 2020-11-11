@@ -658,8 +658,8 @@ class RaidenService(Runnable):
         assert self.wal, f"WAL object not yet initialized. node:{self!r}"
         return views.block_number(self.wal.state_manager.current_state)
 
-    def on_message(self, message: Message, address: Address, is_light_client: bool = False):
-        self.message_handler.on_message(self, message, address, is_light_client)
+    def on_message(self, message: Message, message_receiver_address: Address, is_light_client: bool = False):
+        self.message_handler.on_message(self, message, message_receiver_address, is_light_client)
 
     def handle_and_track_state_change(self, state_change: StateChange):
         """ Dispatch the state change and does not handle the exceptions.

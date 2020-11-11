@@ -37,21 +37,25 @@ log = structlog.get_logger(__name__)  # pylint: disable=invalid-name
 
 
 class MessageHandler:
-    def on_message(self, raiden: RaidenService, message: Message, node_address: Address, is_light_client: bool = False) -> None:
+    def on_message(self,
+                   raiden: RaidenService,
+                   message: Message,
+                   message_receiver_address: Address,
+                   is_light_client: bool = False) -> None:
         # pylint: disable=unidiomatic-typecheck
-        print("On received message " + str(type(message)))
-        node_address = to_canonical_address(node_address)
+        log.info(f"Handling received message {str(type(message))}")
+        message_receiver_address = to_canonical_address(message_receiver_address)
         if type(message) == SecretRequest:
             assert isinstance(message, SecretRequest), MYPY_ANNOTATION
-            self.handle_message_secretrequest(raiden, message, node_address, is_light_client)
+            self.handle_message_secretrequest(raiden, message, message_receiver_address, is_light_client)
 
         elif type(message) == RevealSecret:
             assert isinstance(message, RevealSecret), MYPY_ANNOTATION
-            self.handle_message_revealsecret(raiden, message, node_address, is_light_client)
+            self.handle_message_revealsecret(raiden, message, message_receiver_address, is_light_client)
 
         elif type(message) == Unlock:
             assert isinstance(message, Unlock), MYPY_ANNOTATION
-            self.handle_message_unlock(raiden, message, node_address, is_light_client)
+            self.handle_message_unlock(raiden, message, message_receiver_address, is_light_client)
 
         elif type(message) == LockExpired:
             assert isinstance(message, LockExpired), MYPY_ANNOTATION
@@ -67,11 +71,11 @@ class MessageHandler:
 
         elif type(message) == Delivered:
             assert isinstance(message, Delivered), MYPY_ANNOTATION
-            self.handle_message_delivered(raiden, message, node_address, is_light_client)
+            self.handle_message_delivered(raiden, message, message_receiver_address, is_light_client)
 
         elif type(message) == Processed:
             assert isinstance(message, Processed), MYPY_ANNOTATION
-            self.handle_message_processed(raiden, message, node_address, is_light_client)
+            self.handle_message_processed(raiden, message, message_receiver_address, is_light_client)
         else:
             log.error("Unknown message cmdid {}".format(message.cmdid))
 
