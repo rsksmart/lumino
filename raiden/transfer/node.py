@@ -1,6 +1,7 @@
 import copy
 
 from raiden.lightclient.models.light_client_protocol_message import LightClientProtocolMessageType
+from raiden.tests.unit.fixtures import chain_state
 from raiden.transfer import channel, token_network, views
 from raiden.transfer.architecture import (
     ContractReceiveStateChange,
@@ -90,6 +91,9 @@ from raiden.utils.typing import (
     Address, AddressHex)
 
 from eth_utils import to_canonical_address
+
+import structlog
+log = structlog.get_logger(__name__)  # pylint: disable=invalid-name
 
 # All State changes that are subdispatched as token network actions
 TokenNetworkStateChange = Union[
@@ -199,7 +203,7 @@ def subdispatch_to_all_lockedtransfers(
     chain_state: ChainState, state_change: StateChange, storage=None
 ) -> TransitionResult[ChainState]:
     events = list()
-    for node_address, payment_mapping in chain_state.payment_mapping.items():
+    for node_address, payment_mapping in chain_state.get_payment_states_by_address():
         for secrethash in payment_mapping.secrethashes_to_task:
             result = subdispatch_to_paymenttask(chain_state, state_change, node_address, secrethash, storage)
             events.extend(result.events)
@@ -211,12 +215,7 @@ def subdispatch_to_paymenttask(
 ) -> TransitionResult[ChainState]:
     block_number = chain_state.block_number
     block_hash = chain_state.block_hash
-    sub_task = None
-
-    node_payment_mapping = chain_state.payment_mapping.get(node_address)
-
-    if node_payment_mapping:
-        sub_task = chain_state.payment_mapping[node_address].secrethashes_to_task.get(secrethash)
+    sub_task = chain_state.get_payment_task(node_address, secrethash)
 
     events: List[Event] = list()
     if sub_task:
@@ -243,7 +242,7 @@ def subdispatch_to_paymenttask(
                 )
                 events = sub_iteration.events
                 if sub_iteration.new_state is None:
-                    del chain_state.payment_mapping[node_address].secrethashes_to_task[secrethash]
+                    chain_state.delete_payment_task(node_address, secrethash)
 
         elif isinstance(sub_task, MediatorTask):
             token_network_identifier = sub_task.token_network_identifier
@@ -266,7 +265,7 @@ def subdispatch_to_paymenttask(
                 events = sub_iteration.events
 
                 if sub_iteration.new_state is None:
-                    del chain_state.payment_mapping[node_address].secrethashes_to_task[secrethash]
+                    chain_state.delete_payment_task(node_address, secrethash)
 
         elif isinstance(sub_task, TargetTask):
             token_network_identifier = sub_task.token_network_identifier
@@ -294,7 +293,7 @@ def subdispatch_to_paymenttask(
                 events = sub_iteration.events
 
                 if sub_iteration.new_state is None:
-                    del chain_state.payment_mapping[node_address].secrethashes_to_task[secrethash]
+                    chain_state.delete_payment_task(node_address, secrethash)
 
     return TransitionResult(chain_state, events)
 
@@ -361,10 +360,7 @@ def subdispatch_initiatortask(
     secrethash: SecretHash,
 ) -> TransitionResult[ChainState]:
     block_number = chain_state.block_number
-    sub_task = None
-    node_payment_mapping = chain_state.payment_mapping.get(node_address)
-    if node_payment_mapping:
-        sub_task = chain_state.payment_mapping[node_address].secrethashes_to_task.get(secrethash)
+    sub_task = chain_state.get_payment_task(node_address, secrethash)
 
     if not sub_task:
         is_valid_subtask = True
@@ -394,14 +390,14 @@ def subdispatch_initiatortask(
 
             if iteration.new_state:
                 sub_task = InitiatorTask(token_network_identifier, iteration.new_state)
-                chain_state.payment_mapping.setdefault(node_address, PaymentMappingState()).secrethashes_to_task[secrethash] = sub_task
-            elif node_address in chain_state.payment_mapping \
-                and secrethash in chain_state.payment_mapping[node_address].secrethashes_to_task \
-                    and not isinstance(state_change, ActionInitInitiatorLight):
-                ## We dont delete the payment task when is a light payment, thats because we need the previous payment task for refunds.
-                ## TODO marcosmartinez7, are the p2p payments being removed?
-                print("Deleted payment task {}".format(secrethash.hex()))
-                del chain_state.payment_mapping[node_address].secrethashes_to_task[secrethash]
+                chain_state.create_payment_task(node_address, secrethash, sub_task)
+            elif chain_state.get_payment_task(node_address, secrethash) and \
+                    not isinstance(state_change, ActionInitInitiatorLight):
+                # We dont delete the payment task when is a light payment,
+                # thats because we need the previous payment task for refunds.
+                # TODO marcosmartinez7, are the p2p payments being removed?
+                chain_state.delete_payment_task(node_address, secrethash)
+                log.info(f"Deleted payment task for address {node_address} and secret hash {secrethash.hex()}")
 
     return TransitionResult(chain_state, events)
 
@@ -416,10 +412,7 @@ def subdispatch_mediatortask(
 ) -> TransitionResult[ChainState]:
     block_number = chain_state.block_number
     block_hash = chain_state.block_hash
-    sub_task = None
-    node_payment_mapping = chain_state.payment_mapping.get(node_address)
-    if node_payment_mapping:
-        sub_task = chain_state.payment_mapping[node_address].secrethashes_to_task.get(secrethash)
+    sub_task = chain_state.get_payment_task(node_address, secrethash)
     if not sub_task:
         is_valid_subtask = True
         mediator_state = None
@@ -451,9 +444,9 @@ def subdispatch_mediatortask(
 
             if iteration.new_state:
                 sub_task = MediatorTask(token_network_identifier, iteration.new_state)
-                chain_state.payment_mapping.setdefault(node_address, PaymentMappingState()).secrethashes_to_task[secrethash] = sub_task
-            elif secrethash in chain_state.payment_mapping[node_address].secrethashes_to_task:
-                del chain_state.payment_mapping[node_address].secrethashes_to_task[secrethash]
+                chain_state.create_payment_task(node_address, secrethash, sub_task)
+            elif chain_state.get_payment_task(node_address, secrethash):
+                chain_state.delete_payment_task(node_address, secrethash)
 
     return TransitionResult(chain_state, events)
 
@@ -469,11 +462,7 @@ def subdispatch_targettask(
     storage
 ) -> TransitionResult[ChainState]:
     block_number = chain_state.block_number
-    sub_task = None
-    node_payment_mapping = chain_state.payment_mapping.get(node_address)
-    if node_payment_mapping:
-        sub_task = chain_state.payment_mapping[node_address].secrethashes_to_task.get(secrethash)
-
+    sub_task = chain_state.get_payment_task(node_address, secrethash)
     if not sub_task:
         is_valid_subtask = True
         target_state = None
@@ -512,10 +501,9 @@ def subdispatch_targettask(
 
         if iteration.new_state:
             sub_task = TargetTask(channel_state.canonical_identifier, iteration.new_state)
-            chain_state.payment_mapping.setdefault(node_address, PaymentMappingState()).secrethashes_to_task[secrethash] = sub_task
-        elif node_address in chain_state.payment_mapping.keys() and \
-                secrethash in chain_state.payment_mapping[node_address].secrethashes_to_task:
-            del chain_state.payment_mapping[node_address].secrethashes_to_task[secrethash]
+            chain_state.create_payment_task(node_address, secrethash, sub_task)
+        elif chain_state.get_payment_task(node_address, secrethash):
+            chain_state.delete_payment_task(node_address, secrethash)
 
     return TransitionResult(chain_state, events)
 
@@ -716,7 +704,7 @@ def handle_node_change_network_state(
     network_state = state_change.network_state
     chain_state.nodeaddresses_to_networkstates[node_address] = network_state
 
-    for payment_mapping in chain_state.payment_mapping.values():
+    for payment_mapping in chain_state.get_payment_states():
         for secrethash, subtask in payment_mapping.secrethashes_to_task.items():
             # This assert would not have been needed if token_network_identifier, a common attribute
             # for all TransferTasks was part of the TransferTasks superclass.
@@ -880,14 +868,11 @@ def handle_receive_transfer_refund_cancel_route(
     chain_state: ChainState, state_change: ActionTransferReroute, storage
 ) -> TransitionResult[ChainState]:
 
-    new_secrethash = state_change.secrethash
-    current_payment_task = chain_state.payment_mapping[chain_state.our_address].secrethashes_to_task[
-        state_change.transfer.lock.secrethash
-    ]
-    chain_state.payment_mapping[chain_state.our_address].secrethashes_to_task.update(
-        {new_secrethash: copy.deepcopy(current_payment_task)}
-    )
-    return subdispatch_to_paymenttask(chain_state, state_change, chain_state.our_address, new_secrethash, storage)
+    new_secret_hash = state_change.secrethash
+
+    chain_state.clone_payment_task(chain_state.our_address, state_change.transfer.lock.secrethash, new_secret_hash)
+
+    return subdispatch_to_paymenttask(chain_state, state_change, chain_state.our_address, new_secret_hash, storage)
 
 
 def handle_receive_transfer_cancel_route(

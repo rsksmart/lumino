@@ -1,9 +1,10 @@
 # pylint: disable=too-few-public-methods,too-many-arguments,too-many-instance-attributes
+import copy
 import random
 from collections import defaultdict
 from functools import total_ordering
 from random import Random
-from typing import TYPE_CHECKING, Tuple
+from typing import TYPE_CHECKING, Tuple, ValuesView, ItemsView
 
 import networkx
 from eth_utils import encode_hex, to_canonical_address, to_checksum_address
@@ -401,6 +402,43 @@ class ChainState(State):
         )
 
         return restored
+
+    def get_payment_state(self, creator_address: Address) -> "PaymentMappingState":
+        result = None
+        if creator_address and creator_address in self.payment_mapping:
+            result = self.payment_mapping[creator_address]
+        return result
+
+    def get_payment_states(self) -> ValuesView:
+        return self.payment_mapping.values()
+
+    def get_payment_states_by_address(self) -> ItemsView:
+        return self.payment_mapping.items()
+
+    def get_payment_task(self, creator_address: Address, secret_hash: SecretHash) -> TransferTask:
+        result = None
+        payment_state = self.get_payment_state(creator_address)
+        if payment_state and secret_hash in payment_state.secrethashes_to_task:
+            result = payment_state.secrethashes_to_task[secret_hash]
+        return result
+
+    def create_payment_task(self, creator_address: Address, secret_hash: SecretHash, task: TransferTask):
+        self.payment_mapping.setdefault(
+            creator_address,
+            PaymentMappingState()
+        ).secrethashes_to_task[secret_hash] = task
+
+    def delete_payment_task(self, creator_address: Address, secret_hash: SecretHash):
+        payment_task = self.get_payment_task(creator_address, secret_hash)
+        if payment_task:
+            del self.payment_mapping[creator_address].secrethashes_to_task[secret_hash]
+
+    def clone_payment_task(self, creator_address: Address, secret_hash: SecretHash, new_secret_hash: SecretHash):
+        current_payment_task = self.get_payment_task(creator_address, secret_hash)
+        if current_payment_task:
+            self.payment_mapping[creator_address].secrethashes_to_task.update(
+                {new_secret_hash: copy.deepcopy(current_payment_task)}
+            )
 
 
 class LightClientTransportState(State):

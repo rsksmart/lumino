@@ -875,7 +875,7 @@ class RaidenService(Runnable):
         """
 
         with self.payment_identifier_lock:
-            for payment_mapping in chain_state.payment_mapping.values():
+            for payment_mapping in chain_state.get_payment_states():
                 for task in payment_mapping.secrethashes_to_task.values():
                     if not isinstance(task, InitiatorTask):
                         continue

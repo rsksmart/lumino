@@ -1839,10 +1839,8 @@ class RaidenAPI:
                 privkey=self.raiden.privkey,
             )
             if prev_secrethash:
-                current_payment_task = chain_state.payment_mapping[creator_address].secrethashes_to_task[prev_secrethash]
-                chain_state.payment_mapping[creator_address].secrethashes_to_task.update(
-                    {secrethash: copy.deepcopy(current_payment_task)}
-                )
+                current_payment_task = chain_state.get_payment_task(creator_address, prev_secrethash)
+                chain_state.clone_payment_task(creator_address, prev_secrethash, secrethash)
                 possible_routes = routes.filter_acceptable_routes(
                     route_states=possible_routes, blacklisted_channel_ids=current_payment_task.manager_state.cancelled_channels
                 )
