@@ -7,6 +7,8 @@ from gevent.event import Event
 from greenlet import GreenletExit
 
 from raiden.message_handler import MessageHandler
+from raiden.messages import Message
+from raiden.transfer.identifiers import QueueIdentifier
 from transport.message import Message as TransportMessage
 from raiden.raiden_service import RaidenService
 from raiden.utils.runnable import Runnable
@@ -150,7 +152,37 @@ class RifCommsNode(TransportNode, Runnable):
             queue_identifier=queue_identifier,
         )
 
-        self._send_with_retry(queue_identifier, raiden_message)
+        self._enqueue_message(queue_identifier, raiden_message)
+
+
+    def _enqueue_message(self, queue_identifier: QueueIdentifier, message: Message):
+        queue = self._get_queue(queue_identifier.recipient)
+        queue.enqueue(queue_identifier=queue_identifier, message=message)
+
+    def _get_queue(self, receiver: Address) -> _RetryQueue:
+        """ Construct and return a _RetryQueue for receiver """
+        if receiver not in self._address_to_message_queue:
+            queue = _RetryQueue(transport=self, receiver=receiver)
+            self._address_to_message_queue[receiver] = queue
+            # Always start the _RetryQueue, otherwise `stop` will block forever
+            # waiting for the corresponding gevent.Greenlet to complete. This
+            # has no negative side-effects if the transport has stopped becausecreate_light_client_payment
+            # the queue itself checks the transport running state.
+            queue.start()
+        return self._address_to_message_queue[receiver]
+
+    # TODO exception handling rif comms client
+    def _send_raw(self, receiver_address: Address, data: str):
+        # Check if we have a subscription for that receiver address
+        is_subscribed_to_receiver_topic = self._client.has_subscription(receiver_address).value
+        if not is_subscribed_to_receiver_topic:
+            # If not, create the topic subscription
+            self._client.subscribe(receiver_address) # TODO is this really needed in order to send msg to receiver?
+        # Send the message
+        self._client.send_message(receiver_address, data)
+        self.log.info(
+            "RIF Comms send raw", receiver=pex(receiver_address), data=data.replace("\n", "\\n")
+        )
 
     def start_health_check(self, address: Address):
         self.log.debug("Healthcheck", peer_address=pex(address))

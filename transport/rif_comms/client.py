@@ -2,7 +2,8 @@ from grpc import insecure_channel
 
 from raiden.utils import Address
 from transport.message import Message
-from transport.rif_comms.proto.api_pb2 import Notification, PublishPayload, Channel, Msg, RskAddress, Void
+from transport.rif_comms.proto.api_pb2 import Notification, PublishPayload, Channel, Msg, RskAddress, Void, Subscriber, \
+    BooleanResponse
 from transport.rif_comms.proto.api_pb2_grpc import CommunicationsApiStub
 
 
@@ -39,7 +40,17 @@ class RifCommsClient:
         # TODO catch already subscribed and any error
         return self.stub.CreateTopicWithRskAddress(RskAddress(address=topic_id))
 
-    def send_message(self, topic_id: str, message: Message) -> Void:
+    # TODO review params and create docstring. It has no sense to use both peer id and rsk_address
+    def has_subscription(self, rsk_address: Address) -> BooleanResponse:
+        peer_id = self.get_peer_id(rsk_address)
+        return self.stub.HasSubscriber(
+            Subscriber(
+                peerId=peer_id,
+                channel=Channel(channelId=rsk_address)
+            )
+        )
+
+    def send_message(self, topic_id: str, data: str) -> Void:
         """
         Sends a message to a topic.
         Invokes the SendMessageToTopic grpc api endpoint
