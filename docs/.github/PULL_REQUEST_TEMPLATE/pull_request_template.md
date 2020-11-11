@@ -9,7 +9,7 @@
 
 # Impact
 
-`Describe the impact of the PR, wich specifics components of Lumino it affects`
+`Describe the impact of the PR and the components of Lumino that it affects`
 
 # Changelog
 
