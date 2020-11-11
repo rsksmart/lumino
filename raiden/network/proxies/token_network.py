@@ -20,6 +20,7 @@ from raiden.constants import (
     GENESIS_BLOCK_NUMBER,
     UINT256_MAX,
     UNLOCK_TX_GAS_LIMIT,
+    ErrorCode
 )
 from raiden.exceptions import (
     ChannelOutdatedError,
@@ -2416,9 +2417,9 @@ class TokenNetwork:
             channel_identifier=channel_identifier,
         )
         if channel_data.state == ChannelState.SETTLED:
-            raise RaidenRecoverableError("Channel is already settled")
+            raise RaidenRecoverableError(ErrorCode.Settlement.CHANNEL_ALREADY_SETTLED)
         elif channel_data.state == ChannelState.REMOVED:
-            raise RaidenRecoverableError("Channel is already unlocked. It cannot be settled")
+            raise RaidenRecoverableError(ErrorCode.Settlement.CHANNEL_UNLOCKED)
         elif channel_data.state == ChannelState.OPENED:
             raise RaidenUnrecoverableError("Channel is still open. It cannot be settled")
         elif channel_data.state == ChannelState.CLOSED:

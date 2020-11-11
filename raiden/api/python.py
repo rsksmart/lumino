@@ -24,7 +24,8 @@ from raiden.constants import (
     GENESIS_BLOCK_NUMBER,
     RED_EYES_PER_TOKEN_NETWORK_LIMIT,
     UINT256_MAX,
-    Environment)
+    Environment,
+    ErrorCode)
 from raiden.exceptions import (
     AlreadyRegisteredTokenAddress,
     ChannelNotFound,
@@ -625,9 +626,14 @@ class RaidenAPI:
                                                         and channel.identifier == channel_identifier, settled_channels)
             filtered_settled_channels_list = list(filtered_settled_channels_iterator)
             if filtered_settled_channels_list:
-                raise RaidenRecoverableError("Failed trying to settle a channel that's already settled")
+                raise RaidenRecoverableError(ErrorCode.Settlement.CHANNEL_ALREADY_SETTLED)
             else:
-                raise RaidenRecoverableError("Failed trying to settle a channel that's not in waiting_for_settle state")
+                log.debug("Settlement Light: channel is not in waiting_for_settle state, "
+                          "it was probably settled by the counterparty and removed from memory before this call.")
+                # channel not found, this could be because it was settled and the hub detected that
+                # it doesn't have anything else to unlock so deletes the channel from the memory or
+                # could be a bug, in both cases we assume that the channel is settled so we raise this exception.
+                raise RaidenRecoverableError(ErrorCode.Settlement.CHANNEL_ALREADY_SETTLED)
 
         channel_state = channel_list[0]
 
@@ -827,7 +833,7 @@ class RaidenAPI:
 
     def channel_settle_light(
         self,
-        registry_address: PaymentNetworkID,
+        registry_address: Address,
         token_address: TokenAddress,
         creator_address: Address,
         partner_address: Address,
