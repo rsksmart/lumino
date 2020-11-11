@@ -9,7 +9,7 @@ from grpc._channel import _InactiveRpcError
 from sha3 import keccak_256
 
 from transport.rif_comms.client import RifCommsClient
-from transport.rif_comms.proto.api_pb2 import RskAddress
+from transport.rif_comms.proto.api_pb2 import RskAddress, Channel, Subscriber
 from transport.rif_comms.proto.api_pb2_grpc import CommunicationsApiStub
 
 
@@ -62,15 +62,33 @@ class TestRiffCommsClient(unittest.TestCase):
         channel = self.rif_comms_client.subscribe(get_random_address_str())
         peer_id = self.rif_comms_client.get_peer_id(LUMINO_1_ADDRESS)
 
-    @pytest.mark.skip(reason="ignore")
-    def test_create_random_topic_id_without_connection_1(self):
+    #@pytest.mark.skip(reason="ignore")
+    def test_subscribe(self):
         channel = grpc.insecure_channel(LUMINO_1_COMMS_API)
         stub = CommunicationsApiStub(channel)
         rsk_address = RskAddress(address=LUMINO_1_ADDRESS)
-        peer_addr = RskAddress(address=get_random_address_str())
         notification = stub.ConnectToCommunicationsNode(rsk_address)
-        response = stub.LocatePeerId(rsk_address)
-        print("response=%s" % response)
-        channel = stub.CreateTopicWithRskAddress(peer_addr)
-        for resp in channel:
-            print(resp)
+        channel = stub.CreateTopicWithRskAddress(rsk_address)
+        subscribers = stub.GetSubscribers(Channel(channelId=LUMINO_1_ADDRESS))
+
+    def test_has_subscriber(self):
+        channel = grpc.insecure_channel(LUMINO_1_COMMS_API)
+        stub = CommunicationsApiStub(channel)
+        rsk_address = RskAddress(address=LUMINO_1_ADDRESS)
+        notification = stub.ConnectToCommunicationsNode(rsk_address)
+        channel = stub.CreateTopicWithPeerId(rsk_address)
+        peer_id = stub.LocatePeerId(rsk_address)
+
+        """
+        message Subscriber {
+            string peerId = 1;
+            Channel channel = 2;
+        }"""
+        has_subscriber = stub.HasSubscriber(
+            Subscriber(
+                peerId=peer_id.address,
+                channel=Channel(channelId=LUMINO_1_ADDRESS)
+            )
+        )
+        print("has_subscriber")
+        print(has_subscriber)
