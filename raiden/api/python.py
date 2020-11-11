@@ -70,7 +70,9 @@ from raiden.transfer.state import (
     NettingChannelState,
     TargetTask,
     TransferTask,
-    ChainState, PaymentMappingState)
+    ChainState,
+    PaymentMappingState
+)
 
 from raiden.transfer.state_change import ActionChannelClose
 from raiden.utils import pex, typing
@@ -200,8 +202,8 @@ def transfer_tasks_view(
 ) -> List[Dict[str, Any]]:
     view = list()
 
-    for node_address in payment_mapping.keys():
-        for secrethash, transfer_task in payment_mapping[node_address].secrethashes_to_task.items():
+    for payment_mapping in payment_mapping.values():
+        for secrethash, transfer_task in payment_mapping.secrethashes_to_task.items():
             transfer, role = get_transfer_from_task(secrethash, transfer_task)
             if transfer is None:
                 continue

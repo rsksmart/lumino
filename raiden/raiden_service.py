@@ -10,6 +10,8 @@ import structlog
 from eth_utils import is_binary_address
 from gevent import Greenlet
 from gevent.event import AsyncResult, Event
+
+from raiden.lightclient.handlers.light_client_service import LightClientService
 from raiden.transfer.identifiers import CanonicalIdentifier
 
 from raiden import constants, routing
@@ -873,8 +875,8 @@ class RaidenService(Runnable):
         """
 
         with self.payment_identifier_lock:
-            for node_address in chain_state.payment_mapping.keys():
-                for task in chain_state.payment_mapping[node_address].secrethashes_to_task.values():
+            for payment_mapping in chain_state.payment_mapping.values():
+                for task in payment_mapping.secrethashes_to_task.values():
                     if not isinstance(task, InitiatorTask):
                         continue
 
@@ -1327,9 +1329,13 @@ class RaidenService(Runnable):
     def initiate_send_delivered_light(self, sender_address: Address, receiver_address: Address,
                                       delivered: Delivered, msg_order: int, payment_id: int,
                                       message_type: LightClientProtocolMessageType):
-        lc_transport = self.get_light_client_transport(to_checksum_address(sender_address))
         # check if receiver is a handled light client too
-        if lc_transport:
+        is_handled_lc = LightClientService.is_handled_lc(
+            client_address=to_checksum_address(sender_address),
+            wal=self.wal
+        )
+        if is_handled_lc:
+            lc_transport_instance = self.get_light_client_transport(to_checksum_address(sender_address))
             exists = LightClientMessageHandler.get_message_for_order_and_address(
                 message_id=delivered.delivered_message_identifier,
                 payment_id=payment_id,
@@ -1348,13 +1354,17 @@ class RaidenService(Runnable):
                     wal=self.wal,
                     payment_id=payment_id
                 )
-                lc_transport.send_for_light_client_with_retry(receiver_address, delivered)
+                lc_transport_instance.send_for_light_client_with_retry(receiver_address, delivered)
 
     def initiate_send_processed_light(self, sender_address: Address, receiver_address: Address,
                                       processed: Processed, msg_order: int, payment_id: int,
                                       message_type: LightClientProtocolMessageType):
-        lc_transport = self.get_light_client_transport(to_checksum_address(sender_address))
-        if lc_transport:
+        is_handled_lc = LightClientService.is_handled_lc(
+            client_address=to_checksum_address(sender_address),
+            wal=self.wal
+        )
+        if is_handled_lc:
+            lc_transport_instance = self.get_light_client_transport(to_checksum_address(sender_address))
             LightClientMessageHandler.store_light_client_protocol_message(
                 identifier=processed.message_identifier,
                 message=processed,
@@ -1365,7 +1375,7 @@ class RaidenService(Runnable):
                 wal=self.wal,
                 payment_id=payment_id
             )
-            lc_transport.send_for_light_client_with_retry(receiver_address, processed)
+            lc_transport_instance.send_for_light_client_with_retry(receiver_address, processed)
 
     def initiate_send_secret_reveal_light(
         self,

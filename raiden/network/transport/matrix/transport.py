@@ -624,7 +624,6 @@ class MatrixTransport(Runnable):
         """ Join rooms invited by whitelisted partners """
         if self._stop_event.ready():
             return
-        print("///// RECIBI INVITE ////")
         self.log.info("Got invite", room_id=room_id)
         invite_events = [
             event
@@ -1015,9 +1014,6 @@ class MatrixTransport(Runnable):
                         error_code=error.code,
                     )
             else:
-                print("////VOY A INVITAR /////")
-                print("invitados")
-                print(invitees)
                 # Invite users to existing room
                 member_ids = {user.user_id for user in room.get_joined_members(force_resync=True)}
                 users_to_invite = set(invitees_uids) - member_ids
