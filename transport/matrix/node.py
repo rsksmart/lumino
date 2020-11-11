@@ -877,11 +877,6 @@ class MatrixNode(TransportNode, Runnable):
                     exc_info=True,
                 )
 
-    def _sign(self, data: bytes) -> bytes:
-        """ Use eth_sign compatible hasher to sign matrix data """
-        assert self._raiden_service is not None
-        return self._raiden_service.signer.sign(data=data)
-
     def _get_user(self, user: Union[User, str]) -> User:
         """Creates an User from an user_id, if none, or fetch a cached User
 

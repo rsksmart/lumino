@@ -1,4 +1,4 @@
-from typing import Any, List, Dict, NewType
+from typing import Any, List, Dict, NewType, Union
 
 import gevent
 import structlog
@@ -6,9 +6,13 @@ from gevent import Greenlet
 from gevent.event import Event
 from greenlet import GreenletExit
 
+from raiden.exceptions import InvalidAddress, UnknownAddress, UnknownTokenAddress
 from raiden.message_handler import MessageHandler
-from raiden.messages import Message
+from raiden.messages import Message, SignedRetrieableMessage, SignedMessage, Delivered, Processed
+from raiden.transfer import views
 from raiden.transfer.identifiers import QueueIdentifier
+from raiden.transfer.mediated_transfer.events import CHANNEL_IDENTIFIER_GLOBAL_QUEUE
+from raiden.transfer.state import QueueIdsToQueues
 from transport.message import Message as TransportMessage
 from raiden.raiden_service import RaidenService
 from raiden.utils.runnable import Runnable
@@ -21,8 +25,8 @@ from eth_utils import to_checksum_address, is_binary_address
 _RoomID = NewType("_RoomID", str)
 log = structlog.get_logger(__name__)
 
-class RifCommsNode(TransportNode, Runnable):
 
+class RifCommsNode(TransportNode, Runnable):
     log = log
 
     def __init__(self, address: Address, config: dict):
@@ -34,15 +38,18 @@ class RifCommsNode(TransportNode, Runnable):
         self._client = RifCommsClient(to_checksum_address(address), self._config["grpc_endpoint"])
         print("RifCommsNode init on grpc endpoint: {}".format(self._config["grpc_endpoint"]))
 
-        self._greenlets: List[Greenlet] = list()# TODO why we need this? how it works the _spawn
-        self._address_to_message_queue: Dict[Address, _RetryQueue] = dict() # TODO RetryQueue is on matrix package
+        self._greenlets: List[Greenlet] = list()  # TODO why we need this? how it works the _spawn
+        self._address_to_message_queue: Dict[Address, _RetryQueue] = dict()  # TODO RetryQueue is on matrix package
 
-        self._stop_event = Event() # TODO used on handle message and another points, pending review
+        self._stop_event = Event()  # TODO used on handle message and another points, pending review
         self._stop_event.set()
 
         self.log = log.bind(node_address=pex(self.address))
 
-
+    @property
+    def _queueids_to_queues(self) -> QueueIdsToQueues:
+        chain_state = views.state_from_raiden(self._raiden_service)
+        return views.get_all_messagequeues(chain_state)
 
     def start(self, raiden_service: RaidenService, message_handler: MessageHandler, prev_auth_data: str):
         if not self._stop_event.ready():
@@ -50,7 +57,8 @@ class RifCommsNode(TransportNode, Runnable):
         self._stop_event.clear()
         self._raiden_service = raiden_service
         self._client.connect()
-        self._client.get_peer_id(to_checksum_address(raiden_service.address)) # TODO remove when blocking grpc api bug solved
+        self._client.get_peer_id(
+            to_checksum_address(raiden_service.address))  # TODO remove when blocking grpc api bug solved
 
         # TODO matrix node here invokes inventory_rooms that sets the handle_message callback
         # TODO here we must also check for new messages as the matrix node does with   self._client.start_listener_thread()
@@ -64,7 +72,6 @@ class RifCommsNode(TransportNode, Runnable):
         self.log.debug("RIF Comms Node started", config=self._config)
         Runnable.start(self)
 
-
     def __repr__(self):
         if self._raiden_service is not None:
             node = f" node:{pex(self._raiden_service.address)}"
@@ -73,7 +80,6 @@ class RifCommsNode(TransportNode, Runnable):
 
         return f"<{self.__class__.__name__}{node} id:{id(self)}>"
 
-
     def _run(self, *args: Any, **kwargs: Any) -> None:
         # TODO ActionUpdateTransportAuthData?
         # TODO which is the  Runnable main method, that perform wait on long-running subtasks ?"
@@ -81,8 +87,8 @@ class RifCommsNode(TransportNode, Runnable):
         # dispatch auth data on first scheduling after start
         self.greenlet.name = f"RifCommsNode._run node:{pex(self._raiden_service.address)}"
         try:
-            # waits on _stop_event.ready()
-            # children crashes should throw an exception here
+        # waits on _stop_event.ready()
+        # children crashes should throw an exception here
         except GreenletExit:  # killed without exception
             self._stop_event.set()
             gevent.killall(self.greenlets)  # kill children
@@ -106,8 +112,8 @@ class RifCommsNode(TransportNode, Runnable):
         self._stop_event.set()
 
         for message_queue in self._address_to_message_queue.values():
-            if message_queue: # if message_queue.greenlet is not None
-                message_queue.notify() # if we need to send something, this is the time
+            if message_queue:  # if message_queue.greenlet is not None
+                message_queue.notify()  # if we need to send something, this is the time
 
         # TODO we must stop the listener thread if present on this implementation
         # self._client.stop_listener_thread()  # stop sync_thread, wait client's greenlets
@@ -125,7 +131,6 @@ class RifCommsNode(TransportNode, Runnable):
             pass
         # parent may want to call get() after stop(), to ensure _run errors are re-raised
         # we don't call it here to avoid deadlock when self crashes and calls stop() on finally
-
 
     def send_message(self, message: TransportMessage, recipient: Address):
         """Queue the message for sending to recipient in the queue_identifier
@@ -154,7 +159,6 @@ class RifCommsNode(TransportNode, Runnable):
 
         self._enqueue_message(queue_identifier, raiden_message)
 
-
     def _enqueue_message(self, queue_identifier: QueueIdentifier, message: Message):
         queue = self._get_queue(queue_identifier.recipient)
         queue.enqueue(queue_identifier=queue_identifier, message=message)
@@ -177,16 +181,81 @@ class RifCommsNode(TransportNode, Runnable):
         is_subscribed_to_receiver_topic = self._client.has_subscription(receiver_address).value
         if not is_subscribed_to_receiver_topic:
             # If not, create the topic subscription
-            self._client.subscribe(receiver_address) # TODO is this really needed in order to send msg to receiver?
+            self._client.subscribe(receiver_address)  # TODO is this really needed in order to send msg to receiver?
         # Send the message
         self._client.send_message(receiver_address, data)
         self.log.info(
             "RIF Comms send raw", receiver=pex(receiver_address), data=data.replace("\n", "\\n")
         )
 
+    def _handle_message(self, topic_id, data) -> bool:
+        """ Handle text messages sent received on a topic  """
+        if (
+            self._stop_event.ready()
+        ):
+            # Ignore when stopped
+            return False
+
+        # TODO validate signature of the message
+
+        messages = list()  # TODO validate_and_parse_message(event["content"]["body"], peer_address)
+
+        if not messages:
+            return False
+
+        self.log.info(
+            "Incoming messages",
+            messages=messages,
+            topic_id=pex(topic_id),
+        )
+
+        for message in messages:
+            if not isinstance(message, (SignedRetrieableMessage, SignedMessage)):
+                self.log.warning("Received invalid message", message=message)
+            if isinstance(message, Delivered):
+                self._receive_delivered(message)
+            elif isinstance(message, Processed):
+                self._receive_message(message)
+            else:
+                assert isinstance(message, SignedRetrieableMessage)
+                self._receive_message(message)
+
+        return True
+
+    def _receive_delivered(self, delivered: Delivered):
+        self.log.info(
+            "Delivered message received", sender=pex(delivered.sender), message=delivered
+        )
+
+        assert self._raiden_service is not None
+        self._raiden_service.on_message(delivered)
+
+    def _receive_message(self, message: Union[SignedRetrieableMessage, Processed]):
+        assert self._raiden_service is not None
+        self.log.info(
+            "RIF Comms Message received",
+            node=pex(self._raiden_service.address),
+            message=message,
+            sender=pex(message.sender),
+        )
+
+        try:
+            delivered_message = Delivered(delivered_message_identifier=message.message_identifier)
+            self._raiden_service.sign(delivered_message)
+
+            queue_identifier = QueueIdentifier(
+                recipient=message.sender, channel_identifier=CHANNEL_IDENTIFIER_GLOBAL_QUEUE
+            )
+            self.send_message(*TransportMessage.wrap(queue_identifier, delivered_message))
+            self._raiden_service.on_message(message)
+
+        except (InvalidAddress, UnknownAddress, UnknownTokenAddress):
+            self.log.warning("Exception while processing message", exc_info=True)
+            return
+
+
     def start_health_check(self, address: Address):
         self.log.debug("Healthcheck", peer_address=pex(address))
-
 
     def whitelist(self, address: Address):
         self.log.debug("Whitelist", peer_address=pex(address))
@@ -196,8 +265,6 @@ class RifCommsNode(TransportNode, Runnable):
 
     def join(self, timeout=None):
         self.greenlet.join(timeout)
-
-
 
 
 class RifCommsLightClientNode(RifCommsNode):
