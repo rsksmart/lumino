@@ -2,7 +2,6 @@
 
 `Describe the objective of the PR and a brief description of the changes introduced`
 
-
 # Resolves
 
 `Point here the jira issue`
