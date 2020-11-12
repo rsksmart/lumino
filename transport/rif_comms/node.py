@@ -30,6 +30,12 @@ class RifCommsNode(TransportNode):
     def enqueue_message(self, message: Message, recipient: Address):
         raise NotImplementedError
 
+    def enqueue_global_messages(self):
+        raise NotImplementedError
+
+    def send_message(self, recipient: Address, message_data: str):
+        raise NotImplementedError
+
     def start_health_check(self, address: Address):
         raise NotImplementedError
 
@@ -40,6 +46,15 @@ class RifCommsNode(TransportNode):
         raise NotImplementedError
 
     def join(self, timeout=None):
+        raise NotImplementedError
+
+    def raiden_service(self) -> 'RaidenService':
+        raise NotImplementedError
+
+    def config(self) -> {}:
+        raise NotImplementedError
+
+    def log(self):
         raise NotImplementedError
 
     def _run(self, *args: Any, **kwargs: Any) -> None:
