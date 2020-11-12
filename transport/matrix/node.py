@@ -660,16 +660,16 @@ class MatrixNode(TransportNode):
         retrier = self._get_retrier(queue_identifier.recipient)
         retrier.enqueue(queue_identifier=queue_identifier, message=message)
 
-    def send_message(self, receiver_address: Address, message_data: str):
+    def send_message(self, message_data: str, recipient: Address):
         with self._getroom_lock:
-            room = self._get_room_for_address(receiver_address)
+            room = self._get_room_for_address(recipient)
         if not room:
             self.log.error(
-                "No room for receiver", receiver=to_normalized_address(receiver_address)
+                "No room for receiver", receiver=to_normalized_address(recipient)
             )
             return
         self.log.debug(
-            "Send raw", receiver=pex(receiver_address), room=room, data=message_data.replace("\n", "\\n")
+            "Send raw", receiver=pex(recipient), room=room, data=message_data.replace("\n", "\\n")
         )
         print("---->> Matrix Send Message " + message_data)
 
