@@ -107,9 +107,8 @@ class _RetryQueue(Runnable):
             self.log.warning("Can't retry", reason="Transport stopped")
             return
 
-        if self.transport_node._prioritize_global_messages:
-            # During startup global messages have to be sent first
-            self.transport_node._global_send_queue.join()
+        # During startup global messages have to be sent first
+        self.transport_node.enqueue_global_messages()
 
         self.log.debug("Retrying message", receiver=to_normalized_address(self.receiver))
 

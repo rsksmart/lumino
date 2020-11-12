@@ -98,6 +98,10 @@ class MatrixNode(TransportNode):
 
         self._message_handler: Optional[MessageHandler] = None
 
+    def enqueue_global_messages(self):
+        if self._prioritize_global_messages:
+            self._global_send_queue.join()
+
     def raiden_service(self) -> 'RaidenService':
         return self._raiden_service
 

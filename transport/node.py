@@ -45,6 +45,14 @@ class Node(ABC, Runnable):
         """
 
     @abstractmethod
+    def enqueue_global_messages(self):
+        """
+        Enqueue global messages to be sent.
+        This method might be implemented as a no-op if the concept of global messages does not apply
+        to a specific transport layer implementation.
+        """
+
+    @abstractmethod
     def send_message(self, recipient: Address, message_data: str):
         """
         Send a message to the recipient.
