@@ -1237,11 +1237,6 @@ class RaidenAPI:
             token_address=token_address,
         )
 
-        # checking the balance before doing the payment to avoid problems on the state machine
-        chain_state = views.state_from_raiden(self.raiden)
-
-
-
         self.raiden.mediated_transfer_async_light(
             token_network_identifier=token_network_identifier,
             amount=amount,
