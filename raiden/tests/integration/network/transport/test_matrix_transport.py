@@ -421,7 +421,7 @@ def test_matrix_message_retry(
             "sync_latency": 15_000,
         },
     )
-    transport._send_raw = MagicMock()
+    transport.send_message = MagicMock()
 
     transport.start(raiden_service, raiden_service.message_handler, None)
     transport.log = MagicMock()
@@ -452,7 +452,7 @@ def test_matrix_message_retry(
 
     gevent.sleep(1)
 
-    assert transport._send_raw.call_count == 1
+    assert transport.send_message.call_count == 1
 
     # Receiver goes offline
     transport._address_mgr._address_to_reachability[
@@ -463,7 +463,7 @@ def test_matrix_message_retry(
 
     # now we don't have user presence support so the log will not be there,
     # also the call count should be 2 and 3 at the final result
-    assert transport._send_raw.call_count == 2
+    assert transport.send_message.call_count == 2
 
     # Receiver comes back online
     transport._address_mgr._address_to_reachability[
@@ -473,7 +473,7 @@ def test_matrix_message_retry(
     gevent.sleep(retry_interval)
 
     # Retrier now should have sent the message again
-    assert transport._send_raw.call_count == 3
+    assert transport.send_message.call_count == 3
 
     transport.stop()
     transport.get()
@@ -501,7 +501,7 @@ def test_join_invalid_discovery(
         }
     )
     transport._client.api.retry_timeout = 0
-    transport._send_raw = MagicMock()
+    transport.send_message = MagicMock()
 
     transport.start(raiden_service, raiden_service.message_handler, None)
     transport.log = MagicMock()
@@ -646,7 +646,7 @@ def test_monitoring_global_messages(
         }
     )
     transport._client.api.retry_timeout = 0
-    transport._send_raw = MagicMock()
+    transport.send_message = MagicMock()
     raiden_service = MockRaidenService(None)
     raiden_service.config = dict(services=dict(monitoring_enabled=True))
 
@@ -706,7 +706,7 @@ def test_pfs_global_messages(
         }
     )
     transport._client.api.retry_timeout = 0
-    transport._send_raw = MagicMock()
+    transport.send_message = MagicMock()
     raiden_service = MockRaidenService(None)
     raiden_service.config = dict(services=dict(monitoring_enabled=True))
 

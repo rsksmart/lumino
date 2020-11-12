@@ -660,7 +660,7 @@ class MatrixNode(TransportNode):
         retrier = self._get_retrier(queue_identifier.recipient)
         retrier.enqueue(queue_identifier=queue_identifier, message=message)
 
-    def _send_raw(self, receiver_address: Address, data: str):
+    def send_message(self, receiver_address: Address, message_data: str):
         with self._getroom_lock:
             room = self._get_room_for_address(receiver_address)
         if not room:
@@ -669,11 +669,11 @@ class MatrixNode(TransportNode):
             )
             return
         self.log.debug(
-            "Send raw", receiver=pex(receiver_address), room=room, data=data.replace("\n", "\\n")
+            "Send raw", receiver=pex(receiver_address), room=room, data=message_data.replace("\n", "\\n")
         )
-        print("---->> Matrix Send Message " + data)
+        print("---->> Matrix Send Message " + message_data)
 
-        room.send_text(data)
+        room.send_text(message_data)
 
     def _get_room_for_address(self, address: Address, allow_missing_peers=False) -> Optional[Room]:
         if self._stop_event.ready():
@@ -1225,7 +1225,7 @@ class MatrixLightClientNode(MatrixNode):
             self.stop()  # ensure cleanup and wait on subtasks
             raise
 
-    def _send_raw(self, receiver_address: Address, data: str):
+    def send_message(self, receiver_address: Address, data: str):
         with self._getroom_lock:
             room = self._get_room_for_address(receiver_address)
         if not room:

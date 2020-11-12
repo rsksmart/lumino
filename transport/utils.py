@@ -157,7 +157,7 @@ class _RetryQueue(Runnable):
 
         if message_texts:
             self.log.debug("Send", receiver=pex(self.receiver), messages=message_texts)
-            self.transport_node._send_raw(self.receiver, "\n".join(message_texts))
+            self.transport_node.send_message(self.receiver, "\n".join(message_texts))
 
     @property
     def _queueids_to_queues(self) -> QueueIdsToQueues:
