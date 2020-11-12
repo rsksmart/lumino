@@ -8,6 +8,7 @@ from raiden.messages import Message, RetrieableMessage, Delivered, Ping, Pong
 from raiden.transfer.identifiers import QueueIdentifier
 from raiden.utils import Address, pex
 from raiden.utils.runnable import Runnable
+from transport.node import Node as TransportNode
 from transport.udp import utils as udp_utils
 
 
@@ -23,8 +24,8 @@ class _RetryQueue(Runnable):
         # generator that tells if the message should be sent now
         expiration_generator: Iterator[bool]
 
-    def __init__(self, transport: "MatrixNode", receiver: Address):
-        self.transport = transport
+    def __init__(self, transport_node: TransportNode, receiver: Address):
+        self.transport_node = transport_node
         self.receiver = receiver
         self._message_queue: List[_RetryQueue._MessageData] = list()
         self._notify_event = gevent.event.Event()
@@ -34,7 +35,7 @@ class _RetryQueue(Runnable):
 
     @property
     def log(self):
-        return self.transport.log
+        return self.transport_node.log
 
     @staticmethod
     def _expiration_generator(
@@ -71,9 +72,9 @@ class _RetryQueue(Runnable):
                 )
                 return
             timeout_generator = udp_utils.timeout_exponential_backoff(
-                self.transport._config["retries_before_backoff"],
-                self.transport._config["retry_interval"],
-                self.transport._config["retry_interval"] * 10,
+                self.transport_node._config["retries_before_backoff"],
+                self.transport_node._config["retry_interval"],
+                self.transport_node._config["retry_interval"] * 10,
             )
             expiration_generator = self._expiration_generator(timeout_generator)
             self._message_queue.append(
@@ -97,16 +98,16 @@ class _RetryQueue(Runnable):
         After composing the to-be-sent message, also message queue from messages that are not
         present in the respective SendMessageEvent queue anymore
         """
-        if not self.transport.greenlet:
+        if not self.transport_node.greenlet:
             self.log.warning("Can't retry", reason="Transport not yet started")
             return
-        if self.transport._stop_event.ready():
+        if self.transport_node._stop_event.ready():
             self.log.warning("Can't retry", reason="Transport stopped")
             return
 
-        if self.transport._prioritize_global_messages:
+        if self.transport_node._prioritize_global_messages:
             # During startup global messages have to be sent first
-            self.transport._global_send_queue.join()
+            self.transport_node._global_send_queue.join()
 
         self.log.debug("Retrying message", receiver=to_normalized_address(self.receiver))
 
@@ -121,7 +122,7 @@ class _RetryQueue(Runnable):
             return any(
                 isinstance(data.message, RetrieableMessage)
                 and send_event.message_identifier == data.message.message_identifier
-                for send_event in self.transport._queueids_to_queues[data.queue_identifier]
+                for send_event in self.transport_node._queueids_to_queues[data.queue_identifier]
             )
 
         # clean after composing, so any queued messages (e.g. Delivered) are sent at least once
@@ -132,7 +133,7 @@ class _RetryQueue(Runnable):
                 # TODO: Is this correct? Will a missed Delivered be 'fixed' by the
                 #       later `Processed` message?
                 remove = True
-            elif msg_data.queue_identifier not in self.transport._queueids_to_queues:
+            elif msg_data.queue_identifier not in self.transport_node._queueids_to_queues:
                 remove = True
                 self.log.debug(
                     "Stopping message send retry",
@@ -154,25 +155,25 @@ class _RetryQueue(Runnable):
 
         if message_texts:
             self.log.debug("Send", receiver=pex(self.receiver), messages=message_texts)
-            self.transport._send_raw(self.receiver, "\n".join(message_texts))
+            self.transport_node._send_raw(self.receiver, "\n".join(message_texts))
 
     def _run(self):
         msg = f"_RetryQueue started before transport._raiden_service is set"
-        assert self.transport._raiden_service is not None, msg
+        assert self.transport_node._raiden_service is not None, msg
         self.greenlet.name = (
             f"RetryQueue "
-            f"node:{pex(self.transport._raiden_service.address)} "
+            f"node:{pex(self.transport_node._raiden_service.address)} "
             f"recipient:{pex(self.receiver)}"
         )
         # run while transport parent is running
-        while not self.transport._stop_event.ready():
+        while not self.transport_node._stop_event.ready():
             # once entered the critical section, block any other enqueue or notify attempt
             with self._lock:
                 self._notify_event.clear()
                 if self._message_queue:
                     self._check_and_send()
             # wait up to retry_interval (or to be notified) before checking again
-            self._notify_event.wait(self.transport._config["retry_interval"])
+            self._notify_event.wait(self.transport_node._config["retry_interval"])
 
     def __str__(self):
         return self.greenlet.name

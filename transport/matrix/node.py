@@ -647,7 +647,7 @@ class MatrixNode(TransportNode, Runnable):
     def _get_retrier(self, receiver: Address) -> _RetryQueue:
         """ Construct and return a _RetryQueue for receiver """
         if receiver not in self._address_to_retrier:
-            retrier = _RetryQueue(transport=self, receiver=receiver)
+            retrier = _RetryQueue(transport_node=self, receiver=receiver)
             self._address_to_retrier[receiver] = retrier
             # Always start the _RetryQueue, otherwise `stop` will block forever
             # waiting for the corresponding gevent.Greenlet to complete. This
