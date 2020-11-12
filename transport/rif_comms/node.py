@@ -27,7 +27,7 @@ class RifCommsNode(TransportNode):
     def stop(self):
         raise NotImplementedError
 
-    def send_message(self, message: Message, recipient: Address):
+    def enqueue_message(self, message: Message, recipient: Address):
         raise NotImplementedError
 
     def start_health_check(self, address: Address):

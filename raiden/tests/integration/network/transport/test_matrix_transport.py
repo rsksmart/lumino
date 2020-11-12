@@ -122,7 +122,7 @@ def ping_pong_message_success(transport0, transport1):
 
     transport0._raiden_service.sign(ping_message)
     transport1._raiden_service.sign(pong_message)
-    transport0.send_message(
+    transport0.enqueue_message(
         *TransportMessage.wrap(queueid1, ping_message)
     )
 
@@ -138,7 +138,7 @@ def ping_pong_message_success(transport0, transport1):
 
     transport0._raiden_service.sign(pong_message)
     transport1._raiden_service.sign(ping_message)
-    transport1.send_message(
+    transport1.enqueue_message(
         *TransportMessage.wrap(queueid0, ping_message)
     )
 
@@ -323,7 +323,7 @@ def test_matrix_message_sync(matrix_transports):
     for i in range(5):
         message = Processed(message_identifier=i)
         transport0._raiden_service.sign(message)
-        transport0.send_message(
+        transport0.enqueue_message(
             *TransportMessage.wrap(queue_identifier, message)
         )
 
@@ -344,7 +344,7 @@ def test_matrix_message_sync(matrix_transports):
     for i in range(10, 15):
         message = Processed(message_identifier=i)
         transport0._raiden_service.sign(message)
-        transport0.send_message(
+        transport0.enqueue_message(
             *TransportMessage.wrap(queue_identifier, message)
         )
 

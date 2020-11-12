@@ -284,7 +284,7 @@ class MatrixNode(TransportNode):
             # representing the target node
             self._address_mgr.refresh_address_presence(node_address)
 
-    def send_message(self, message: TransportMessage, recipient: Address):
+    def enqueue_message(self, message: TransportMessage, recipient: Address):
         """Queue the message for sending to recipient in the queue_identifier
 
         It may be called before transport is started, to initialize message queues
@@ -299,7 +299,7 @@ class MatrixNode(TransportNode):
         # These are not protocol messages, but transport specific messages
         if isinstance(raiden_message, (Ping, Pong)):
             raise ValueError(
-                "Do not use send_message for {} messages".format(raiden_message.__class__.__name__)
+                "Do not use enqueue_message for {} messages".format(raiden_message.__class__.__name__)
             )
 
         self.log.info(
@@ -632,7 +632,7 @@ class MatrixNode(TransportNode):
             queue_identifier = QueueIdentifier(
                 recipient=message.sender, channel_identifier=CHANNEL_IDENTIFIER_GLOBAL_QUEUE
             )
-            self.send_message(*TransportMessage.wrap(queue_identifier, delivered_message))
+            self.enqueue_message(*TransportMessage.wrap(queue_identifier, delivered_message))
             self._raiden_service.on_message(message)
 
         except (InvalidAddress, UnknownAddress, UnknownTokenAddress):

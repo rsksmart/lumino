@@ -37,9 +37,9 @@ class Node(ABC, Runnable):
         """
 
     @abstractmethod
-    def send_message(self, message: Message, recipient: Address):
+    def enqueue_message(self, message: Message, recipient: Address):
         """
-        Send a message to the recipient.
+        Enqueue a message to be sent the recipient.
         This method may be called before the transport node is started, but the actual message sending
         should only be attempted when the transport node is started.
         """
