@@ -16,10 +16,9 @@ from raiden.exceptions import InvalidAddress, UnknownAddress, UnknownTokenAddres
 from raiden.message_handler import MessageHandler
 from raiden.messages import Message, Ping, Pong, SignedRetrieableMessage, SignedMessage, Delivered, Processed, ToDevice
 from raiden.raiden_service import RaidenService
-from raiden.transfer import views
 from raiden.transfer.identifiers import QueueIdentifier
 from raiden.transfer.mediated_transfer.events import CHANNEL_IDENTIFIER_GLOBAL_QUEUE
-from raiden.transfer.state import QueueIdsToQueues, NODE_NETWORK_REACHABLE, NODE_NETWORK_UNKNOWN, \
+from raiden.transfer.state import NODE_NETWORK_REACHABLE, NODE_NETWORK_UNKNOWN, \
     NODE_NETWORK_UNREACHABLE
 from raiden.transfer.state_change import ActionUpdateTransportAuthData, ActionChangeNodeNetworkState
 from raiden.utils import Address, pex
@@ -367,11 +366,6 @@ class MatrixNode(TransportNode, Runnable):
             # Stop prioritizing global messages after initial queue has been emptied
             self._prioritize_global_messages = False
             self._global_send_event.wait(self._config["retry_interval"])
-
-    @property
-    def _queueids_to_queues(self) -> QueueIdsToQueues:
-        chain_state = views.state_from_raiden(self._raiden_service)
-        return views.get_all_messagequeues(chain_state)
 
     @property
     def _user_id(self) -> Optional[str]:

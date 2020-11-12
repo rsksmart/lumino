@@ -5,7 +5,9 @@ from typing import NamedTuple, Iterator, List, Iterable, Callable
 import gevent
 from eth_utils import to_normalized_address
 from raiden.messages import Message, RetrieableMessage, Delivered, Ping, Pong
+from raiden.transfer import views
 from raiden.transfer.identifiers import QueueIdentifier
+from raiden.transfer.state import QueueIdsToQueues
 from raiden.utils import Address, pex
 from raiden.utils.runnable import Runnable
 from transport.node import Node as TransportNode
@@ -122,7 +124,7 @@ class _RetryQueue(Runnable):
             return any(
                 isinstance(data.message, RetrieableMessage)
                 and send_event.message_identifier == data.message.message_identifier
-                for send_event in self.transport_node._queueids_to_queues[data.queue_identifier]
+                for send_event in self._queueids_to_queues[data.queue_identifier]
             )
 
         # clean after composing, so any queued messages (e.g. Delivered) are sent at least once
@@ -133,7 +135,7 @@ class _RetryQueue(Runnable):
                 # TODO: Is this correct? Will a missed Delivered be 'fixed' by the
                 #       later `Processed` message?
                 remove = True
-            elif msg_data.queue_identifier not in self.transport_node._queueids_to_queues:
+            elif msg_data.queue_identifier not in self._queueids_to_queues:
                 remove = True
                 self.log.debug(
                     "Stopping message send retry",
@@ -156,6 +158,11 @@ class _RetryQueue(Runnable):
         if message_texts:
             self.log.debug("Send", receiver=pex(self.receiver), messages=message_texts)
             self.transport_node._send_raw(self.receiver, "\n".join(message_texts))
+
+    @property
+    def _queueids_to_queues(self) -> QueueIdsToQueues:
+        chain_state = views.state_from_raiden(self.transport_node.raiden_service)
+        return views.get_all_messagequeues(chain_state)
 
     def _run(self):
         msg = f"_RetryQueue started before transport.raiden_service is set"
