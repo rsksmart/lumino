@@ -10,8 +10,6 @@ import structlog
 from eth_utils import is_binary_address, to_canonical_address, to_checksum_address
 from gevent import Greenlet
 from gevent.event import AsyncResult, Event
-from raiden_contracts.contract_manager import ContractManager
-
 from raiden import constants, routing
 from raiden.blockchain.events import BlockchainEvents
 from raiden.blockchain_events_handler import on_blockchain_event
@@ -96,6 +94,7 @@ from raiden.utils.typing import (
     TokenNetworkID,
     PaymentHashInvoice, ChannelID)
 from raiden.utils.upgrades import UpgradeManager
+from raiden_contracts.contract_manager import ContractManager
 from transport.layer import Layer as TransportLayer
 from transport.message import Message as TransportMessage
 

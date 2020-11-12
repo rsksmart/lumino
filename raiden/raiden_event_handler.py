@@ -4,7 +4,6 @@ from typing import TYPE_CHECKING
 
 import structlog
 from eth_utils import to_checksum_address, to_hex, encode_hex
-
 from raiden.api.objects import SettlementParameters
 from raiden.billing.invoices.handlers.invoice_handler import handle_receive_events_with_payments
 from raiden.constants import EMPTY_BALANCE_HASH, EMPTY_HASH, EMPTY_MESSAGE_HASH, EMPTY_SIGNATURE
@@ -140,6 +139,7 @@ def unlock_light(raiden: "RaidenService",
             message=message
         )
 
+
 class EventHandler(ABC):
     @abstractmethod
     def on_raiden_event(self, raiden: "RaidenService", chain_state: ChainState, event: Event):
@@ -257,7 +257,7 @@ class RaidenEventHandler(EventHandler):
             stored_but_unsigned = existing_message.signed_message is None
             if stored_but_unsigned and store_message_event.is_signed:
                 # Update messages that were created by the hub and now are received signed by the light client
-                LightClientMessageHandler\
+                LightClientMessageHandler \
                     .update_offchain_light_client_protocol_message_set_signed_message(store_message_event.message,
                                                                                       store_message_event.payment_id,
                                                                                       store_message_event.message_order,
@@ -450,15 +450,17 @@ class RaidenEventHandler(EventHandler):
             wal=raiden.wal)
         # Do not store the RegisterSecretRequest twice for same payment
         if not existing_message:
+            LightClientMessageHandler.store_light_client_protocol_message(
+                identifier=channel_reveal_secret_event.message_id,
+                message=message,
+                signed=False,
+                payment_id=channel_reveal_secret_event.payment_identifier,
+                light_client_address=channel_reveal_secret_event.light_client_address,
+                order=0,
+                message_type=LightClientProtocolMessageType.RequestRegisterSecret,
+                wal=raiden.wal
+            )
 
-            LightClientMessageHandler.store_light_client_protocol_message(identifier=channel_reveal_secret_event.message_id,
-                                                                          message=message,
-                                                                          signed=False,
-                                                                          payment_id=channel_reveal_secret_event.payment_identifier,
-                                                                          light_client_address=channel_reveal_secret_event.light_client_address,
-                                                                          order=0,
-                                                                          message_type=LightClientProtocolMessageType.RequestRegisterSecret,
-                                                                          wal=raiden.wal)
     @staticmethod
     def handle_contract_send_channelclose(
         raiden: "RaidenService",
