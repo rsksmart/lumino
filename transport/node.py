@@ -67,3 +67,24 @@ class Node(ABC):
         """
         Wait until the transport node finishes its pending tasks or the given timeout passes.
         """
+
+    @property
+    @abstractmethod
+    def raiden_service(self) -> 'RaidenService':
+        """
+        Return the Raiden Service object for this entity.
+        """
+
+    @property
+    @abstractmethod
+    def config(self) -> {}:
+        """
+        Return the config dictionary for this entity.
+        """
+
+    @property
+    @abstractmethod
+    def log(self):
+        """
+        Return the logger for this entity.
+        """

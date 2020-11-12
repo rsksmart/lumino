@@ -99,6 +99,15 @@ class MatrixNode(TransportNode, Runnable):
 
         self._message_handler: Optional[MessageHandler] = None
 
+    def raiden_service(self) -> 'RaidenService':
+        return self._raiden_service
+
+    def config(self) -> {}:
+        return self._config
+
+    def log(self):
+        return self.log
+
     def start_greenlet_for_light_client(self):
         Runnable.start(self)
 
