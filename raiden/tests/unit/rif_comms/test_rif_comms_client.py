@@ -44,25 +44,29 @@ def rif_comms_client(request):
 @pytest.mark.usefixtures("rif_comms_client")
 class TestRiffCommsClient(unittest.TestCase):
 
+    @pytest.mark.skip(reason="ignore")
     def test_initialization(self):
         assert self.rif_comms_client is not None
 
+    @pytest.mark.skip(reason="ignore")
     def test_locate_peer_id(self):
         response = self.rif_comms_client.connect()
         peer_id = self.rif_comms_client.get_peer_id(LUMINO_1_ADDRESS)
         print(f"test_locate_peer_id peer_id = {peer_id}")
         assert peer_id is not None
 
+    @pytest.mark.skip(reason="ignore")
     def test_locate_unregistered_peer_id(self):
         self.assertRaises(_InactiveRpcError, lambda: self.rif_comms_client.get_peer_id(UNREGISTERED_ADDRESS))
 
+    @pytest.mark.skip(reason="ignore")
     def test_create_random_topic_id_without_connection(self):
         notification = self.rif_comms_client.connect()
         peer_id = self.rif_comms_client.get_peer_id(LUMINO_1_ADDRESS)
         channel = self.rif_comms_client.subscribe(get_random_address_str())
         peer_id = self.rif_comms_client.get_peer_id(LUMINO_1_ADDRESS)
 
-    #@pytest.mark.skip(reason="ignore")
+    @pytest.mark.skip(reason="ignore")
     def test_subscribe(self):
         channel = grpc.insecure_channel(LUMINO_1_COMMS_API)
         stub = CommunicationsApiStub(channel)
@@ -71,6 +75,7 @@ class TestRiffCommsClient(unittest.TestCase):
         channel = stub.CreateTopicWithRskAddress(rsk_address)
         subscribers = stub.GetSubscribers(Channel(channelId=LUMINO_1_ADDRESS))
 
+    @pytest.mark.skip(reason="ignore")
     def test_has_subscriber(self):
         channel = grpc.insecure_channel(LUMINO_1_COMMS_API)
         stub = CommunicationsApiStub(channel)
@@ -92,3 +97,10 @@ class TestRiffCommsClient(unittest.TestCase):
         )
         print("has_subscriber")
         print(has_subscriber)
+
+    def test_disconnect(self):
+        notification = self.rif_comms_client.connect()
+        peer_id = self.rif_comms_client.get_peer_id(LUMINO_1_ADDRESS)
+        self.rif_comms_client.disconnect()
+
+

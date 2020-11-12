@@ -1,7 +1,6 @@
 from grpc import insecure_channel
 
 from raiden.utils import Address
-from transport.message import Message
 from transport.rif_comms.proto.api_pb2 import Notification, PublishPayload, Channel, Msg, RskAddress, Void, Subscriber, \
     BooleanResponse
 from transport.rif_comms.proto.api_pb2_grpc import CommunicationsApiStub
@@ -82,8 +81,7 @@ class RifCommsClient:
         Invokes the EndCommunication grpc api endpoint.
         :return: void
         """
-        # TODO param for end
-       # self.stub.EndCommunication()
+        self.stub.EndCommunication(Void())
         self.grpc_channel.unsubscribe(lambda: self.grpc_channel.close())
 
     def get_peer_id(self, rsk_address: Address) -> str:

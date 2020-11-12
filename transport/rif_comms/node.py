@@ -56,9 +56,9 @@ class RifCommsNode(TransportNode, Runnable):
             raise RuntimeError(f"{self!r} already started")
         self._stop_event.clear()
         self._raiden_service = raiden_service
-        self._client.connect()
+        notification = self._client.connect()
         self._client.get_peer_id(
-            to_checksum_address(raiden_service.address))  # TODO remove when blocking grpc api bug solved
+            to_checksum_address(to_checksum_address(raiden_service.address)))  # TODO remove when blocking grpc api bug solved
 
         # TODO matrix node here invokes inventory_rooms that sets the handle_message callback
         # TODO here we must also check for new messages as the matrix node does with   self._client.start_listener_thread()
@@ -80,15 +80,16 @@ class RifCommsNode(TransportNode, Runnable):
 
         return f"<{self.__class__.__name__}{node} id:{id(self)}>"
 
-    def _run(self, *args: Any, **kwargs: Any) -> None:
+    def _run(self) -> None:
         # TODO ActionUpdateTransportAuthData?
         # TODO which is the  Runnable main method, that perform wait on long-running subtasks ?"
         """ Runnable main method, perform wait on long-running subtasks """
         # dispatch auth data on first scheduling after start
         self.greenlet.name = f"RifCommsNode._run node:{pex(self._raiden_service.address)}"
         try:
-        # waits on _stop_event.ready()
-        # children crashes should throw an exception here
+            # waits on _stop_event.ready()
+            # children crashes should throw an exception here
+            self.log.info("RIF Comms _run")
         except GreenletExit:  # killed without exception
             self._stop_event.set()
             gevent.killall(self.greenlets)  # kill children
@@ -119,9 +120,10 @@ class RifCommsNode(TransportNode, Runnable):
         # self._client.stop_listener_thread()  # stop sync_thread, wait client's greenlets
 
         # wait own greenlets, no need to get on them, exceptions should be raised in _run()
-        gevent.wait(self.greenlets + [r.greenlet for r in self._address_to_message_queue.values()])
+        gevent.wait(self._greenlets + [r.greenlet for r in self._address_to_message_queue.values()])
 
         # TODO we must end rif comms communication and grpc session
+        self._client.disconnect()
 
         self.log.debug("RIF Comms Node stopped", config=self._config)
         try:
