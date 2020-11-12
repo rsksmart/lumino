@@ -3,17 +3,15 @@ from typing import Any
 from raiden.message_handler import MessageHandler
 from raiden.messages import Message
 from raiden.raiden_service import RaidenService
-from raiden.utils.runnable import Runnable
 from raiden.utils.typing import Address
 from transport.node import Node as TransportNode
 from transport.rif_comms.client import RifCommsClient
 
 
-class RifCommsNode(TransportNode, Runnable):
+class RifCommsNode(TransportNode):
 
     def __init__(self, address: Address, config: dict):
         TransportNode.__init__(self, address)
-        Runnable.__init__(self)
         self._config = config
 
         self._client = RifCommsClient("0x5Ec92458ACD047f3B583E09C243a480Ef54A68D4", self._config["grpc_endpoint"])

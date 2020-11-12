@@ -24,8 +24,8 @@ from raiden.utils.typing import Address, List, Optional, Union
 from transport.matrix.client import Room
 from transport.matrix.node import MatrixNode as MatrixTransportNode
 from transport.matrix.utils import AddressReachability, make_room_alias
-from transport.utils import _RetryQueue
 from transport.message import Message as TransportMessage
+from transport.utils import _RetryQueue
 
 USERID0 = "@Arthur:RestaurantAtTheEndOfTheUniverse"
 USERID1 = "@Alice:Wonderland"

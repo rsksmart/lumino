@@ -37,14 +37,14 @@ _RoomID = NewType("_RoomID", str)
 log = structlog.get_logger(__name__)
 
 
-class MatrixNode(TransportNode, Runnable):
+class MatrixNode(TransportNode):
     _room_prefix = "raiden"
     _room_sep = "_"
     log = log
 
     def __init__(self, address: Address, config: dict):
         TransportNode.__init__(self, address)
-        Runnable.__init__(self)
+
         self._config = config
         self._raiden_service: Optional[RaidenService] = None
 

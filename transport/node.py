@@ -3,9 +3,10 @@ from typing import Any
 
 from raiden.messages import Message
 from raiden.utils import Address
+from raiden.utils.runnable import Runnable
 
 
-class Node(ABC):
+class Node(ABC, Runnable):
     """
     Node is an abstraction that represents a single address (belonging to regular node or one registered as a light
     client) managed by the transport layer of the running Lumino node.
@@ -20,6 +21,7 @@ class Node(ABC):
         Messages to be received by this Node should be have this address as the message receiver.
         Messages to be sent from this Node should have this address as the message sender.
         """
+        Runnable.__init__(self)
         self.address = address
 
     @abstractmethod
