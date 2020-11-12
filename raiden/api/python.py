@@ -57,6 +57,7 @@ from raiden.messages import RequestMonitoring, LockedTransfer, RevealSecret, Unl
 from raiden.settings import DEFAULT_RETRY_TIMEOUT, DEVELOPMENT_CONTRACT_VERSION
 
 from raiden.transfer import architecture, views, routes
+from raiden.transfer.channel import get_distributable
 from raiden.transfer.events import (
     EventPaymentReceivedSuccess,
     EventPaymentSentFailed,
@@ -1235,6 +1236,12 @@ class RaidenAPI:
             payment_network_id=payment_network_identifier,
             token_address=token_address,
         )
+
+        # checking the balance before doing the payment to avoid problems on the state machine
+        chain_state = views.state_from_raiden(self.raiden)
+
+
+
         self.raiden.mediated_transfer_async_light(
             token_network_identifier=token_network_identifier,
             amount=amount,
@@ -1855,6 +1862,10 @@ class RaidenAPI:
                 )
 
         if channel_state:
+
+            # checking the balance before creating the payment
+            if amount > get_distributable(channel_state.our_state, channel_state.partner_state):
+                raise InsufficientFunds("Insufficient funds to create payment")
 
             locked_transfer = LightClientUtils.create_locked_transfer(
                 chain_state=chain_state,
