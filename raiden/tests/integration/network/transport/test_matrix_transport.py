@@ -87,7 +87,7 @@ def mock_matrix(
 
     transport = MatrixTransportNode(raiden_service.address, config)
     transport._raiden_service = raiden_service
-    transport._stop_event.clear()
+    transport.stop_event.clear()
     transport._address_mgr.add_userid_for_address(factories.HOP1, USERID1)
     transport._client.user_id = USERID0
 

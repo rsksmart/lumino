@@ -103,7 +103,7 @@ class _RetryQueue(Runnable):
         if not self.transport_node.greenlet:
             self.log.warning("Can't retry", reason="Transport not yet started")
             return
-        if self.transport_node._stop_event.ready():
+        if self.transport_node.stop_event.ready():
             self.log.warning("Can't retry", reason="Transport stopped")
             return
 
@@ -172,7 +172,7 @@ class _RetryQueue(Runnable):
             f"recipient:{pex(self.receiver)}"
         )
         # run while transport parent is running
-        while not self.transport_node._stop_event.ready():
+        while not self.transport_node.stop_event.ready():
             # once entered the critical section, block any other enqueue or notify attempt
             with self._lock:
                 self._notify_event.clear()

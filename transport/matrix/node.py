@@ -86,7 +86,7 @@ class MatrixNode(TransportNode):
             get_user_callable=self._get_user,
             address_reachability_changed_callback=self._address_reachability_changed,
             user_presence_changed_callback=self._user_presence_changed,
-            stop_event=self._stop_event,
+            stop_event=self.stop_event,
         )
 
         self._client.add_invite_listener(self._handle_invite)
@@ -125,9 +125,9 @@ class MatrixNode(TransportNode):
     def start(  # type: ignore
         self, raiden_service: RaidenService, message_handler: MessageHandler, prev_auth_data: str
     ):
-        if not self._stop_event.ready():
+        if not self.stop_event.ready():
             raise RuntimeError(f"{self!r} already started")
-        self._stop_event.clear()
+        self.stop_event.clear()
         self._raiden_service = raiden_service
         self._message_handler = message_handler
 
@@ -195,7 +195,7 @@ class MatrixNode(TransportNode):
             self._global_send_worker()
             # children crashes should throw an exception here
         except gevent.GreenletExit:  # killed without exception
-            self._stop_event.set()
+            self.stop_event.set()
             gevent.killall(self.greenlets)  # kill children
             raise  # re-raise to keep killed status
         except Exception:
@@ -208,9 +208,9 @@ class MatrixNode(TransportNode):
         Stop isn't expected to re-raise greenlet _run exception
         (use self.greenlet.get() for that),
         but it should raise any stop-time exception """
-        if self._stop_event.ready():
+        if self.stop_event.ready():
             return
-        self._stop_event.set()
+        self.stop_event.set()
         self._global_send_event.set()
 
         for retrier in self._address_to_retrier.values():
@@ -262,7 +262,7 @@ class MatrixNode(TransportNode):
 
         It also whitelists the address to answer invites and listen for messages
         """
-        if self._stop_event.ready():
+        if self.stop_event.ready():
             return
 
         with self._health_lock:
@@ -354,7 +354,7 @@ class MatrixNode(TransportNode):
             )
             room.send_text(serialized_message)
 
-        while not self._stop_event.ready():
+        while not self.stop_event.ready():
             self._global_send_event.clear()
             messages: Dict[str, List[Message]] = defaultdict(list)
             while self._global_send_queue.qsize() > 0:
@@ -407,7 +407,7 @@ class MatrixNode(TransportNode):
 
     def _handle_invite(self, room_id: _RoomID, state: dict):
         """ Join rooms invited by whitelisted partners """
-        if self._stop_event.ready():
+        if self.stop_event.ready():
             return
 
         self.log.debug("Got invite", room_id=room_id)
@@ -474,7 +474,7 @@ class MatrixNode(TransportNode):
                 room = self._client.join_room(room_id)
             except MatrixRequestError as e:
                 last_ex = e
-                if self._stop_event.wait(retry_interval):
+                if self.stop_event.wait(retry_interval):
                     break
                 retry_interval = retry_interval * 2
             else:
@@ -505,7 +505,7 @@ class MatrixNode(TransportNode):
         if (
             event["type"] != "m.room.message"
             or event["content"]["msgtype"] != "m.text"
-            or self._stop_event.ready()
+            or self.stop_event.ready()
         ):
             # Ignore non-messages and non-text messages
             return False
@@ -680,7 +680,7 @@ class MatrixNode(TransportNode):
         room.send_text(message_data)
 
     def _get_room_for_address(self, address: Address, allow_missing_peers=False) -> Optional[Room]:
-        if self._stop_event.ready():
+        if self.stop_event.ready():
             return None
         address_hex = to_normalized_address(address)
 
@@ -734,7 +734,7 @@ class MatrixNode(TransportNode):
                     last_ex = e
                 room_is_empty = not bool(peer_ids & member_ids)
                 if room_is_empty or last_ex:
-                    if self._stop_event.wait(retry_interval):
+                    if self.stop_event.wait(retry_interval):
                         break
                     retry_interval = retry_interval * 2
                 else:
@@ -1069,7 +1069,7 @@ class MatrixNode(TransportNode):
 
         if (
             event["type"] != "m.to_device_message"
-            or self._stop_event.ready()
+            or self.stop_event.ready()
             or sender_id == self._user_id
         ):
             # Ignore non-messages and our own messages
@@ -1149,9 +1149,9 @@ class MatrixLightClientNode(MatrixNode):
         prev_auth_data: str,
 
     ):
-        if not self._stop_event.ready():
+        if not self.stop_event.ready():
             raise RuntimeError(f"{self!r} already started")
-        self._stop_event.clear()
+        self.stop_event.clear()
         self._raiden_service = raiden_service
         self._message_handler = message_handler
 
@@ -1222,7 +1222,7 @@ class MatrixLightClientNode(MatrixNode):
             self._global_send_worker()
             # children crashes should throw an exception here
         except gevent.GreenletExit:  # killed without exception
-            self._stop_event.set()
+            self.stop_event.set()
             gevent.killall(self.greenlets)  # kill children
             raise  # re-raise to keep killed status
         except Exception:
@@ -1245,7 +1245,7 @@ class MatrixLightClientNode(MatrixNode):
         room.send_text(data)
 
     def _get_room_for_address(self, address: Address, allow_missing_peers=False) -> Optional[Room]:
-        if self._stop_event.ready():
+        if self.stop_event.ready():
             return None
         address_hex = to_normalized_address(address)
         assert address
@@ -1301,7 +1301,7 @@ class MatrixLightClientNode(MatrixNode):
                     last_ex = e
                 room_is_empty = not bool(peer_ids & member_ids)
                 if room_is_empty or last_ex:
-                    if self._stop_event.wait(retry_interval):
+                    if self.stop_event.wait(retry_interval):
                         break
                     retry_interval = retry_interval * 2
                 else:
@@ -1393,7 +1393,7 @@ class MatrixLightClientNode(MatrixNode):
         if (
             event["type"] != "m.room.message"
             or event["content"]["msgtype"] != "m.text"
-            or self._stop_event.ready()
+            or self.stop_event.ready()
         ):
             # Ignore non-messages and non-text messages
             return False

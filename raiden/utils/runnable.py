@@ -16,8 +16,8 @@ class Runnable:
 
     def __init__(self) -> None:
         self._set_greenlet()
-        self._stop_event = Event()
-        self._stop_event.set()
+        self.stop_event = Event()
+        self.stop_event.set()
 
     def start(self) -> None:
         """ Synchronously start task
