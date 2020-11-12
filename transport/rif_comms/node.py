@@ -1,26 +1,26 @@
 from typing import Any, List, Dict, NewType, Union
 
-import gevent
 import structlog
-from gevent import Greenlet
+from eth_utils import to_checksum_address, is_binary_address
+from gevent import Greenlet, killall, wait
 from gevent.event import Event
 from greenlet import GreenletExit
 
 from raiden.exceptions import InvalidAddress, UnknownAddress, UnknownTokenAddress
 from raiden.message_handler import MessageHandler
 from raiden.messages import Message, SignedRetrieableMessage, SignedMessage, Delivered, Processed
+from raiden.raiden_service import RaidenService
 from raiden.transfer import views
 from raiden.transfer.identifiers import QueueIdentifier
 from raiden.transfer.mediated_transfer.events import CHANNEL_IDENTIFIER_GLOBAL_QUEUE
 from raiden.transfer.state import QueueIdsToQueues
-from transport.message import Message as TransportMessage
-from raiden.raiden_service import RaidenService
-from raiden.utils.runnable import Runnable
 from raiden.utils import Address, pex
+from raiden.utils.runnable import Runnable
 from transport.matrix.utils import _RetryQueue
+from transport.message import Message as TransportMessage
 from transport.node import Node as TransportNode
 from transport.rif_comms.client import RifCommsClient
-from eth_utils import to_checksum_address, is_binary_address
+from transport.rif_comms.proto.api_pb2 import Notification
 
 _RoomID = NewType("_RoomID", str)
 log = structlog.get_logger(__name__)
@@ -35,6 +35,7 @@ class RifCommsNode(TransportNode, Runnable):
         self._config = config
         self._raiden_service: RaidenService = None
 
+        self._rif_comms_connect_stream : Notification = None
         self._client = RifCommsClient(to_checksum_address(address), self._config["grpc_endpoint"])
         print("RifCommsNode init on grpc endpoint: {}".format(self._config["grpc_endpoint"]))
 
@@ -56,7 +57,7 @@ class RifCommsNode(TransportNode, Runnable):
             raise RuntimeError(f"{self!r} already started")
         self._stop_event.clear()
         self._raiden_service = raiden_service
-        notification = self._client.connect()
+        self._rif_comms_connect_stream = self._client.connect()
         self._client.get_peer_id(
             to_checksum_address(to_checksum_address(raiden_service.address)))  # TODO remove when blocking grpc api bug solved
 
@@ -92,7 +93,7 @@ class RifCommsNode(TransportNode, Runnable):
             self.log.info("RIF Comms _run")
         except GreenletExit:  # killed without exception
             self._stop_event.set()
-            gevent.killall(self.greenlets)  # kill children
+            killall(self.greenlets)  # kill children
             raise  # re-raise to keep killed status
         except Exception:
             self.stop()  # ensure cleanup and wait on subtasks
@@ -120,7 +121,7 @@ class RifCommsNode(TransportNode, Runnable):
         # self._client.stop_listener_thread()  # stop sync_thread, wait client's greenlets
 
         # wait own greenlets, no need to get on them, exceptions should be raised in _run()
-        gevent.wait(self._greenlets + [r.greenlet for r in self._address_to_message_queue.values()])
+        wait(self._greenlets + [r.greenlet for r in self._address_to_message_queue.values()])
 
         # TODO we must end rif comms communication and grpc session
         self._client.disconnect()
