@@ -72,9 +72,9 @@ class _RetryQueue(Runnable):
                 )
                 return
             timeout_generator = udp_utils.timeout_exponential_backoff(
-                self.transport_node._config["retries_before_backoff"],
-                self.transport_node._config["retry_interval"],
-                self.transport_node._config["retry_interval"] * 10,
+                self.transport_node.config["retries_before_backoff"],
+                self.transport_node.config["retry_interval"],
+                self.transport_node.config["retry_interval"] * 10,
             )
             expiration_generator = self._expiration_generator(timeout_generator)
             self._message_queue.append(
@@ -158,11 +158,11 @@ class _RetryQueue(Runnable):
             self.transport_node._send_raw(self.receiver, "\n".join(message_texts))
 
     def _run(self):
-        msg = f"_RetryQueue started before transport._raiden_service is set"
-        assert self.transport_node._raiden_service is not None, msg
+        msg = f"_RetryQueue started before transport.raiden_service is set"
+        assert self.transport_node.raiden_service is not None, msg
         self.greenlet.name = (
             f"RetryQueue "
-            f"node:{pex(self.transport_node._raiden_service.address)} "
+            f"node:{pex(self.transport_node.raiden_service.address)} "
             f"recipient:{pex(self.receiver)}"
         )
         # run while transport parent is running
@@ -173,7 +173,7 @@ class _RetryQueue(Runnable):
                 if self._message_queue:
                     self._check_and_send()
             # wait up to retry_interval (or to be notified) before checking again
-            self._notify_event.wait(self.transport_node._config["retry_interval"])
+            self._notify_event.wait(self.transport_node.config["retry_interval"])
 
     def __str__(self):
         return self.greenlet.name

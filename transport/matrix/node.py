@@ -29,10 +29,10 @@ from transport.matrix.client import Room, GMatrixClient
 from transport.matrix.utils import get_available_servers_from_config, make_client, get_server_url, UserAddressManager, \
     login_or_register, make_room_alias, join_global_room, UserPresence, validate_userid_signature, JOIN_RETRIES, \
     AddressReachability, validate_and_parse_message, login_or_register_light_client
-from transport.utils import _RetryQueue
 from transport.message import Message as TransportMessage
 from transport.node import Node as TransportNode
 from transport.udp import utils as udp_utils
+from transport.utils import _RetryQueue
 
 _RoomID = NewType("_RoomID", str)
 log = structlog.get_logger(__name__)
