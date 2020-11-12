@@ -2,6 +2,7 @@ from typing import Any
 
 import structlog
 from gevent import Greenlet
+from gevent.event import Event
 
 log = structlog.get_logger(__name__)
 
@@ -15,6 +16,8 @@ class Runnable:
 
     def __init__(self) -> None:
         self._set_greenlet()
+        self._stop_event = Event()
+        self._stop_event.set()
 
     def start(self) -> None:
         """ Synchronously start task

@@ -79,9 +79,6 @@ class MatrixNode(TransportNode, Runnable):
 
         self._started = False
 
-        self._stop_event = Event()
-        self._stop_event.set()
-
         self._global_send_event = Event()
         self._prioritize_global_messages = True
 
