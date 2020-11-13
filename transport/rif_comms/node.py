@@ -67,11 +67,6 @@ class RifCommsNode(TransportNode, Runnable):
         self._client.get_peer_id(
             to_checksum_address(raiden_service.address))  # TODO remove when blocking grpc api bug solved
 
-        # TODO matrix node here invokes inventory_rooms that sets the handle_message callback
-        # TODO here we must also check for new messages as the matrix node does with   self._client.start_listener_thread()
-        #         self._client.sync_thread.link_exception(self.on_error)
-        #         self._client.sync_thread.link_value(on_success)
-        #         self.greenlets = [self._client.sync_thread]
         for message_queue in self._address_to_message_queue.values():
             if not message_queue:
                 self.log.debug("Starting message_queue", message_queue=message_queue)
@@ -126,8 +121,7 @@ class RifCommsNode(TransportNode, Runnable):
             if message_queue:  # if message_queue.greenlet is not None
                 message_queue.notify()  # if we need to send something, this is the time
 
-        # TODO we must stop the listener thread if present on this implementation
-        # self._client.stop_listener_thread()  # stop sync_thread, wait client's greenlets
+        self.stop_listener_thread()  # stop sync_thread, wait client's greenlets
 
         # wait own greenlets, no need to get on them, exceptions should be raised in _run()
         wait(self._greenlets + [r.greenlet for r in self._address_to_message_queue.values()])
@@ -291,6 +285,15 @@ class RifCommsNode(TransportNode, Runnable):
         """
         self._our_topic_thread = spawn(self.listen_messages)
         self._our_topic_thread.name = f"RifCommsClient.listen_messages rsk_address:{self.address}"
+
+    def stop_listener_thread(self):
+        """ Kills messge listener greenlet  """
+        if self._our_topic:
+            self._our_topic.kill()
+            self._our_topic.get()
+        if self._our_topicis not None:
+            self._our_topic.get()
+        self._our_topic= None
 
 
 class RifCommsLightClientNode(RifCommsNode):
