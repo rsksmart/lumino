@@ -42,10 +42,10 @@ class RifCommsNode(TransportNode, Runnable):
         self._client = RifCommsClient(to_checksum_address(address), self._config["grpc_endpoint"])
         print("RifCommsNode init on grpc endpoint: {}".format(self._config["grpc_endpoint"]))
 
-        self._greenlets: List[Greenlet] = list()  # TODO why we need this? how it works the _spawn
-        self._address_to_message_queue: Dict[Address, _RetryQueue] = dict()  # TODO RetryQueue is on matrix package
+        self._greenlets: List[Greenlet] = list()
+        self._address_to_message_queue: Dict[Address, _RetryQueue] = dict()
 
-        self._stop_event = Event()  # TODO used on handle message and another points, pending review
+        self._stop_event = Event()
         self._stop_event.set()
 
         self.log = log.bind(node_address=pex(self.address))
@@ -63,9 +63,6 @@ class RifCommsNode(TransportNode, Runnable):
 
         self._rif_comms_connect_stream = self._client.connect()
         self._our_topic = self._client.subscribe(to_checksum_address(raiden_service.address))
-
-        self._client.get_peer_id(
-            to_checksum_address(raiden_service.address))  # TODO remove when blocking grpc api bug solved
 
         for message_queue in self._address_to_message_queue.values():
             if not message_queue:
@@ -86,8 +83,6 @@ class RifCommsNode(TransportNode, Runnable):
         return f"<{self.__class__.__name__}{node} id:{id(self)}>"
 
     def _run(self) -> None:
-        # TODO ActionUpdateTransportAuthData?
-        # TODO which is the  Runnable main method, that perform wait on long-running subtasks ?"
         """ Runnable main method, perform wait on long-running subtasks """
         # dispatch auth data on first scheduling after start
         self.greenlet.name = f"RifCommsNode._run node:{pex(self._raiden_service.address)}"
@@ -291,7 +286,7 @@ class RifCommsNode(TransportNode, Runnable):
         if self._our_topic:
             self._our_topic.kill()
             self._our_topic.get()
-        if self._our_topicis not None:
+        if self._our_topic is not None:
             self._our_topic.get()
         self._our_topic= None
 
