@@ -35,9 +35,9 @@ class RifCommsNode(TransportNode, Runnable):
         self._config = config
         self._raiden_service: RaidenService = None
 
-        self._rif_comms_connect_stream : Notification = None
-        self._our_topic : Notification = None
-        self._our_topic_thread : Greenlet = None
+        self._rif_comms_connect_stream: Notification = None
+        self._our_topic: Notification = None
+        self._our_topic_thread: Greenlet = None
 
         self._client = RifCommsClient(to_checksum_address(address), self._config["grpc_endpoint"])
         print("RifCommsNode init on grpc endpoint: {}".format(self._config["grpc_endpoint"]))
@@ -64,7 +64,8 @@ class RifCommsNode(TransportNode, Runnable):
         self._rif_comms_connect_stream = self._client.connect()
         self._our_topic = self._client.subscribe(to_checksum_address(raiden_service.address))
 
-        self._client.get_peer_id(to_checksum_address(raiden_service.address))  # TODO remove when blocking grpc api bug solved
+        self._client.get_peer_id(
+            to_checksum_address(raiden_service.address))  # TODO remove when blocking grpc api bug solved
 
         # TODO matrix node here invokes inventory_rooms that sets the handle_message callback
         # TODO here we must also check for new messages as the matrix node does with   self._client.start_listener_thread()
@@ -262,7 +263,6 @@ class RifCommsNode(TransportNode, Runnable):
         except (InvalidAddress, UnknownAddress, UnknownTokenAddress):
             self.log.warning("Exception while processing message", exc_info=True)
             return
-
 
     def start_health_check(self, address: Address):
         self.log.debug("Healthcheck", peer_address=pex(address))

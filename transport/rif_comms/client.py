@@ -1,8 +1,16 @@
 from grpc import insecure_channel
 
 from raiden.utils import Address
-from transport.rif_comms.proto.api_pb2 import Notification, PublishPayload, Channel, Msg, RskAddress, Void, Subscriber, \
+from transport.rif_comms.proto.api_pb2 import (
+    Notification,
+    PublishPayload,
+    Channel,
+    Msg,
+    RskAddress,
+    Void,
+    Subscriber,
     BooleanResponse
+)
 from transport.rif_comms.proto.api_pb2_grpc import CommunicationsApiStub
 
 
