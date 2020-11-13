@@ -33,7 +33,7 @@ class RifCommsNode(TransportNode):
     def enqueue_global_messages(self):
         raise NotImplementedError
 
-    def send_message(self, recipient: Address, message_data: str):
+    def send_message(self, payload: str, recipient: Address):
         raise NotImplementedError
 
     def start_health_check(self, address: Address):

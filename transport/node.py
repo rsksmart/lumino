@@ -53,9 +53,9 @@ class Node(ABC, Runnable):
         """
 
     @abstractmethod
-    def send_message(self, recipient: Address, message_data: str):
+    def send_message(self, payload: str, recipient: Address):
         """
-        Send a message to the recipient.
+        Send a message payload to the recipient.
         Due to a coupled design, this method should only be called by the _RetryQueue class.
         Other entities should use enqueue_message instead.
         """

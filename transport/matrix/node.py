@@ -667,7 +667,7 @@ class MatrixNode(TransportNode):
         retrier = self._get_retrier(queue_identifier.recipient)
         retrier.enqueue(queue_identifier=queue_identifier, message=message)
 
-    def send_message(self, message_data: str, recipient: Address):
+    def send_message(self, payload: str, recipient: Address):
         with self._getroom_lock:
             room = self._get_room_for_address(recipient)
         if not room:
@@ -676,11 +676,11 @@ class MatrixNode(TransportNode):
             )
             return
         self.log.debug(
-            "Send raw", receiver=pex(recipient), room=room, data=message_data.replace("\n", "\\n")
+            "Send raw", receiver=pex(recipient), room=room, data=payload.replace("\n", "\\n")
         )
-        print("---->> Matrix Send Message " + message_data)
+        print("---->> Matrix Send Message " + payload)
 
-        room.send_text(message_data)
+        room.send_text(payload)
 
     def _get_room_for_address(self, address: Address, allow_missing_peers=False) -> Optional[Room]:
         if self.stop_event.ready():
@@ -1232,20 +1232,20 @@ class MatrixLightClientNode(MatrixNode):
             self.stop()  # ensure cleanup and wait on subtasks
             raise
 
-    def send_message(self, receiver_address: Address, data: str):
+    def send_message(self, payload: str, recipient: Address):
         with self._getroom_lock:
-            room = self._get_room_for_address(receiver_address)
+            room = self._get_room_for_address(recipient)
         if not room:
             self.log.error(
-                "No room for receiver", receiver=to_normalized_address(receiver_address)
+                "No room for receiver", receiver=to_normalized_address(recipient)
             )
             return
         self.log.debug(
-            "Send raw", receiver=pex(receiver_address), room=room, data=data.replace("\n", "\\n")
+            "Send raw", receiver=pex(recipient), room=room, data=payload.replace("\n", "\\n")
         )
-        print("---- Matrix Send Message " + data)
+        print("---- Matrix Send Message " + payload)
 
-        room.send_text(data)
+        room.send_text(payload)
 
     def _get_room_for_address(self, address: Address, allow_missing_peers=False) -> Optional[Room]:
         if self.stop_event.ready():
