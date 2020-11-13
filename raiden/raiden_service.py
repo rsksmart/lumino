@@ -12,6 +12,7 @@ from gevent import Greenlet
 from gevent.event import AsyncResult, Event
 
 from raiden.lightclient.handlers.light_client_service import LightClientService
+from raiden.transfer.channel import get_distributable
 from raiden.transfer.identifiers import CanonicalIdentifier
 
 from raiden import constants, routing
@@ -33,7 +34,8 @@ from raiden.exceptions import (
     PaymentConflict,
     RaidenRecoverableError,
     RaidenUnrecoverableError,
-    InvalidPaymentIdentifier)
+    InvalidPaymentIdentifier,
+    InsufficientFunds)
 from raiden.lightclient.handlers.light_client_message_handler import LightClientMessageHandler
 from raiden.lightclient.models.light_client_protocol_message import LightClientProtocolMessageType
 from raiden.messages import (
@@ -156,6 +158,10 @@ def initiator_init_light(
         channel_identifier=channel_identifier)
     current_channel = views.get_channelstate_by_canonical_identifier_and_address(chain_state, canonical_identifier,
                                                                                  creator_address)
+
+    # checking the balance before initiating the payment
+    if transfer_amount > get_distributable(current_channel.our_state, current_channel.partner_state):
+        raise InsufficientFunds("Insufficient funds to initiate payment")
 
     return ActionInitInitiatorLight(transfer_state, current_channel, signed_locked_transfer,
                                     transfer_prev_secrethash is not None)
