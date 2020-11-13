@@ -48,12 +48,15 @@ class RifCommsNode(TransportNode):
     def join(self, timeout=None):
         raise NotImplementedError
 
+    @property
     def raiden_service(self) -> 'RaidenService':
         raise NotImplementedError
 
+    @property
     def config(self) -> {}:
         raise NotImplementedError
 
+    @property
     def log(self):
         raise NotImplementedError
 

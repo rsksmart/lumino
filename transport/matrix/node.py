@@ -40,7 +40,7 @@ log = structlog.get_logger(__name__)
 class MatrixNode(TransportNode):
     _room_prefix = "raiden"
     _room_sep = "_"
-    log = log
+    _log = log
 
     def __init__(self, address: Address, config: dict):
         TransportNode.__init__(self, address)
@@ -102,14 +102,17 @@ class MatrixNode(TransportNode):
         if self._prioritize_global_messages:
             self._global_send_queue.join()
 
+    @property
     def raiden_service(self) -> 'RaidenService':
         return self._raiden_service
 
+    @property
     def config(self) -> {}:
         return self._config
 
+    @property
     def log(self):
-        return self.log
+        return self._log
 
     def start_greenlet_for_light_client(self):
         Runnable.start(self)
@@ -145,7 +148,7 @@ class MatrixNode(TransportNode):
             prev_access_token=prev_access_token
         )
 
-        self.log = log.bind(current_user=self._user_id, node=pex(self._raiden_service.address))
+        self._log = log.bind(current_user=self._user_id, node=pex(self._raiden_service.address))
 
         self.log.debug("Start: handle thread", handle_thread=self._client._handle_thread)
         if self._client._handle_thread:
@@ -1173,7 +1176,7 @@ class MatrixLightClientNode(MatrixNode):
             light_client_address=self.address
         )
 
-        self.log = log.bind(current_user=self._user_id, node=pex(self._raiden_service.address))
+        self._log = log.bind(current_user=self._user_id, node=pex(self._raiden_service.address))
 
         self.log.debug("Start: handle thread", handle_thread=self._client._handle_thread)
         if self._client._handle_thread:
