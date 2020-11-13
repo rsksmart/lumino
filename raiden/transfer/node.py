@@ -204,7 +204,7 @@ def subdispatch_to_all_lockedtransfers(
 ) -> TransitionResult[ChainState]:
     events = list()
     for node_address, payment_mapping in chain_state.get_payment_states_by_address():
-        for secrethash in payment_mapping.secrethashes_to_task:
+        for secrethash in list(payment_mapping.secrethashes_to_task):
             result = subdispatch_to_paymenttask(chain_state, state_change, node_address, secrethash, storage)
             events.extend(result.events)
     return TransitionResult(chain_state, events)
