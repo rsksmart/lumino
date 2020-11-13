@@ -2,13 +2,13 @@ from typing import Any, List, Dict, NewType, Union
 
 import structlog
 from eth_utils import to_checksum_address, is_binary_address
-from gevent import Greenlet, killall, wait
+from gevent import Greenlet, killall, wait, spawn
 from gevent.event import Event
 from greenlet import GreenletExit
 
 from raiden.exceptions import InvalidAddress, UnknownAddress, UnknownTokenAddress
 from raiden.message_handler import MessageHandler
-from raiden.messages import Message, SignedRetrieableMessage, SignedMessage, Delivered, Processed
+from raiden.messages import Message, SignedRetrieableMessage, SignedMessage, Delivered, Processed, Ping, Pong
 from raiden.raiden_service import RaidenService
 from raiden.transfer import views
 from raiden.transfer.identifiers import QueueIdentifier
@@ -36,6 +36,9 @@ class RifCommsNode(TransportNode, Runnable):
         self._raiden_service: RaidenService = None
 
         self._rif_comms_connect_stream : Notification = None
+        self._our_topic : Notification = None
+        self._our_topic_thread : Greenlet = None
+
         self._client = RifCommsClient(to_checksum_address(address), self._config["grpc_endpoint"])
         print("RifCommsNode init on grpc endpoint: {}".format(self._config["grpc_endpoint"]))
 
@@ -57,9 +60,11 @@ class RifCommsNode(TransportNode, Runnable):
             raise RuntimeError(f"{self!r} already started")
         self._stop_event.clear()
         self._raiden_service = raiden_service
+
         self._rif_comms_connect_stream = self._client.connect()
-        self._client.get_peer_id(
-            to_checksum_address(to_checksum_address(raiden_service.address)))  # TODO remove when blocking grpc api bug solved
+        self._our_topic = self._client.subscribe(to_checksum_address(raiden_service.address))
+
+        self._client.get_peer_id(to_checksum_address(raiden_service.address))  # TODO remove when blocking grpc api bug solved
 
         # TODO matrix node here invokes inventory_rooms that sets the handle_message callback
         # TODO here we must also check for new messages as the matrix node does with   self._client.start_listener_thread()
@@ -70,6 +75,9 @@ class RifCommsNode(TransportNode, Runnable):
             if not message_queue:
                 self.log.debug("Starting message_queue", message_queue=message_queue)
                 message_queue.start()
+
+        self.start_listener_thread()
+        self._greenlets = [self._our_topic_thread]
         self.log.debug("RIF Comms Node started", config=self._config)
         Runnable.start(self)
 
@@ -123,7 +131,6 @@ class RifCommsNode(TransportNode, Runnable):
         # wait own greenlets, no need to get on them, exceptions should be raised in _run()
         wait(self._greenlets + [r.greenlet for r in self._address_to_message_queue.values()])
 
-        # TODO we must end rif comms communication and grpc session
         self._client.disconnect()
 
         self.log.debug("RIF Comms Node stopped", config=self._config)
@@ -268,6 +275,22 @@ class RifCommsNode(TransportNode, Runnable):
 
     def join(self, timeout=None):
         self.greenlet.join(timeout)
+
+    def listen_messages(
+        self
+    ):
+        """
+        Iterate over the Notification stream and blocks thread to receive messages
+        """
+        for resp in self._our_topic:
+            self.log.info(resp)
+
+    def start_listener_thread(self):
+        """
+        Start a listener greenlet to listen for received messages in the background.
+        """
+        self._our_topic_thread = spawn(self.listen_messages)
+        self._our_topic_thread.name = f"RifCommsClient.listen_messages rsk_address:{self.address}"
 
 
 class RifCommsLightClientNode(RifCommsNode):
