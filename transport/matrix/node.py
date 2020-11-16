@@ -31,7 +31,7 @@ from transport.matrix.utils import get_available_servers_from_config, make_clien
 from transport.message import Message as TransportMessage
 from transport.node import Node as TransportNode
 from transport.udp import utils as udp_utils
-from transport.utils import _RetryQueue
+from transport.utils import MessageQueue
 
 _RoomID = NewType("_RoomID", str)
 log = structlog.get_logger(__name__)
@@ -71,7 +71,7 @@ class MatrixNode(TransportNode):
 
         self.greenlets: List[gevent.Greenlet] = list()
 
-        self._address_to_retrier: Dict[Address, _RetryQueue] = dict()
+        self._address_to_retrier: Dict[Address, MessageQueue] = dict()
 
         self._global_rooms: Dict[str, Optional[Room]] = dict()
         self._global_send_queue: JoinableQueue[Tuple[str, Message]] = JoinableQueue()
@@ -651,10 +651,10 @@ class MatrixNode(TransportNode):
             "ToDevice message received", sender=pex(to_device.sender), message=to_device
         )
 
-    def _get_retrier(self, recipient: Address) -> _RetryQueue:
+    def _get_retrier(self, recipient: Address) -> MessageQueue:
         """ Construct and return a _RetryQueue for recipient """
         if recipient not in self._address_to_retrier:
-            retrier = _RetryQueue(transport_node=self, recipient=recipient)
+            retrier = MessageQueue(transport_node=self, recipient=recipient)
             self._address_to_retrier[recipient] = retrier
             # Always start the _RetryQueue, otherwise `stop` will block forever
             # waiting for the corresponding gevent.Greenlet to complete. This

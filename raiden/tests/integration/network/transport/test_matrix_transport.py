@@ -25,7 +25,7 @@ from transport.matrix.client import Room
 from transport.matrix.node import MatrixNode as MatrixTransportNode
 from transport.matrix.utils import AddressReachability, make_room_alias
 from transport.message import Message as TransportMessage
-from transport.utils import _RetryQueue
+from transport.utils import MessageQueue
 
 USERID0 = "@Arthur:RestaurantAtTheEndOfTheUniverse"
 USERID1 = "@Alice:Wonderland"
@@ -436,7 +436,7 @@ def test_matrix_message_retry(
     )
     chain_state = raiden_service.wal.state_manager.current_state
 
-    retry_queue: _RetryQueue = transport._get_retrier(partner_address)
+    retry_queue: MessageQueue = transport._get_retrier(partner_address)
     assert bool(retry_queue), "retry_queue not running"
 
     # Send the initial message

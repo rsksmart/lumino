@@ -14,7 +14,7 @@ from transport.node import Node as TransportNode
 from transport.udp import utils as udp_utils
 
 
-class _RetryQueue(Runnable):
+class MessageQueue(Runnable):
     """ A helper Runnable to send batched messages to recipient through transport """
 
     class _MessageData(NamedTuple):
@@ -29,7 +29,7 @@ class _RetryQueue(Runnable):
     def __init__(self, transport_node: TransportNode, recipient: Address):
         self.transport_node = transport_node
         self.recipient = recipient
-        self._message_queue: List[_RetryQueue._MessageData] = list()
+        self._message_queue: List[MessageQueue._MessageData] = list()
         self._notify_event = gevent.event.Event()
         self._lock = gevent.lock.Semaphore()
         super().__init__()
@@ -80,7 +80,7 @@ class _RetryQueue(Runnable):
             )
             expiration_generator = self._expiration_generator(timeout_generator)
             self._message_queue.append(
-                _RetryQueue._MessageData(
+                MessageQueue._MessageData(
                     queue_identifier=queue_identifier,
                     message=message,
                     text=json.dumps(message.to_dict()),
@@ -119,7 +119,7 @@ class _RetryQueue(Runnable):
             if next(data.expiration_generator)
         ]
 
-        def message_is_in_queue(data: _RetryQueue._MessageData) -> bool:
+        def message_is_in_queue(data: MessageQueue._MessageData) -> bool:
             return any(
                 isinstance(data.message, RetrieableMessage)
                 and send_event.message_identifier == data.message.message_identifier
