@@ -18,7 +18,7 @@ class Node(ABC, Runnable):
     def __init__(self, address: Address):
         """
         The address represented by the Node in the context of communications.
-        Messages to be received by this Node should be have this address as the message receiver.
+        Messages to be received by this Node should be have this address as the message recipient.
         Messages to be sent from this Node should have this address as the message sender.
         """
         Runnable.__init__(self)

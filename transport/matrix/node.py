@@ -672,11 +672,11 @@ class MatrixNode(TransportNode):
             room = self._get_room_for_address(recipient)
         if not room:
             self.log.error(
-                "No room for receiver", receiver=to_normalized_address(recipient)
+                "No room for recipient", recipient=to_normalized_address(recipient)
             )
             return
         self.log.debug(
-            "Send raw", receiver=pex(recipient), room=room, data=payload.replace("\n", "\\n")
+            "Send raw", recipient=pex(recipient), room=room, payload=payload.replace("\n", "\\n")
         )
         print("---->> Matrix Send Message " + payload)
 
@@ -1237,11 +1237,11 @@ class MatrixLightClientNode(MatrixNode):
             room = self._get_room_for_address(recipient)
         if not room:
             self.log.error(
-                "No room for receiver", receiver=to_normalized_address(recipient)
+                "No room for recipient", recipient=to_normalized_address(recipient)
             )
             return
         self.log.debug(
-            "Send raw", receiver=pex(recipient), room=room, data=payload.replace("\n", "\\n")
+            "Send raw", recipient=pex(recipient), room=room, payload=payload.replace("\n", "\\n")
         )
         print("---- Matrix Send Message " + payload)
 
