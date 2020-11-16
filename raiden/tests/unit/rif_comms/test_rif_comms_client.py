@@ -1,3 +1,4 @@
+import json
 import secrets
 import unittest
 
@@ -9,7 +10,7 @@ from grpc._channel import _InactiveRpcError
 from sha3 import keccak_256
 
 from transport.rif_comms.client import RifCommsClient
-from transport.rif_comms.proto.api_pb2 import RskAddress, Channel, Subscriber
+from transport.rif_comms.proto.api_pb2 import RskAddress, Channel, Subscriber, PublishPayload, Msg
 from transport.rif_comms.proto.api_pb2_grpc import CommunicationsApiStub
 
 
@@ -24,7 +25,7 @@ LUMINO_1_ADDRESS = "0xe717e81105471648a152381aE6De4c878343E2sb2"
 LUMINO_1_COMMS_API = "localhost:5013"
 
 LUMINO_2_COMMS_API = "localhost:5016"
-LUMINO_2_ADDRESS = "0xe798e91805471D48a152382aE6De4c878343E6b2"
+LUMINO_2_ADDRESS = "0x138af366e0ed7cc4b9747a935d1b5f75a86b9d83"
 
 UNREGISTERED_ADDRESS = get_random_address_str()
 
@@ -37,7 +38,7 @@ def rif_comms_client(request):
     def teardown():
         rif_comms_client.disconnect()
 
-    request.addfinalizer(teardown)
+    #request.addfinalizer(teardown)
     request.cls.rif_comms_client = rif_comms_client
 
 
@@ -98,9 +99,48 @@ class TestRiffCommsClient(unittest.TestCase):
         print("has_subscriber")
         print(has_subscriber)
 
+    @pytest.mark.skip(reason="ignore")
     def test_disconnect(self):
         notification = self.rif_comms_client.connect()
         peer_id = self.rif_comms_client.get_peer_id(LUMINO_1_ADDRESS)
         self.rif_comms_client.disconnect()
+
+    def test_send_lumino_message(self):
+        channel = grpc.insecure_channel(LUMINO_2_COMMS_API)
+        stub = CommunicationsApiStub(channel)
+        channel = stub.Subscribe(Channel(channelId="16Uiu2HAm9otWzXBcFm7WC2Qufp2h1mpRxK1oox289omHTcKgrpRA")) # got this from subscription of lumino node
+
+        some_raiden_message = {
+            'type': 'LockedTransfer',
+            'chain_id': 33,
+            'message_identifier': 9074731958492744333,
+            'payment_identifier': 2958725218135700941,
+            'payment_hash_invoice': '0x0000000000000000000000000000000000000000000000000000000000000000',
+            'nonce': 45,
+            'token_network_address': '0xd548700d98f32f83b3c88756cf340b7f61877d75',
+            'token': '0xf563b16dc42d9cb6d7ca31793f2d62131d586d05',
+            'channel_identifier': 12,
+            'transferred_amount': 17000000000000000000,
+            'locked_amount': 1000000000000000000,
+            'recipient': '0x00e8249ee607ea67127c4add69291a6c412603c5',
+            'locksroot': '0x043c092c72059c4c154cb342409d95364888a98fa87efadece5add9c255dce9a',
+            'lock': {
+                'type': 'Lock',
+                'amount': 1000000000000000000,
+                'expiration': 1165251,
+                'secrethash': '0x2dc5a7ff26be395d443200db5d16b5d2aadae3a83836be648cd4cba8e2e555fe'
+            },
+            'target': '0x00e8249ee607ea67127c4add69291a6c412603c5',
+            'initiator': '0x27633dc87378a551f09f2fcf43a48fc2b3425d43',
+            'fee': 0,
+            'signature': '0xbaa4df61ab23ab8fdddf4a90fd5db7dd04da364795ebb717426bdd1fcefb411759e1b41d71c3c54b2a75c3eba0f2a2c54c846a0139120ee794f51b0e2a0d954d1c'
+        }
+
+        stub.SendMessageToTopic(
+            PublishPayload(
+                topic=Channel(channelId="16Uiu2HAm9otWzXBcFm7WC2Qufp2h1mpRxK1oox289omHTcKgrpRA"),
+                message=Msg(payload=str.encode(json.dumps(some_raiden_message)))
+            )
+        )
 
 

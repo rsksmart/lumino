@@ -1,3 +1,4 @@
+import json
 from typing import Any, List, Dict, NewType, Union
 
 import structlog
@@ -8,7 +9,15 @@ from greenlet import GreenletExit
 
 from raiden.exceptions import InvalidAddress, UnknownAddress, UnknownTokenAddress
 from raiden.message_handler import MessageHandler
-from raiden.messages import Message, SignedRetrieableMessage, SignedMessage, Delivered, Processed, Ping, Pong
+from raiden.messages import (
+    Message,
+    SignedRetrieableMessage,
+    SignedMessage, Delivered,
+    Processed,
+    Ping,
+    Pong,
+    from_dict as message_from_dict
+)
 from raiden.raiden_service import RaidenService
 from raiden.transfer import views
 from raiden.transfer.identifiers import QueueIdentifier
@@ -20,7 +29,7 @@ from transport.matrix.utils import _RetryQueue
 from transport.message import Message as TransportMessage
 from transport.node import Node as TransportNode
 from transport.rif_comms.client import RifCommsClient
-from transport.rif_comms.proto.api_pb2 import Notification
+from transport.rif_comms.proto.api_pb2 import Notification, ChannelNewData
 
 _RoomID = NewType("_RoomID", str)
 log = structlog.get_logger(__name__)
@@ -63,7 +72,7 @@ class RifCommsNode(TransportNode, Runnable):
 
         self._rif_comms_connect_stream = self._client.connect()
         self._our_topic = self._client.subscribe(to_checksum_address(raiden_service.address))
-
+        # self._client.get_peer_id(to_checksum_address(raiden_service.address))
         for message_queue in self._address_to_message_queue.values():
             if not message_queue:
                 self.log.debug("Starting message_queue", message_queue=message_queue)
@@ -271,8 +280,10 @@ class RifCommsNode(TransportNode, Runnable):
         """
         Iterate over the Notification stream and blocks thread to receive messages
         """
-        for resp in self._our_topic:
-            self.log.info(resp)
+        for notification_stream in self._our_topic:
+            parsed_message = self._parse_topic_new_data(notification_stream.channelNewData)
+            if parsed_message:
+                self.log.info(parsed_message)
 
     def start_listener_thread(self):
         """
@@ -288,7 +299,41 @@ class RifCommsNode(TransportNode, Runnable):
             self._our_topic.get()
         if self._our_topic is not None:
             self._our_topic.get()
-        self._our_topic= None
+        self._our_topic = None
+
+    def _parse_topic_new_data(self, topic_new_data: ChannelNewData) -> Message:
+        """
+
+        :param topic_new_data: raw data received by the RIF Comms GRPC api
+        :return: a raiden.Message
+        """
+        content = topic_new_data.data
+        """
+            topic_new_data has the following structure:
+            from: "16Uiu2HAm8wq7GpkmTDqBxb4eKGfa2Yos79DabTgSXXF4PcHaDhWJ"
+            data: "{\"type\":\"Buffer\",\"data\":[104,101,121]}"
+            nonce: "\216f\225\232d\023e{"
+            channel {
+              channelId: "16Uiu2HAm9otWzXBcFm7WC2Qufp2h1mpRxK1oox289omHTcKgrpRA"
+            }
+
+        """
+        if content:
+            # We first transform the content of the topic new data to an object
+            object_data = json.loads(content.decode())
+            """
+                Since the message is assigned to the 'data' key and encoded by the RIF Comms GRPC api
+                we need to convert it to string.
+                
+                    data: "{\"type\":\"Buffer\",\"data\":[104,101,121]}"
+
+            """
+            string_message = bytes(object_data["data"]).decode()
+            message_dict = json.loads(string_message)
+            message = message_from_dict(message_dict)
+            return message
+        else:
+            return None
 
 
 class RifCommsLightClientNode(RifCommsNode):
