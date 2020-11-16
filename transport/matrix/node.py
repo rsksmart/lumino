@@ -652,7 +652,7 @@ class MatrixNode(TransportNode):
         )
 
     def _get_retrier(self, recipient: Address) -> MessageQueue:
-        """ Construct and return a _RetryQueue for recipient """
+        """ Construct and return a MessageQueue for recipient """
         if recipient not in self._address_to_retrier:
             retrier = MessageQueue(transport_node=self, recipient=recipient)
             self._address_to_retrier[recipient] = retrier
