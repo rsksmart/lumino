@@ -445,7 +445,7 @@ def test_matrix_message_retry(
     chain_state.queueids_to_queues[queueid] = [message]
     retry_queue.enqueue(
         queue_identifier=QueueIdentifier(
-            recipient=retry_queue.receiver, channel_identifier=CHANNEL_IDENTIFIER_GLOBAL_QUEUE
+            recipient=retry_queue.recipient, channel_identifier=CHANNEL_IDENTIFIER_GLOBAL_QUEUE
         ),
         message=message
     )

@@ -15,7 +15,7 @@ from transport.udp import utils as udp_utils
 
 
 class _RetryQueue(Runnable):
-    """ A helper Runnable to send batched messages to receiver through transport """
+    """ A helper Runnable to send batched messages to recipient through transport """
 
     class _MessageData(NamedTuple):
         """ Small helper data structure for message queue """
@@ -26,14 +26,14 @@ class _RetryQueue(Runnable):
         # generator that tells if the message should be sent now
         expiration_generator: Iterator[bool]
 
-    def __init__(self, transport_node: TransportNode, receiver: Address):
+    def __init__(self, transport_node: TransportNode, recipient: Address):
         self.transport_node = transport_node
-        self.receiver = receiver
+        self.recipient = recipient
         self._message_queue: List[_RetryQueue._MessageData] = list()
         self._notify_event = gevent.event.Event()
         self._lock = gevent.lock.Semaphore()
         super().__init__()
-        self.greenlet.name = f"RetryQueue " f"recipient:{pex(self.receiver)}"
+        self.greenlet.name = f"RetryQueue " f"recipient:{pex(self.recipient)}"
 
     @property
     def log(self):
@@ -59,7 +59,7 @@ class _RetryQueue(Runnable):
 
     def enqueue(self, queue_identifier: QueueIdentifier, message: Message):
         """ Enqueue a message to be sent, and notify main loop """
-        assert queue_identifier.recipient == self.receiver
+        assert queue_identifier.recipient == self.recipient
         with self._lock:
             already_queued = any(
                 queue_identifier == data.queue_identifier and message == data.message
@@ -68,7 +68,7 @@ class _RetryQueue(Runnable):
             if already_queued:
                 self.log.warning(
                     "Message already in queue - ignoring",
-                    receiver=pex(self.receiver),
+                    recipient=pex(self.recipient),
                     queue=queue_identifier,
                     message=message,
                 )
@@ -110,7 +110,7 @@ class _RetryQueue(Runnable):
         # During startup global messages have to be sent first
         self.transport_node.enqueue_global_messages()
 
-        self.log.debug("Retrying message", receiver=to_normalized_address(self.receiver))
+        self.log.debug("Retrying message", recipient=to_normalized_address(self.recipient))
 
         message_texts = [
             data.text
@@ -155,8 +155,8 @@ class _RetryQueue(Runnable):
                 self._message_queue.remove(msg_data)
 
         if message_texts:
-            self.log.debug("Send", receiver=pex(self.receiver), messages=message_texts)
-            self.transport_node.send_message("\n".join(message_texts), self.receiver)
+            self.log.debug("Send", recipient=pex(self.recipient), messages=message_texts)
+            self.transport_node.send_message("\n".join(message_texts), self.recipient)
 
     @property
     def _queueids_to_queues(self) -> QueueIdsToQueues:
@@ -169,7 +169,7 @@ class _RetryQueue(Runnable):
         self.greenlet.name = (
             f"RetryQueue "
             f"node:{pex(self.transport_node.raiden_service.address)} "
-            f"recipient:{pex(self.receiver)}"
+            f"recipient:{pex(self.recipient)}"
         )
         # run while transport parent is running
         while not self.transport_node.stop_event.ready():
@@ -185,4 +185,4 @@ class _RetryQueue(Runnable):
         return self.greenlet.name
 
     def __repr__(self):
-        return f"<{self.__class__.__name__} for {to_normalized_address(self.receiver)}>"
+        return f"<{self.__class__.__name__} for {to_normalized_address(self.recipient)}>"
