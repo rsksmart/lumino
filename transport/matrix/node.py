@@ -651,17 +651,17 @@ class MatrixNode(TransportNode):
             "ToDevice message received", sender=pex(to_device.sender), message=to_device
         )
 
-    def _get_retrier(self, receiver: Address) -> _RetryQueue:
-        """ Construct and return a _RetryQueue for receiver """
-        if receiver not in self._address_to_retrier:
-            retrier = _RetryQueue(transport_node=self, receiver=receiver)
-            self._address_to_retrier[receiver] = retrier
+    def _get_retrier(self, recipient: Address) -> _RetryQueue:
+        """ Construct and return a _RetryQueue for recipient """
+        if recipient not in self._address_to_retrier:
+            retrier = _RetryQueue(transport_node=self, recipient=recipient)
+            self._address_to_retrier[recipient] = retrier
             # Always start the _RetryQueue, otherwise `stop` will block forever
             # waiting for the corresponding gevent.Greenlet to complete. This
             # has no negative side-effects if the transport has stopped because
             # the retrier itself checks the transport running state.
             retrier.start()
-        return self._address_to_retrier[receiver]
+        return self._address_to_retrier[recipient]
 
     def _send_with_retry(self, queue_identifier: QueueIdentifier, message: Message):
         retrier = self._get_retrier(queue_identifier.recipient)
