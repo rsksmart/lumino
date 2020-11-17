@@ -115,10 +115,12 @@ class TestRiffCommsClient(unittest.TestCase):
         peer_id = self.rif_comms_client.get_peer_id(LUMINO_1_ADDRESS)
         self.rif_comms_client.disconnect()
 
+    @pytest.mark.skip(reason="ignore")
     def test_send_lumino_message(self):
         channel = grpc.insecure_channel(LUMINO_2_COMMS_API)
         stub = CommunicationsApiStub(channel)
-        channel = stub.Subscribe(Channel(channelId="16Uiu2HAm9otWzXBcFm7WC2Qufp2h1mpRxK1oox289omHTcKgrpRA")) # got this from subscription of lumino node
+        channel = stub.Subscribe(Channel(
+            channelId="16Uiu2HAm9otWzXBcFm7WC2Qufp2h1mpRxK1oox289omHTcKgrpRA"))  # got this from subscription of lumino node
 
         some_raiden_message = {
             'type': 'LockedTransfer',
@@ -152,4 +154,3 @@ class TestRiffCommsClient(unittest.TestCase):
                 message=Msg(payload=str.encode(json.dumps(some_raiden_message)))
             )
         )
-

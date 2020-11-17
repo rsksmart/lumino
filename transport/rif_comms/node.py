@@ -25,9 +25,9 @@ from raiden.transfer.mediated_transfer.events import CHANNEL_IDENTIFIER_GLOBAL_Q
 from raiden.transfer.state import QueueIdsToQueues
 from raiden.utils import pex
 from raiden.utils.runnable import Runnable
-from transport.matrix.utils import _RetryQueue
-from transport.message import Message as TransportMessage
 from raiden.utils.typing import Address
+from transport.utils import MessageQueue
+from transport.message import Message as TransportMessage
 from transport.node import Node as TransportNode
 from transport.rif_comms.client import RifCommsClient
 from transport.rif_comms.proto.api_pb2 import Notification, ChannelNewData
@@ -51,7 +51,7 @@ class RifCommsNode(TransportNode):
         print("RifCommsNode init on grpc endpoint: {}".format(self._config["grpc_endpoint"]))
 
         self._greenlets: List[Greenlet] = list()
-        self._address_to_message_queue: Dict[Address, _RetryQueue] = dict()
+        self._address_to_message_queue: Dict[Address, MessageQueue] = dict()
 
         self._stop_event = Event()
         self._stop_event.set()
@@ -71,7 +71,8 @@ class RifCommsNode(TransportNode):
 
         self._rif_comms_connect_stream = self._client.connect()
         self._our_topic = self._client.subscribe(to_checksum_address(raiden_service.address))
-        self._client.get_peer_id(to_checksum_address(raiden_service.address)) # TODO remove this after grpc api request blocking is fixed
+        self._client.get_peer_id(
+            to_checksum_address(raiden_service.address))  # TODO remove this after grpc api request blocking is fixed
         for message_queue in self._address_to_message_queue.values():
             if not message_queue:
                 self.log.debug("Starting message_queue", message_queue=message_queue)
@@ -168,12 +169,12 @@ class RifCommsNode(TransportNode):
         queue = self._get_queue(queue_identifier.recipient)
         queue.enqueue(queue_identifier=queue_identifier, message=message)
 
-    def _get_queue(self, receiver: Address) -> _RetryQueue:
-        """ Construct and return a _RetryQueue for receiver """
+    def _get_queue(self, receiver: Address) -> MessageQueue:
+        """ Construct and return a MessageQueue for receiver """
         if receiver not in self._address_to_message_queue:
-            queue = _RetryQueue(transport=self, receiver=receiver)
+            queue = MessageQueue(transport=self, receiver=receiver)
             self._address_to_message_queue[receiver] = queue
-            # Always start the _RetryQueue, otherwise `stop` will block forever
+            # Always start the MessageQueue, otherwise `stop` will block forever
             # waiting for the corresponding gevent.Greenlet to complete. This
             # has no negative side-effects if the transport has stopped becausecreate_light_client_payment
             # the queue itself checks the transport running state.

@@ -11,6 +11,7 @@ from gevent.event import Event
 from gevent.queue import JoinableQueue
 from matrix_client.errors import MatrixRequestError
 from matrix_client.user import User
+
 from raiden.constants import DISCOVERY_DEFAULT_ROOM
 from raiden.exceptions import InvalidAddress, UnknownAddress, UnknownTokenAddress
 from raiden.message_handler import MessageHandler
