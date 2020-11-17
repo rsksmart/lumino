@@ -4,7 +4,6 @@ from typing import TYPE_CHECKING
 
 import structlog
 from eth_utils import to_checksum_address, to_hex, encode_hex
-
 from raiden.api.objects import SettlementParameters
 from raiden.billing.invoices.handlers.invoice_handler import handle_receive_events_with_payments
 from raiden.constants import EMPTY_BALANCE_HASH, EMPTY_HASH, EMPTY_MESSAGE_HASH, EMPTY_SIGNATURE
@@ -140,6 +139,7 @@ def unlock_light(raiden: "RaidenService",
             message=message
         )
 
+
 class EventHandler(ABC):
     @abstractmethod
     def on_raiden_event(self, raiden: "RaidenService", chain_state: ChainState, event: Event):
@@ -257,7 +257,7 @@ class RaidenEventHandler(EventHandler):
             stored_but_unsigned = existing_message.signed_message is None
             if stored_but_unsigned and store_message_event.is_signed:
                 # Update messages that were created by the hub and now are received signed by the light client
-                LightClientMessageHandler\
+                LightClientMessageHandler \
                     .update_offchain_light_client_protocol_message_set_signed_message(store_message_event.message,
                                                                                       store_message_event.payment_id,
                                                                                       store_message_event.message_order,
@@ -270,7 +270,7 @@ class RaidenEventHandler(EventHandler):
     def handle_send_lockexpired(raiden: "RaidenService", send_lock_expired: SendLockExpired):
         lock_expired_message = message_from_sendevent(send_lock_expired)
         raiden.sign(lock_expired_message)
-        raiden.transport.full_node.send_message(
+        raiden.transport.full_node.enqueue_message(
             *TransportMessage.wrap(send_lock_expired.queue_identifier, lock_expired_message)
         )
 
@@ -279,7 +279,7 @@ class RaidenEventHandler(EventHandler):
         signed_lock_expired = send_lock_expired.signed_lock_expired
         lc_transport = raiden.get_light_client_transport(to_checksum_address(signed_lock_expired.sender))
         if lc_transport:
-            lc_transport.send_message(
+            lc_transport.enqueue_message(
                 *TransportMessage.wrap(send_lock_expired.queue_identifier, signed_lock_expired)
             )
 
@@ -289,7 +289,7 @@ class RaidenEventHandler(EventHandler):
     ):
         mediated_transfer_message = message_from_sendevent(send_locked_transfer)
         raiden.sign(mediated_transfer_message)
-        raiden.transport.full_node.send_message(
+        raiden.transport.full_node.enqueue_message(
             *TransportMessage.wrap(send_locked_transfer.queue_identifier, mediated_transfer_message)
         )
 
@@ -301,7 +301,7 @@ class RaidenEventHandler(EventHandler):
         light_client_address = to_checksum_address(send_locked_transfer_light.signed_locked_transfer.initiator)
         for light_client_transport in raiden.transport.light_clients:
             if light_client_address == light_client_transport.address:
-                light_client_transport.send_message(
+                light_client_transport.enqueue_message(
                     *TransportMessage.wrap(send_locked_transfer_light.queue_identifier, mediated_transfer_message)
                 )
 
@@ -309,7 +309,7 @@ class RaidenEventHandler(EventHandler):
     def handle_send_secretreveal(raiden: "RaidenService", reveal_secret_event: SendSecretReveal):
         reveal_secret_message = message_from_sendevent(reveal_secret_event)
         raiden.sign(reveal_secret_message)
-        raiden.transport.full_node.send_message(
+        raiden.transport.full_node.enqueue_message(
             *TransportMessage.wrap(reveal_secret_event.queue_identifier, reveal_secret_message)
         )
 
@@ -318,7 +318,7 @@ class RaidenEventHandler(EventHandler):
         signed_secret_reveal = reveal_secret_event.signed_secret_reveal
         lc_transport = raiden.get_light_client_transport(to_checksum_address(reveal_secret_event.sender))
         if lc_transport:
-            lc_transport.send_message(
+            lc_transport.enqueue_message(
                 *TransportMessage.wrap(reveal_secret_event.queue_identifier, signed_secret_reveal)
             )
 
@@ -326,7 +326,7 @@ class RaidenEventHandler(EventHandler):
     def handle_send_balanceproof(raiden: "RaidenService", balance_proof_event: SendBalanceProof):
         unlock_message = message_from_sendevent(balance_proof_event)
         raiden.sign(unlock_message)
-        raiden.transport.full_node.send_message(
+        raiden.transport.full_node.enqueue_message(
             *TransportMessage.wrap(balance_proof_event.queue_identifier, unlock_message)
         )
 
@@ -335,7 +335,7 @@ class RaidenEventHandler(EventHandler):
         unlock_message = message_from_sendevent(balance_proof_event)
         lc_transport = raiden.get_light_client_transport(to_checksum_address(balance_proof_event.sender))
         if lc_transport:
-            lc_transport.send_message(
+            lc_transport.enqueue_message(
                 *TransportMessage.wrap(balance_proof_event.queue_identifier, unlock_message)
             )
 
@@ -348,7 +348,7 @@ class RaidenEventHandler(EventHandler):
 
         secret_request_message = message_from_sendevent(secret_request_event)
         raiden.sign(secret_request_message)
-        raiden.transport.full_node.send_message(
+        raiden.transport.full_node.enqueue_message(
             *TransportMessage.wrap(secret_request_event.queue_identifier, secret_request_message)
         )
 
@@ -359,7 +359,7 @@ class RaidenEventHandler(EventHandler):
         secret_request_message = message_from_sendevent(secret_request_event)
         lc_transport = raiden.get_light_client_transport(to_checksum_address(secret_request_event.sender))
         if lc_transport:
-            lc_transport.send_message(
+            lc_transport.enqueue_message(
                 *TransportMessage.wrap(secret_request_event.queue_identifier, secret_request_message)
             )
 
@@ -369,7 +369,7 @@ class RaidenEventHandler(EventHandler):
     ):
         refund_transfer_message = message_from_sendevent(refund_transfer_event)
         raiden.sign(refund_transfer_message)
-        raiden.transport.full_node.send_message(
+        raiden.transport.full_node.enqueue_message(
             *TransportMessage.wrap(refund_transfer_event.queue_identifier, refund_transfer_message)
         )
 
@@ -377,7 +377,7 @@ class RaidenEventHandler(EventHandler):
     def handle_send_processed(raiden: "RaidenService", processed_event: SendProcessed):
         processed_message = message_from_sendevent(processed_event)
         raiden.sign(processed_message)
-        raiden.transport.full_node.send_message(
+        raiden.transport.full_node.enqueue_message(
             *TransportMessage.wrap(processed_event.queue_identifier, processed_message)
         )
 
@@ -450,15 +450,17 @@ class RaidenEventHandler(EventHandler):
             wal=raiden.wal)
         # Do not store the RegisterSecretRequest twice for same payment
         if not existing_message:
+            LightClientMessageHandler.store_light_client_protocol_message(
+                identifier=channel_reveal_secret_event.message_id,
+                message=message,
+                signed=False,
+                payment_id=channel_reveal_secret_event.payment_identifier,
+                light_client_address=channel_reveal_secret_event.light_client_address,
+                order=0,
+                message_type=LightClientProtocolMessageType.RequestRegisterSecret,
+                wal=raiden.wal
+            )
 
-            LightClientMessageHandler.store_light_client_protocol_message(identifier=channel_reveal_secret_event.message_id,
-                                                                          message=message,
-                                                                          signed=False,
-                                                                          payment_id=channel_reveal_secret_event.payment_identifier,
-                                                                          light_client_address=channel_reveal_secret_event.light_client_address,
-                                                                          order=0,
-                                                                          message_type=LightClientProtocolMessageType.RequestRegisterSecret,
-                                                                          wal=raiden.wal)
     @staticmethod
     def handle_contract_send_channelclose(
         raiden: "RaidenService",

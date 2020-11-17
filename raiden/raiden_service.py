@@ -10,8 +10,6 @@ import structlog
 from eth_utils import is_binary_address, to_canonical_address, to_checksum_address
 from gevent import Greenlet
 from gevent.event import AsyncResult, Event
-from raiden_contracts.contract_manager import ContractManager
-
 from raiden import constants, routing
 from raiden.blockchain.events import BlockchainEvents
 from raiden.blockchain_events_handler import on_blockchain_event
@@ -96,6 +94,7 @@ from raiden.utils.typing import (
     TokenNetworkID,
     PaymentHashInvoice, ChannelID)
 from raiden.utils.upgrades import UpgradeManager
+from raiden_contracts.contract_manager import ContractManager
 from transport.layer import Layer as TransportLayer
 from transport.message import Message as TransportMessage
 
@@ -1329,7 +1328,7 @@ class RaidenService(Runnable):
             queue_identifier = QueueIdentifier(
                 recipient=receiver_address, channel_identifier=CHANNEL_IDENTIFIER_GLOBAL_QUEUE
             )
-            lc_transport.send_message(*TransportMessage.wrap(queue_identifier, delivered))
+            lc_transport.enqueue_message(*TransportMessage.wrap(queue_identifier, delivered))
 
     def initiate_send_processed_light(self, sender_address: Address, receiver_address: Address,
                                       processed: Processed, msg_order: int, payment_id: int,
@@ -1349,7 +1348,7 @@ class RaidenService(Runnable):
             queue_identifier = QueueIdentifier(
                 recipient=receiver_address, channel_identifier=CHANNEL_IDENTIFIER_GLOBAL_QUEUE
             )
-            lc_transport.send_message(*TransportMessage.wrap(queue_identifier, processed))
+            lc_transport.enqueue_message(*TransportMessage.wrap(queue_identifier, processed))
 
     def initiate_send_secret_reveal_light(
         self,

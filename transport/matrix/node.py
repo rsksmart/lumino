@@ -16,10 +16,9 @@ from raiden.exceptions import InvalidAddress, UnknownAddress, UnknownTokenAddres
 from raiden.message_handler import MessageHandler
 from raiden.messages import Message, Ping, Pong, SignedRetrieableMessage, SignedMessage, Delivered, Processed, ToDevice
 from raiden.raiden_service import RaidenService
-from raiden.transfer import views
 from raiden.transfer.identifiers import QueueIdentifier
 from raiden.transfer.mediated_transfer.events import CHANNEL_IDENTIFIER_GLOBAL_QUEUE
-from raiden.transfer.state import QueueIdsToQueues, NODE_NETWORK_REACHABLE, NODE_NETWORK_UNKNOWN, \
+from raiden.transfer.state import NODE_NETWORK_REACHABLE, NODE_NETWORK_UNKNOWN, \
     NODE_NETWORK_UNREACHABLE
 from raiden.transfer.state_change import ActionUpdateTransportAuthData, ActionChangeNodeNetworkState
 from raiden.utils import Address, pex
@@ -28,23 +27,24 @@ from raiden.utils.typing import ChainID, AddressHex
 from transport.matrix.client import Room, GMatrixClient
 from transport.matrix.utils import get_available_servers_from_config, make_client, get_server_url, UserAddressManager, \
     login_or_register, make_room_alias, join_global_room, UserPresence, validate_userid_signature, JOIN_RETRIES, \
-    AddressReachability, validate_and_parse_message, login_or_register_light_client, _RetryQueue
+    AddressReachability, validate_and_parse_message, login_or_register_light_client
 from transport.message import Message as TransportMessage
 from transport.node import Node as TransportNode
 from transport.udp import utils as udp_utils
+from transport.utils import MessageQueue
 
 _RoomID = NewType("_RoomID", str)
 log = structlog.get_logger(__name__)
 
 
-class MatrixNode(TransportNode, Runnable):
+class MatrixNode(TransportNode):
     _room_prefix = "raiden"
     _room_sep = "_"
-    log = log
+    _log = log
 
     def __init__(self, address: Address, config: dict):
         TransportNode.__init__(self, address)
-        Runnable.__init__(self)
+
         self._config = config
         self._raiden_service: Optional[RaidenService] = None
 
@@ -71,15 +71,12 @@ class MatrixNode(TransportNode, Runnable):
 
         self.greenlets: List[gevent.Greenlet] = list()
 
-        self._address_to_retrier: Dict[Address, _RetryQueue] = dict()
+        self._address_to_retrier: Dict[Address, MessageQueue] = dict()
 
         self._global_rooms: Dict[str, Optional[Room]] = dict()
         self._global_send_queue: JoinableQueue[Tuple[str, Message]] = JoinableQueue()
 
         self._started = False
-
-        self._stop_event = Event()
-        self._stop_event.set()
 
         self._global_send_event = Event()
         self._prioritize_global_messages = True
@@ -89,7 +86,7 @@ class MatrixNode(TransportNode, Runnable):
             get_user_callable=self._get_user,
             address_reachability_changed_callback=self._address_reachability_changed,
             user_presence_changed_callback=self._user_presence_changed,
-            stop_event=self._stop_event,
+            stop_event=self.stop_event,
         )
 
         self._client.add_invite_listener(self._handle_invite)
@@ -100,6 +97,22 @@ class MatrixNode(TransportNode, Runnable):
         self._account_data_lock = Semaphore()
 
         self._message_handler: Optional[MessageHandler] = None
+
+    def enqueue_global_messages(self):
+        if self._prioritize_global_messages:
+            self._global_send_queue.join()
+
+    @property
+    def raiden_service(self) -> 'RaidenService':
+        return self._raiden_service
+
+    @property
+    def config(self) -> {}:
+        return self._config
+
+    @property
+    def log(self):
+        return self._log
 
     def start_greenlet_for_light_client(self):
         Runnable.start(self)
@@ -115,9 +128,9 @@ class MatrixNode(TransportNode, Runnable):
     def start(  # type: ignore
         self, raiden_service: RaidenService, message_handler: MessageHandler, prev_auth_data: str
     ):
-        if not self._stop_event.ready():
+        if not self.stop_event.ready():
             raise RuntimeError(f"{self!r} already started")
-        self._stop_event.clear()
+        self.stop_event.clear()
         self._raiden_service = raiden_service
         self._message_handler = message_handler
 
@@ -135,7 +148,7 @@ class MatrixNode(TransportNode, Runnable):
             prev_access_token=prev_access_token
         )
 
-        self.log = log.bind(current_user=self._user_id, node=pex(self._raiden_service.address))
+        self._log = log.bind(current_user=self._user_id, node=pex(self._raiden_service.address))
 
         self.log.debug("Start: handle thread", handle_thread=self._client._handle_thread)
         if self._client._handle_thread:
@@ -185,7 +198,7 @@ class MatrixNode(TransportNode, Runnable):
             self._global_send_worker()
             # children crashes should throw an exception here
         except gevent.GreenletExit:  # killed without exception
-            self._stop_event.set()
+            self.stop_event.set()
             gevent.killall(self.greenlets)  # kill children
             raise  # re-raise to keep killed status
         except Exception:
@@ -198,9 +211,9 @@ class MatrixNode(TransportNode, Runnable):
         Stop isn't expected to re-raise greenlet _run exception
         (use self.greenlet.get() for that),
         but it should raise any stop-time exception """
-        if self._stop_event.ready():
+        if self.stop_event.ready():
             return
-        self._stop_event.set()
+        self.stop_event.set()
         self._global_send_event.set()
 
         for retrier in self._address_to_retrier.values():
@@ -252,7 +265,7 @@ class MatrixNode(TransportNode, Runnable):
 
         It also whitelists the address to answer invites and listen for messages
         """
-        if self._stop_event.ready():
+        if self.stop_event.ready():
             return
 
         with self._health_lock:
@@ -278,7 +291,7 @@ class MatrixNode(TransportNode, Runnable):
             # representing the target node
             self._address_mgr.refresh_address_presence(node_address)
 
-    def send_message(self, message: TransportMessage, recipient: Address):
+    def enqueue_message(self, message: TransportMessage, recipient: Address):
         """Queue the message for sending to recipient in the queue_identifier
 
         It may be called before transport is started, to initialize message queues
@@ -293,7 +306,7 @@ class MatrixNode(TransportNode, Runnable):
         # These are not protocol messages, but transport specific messages
         if isinstance(raiden_message, (Ping, Pong)):
             raise ValueError(
-                "Do not use send_message for {} messages".format(raiden_message.__class__.__name__)
+                "Do not use enqueue_message for {} messages".format(raiden_message.__class__.__name__)
             )
 
         self.log.info(
@@ -344,7 +357,7 @@ class MatrixNode(TransportNode, Runnable):
             )
             room.send_text(serialized_message)
 
-        while not self._stop_event.ready():
+        while not self.stop_event.ready():
             self._global_send_event.clear()
             messages: Dict[str, List[Message]] = defaultdict(list)
             while self._global_send_queue.qsize() > 0:
@@ -360,11 +373,6 @@ class MatrixNode(TransportNode, Runnable):
             # Stop prioritizing global messages after initial queue has been emptied
             self._prioritize_global_messages = False
             self._global_send_event.wait(self._config["retry_interval"])
-
-    @property
-    def _queueids_to_queues(self) -> QueueIdsToQueues:
-        chain_state = views.state_from_raiden(self._raiden_service)
-        return views.get_all_messagequeues(chain_state)
 
     @property
     def _user_id(self) -> Optional[str]:
@@ -402,7 +410,7 @@ class MatrixNode(TransportNode, Runnable):
 
     def _handle_invite(self, room_id: _RoomID, state: dict):
         """ Join rooms invited by whitelisted partners """
-        if self._stop_event.ready():
+        if self.stop_event.ready():
             return
 
         self.log.debug("Got invite", room_id=room_id)
@@ -469,7 +477,7 @@ class MatrixNode(TransportNode, Runnable):
                 room = self._client.join_room(room_id)
             except MatrixRequestError as e:
                 last_ex = e
-                if self._stop_event.wait(retry_interval):
+                if self.stop_event.wait(retry_interval):
                     break
                 retry_interval = retry_interval * 2
             else:
@@ -500,7 +508,7 @@ class MatrixNode(TransportNode, Runnable):
         if (
             event["type"] != "m.room.message"
             or event["content"]["msgtype"] != "m.text"
-            or self._stop_event.ready()
+            or self.stop_event.ready()
         ):
             # Ignore non-messages and non-text messages
             return False
@@ -631,7 +639,7 @@ class MatrixNode(TransportNode, Runnable):
             queue_identifier = QueueIdentifier(
                 recipient=message.sender, channel_identifier=CHANNEL_IDENTIFIER_GLOBAL_QUEUE
             )
-            self.send_message(*TransportMessage.wrap(queue_identifier, delivered_message))
+            self.enqueue_message(*TransportMessage.wrap(queue_identifier, delivered_message))
             self._raiden_service.on_message(message)
 
         except (InvalidAddress, UnknownAddress, UnknownTokenAddress):
@@ -643,39 +651,39 @@ class MatrixNode(TransportNode, Runnable):
             "ToDevice message received", sender=pex(to_device.sender), message=to_device
         )
 
-    def _get_retrier(self, receiver: Address) -> _RetryQueue:
-        """ Construct and return a _RetryQueue for receiver """
-        if receiver not in self._address_to_retrier:
-            retrier = _RetryQueue(transport=self, receiver=receiver)
-            self._address_to_retrier[receiver] = retrier
+    def _get_retrier(self, recipient: Address) -> MessageQueue:
+        """ Construct and return a MessageQueue for recipient """
+        if recipient not in self._address_to_retrier:
+            retrier = MessageQueue(transport_node=self, recipient=recipient)
+            self._address_to_retrier[recipient] = retrier
             # Always start the _RetryQueue, otherwise `stop` will block forever
             # waiting for the corresponding gevent.Greenlet to complete. This
             # has no negative side-effects if the transport has stopped because
             # the retrier itself checks the transport running state.
             retrier.start()
-        return self._address_to_retrier[receiver]
+        return self._address_to_retrier[recipient]
 
     def _send_with_retry(self, queue_identifier: QueueIdentifier, message: Message):
         retrier = self._get_retrier(queue_identifier.recipient)
         retrier.enqueue(queue_identifier=queue_identifier, message=message)
 
-    def _send_raw(self, receiver_address: Address, data: str):
+    def send_message(self, payload: str, recipient: Address):
         with self._getroom_lock:
-            room = self._get_room_for_address(receiver_address)
+            room = self._get_room_for_address(recipient)
         if not room:
             self.log.error(
-                "No room for receiver", receiver=to_normalized_address(receiver_address)
+                "No room for recipient", recipient=to_normalized_address(recipient)
             )
             return
         self.log.debug(
-            "Send raw", receiver=pex(receiver_address), room=room, data=data.replace("\n", "\\n")
+            "Send raw", recipient=pex(recipient), room=room, payload=payload.replace("\n", "\\n")
         )
-        print("---->> Matrix Send Message " + data)
+        print("---->> Matrix Send Message " + payload)
 
-        room.send_text(data)
+        room.send_text(payload)
 
     def _get_room_for_address(self, address: Address, allow_missing_peers=False) -> Optional[Room]:
-        if self._stop_event.ready():
+        if self.stop_event.ready():
             return None
         address_hex = to_normalized_address(address)
 
@@ -729,7 +737,7 @@ class MatrixNode(TransportNode, Runnable):
                     last_ex = e
                 room_is_empty = not bool(peer_ids & member_ids)
                 if room_is_empty or last_ex:
-                    if self._stop_event.wait(retry_interval):
+                    if self.stop_event.wait(retry_interval):
                         break
                     retry_interval = retry_interval * 2
                 else:
@@ -1064,7 +1072,7 @@ class MatrixNode(TransportNode, Runnable):
 
         if (
             event["type"] != "m.to_device_message"
-            or self._stop_event.ready()
+            or self.stop_event.ready()
             or sender_id == self._user_id
         ):
             # Ignore non-messages and our own messages
@@ -1144,9 +1152,9 @@ class MatrixLightClientNode(MatrixNode):
         prev_auth_data: str,
 
     ):
-        if not self._stop_event.ready():
+        if not self.stop_event.ready():
             raise RuntimeError(f"{self!r} already started")
-        self._stop_event.clear()
+        self.stop_event.clear()
         self._raiden_service = raiden_service
         self._message_handler = message_handler
 
@@ -1168,7 +1176,7 @@ class MatrixLightClientNode(MatrixNode):
             light_client_address=self.address
         )
 
-        self.log = log.bind(current_user=self._user_id, node=pex(self._raiden_service.address))
+        self._log = log.bind(current_user=self._user_id, node=pex(self._raiden_service.address))
 
         self.log.debug("Start: handle thread", handle_thread=self._client._handle_thread)
         if self._client._handle_thread:
@@ -1217,30 +1225,30 @@ class MatrixLightClientNode(MatrixNode):
             self._global_send_worker()
             # children crashes should throw an exception here
         except gevent.GreenletExit:  # killed without exception
-            self._stop_event.set()
+            self.stop_event.set()
             gevent.killall(self.greenlets)  # kill children
             raise  # re-raise to keep killed status
         except Exception:
             self.stop()  # ensure cleanup and wait on subtasks
             raise
 
-    def _send_raw(self, receiver_address: Address, data: str):
+    def send_message(self, payload: str, recipient: Address):
         with self._getroom_lock:
-            room = self._get_room_for_address(receiver_address)
+            room = self._get_room_for_address(recipient)
         if not room:
             self.log.error(
-                "No room for receiver", receiver=to_normalized_address(receiver_address)
+                "No room for recipient", recipient=to_normalized_address(recipient)
             )
             return
         self.log.debug(
-            "Send raw", receiver=pex(receiver_address), room=room, data=data.replace("\n", "\\n")
+            "Send raw", recipient=pex(recipient), room=room, payload=payload.replace("\n", "\\n")
         )
-        print("---- Matrix Send Message " + data)
+        print("---- Matrix Send Message " + payload)
 
-        room.send_text(data)
+        room.send_text(payload)
 
     def _get_room_for_address(self, address: Address, allow_missing_peers=False) -> Optional[Room]:
-        if self._stop_event.ready():
+        if self.stop_event.ready():
             return None
         address_hex = to_normalized_address(address)
         assert address
@@ -1296,7 +1304,7 @@ class MatrixLightClientNode(MatrixNode):
                     last_ex = e
                 room_is_empty = not bool(peer_ids & member_ids)
                 if room_is_empty or last_ex:
-                    if self._stop_event.wait(retry_interval):
+                    if self.stop_event.wait(retry_interval):
                         break
                     retry_interval = retry_interval * 2
                 else:
@@ -1388,7 +1396,7 @@ class MatrixLightClientNode(MatrixNode):
         if (
             event["type"] != "m.room.message"
             or event["content"]["msgtype"] != "m.text"
-            or self._stop_event.ready()
+            or self.stop_event.ready()
         ):
             # Ignore non-messages and non-text messages
             return False

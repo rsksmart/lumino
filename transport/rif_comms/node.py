@@ -3,17 +3,15 @@ from typing import Any
 from raiden.message_handler import MessageHandler
 from raiden.messages import Message
 from raiden.raiden_service import RaidenService
-from raiden.utils.runnable import Runnable
 from raiden.utils.typing import Address
 from transport.node import Node as TransportNode
 from transport.rif_comms.client import RifCommsClient
 
 
-class RifCommsNode(TransportNode, Runnable):
+class RifCommsNode(TransportNode):
 
     def __init__(self, address: Address, config: dict):
         TransportNode.__init__(self, address)
-        Runnable.__init__(self)
         self._config = config
 
         self._client = RifCommsClient("0x5Ec92458ACD047f3B583E09C243a480Ef54A68D4", self._config["grpc_endpoint"])
@@ -29,7 +27,13 @@ class RifCommsNode(TransportNode, Runnable):
     def stop(self):
         raise NotImplementedError
 
-    def send_message(self, message: Message, recipient: Address):
+    def enqueue_message(self, message: Message, recipient: Address):
+        raise NotImplementedError
+
+    def enqueue_global_messages(self):
+        raise NotImplementedError
+
+    def send_message(self, payload: str, recipient: Address):
         raise NotImplementedError
 
     def start_health_check(self, address: Address):
@@ -42,6 +46,18 @@ class RifCommsNode(TransportNode, Runnable):
         raise NotImplementedError
 
     def join(self, timeout=None):
+        raise NotImplementedError
+
+    @property
+    def raiden_service(self) -> 'RaidenService':
+        raise NotImplementedError
+
+    @property
+    def config(self) -> {}:
+        raise NotImplementedError
+
+    @property
+    def log(self):
         raise NotImplementedError
 
     def _run(self, *args: Any, **kwargs: Any) -> None:

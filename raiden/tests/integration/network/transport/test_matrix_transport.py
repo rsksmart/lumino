@@ -23,8 +23,9 @@ from raiden.utils.signer import LocalSigner
 from raiden.utils.typing import Address, List, Optional, Union
 from transport.matrix.client import Room
 from transport.matrix.node import MatrixNode as MatrixTransportNode
-from transport.matrix.utils import AddressReachability, make_room_alias, _RetryQueue
+from transport.matrix.utils import AddressReachability, make_room_alias
 from transport.message import Message as TransportMessage
+from transport.utils import MessageQueue
 
 USERID0 = "@Arthur:RestaurantAtTheEndOfTheUniverse"
 USERID1 = "@Alice:Wonderland"
@@ -86,7 +87,7 @@ def mock_matrix(
 
     transport = MatrixTransportNode(raiden_service.address, config)
     transport._raiden_service = raiden_service
-    transport._stop_event.clear()
+    transport.stop_event.clear()
     transport._address_mgr.add_userid_for_address(factories.HOP1, USERID1)
     transport._client.user_id = USERID0
 
@@ -121,7 +122,7 @@ def ping_pong_message_success(transport0, transport1):
 
     transport0._raiden_service.sign(ping_message)
     transport1._raiden_service.sign(pong_message)
-    transport0.send_message(
+    transport0.enqueue_message(
         *TransportMessage.wrap(queueid1, ping_message)
     )
 
@@ -137,7 +138,7 @@ def ping_pong_message_success(transport0, transport1):
 
     transport0._raiden_service.sign(pong_message)
     transport1._raiden_service.sign(ping_message)
-    transport1.send_message(
+    transport1.enqueue_message(
         *TransportMessage.wrap(queueid0, ping_message)
     )
 
@@ -322,7 +323,7 @@ def test_matrix_message_sync(matrix_transports):
     for i in range(5):
         message = Processed(message_identifier=i)
         transport0._raiden_service.sign(message)
-        transport0.send_message(
+        transport0.enqueue_message(
             *TransportMessage.wrap(queue_identifier, message)
         )
 
@@ -343,7 +344,7 @@ def test_matrix_message_sync(matrix_transports):
     for i in range(10, 15):
         message = Processed(message_identifier=i)
         transport0._raiden_service.sign(message)
-        transport0.send_message(
+        transport0.enqueue_message(
             *TransportMessage.wrap(queue_identifier, message)
         )
 
@@ -420,10 +421,10 @@ def test_matrix_message_retry(
             "sync_latency": 15_000,
         },
     )
-    transport._send_raw = MagicMock()
+    transport.send_message = MagicMock()
 
     transport.start(raiden_service, raiden_service.message_handler, None)
-    transport.log = MagicMock()
+    transport._log = MagicMock()
 
     # Receiver is online
     transport._address_mgr._address_to_reachability[
@@ -435,7 +436,7 @@ def test_matrix_message_retry(
     )
     chain_state = raiden_service.wal.state_manager.current_state
 
-    retry_queue: _RetryQueue = transport._get_retrier(partner_address)
+    retry_queue: MessageQueue = transport._get_retrier(partner_address)
     assert bool(retry_queue), "retry_queue not running"
 
     # Send the initial message
@@ -444,14 +445,14 @@ def test_matrix_message_retry(
     chain_state.queueids_to_queues[queueid] = [message]
     retry_queue.enqueue(
         queue_identifier=QueueIdentifier(
-            recipient=retry_queue.receiver, channel_identifier=CHANNEL_IDENTIFIER_GLOBAL_QUEUE
+            recipient=retry_queue.recipient, channel_identifier=CHANNEL_IDENTIFIER_GLOBAL_QUEUE
         ),
         message=message
     )
 
     gevent.sleep(1)
 
-    assert transport._send_raw.call_count == 1
+    assert transport.send_message.call_count == 1
 
     # Receiver goes offline
     transport._address_mgr._address_to_reachability[
@@ -462,7 +463,7 @@ def test_matrix_message_retry(
 
     # now we don't have user presence support so the log will not be there,
     # also the call count should be 2 and 3 at the final result
-    assert transport._send_raw.call_count == 2
+    assert transport.send_message.call_count == 2
 
     # Receiver comes back online
     transport._address_mgr._address_to_reachability[
@@ -472,7 +473,7 @@ def test_matrix_message_retry(
     gevent.sleep(retry_interval)
 
     # Retrier now should have sent the message again
-    assert transport._send_raw.call_count == 3
+    assert transport.send_message.call_count == 3
 
     transport.stop()
     transport.get()
@@ -500,10 +501,10 @@ def test_join_invalid_discovery(
         }
     )
     transport._client.api.retry_timeout = 0
-    transport._send_raw = MagicMock()
+    transport.send_message = MagicMock()
 
     transport.start(raiden_service, raiden_service.message_handler, None)
-    transport.log = MagicMock()
+    transport._log = MagicMock()
     discovery_room_name = make_room_alias(transport.network_id, "discovery")
     assert isinstance(transport._global_rooms.get(discovery_room_name), Room)
 
@@ -645,7 +646,7 @@ def test_monitoring_global_messages(
         }
     )
     transport._client.api.retry_timeout = 0
-    transport._send_raw = MagicMock()
+    transport.send_message = MagicMock()
     raiden_service = MockRaidenService(None)
     raiden_service.config = dict(services=dict(monitoring_enabled=True))
 
@@ -705,7 +706,7 @@ def test_pfs_global_messages(
         }
     )
     transport._client.api.retry_timeout = 0
-    transport._send_raw = MagicMock()
+    transport.send_message = MagicMock()
     raiden_service = MockRaidenService(None)
     raiden_service.config = dict(services=dict(monitoring_enabled=True))
 
