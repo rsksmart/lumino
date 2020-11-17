@@ -11,6 +11,7 @@ from gevent.event import Event
 from gevent.queue import JoinableQueue
 from matrix_client.errors import MatrixRequestError
 from matrix_client.user import User
+
 from raiden.constants import DISCOVERY_DEFAULT_ROOM
 from raiden.exceptions import InvalidAddress, UnknownAddress, UnknownTokenAddress
 from raiden.message_handler import MessageHandler
@@ -231,7 +232,7 @@ class MatrixNode(TransportNode):
 
         self.log.debug("Matrix stopped", config=self._config)
         try:
-            del self.log
+            del self._log
         except AttributeError:
             # During shutdown the log attribute may have already been collected
             pass
@@ -884,11 +885,6 @@ class MatrixNode(TransportNode):
                     room=room,
                     exc_info=True,
                 )
-
-    def _sign(self, data: bytes) -> bytes:
-        """ Use eth_sign compatible hasher to sign matrix data """
-        assert self._raiden_service is not None
-        return self._raiden_service.signer.sign(data=data)
 
     def _get_user(self, user: Union[User, str]) -> User:
         """Creates an User from an user_id, if none, or fetch a cached User

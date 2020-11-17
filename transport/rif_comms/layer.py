@@ -10,7 +10,7 @@ class RifCommsLayer(TransportLayer[RifCommsNode]):
         return RifCommsNode(config["address"], config["transport"]["rif_comms"])
 
     def construct_light_clients_nodes(self, config):
-        pass
+        return []
 
     def light_client_onboarding_data(self, address: Address) -> dict:
         pass

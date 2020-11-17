@@ -1,3 +1,4 @@
+import json
 import secrets
 import unittest
 
@@ -9,7 +10,7 @@ from grpc._channel import _InactiveRpcError
 from sha3 import keccak_256
 
 from transport.rif_comms.client import RifCommsClient
-from transport.rif_comms.proto.api_pb2 import RskAddress
+from transport.rif_comms.proto.api_pb2 import RskAddress, Channel, Subscriber, PublishPayload, Msg
 from transport.rif_comms.proto.api_pb2_grpc import CommunicationsApiStub
 
 
@@ -24,7 +25,7 @@ LUMINO_1_ADDRESS = "0xe717e81105471648a152381aE6De4c878343E2sb2"
 LUMINO_1_COMMS_API = "localhost:5013"
 
 LUMINO_2_COMMS_API = "localhost:5016"
-LUMINO_2_ADDRESS = "0xe798e91805471D48a152382aE6De4c878343E6b2"
+LUMINO_2_ADDRESS = "0x138af366e0ed7cc4b9747a935d1b5f75a86b9d83"
 
 UNREGISTERED_ADDRESS = get_random_address_str()
 
@@ -43,19 +44,33 @@ def rif_comms_client(request):
 
 @pytest.mark.usefixtures("rif_comms_client")
 class TestRiffCommsClient(unittest.TestCase):
+    """
+    Test for RIFCommsClient. This class is for test the basic operations of the client.
 
+    How to use it:
+
+    - Modify the LUMINO_1_COMMS_API, LUMINO_2_COMMS_API, LUMINO_1_ADDRESS and LUMINO_2_ADDRESS
+    - Some tests uses LUMINO_1_ADDRESS as a representation of the Lumino keystore
+    - Others uses both LUMINO_1_ADDRESS and LUMINO_2_ADDRESS to represent two separeted peers
+    - ALl the tests assumes that there is a RIF COMMS node already running
+    """
+
+    @pytest.mark.skip(reason="ignore")
     def test_initialization(self):
         assert self.rif_comms_client is not None
 
+    @pytest.mark.skip(reason="ignore")
     def test_locate_peer_id(self):
         response = self.rif_comms_client.connect()
         peer_id = self.rif_comms_client.get_peer_id(LUMINO_1_ADDRESS)
         print(f"test_locate_peer_id peer_id = {peer_id}")
         assert peer_id is not None
 
+    @pytest.mark.skip(reason="ignore")
     def test_locate_unregistered_peer_id(self):
         self.assertRaises(_InactiveRpcError, lambda: self.rif_comms_client.get_peer_id(UNREGISTERED_ADDRESS))
 
+    @pytest.mark.skip(reason="ignore")
     def test_create_random_topic_id_without_connection(self):
         notification = self.rif_comms_client.connect()
         peer_id = self.rif_comms_client.get_peer_id(LUMINO_1_ADDRESS)
@@ -63,14 +78,79 @@ class TestRiffCommsClient(unittest.TestCase):
         peer_id = self.rif_comms_client.get_peer_id(LUMINO_1_ADDRESS)
 
     @pytest.mark.skip(reason="ignore")
-    def test_create_random_topic_id_without_connection_1(self):
+    def test_subscribe(self):
         channel = grpc.insecure_channel(LUMINO_1_COMMS_API)
         stub = CommunicationsApiStub(channel)
         rsk_address = RskAddress(address=LUMINO_1_ADDRESS)
-        peer_addr = RskAddress(address=get_random_address_str())
         notification = stub.ConnectToCommunicationsNode(rsk_address)
-        response = stub.LocatePeerId(rsk_address)
-        print("response=%s" % response)
-        channel = stub.CreateTopicWithRskAddress(peer_addr)
-        for resp in channel:
-            print(resp)
+        channel = stub.CreateTopicWithRskAddress(rsk_address)
+        subscribers = stub.GetSubscribers(Channel(channelId=LUMINO_1_ADDRESS))
+
+    @pytest.mark.skip(reason="ignore")
+    def test_has_subscriber(self):
+        channel = grpc.insecure_channel(LUMINO_1_COMMS_API)
+        stub = CommunicationsApiStub(channel)
+        rsk_address = RskAddress(address=LUMINO_1_ADDRESS)
+        notification = stub.ConnectToCommunicationsNode(rsk_address)
+        channel = stub.CreateTopicWithPeerId(rsk_address)
+        peer_id = stub.LocatePeerId(rsk_address)
+
+        """
+        message Subscriber {
+            string peerId = 1;
+            Channel channel = 2;
+        }
+        """
+        has_subscriber = stub.HasSubscriber(
+            Subscriber(
+                peerId=peer_id.address,
+                channel=Channel(channelId=LUMINO_1_ADDRESS)
+            )
+        )
+        print("has_subscriber", has_subscriber)
+
+    @pytest.mark.skip(reason="ignore")
+    def test_disconnect(self):
+        notification = self.rif_comms_client.connect()
+        peer_id = self.rif_comms_client.get_peer_id(LUMINO_1_ADDRESS)
+        self.rif_comms_client.disconnect()
+
+    @pytest.mark.skip(reason="ignore")
+    def test_send_lumino_message(self):
+        channel = grpc.insecure_channel(LUMINO_2_COMMS_API)
+        stub = CommunicationsApiStub(channel)
+        channel = stub.Subscribe(Channel(
+            channelId="16Uiu2HAm9otWzXBcFm7WC2Qufp2h1mpRxK1oox289omHTcKgrpRA"))  # got this from subscription of lumino node
+
+        some_raiden_message = {
+            'type': 'LockedTransfer',
+            'chain_id': 33,
+            'message_identifier': 9074731958492744333,
+            'payment_identifier': 2958725218135700941,
+            'payment_hash_invoice': '0x0000000000000000000000000000000000000000000000000000000000000000',
+            'nonce': 45,
+            'token_network_address': '0xd548700d98f32f83b3c88756cf340b7f61877d75',
+            'token': '0xf563b16dc42d9cb6d7ca31793f2d62131d586d05',
+            'channel_identifier': 12,
+            'transferred_amount': 17000000000000000000,
+            'locked_amount': 1000000000000000000,
+            'recipient': '0x00e8249ee607ea67127c4add69291a6c412603c5',
+            'locksroot': '0x043c092c72059c4c154cb342409d95364888a98fa87efadece5add9c255dce9a',
+            'lock': {
+                'type': 'Lock',
+                'amount': 1000000000000000000,
+                'expiration': 1165251,
+                'secrethash': '0x2dc5a7ff26be395d443200db5d16b5d2aadae3a83836be648cd4cba8e2e555fe'
+            },
+            'target': '0x00e8249ee607ea67127c4add69291a6c412603c5',
+            'initiator': '0x27633dc87378a551f09f2fcf43a48fc2b3425d43',
+            'fee': 0,
+            'signature': '0xbaa4df61ab23ab8fdddf4a90fd5db7dd04da364795ebb717426bdd1fcefb411759e1b41d71c3c54b2a75c3eba0f2a2c54c846a0139120ee794f51b0e2a0d954d1c'
+        }
+
+        stub.SendMessageToTopic(
+            PublishPayload(
+                topic=Channel(channelId="16Uiu2HAm9otWzXBcFm7WC2Qufp2h1mpRxK1oox289omHTcKgrpRA"),
+                message=Msg(payload=str.encode(json.dumps(some_raiden_message)))
+            )
+        )
