@@ -184,7 +184,7 @@ class RifCommsNode(TransportNode):
     # TODO exception handling rif comms client
     def send_message(self, payload: str, recipient: Address):
         # Check if we have a subscription for that receiver address
-        is_subscribed_to_receiver_topic = self._client.has_subscription(receiver_address).value
+        is_subscribed_to_receiver_topic = self._client.has_subscription(recipient).value
         if not is_subscribed_to_receiver_topic:
             # If not, create the topic subscription
             self._client.subscribe(recipient)  # TODO is this really needed in order to send msg to receiver?
@@ -323,13 +323,14 @@ class RifCommsNode(TransportNode):
             object_data = json.loads(content.decode())
             """
                 Since the message is assigned to the 'data' key and encoded by the RIF Comms GRPC api
-                we need to convert it to string.
+                we need to convert it to raiden.Message.
                 
                     data: "{\"type\":\"Buffer\",\"data\":[104,101,121]}"
             """
             string_message = bytes(object_data["data"]).decode()
             message_dict = json.loads(string_message)
-            message = message_from_dict(message_dict)
+            message = message_from_dict(message_dict) # TODO this can fail
+            # TODO Pending signature validation
             return message
         else:
             return None
