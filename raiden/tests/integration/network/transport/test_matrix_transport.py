@@ -424,7 +424,7 @@ def test_matrix_message_retry(
     transport.send_message = MagicMock()
 
     transport.start(raiden_service, raiden_service.message_handler, None)
-    transport.log = MagicMock()
+    transport._log = MagicMock()
 
     # Receiver is online
     transport._address_mgr._address_to_reachability[
@@ -504,7 +504,7 @@ def test_join_invalid_discovery(
     transport.send_message = MagicMock()
 
     transport.start(raiden_service, raiden_service.message_handler, None)
-    transport.log = MagicMock()
+    transport._log = MagicMock()
     discovery_room_name = make_room_alias(transport.network_id, "discovery")
     assert isinstance(transport._global_rooms.get(discovery_room_name), Room)
 
