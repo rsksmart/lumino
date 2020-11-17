@@ -1,5 +1,5 @@
 import json
-from typing import Any, List, Dict, NewType, Union
+from typing import Any, List, Dict, Union
 
 import structlog
 from eth_utils import to_checksum_address, is_binary_address
@@ -23,10 +23,11 @@ from raiden.transfer import views
 from raiden.transfer.identifiers import QueueIdentifier
 from raiden.transfer.mediated_transfer.events import CHANNEL_IDENTIFIER_GLOBAL_QUEUE
 from raiden.transfer.state import QueueIdsToQueues
-from raiden.utils import Address, pex
+from raiden.utils import pex
 from raiden.utils.runnable import Runnable
 from transport.matrix.utils import _RetryQueue
 from transport.message import Message as TransportMessage
+from raiden.utils.typing import Address
 from transport.node import Node as TransportNode
 from transport.rif_comms.client import RifCommsClient
 from transport.rif_comms.proto.api_pb2 import Notification, ChannelNewData
@@ -34,12 +35,11 @@ from transport.rif_comms.proto.api_pb2 import Notification, ChannelNewData
 log = structlog.get_logger(__name__)
 
 
-class RifCommsNode(TransportNode, Runnable):
-    log = log
+class RifCommsNode(TransportNode):
+    _log = log
 
     def __init__(self, address: Address, config: dict):
         TransportNode.__init__(self, address)
-        Runnable.__init__(self)
         self._config = config
         self._raiden_service: RaidenService = None
 
@@ -56,7 +56,7 @@ class RifCommsNode(TransportNode, Runnable):
         self._stop_event = Event()
         self._stop_event.set()
 
-        self.log = log.bind(node_address=pex(self.address))
+        self._log = log.bind(node_address=pex(self.address))
 
     @property
     def _queueids_to_queues(self) -> QueueIdsToQueues:
@@ -130,14 +130,14 @@ class RifCommsNode(TransportNode, Runnable):
 
         self.log.debug("RIF Comms Node stopped", config=self._config)
         try:
-            del self.log
+            del self._log
         except AttributeError:
             # During shutdown the log attribute may have already been collected
             pass
         # parent may want to call get() after stop(), to ensure _run errors are re-raised
         # we don't call it here to avoid deadlock when self crashes and calls stop() on finally
 
-    def send_message(self, message: TransportMessage, recipient: Address):
+    def enqueue_message(self, message: TransportMessage, recipient: Address):
         """Queue the message for sending to recipient
 
         It may be called before transport is started, to initialize message queues
@@ -181,16 +181,16 @@ class RifCommsNode(TransportNode, Runnable):
         return self._address_to_message_queue[receiver]
 
     # TODO exception handling rif comms client
-    def _send_raw(self, receiver_address: Address, data: str):
+    def send_message(self, payload: str, recipient: Address):
         # Check if we have a subscription for that receiver address
         is_subscribed_to_receiver_topic = self._client.has_subscription(receiver_address).value
         if not is_subscribed_to_receiver_topic:
             # If not, create the topic subscription
-            self._client.subscribe(receiver_address)  # TODO is this really needed in order to send msg to receiver?
+            self._client.subscribe(recipient)  # TODO is this really needed in order to send msg to receiver?
         # Send the message
-        self._client.send_message(receiver_address, data)
+        self._client.send_message(recipient, payload)
         self.log.info(
-            "RIF Comms send raw", receiver=pex(receiver_address), data=data.replace("\n", "\\n")
+            "RIF Comms send raw", recipient=pex(recipient), data=payload.replace("\n", "\\n")
         )
 
     def _handle_message(self, topic_id, data) -> bool:
@@ -258,6 +258,9 @@ class RifCommsNode(TransportNode, Runnable):
             self.log.warning("Exception while processing message", exc_info=True)
             return
 
+    def enqueue_global_messages(self):
+        pass
+
     def start_health_check(self, address: Address):
         self.log.debug("Healthcheck", peer_address=pex(address))
 
@@ -322,7 +325,6 @@ class RifCommsNode(TransportNode, Runnable):
                 we need to convert it to string.
                 
                     data: "{\"type\":\"Buffer\",\"data\":[104,101,121]}"
-
             """
             string_message = bytes(object_data["data"]).decode()
             message_dict = json.loads(string_message)
@@ -330,6 +332,18 @@ class RifCommsNode(TransportNode, Runnable):
             return message
         else:
             return None
+
+    @property
+    def raiden_service(self) -> 'RaidenService':
+        return self._raiden_service
+
+    @property
+    def config(self) -> {}:
+        return self._config
+
+    @property
+    def log(self):
+        return self._log
 
 
 class RifCommsLightClientNode(RifCommsNode):
