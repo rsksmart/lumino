@@ -71,7 +71,7 @@ class RifCommsNode(TransportNode, Runnable):
 
         self._rif_comms_connect_stream = self._client.connect()
         self._our_topic = self._client.subscribe(to_checksum_address(raiden_service.address))
-        # self._client.get_peer_id(to_checksum_address(raiden_service.address))
+        self._client.get_peer_id(to_checksum_address(raiden_service.address)) # TODO remove this after grpc api request blocking is fixed
         for message_queue in self._address_to_message_queue.values():
             if not message_queue:
                 self.log.debug("Starting message_queue", message_queue=message_queue)
