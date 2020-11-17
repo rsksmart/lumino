@@ -83,10 +83,7 @@ class RifCommsNode(TransportNode, Runnable):
         Runnable.start(self)
 
     def __repr__(self):
-        if self._raiden_service is not None:
-            node = f" node:{pex(self._raiden_service.address)}"
-        else:
-            node = ""
+        node = f" node:{pex(self._raiden_service.address)}" if self._raiden_service else ""
 
         return f"<{self.__class__.__name__}{node} id:{id(self)}>"
 
@@ -121,12 +118,12 @@ class RifCommsNode(TransportNode, Runnable):
         self._stop_event.set()
 
         for message_queue in self._address_to_message_queue.values():
-            if message_queue:  # if message_queue.greenlet is not None
+            if message_queue.greenlet:
                 message_queue.notify()  # if we need to send something, this is the time
 
-        self.stop_listener_thread()  # stop sync_thread, wait client's greenlets
+        self.stop_listener_thread()  # stop sync_thread, wait for client's greenlets
 
-        # wait own greenlets, no need to get on them, exceptions should be raised in _run()
+        # wait for our own greenlets, no need to get on them, exceptions should be raised in _run()
         wait(self._greenlets + [r.greenlet for r in self._address_to_message_queue.values()])
 
         self._client.disconnect()

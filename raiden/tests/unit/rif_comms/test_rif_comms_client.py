@@ -99,15 +99,15 @@ class TestRiffCommsClient(unittest.TestCase):
         message Subscriber {
             string peerId = 1;
             Channel channel = 2;
-        }"""
+        }
+        """
         has_subscriber = stub.HasSubscriber(
             Subscriber(
                 peerId=peer_id.address,
                 channel=Channel(channelId=LUMINO_1_ADDRESS)
             )
         )
-        print("has_subscriber")
-        print(has_subscriber)
+        print("has_subscriber", has_subscriber)
 
     @pytest.mark.skip(reason="ignore")
     def test_disconnect(self):
@@ -152,5 +152,4 @@ class TestRiffCommsClient(unittest.TestCase):
                 message=Msg(payload=str.encode(json.dumps(some_raiden_message)))
             )
         )
-
 
