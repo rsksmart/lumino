@@ -38,12 +38,22 @@ def rif_comms_client(request):
     def teardown():
         rif_comms_client.disconnect()
 
-    #request.addfinalizer(teardown)
+    request.addfinalizer(teardown)
     request.cls.rif_comms_client = rif_comms_client
 
 
 @pytest.mark.usefixtures("rif_comms_client")
 class TestRiffCommsClient(unittest.TestCase):
+    """
+    Test for RIFCommsClient. This class is for test the basic operations of the client.
+
+    How to use it:
+
+    - Modify the LUMINO_1_COMMS_API, LUMINO_2_COMMS_API, LUMINO_1_ADDRESS and LUMINO_2_ADDRESS
+    - Some tests uses LUMINO_1_ADDRESS as a representation of the Lumino keystore
+    - Others uses both LUMINO_1_ADDRESS and LUMINO_2_ADDRESS to represent two separeted peers
+    - ALl the tests assumes that there is a RIF COMMS node already running
+    """
 
     @pytest.mark.skip(reason="ignore")
     def test_initialization(self):

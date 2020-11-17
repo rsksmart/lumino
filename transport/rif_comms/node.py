@@ -31,7 +31,6 @@ from transport.node import Node as TransportNode
 from transport.rif_comms.client import RifCommsClient
 from transport.rif_comms.proto.api_pb2 import Notification, ChannelNewData
 
-_RoomID = NewType("_RoomID", str)
 log = structlog.get_logger(__name__)
 
 
@@ -142,7 +141,7 @@ class RifCommsNode(TransportNode, Runnable):
         # we don't call it here to avoid deadlock when self crashes and calls stop() on finally
 
     def send_message(self, message: TransportMessage, recipient: Address):
-        """Queue the message for sending to recipient in the queue_identifier
+        """Queue the message for sending to recipient
 
         It may be called before transport is started, to initialize message queues
         The actual sending is started only when the transport is started
@@ -274,7 +273,7 @@ class RifCommsNode(TransportNode, Runnable):
     def join(self, timeout=None):
         self.greenlet.join(timeout)
 
-    def listen_messages(
+    def listen_for_messages(
         self
     ):
         """
@@ -289,7 +288,7 @@ class RifCommsNode(TransportNode, Runnable):
         """
         Start a listener greenlet to listen for received messages in the background.
         """
-        self._our_topic_thread = spawn(self.listen_messages)
+        self._our_topic_thread = spawn(self.listen_for_messages)
         self._our_topic_thread.name = f"RifCommsClient.listen_messages rsk_address:{self.address}"
 
     def stop_listener_thread(self):
