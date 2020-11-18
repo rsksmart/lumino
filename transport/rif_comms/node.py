@@ -107,11 +107,9 @@ class RifCommsNode(TransportNode):
     def stop(self):
         """
         Try to gracefully stop the greenlet synchronously
-
         Stop isn't expected to re-raise greenlet _run exception
         (use self.greenlet.get() for that),
         but it should raise any stop-time exception
-
         Disconnects from RIF Communications node
         """
         if self._stop_event.ready():
@@ -140,7 +138,6 @@ class RifCommsNode(TransportNode):
 
     def enqueue_message(self, message: TransportMessage, recipient: Address):
         """Queue the message for sending to recipient
-
         It may be called before transport is started, to initialize message queues
         The actual sending is started only when the transport is started
         """
@@ -184,7 +181,7 @@ class RifCommsNode(TransportNode):
     # TODO exception handling rif comms client
     def send_message(self, payload: str, recipient: Address):
         # Check if we have a subscription for that receiver address
-        is_subscribed_to_receiver_topic = self._client.has_subscription(recipient).value
+        is_subscribed_to_receiver_topic = self._client.has_subscription(receiver_address).value
         if not is_subscribed_to_receiver_topic:
             # If not, create the topic subscription
             self._client.subscribe(recipient)  # TODO is this really needed in order to send msg to receiver?
@@ -303,7 +300,6 @@ class RifCommsNode(TransportNode):
 
     def _parse_topic_new_data(self, topic_new_data: ChannelNewData) -> Message:
         """
-
         :param topic_new_data: raw data received by the RIF Comms GRPC api
         :return: a raiden.Message
         """
@@ -316,21 +312,19 @@ class RifCommsNode(TransportNode):
             channel {
               channelId: "16Uiu2HAm9otWzXBcFm7WC2Qufp2h1mpRxK1oox289omHTcKgrpRA"
             }
-
         """
         if content:
             # We first transform the content of the topic new data to an object
             object_data = json.loads(content.decode())
             """
                 Since the message is assigned to the 'data' key and encoded by the RIF Comms GRPC api
-                we need to convert it to raiden.Message.
+                we need to convert it to string.
                 
                     data: "{\"type\":\"Buffer\",\"data\":[104,101,121]}"
             """
             string_message = bytes(object_data["data"]).decode()
             message_dict = json.loads(string_message)
-            message = message_from_dict(message_dict) # TODO this can fail
-            # TODO Pending signature validation
+            message = message_from_dict(message_dict)
             return message
         else:
             return None
