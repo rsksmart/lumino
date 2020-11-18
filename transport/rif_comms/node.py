@@ -84,17 +84,18 @@ class RifCommsNode(TransportNode):
 
         return f"<{self.__class__.__name__}{node} id:{id(self)}>"
 
-    def _run(self) -> None:
+    def _run(self, *args: Any, **kwargs: Any) -> None:
         """ Runnable main method, perform wait on long-running subtasks """
         # dispatch auth data on first scheduling after start
         self.greenlet.name = f"RifCommsNode._run node:{pex(self._raiden_service.address)}"
         try:
             # waits on _stop_event.ready()
             # children crashes should throw an exception here
+            # TODO: figure out if something else is needed here
             self.log.info("RIF Comms _run")
         except GreenletExit:  # killed without exception
             self._stop_event.set()
-            killall(self.greenlets)  # kill children
+            killall(self._our_topic_thread)  # kill children
             raise  # re-raise to keep killed status
         except Exception:
             self.stop()  # ensure cleanup and wait on subtasks
