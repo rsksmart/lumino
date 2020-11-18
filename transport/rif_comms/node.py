@@ -169,22 +169,22 @@ class RifCommsNode(TransportNode):
         queue = self._get_queue(queue_identifier.recipient)
         queue.enqueue(queue_identifier=queue_identifier, message=message)
 
-    def _get_queue(self, receiver: Address) -> MessageQueue:
-        """ Construct and return a MessageQueue for receiver """
-        if receiver not in self._address_to_message_queue:
-            queue = MessageQueue(transport=self, receiver=receiver)
-            self._address_to_message_queue[receiver] = queue
+    def _get_queue(self, recipient: Address) -> MessageQueue:
+        """ Construct and return a MessageQueue for recipient """
+        if recipient not in self._address_to_message_queue:
+            queue = MessageQueue(transport_node=self, recipient=recipient)
+            self._address_to_message_queue[recipient] = queue
             # Always start the MessageQueue, otherwise `stop` will block forever
             # waiting for the corresponding gevent.Greenlet to complete. This
-            # has no negative side-effects if the transport has stopped becausecreate_light_client_payment
+            # has no negative side-effects if the transport has stopped because create_light_client_payment
             # the queue itself checks the transport running state.
             queue.start()
-        return self._address_to_message_queue[receiver]
+        return self._address_to_message_queue[recipient]
 
     # TODO exception handling rif comms client
     def send_message(self, payload: str, recipient: Address):
         # Check if we have a subscription for that receiver address
-        is_subscribed_to_receiver_topic = self._client.has_subscription(receiver_address).value
+        is_subscribed_to_receiver_topic = self._client.has_subscription(recipient).value
         if not is_subscribed_to_receiver_topic:
             # If not, create the topic subscription
             self._client.subscribe(recipient)  # TODO is this really needed in order to send msg to receiver?
@@ -281,7 +281,7 @@ class RifCommsNode(TransportNode):
         Iterate over the Notification stream and blocks thread to receive messages
         """
         for notification_stream in self._our_topic:
-            parsed_message = self._parse_topic_new_data(notification_stream.channelNewData)
+            parsed_message = self.parse_topic_new_data(notification_stream.channelNewData)
             if parsed_message:
                 self.log.info(parsed_message)
 
@@ -293,7 +293,7 @@ class RifCommsNode(TransportNode):
         self._our_topic_thread.name = f"RifCommsClient.listen_messages rsk_address:{self.address}"
 
     def stop_listener_thread(self):
-        """ Kills messge listener greenlet  """
+        """ Kills message listener greenlet  """
         if self._our_topic:
             self._our_topic.kill()
             self._our_topic.get()
@@ -301,9 +301,9 @@ class RifCommsNode(TransportNode):
             self._our_topic.get()
         self._our_topic = None
 
-    def _parse_topic_new_data(self, topic_new_data: ChannelNewData) -> Message:
+    @staticmethod
+    def parse_topic_new_data(topic_new_data: ChannelNewData) -> Message:
         """
-
         :param topic_new_data: raw data received by the RIF Comms GRPC api
         :return: a raiden.Message
         """
@@ -324,7 +324,7 @@ class RifCommsNode(TransportNode):
             """
                 Since the message is assigned to the 'data' key and encoded by the RIF Comms GRPC api
                 we need to convert it to string.
-                
+
                     data: "{\"type\":\"Buffer\",\"data\":[104,101,121]}"
             """
             string_message = bytes(object_data["data"]).decode()
