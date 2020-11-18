@@ -80,7 +80,9 @@ class MessageHandler:
             log.error("Unknown message cmdid {}".format(message.cmdid))
 
     @staticmethod
-    def handle_message_secretrequest(raiden: RaidenService, message: SecretRequest, node_address: Address,
+    def handle_message_secretrequest(raiden: RaidenService,
+                                     message: SecretRequest,
+                                     message_receiver_address: Address,
                                      is_light_client: bool = False) -> None:
 
         if is_light_client:
@@ -90,7 +92,7 @@ class MessageHandler:
                 message.expiration,
                 message.secrethash,
                 message.sender,
-                node_address,
+                message_receiver_address,
                 message
             )
             raiden.handle_and_track_state_change(secret_request_light)
@@ -105,16 +107,22 @@ class MessageHandler:
             raiden.handle_and_track_state_change(secret_request)
 
     @staticmethod
-    def handle_message_revealsecret(raiden: RaidenService, message: RevealSecret, node_address: Address, is_light_client=False) -> None:
+    def handle_message_revealsecret(raiden: RaidenService,
+                                    message: RevealSecret,
+                                    message_receiver_address: Address,
+                                    is_light_client=False) -> None:
         if is_light_client:
-            state_change = ReceiveSecretRevealLight(message.secret, message.sender, node_address, message)
+            state_change = ReceiveSecretRevealLight(message.secret, message.sender, message_receiver_address, message)
             raiden.handle_and_track_state_change(state_change)
         else:
             state_change = ReceiveSecretReveal(message.secret, message.sender)
             raiden.handle_and_track_state_change(state_change)
 
     @staticmethod
-    def handle_message_unlock(raiden: RaidenService, message: Unlock, node_address: Address, is_light_client=False) -> None:
+    def handle_message_unlock(raiden: RaidenService,
+                              message: Unlock,
+                              message_receiver_address: Address,
+                              is_light_client=False) -> None:
         balance_proof = balanceproof_from_envelope(message)
         if is_light_client:
             state_change = ReceiveUnlockLight(
@@ -122,7 +130,7 @@ class MessageHandler:
                 secret=message.secret,
                 balance_proof=balance_proof,
                 signed_unlock=message,
-                recipient=node_address
+                recipient=message_receiver_address
             )
             raiden.handle_and_track_state_change(state_change)
         else:
@@ -134,7 +142,10 @@ class MessageHandler:
             raiden.handle_and_track_state_change(state_change)
 
     @staticmethod
-    def handle_message_lockexpired(raiden: RaidenService, message: LockExpired, node_address: Address, is_light_client=False) -> None:
+    def handle_message_lockexpired(raiden: RaidenService,
+                                   message: LockExpired,
+                                   message_receiver_address: Address,
+                                   is_light_client=False) -> None:
         balance_proof = balanceproof_from_envelope(message)
         if is_light_client:
             state_change = ReceiveLockExpiredLight(

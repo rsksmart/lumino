@@ -293,7 +293,7 @@ class ChainState(State):
         self.identifiers_to_paymentnetworks: Dict[PaymentNetworkID, PaymentNetworkState] = dict()
         self.nodeaddresses_to_networkstates: Dict[Address, str] = dict()
         self.our_address = our_address
-        self.payment_mapping : Dict[AddressHex, PaymentMappingState] = dict()
+        self.payment_states_by_address : Dict[AddressHex, PaymentMappingState] = dict()
         self.pending_transactions: List[ContractSendEvent] = list()
         self.pseudo_random_generator = pseudo_random_generator
         self.queueids_to_queues: QueueIdsToQueues = dict()
@@ -330,7 +330,7 @@ class ChainState(State):
             and self.queueids_to_queues == other.queueids_to_queues
             and self.identifiers_to_paymentnetworks == other.identifiers_to_paymentnetworks
             and self.nodeaddresses_to_networkstates == other.nodeaddresses_to_networkstates
-            and self.payment_mapping == other.payment_mapping
+            and self.payment_states_by_address == other.payment_states_by_address
             and self.chain_id == other.chain_id
             and self.last_node_transport_state_authdata == other.last_node_transport_state_authdata
             and our_tnpn == other_tnpn
@@ -352,10 +352,10 @@ class ChainState(State):
                 to_checksum_address, serialization.identity, self.nodeaddresses_to_networkstates
             ),
             "our_address": to_checksum_address(self.our_address),
-            "payment_mapping": map_dict(
+            "payment_states_by_address": map_dict(
                 serialization.checksum_address,
                 serialization.identity,
-                self.payment_mapping,
+                self.payment_states_by_address,
             ),
             "pending_transactions": self.pending_transactions,
             "queueids_to_queues": serialization.serialize_queueid_to_queue(
@@ -387,8 +387,8 @@ class ChainState(State):
         restored.nodeaddresses_to_networkstates = map_dict(
             to_canonical_address, serialization.identity, data["nodeaddresses_to_networkstates"]
         )
-        restored.payment_mapping = map_dict(
-            to_canonical_address, serialization.identity, data["payment_mapping"]
+        restored.payment_states_by_address = map_dict(
+            to_canonical_address, serialization.identity, data["payment_states_by_address"]
         )
         restored.pending_transactions = data["pending_transactions"]
         restored.queueids_to_queues = serialization.deserialize_queueid_to_queue(
@@ -405,15 +405,15 @@ class ChainState(State):
 
     def get_payment_state(self, creator_address: Address) -> "PaymentMappingState":
         result = None
-        if creator_address and creator_address in self.payment_mapping:
-            result = self.payment_mapping[creator_address]
+        if creator_address and creator_address in self.payment_states_by_address:
+            result = self.payment_states_by_address[creator_address]
         return result
 
     def get_payment_states(self) -> ValuesView:
-        return self.payment_mapping.values()
+        return self.payment_states_by_address.values()
 
     def get_payment_states_by_address(self) -> ItemsView:
-        return self.payment_mapping.items()
+        return self.payment_states_by_address.items()
 
     def get_payment_task(self, creator_address: Address, secret_hash: SecretHash) -> TransferTask:
         result = None
@@ -422,8 +422,20 @@ class ChainState(State):
             result = payment_state.secrethashes_to_task[secret_hash]
         return result
 
+    def get_payment_tasks(self, creator_address: Address) -> ValuesView:
+        result = None
+        if creator_address in self.payment_states_by_address:
+            return self.payment_states_by_address[creator_address].secrethashes_to_task.values()
+        return result
+
+    def get_payment_tasks_by_hash(self, creator_address: Address) -> ItemsView:
+        result = None
+        if creator_address in self.payment_states_by_address:
+            result = self.payment_states_by_address[creator_address].secrethashes_to_task.items()
+        return result
+
     def create_payment_task(self, creator_address: Address, secret_hash: SecretHash, task: TransferTask):
-        self.payment_mapping.setdefault(
+        self.payment_states_by_address.setdefault(
             creator_address,
             PaymentMappingState()
         ).secrethashes_to_task[secret_hash] = task
@@ -431,12 +443,12 @@ class ChainState(State):
     def delete_payment_task(self, creator_address: Address, secret_hash: SecretHash):
         payment_task = self.get_payment_task(creator_address, secret_hash)
         if payment_task:
-            del self.payment_mapping[creator_address].secrethashes_to_task[secret_hash]
+            del self.payment_states_by_address[creator_address].secrethashes_to_task[secret_hash]
 
     def clone_payment_task(self, creator_address: Address, secret_hash: SecretHash, new_secret_hash: SecretHash):
         current_payment_task = self.get_payment_task(creator_address, secret_hash)
         if current_payment_task:
-            self.payment_mapping[creator_address].secrethashes_to_task.update(
+            self.payment_states_by_address[creator_address].secrethashes_to_task.update(
                 {new_secret_hash: copy.deepcopy(current_payment_task)}
             )
 

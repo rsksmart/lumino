@@ -197,14 +197,14 @@ def get_transfer_from_task(
 
 
 def transfer_tasks_view(
-    payment_mapping: Dict[Address, PaymentMappingState],
+    payment_states_by_address: Dict[Address, PaymentMappingState],
     token_address: TokenAddress = None,
     channel_id: ChannelID = None,
 ) -> List[Dict[str, Any]]:
     view = list()
 
-    for payment_mapping in payment_mapping.values():
-        for secrethash, transfer_task in payment_mapping.secrethashes_to_task.items():
+    for payment_states_by_address in payment_states_by_address.values():
+        for secrethash, transfer_task in payment_states_by_address.secrethashes_to_task.items():
             transfer, role = get_transfer_from_task(secrethash, transfer_task)
             if transfer is None:
                 continue
@@ -1509,7 +1509,7 @@ class RaidenAPI:
                 )
                 channel_id = partner_channel.identifier
 
-        return transfer_tasks_view(chain_state.payment_mapping, token_address, channel_id)
+        return transfer_tasks_view(chain_state.payment_states_by_address, token_address, channel_id)
 
     def get_network_graph(self, token_network_address):
         chain_state = views.state_from_raiden(self.raiden)

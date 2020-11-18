@@ -200,8 +200,8 @@ def subdispatch_to_all_lockedtransfers(
     chain_state: ChainState, state_change: StateChange, storage=None
 ) -> TransitionResult[ChainState]:
     events = list()
-    for node_address, payment_mapping in chain_state.get_payment_states_by_address():
-        for secrethash in payment_mapping.secrethashes_to_task:
+    for node_address, payment_state in chain_state.get_payment_states_by_address():
+        for secrethash in list(payment_state.secrethashes_to_task):
             result = subdispatch_to_paymenttask(chain_state, state_change, node_address, secrethash, storage)
             events.extend(result.events)
     return TransitionResult(chain_state, events)
@@ -701,8 +701,8 @@ def handle_node_change_network_state(
     network_state = state_change.network_state
     chain_state.nodeaddresses_to_networkstates[node_address] = network_state
 
-    for payment_mapping in chain_state.get_payment_states():
-        for secrethash, subtask in payment_mapping.secrethashes_to_task.items():
+    for payment_state in chain_state.get_payment_states():
+        for secrethash, subtask in payment_state.secrethashes_to_task.items():
             # This assert would not have been needed if token_network_identifier, a common attribute
             # for all TransferTasks was part of the TransferTasks superclass.
             assert isinstance(subtask, (InitiatorTask, MediatorTask, TargetTask))
