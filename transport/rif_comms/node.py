@@ -85,7 +85,9 @@ class RifCommsNode(TransportNode):
         return f"<{self.__class__.__name__}{node} id:{id(self)}>"
 
     def _run(self, *args: Any, **kwargs: Any) -> None:
-        """ Runnable main method, perform wait on long-running subtasks """
+        """
+        Runnable main method, perform wait on long-running subtasks
+        """
         # dispatch auth data on first scheduling after start
         self.greenlet.name = f"RifCommsNode._run node:{pex(self._raiden_service.address)}"
         try:
@@ -136,18 +138,18 @@ class RifCommsNode(TransportNode):
         # we don't call it here to avoid deadlock when self crashes and calls stop() on finally
 
     def enqueue_message(self, message: TransportMessage, recipient: Address):
-        """Queue the message for sending to recipient
+        """
+        Queue the message for sending to recipient.
 
-        It may be called before transport is started, to initialize message queues
-        The actual sending is started only when the transport is started
+        It may be called before transport is started, to initialize message queues.
+        The actual sending is started only when the transport is started.
         """
         raiden_message, queue_identifier = TransportMessage.unwrap(message)
 
-        # even if transport is not started, can run to enqueue messages to send when it starts
         if not is_binary_address(recipient):
             raise ValueError("Invalid address {}".format(pex(recipient)))
 
-        # These are not protocol messages, but transport specific messages
+        # these are not protocol messages, but transport specific messages
         if isinstance(raiden_message, (Ping, Pong)):
             raise ValueError(
                 "Do not use send_message for {} messages".format(raiden_message.__class__.__name__)
@@ -160,8 +162,8 @@ class RifCommsNode(TransportNode):
             queue_identifier=queue_identifier,
         )
 
-        queue = self._get_queue(queue_identifier.recipient)
-        queue.enqueue(queue_identifier=queue_identifier, message=raiden_message)
+        message_queue = self._get_queue(queue_identifier.recipient)
+        message_queue.enqueue(queue_identifier=queue_identifier, message=raiden_message)
 
     def _get_queue(self, recipient: Address) -> MessageQueue:
         """ Construct and return a MessageQueue for recipient """
@@ -181,7 +183,7 @@ class RifCommsNode(TransportNode):
         is_subscribed_to_receiver_topic = self._comms_client.has_subscription(recipient).value
         if not is_subscribed_to_receiver_topic:
             # If not, create the topic subscription
-            self._comms_client.subscribe(recipient)  # TODO is this really needed in order to send msg to receiver?
+            self._comms_client.subscribe(recipient)  # TODO: is this really needed in order to send msg to receiver?
         # Send the message
         self._comms_client.send_message(recipient, payload)
         self.log.info(
