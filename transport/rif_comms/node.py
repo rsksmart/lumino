@@ -6,7 +6,6 @@ from eth_utils import to_checksum_address, is_binary_address
 from gevent import Greenlet, killall, wait, spawn
 from gevent.event import Event
 from greenlet import GreenletExit
-
 from raiden.exceptions import InvalidAddress, UnknownAddress, UnknownTokenAddress
 from raiden.message_handler import MessageHandler
 from raiden.messages import (
@@ -26,11 +25,11 @@ from raiden.transfer.state import QueueIdsToQueues
 from raiden.utils import pex
 from raiden.utils.runnable import Runnable
 from raiden.utils.typing import Address
-from transport.utils import MessageQueue
 from transport.message import Message as TransportMessage
 from transport.node import Node as TransportNode
 from transport.rif_comms.client import RifCommsClient
 from transport.rif_comms.proto.api_pb2 import Notification, ChannelNewData
+from transport.utils import MessageQueue
 
 log = structlog.get_logger(__name__)
 
@@ -47,7 +46,7 @@ class RifCommsNode(TransportNode):
         self._our_topic: Notification = None
         self._our_topic_thread: Greenlet = None
 
-        self._client = RifCommsClient(to_checksum_address(address), self._config["grpc_endpoint"])
+        self._comms_client = RifCommsClient(to_checksum_address(address), self._config["grpc_endpoint"])
         print("RifCommsNode init on grpc endpoint: {}".format(self._config["grpc_endpoint"]))
 
         self._greenlets: List[Greenlet] = list()
@@ -64,22 +63,33 @@ class RifCommsNode(TransportNode):
         return views.get_all_messagequeues(chain_state)
 
     def start(self, raiden_service: RaidenService, message_handler: MessageHandler, prev_auth_data: str):
+        self._raiden_service = raiden_service
+
+        # check if node is already running
         if not self._stop_event.ready():
             raise RuntimeError(f"{self!r} already started")
         self._stop_event.clear()
-        self._raiden_service = raiden_service
 
-        self._rif_comms_connect_stream = self._client.connect()
-        self._our_topic = self._client.subscribe(to_checksum_address(raiden_service.address))
-        self._client.get_peer_id(
-            to_checksum_address(raiden_service.address))  # TODO remove this after grpc api request blocking is fixed
+        # connect to rif comms node
+        # TODO: this shouldn't need to be assigned, it is only done because otherwise the code hangs
+        self._rif_comms_connect_stream = self._comms_client.connect()
+
+        # subscribe to our own topic
+        self._our_topic = self._comms_client.subscribe(to_checksum_address(raiden_service.address))
+        # TODO: remove this after GRPC API request blocking is fixed
+        self._comms_client.get_peer_id(
+            to_checksum_address(raiden_service.address)
+        )
+        self.start_listener_thread()
+        self._greenlets = [self._our_topic_thread]
+
+        # start pre-loaded message queues
         for message_queue in self._address_to_message_queue.values():
-            if not message_queue:
+            if not message_queue.greenlet:
                 self.log.debug("Starting message_queue", message_queue=message_queue)
                 message_queue.start()
 
-        self.start_listener_thread()
-        self._greenlets = [self._our_topic_thread]
+        # start greenlet
         self.log.debug("RIF Comms Node started", config=self._config)
         Runnable.start(self)
 
@@ -127,7 +137,7 @@ class RifCommsNode(TransportNode):
         # wait for our own greenlets, no need to get on them, exceptions should be raised in _run()
         wait(self._greenlets + [r.greenlet for r in self._address_to_message_queue.values()])
 
-        self._client.disconnect()
+        self._comms_client.disconnect()
 
         self.log.debug("RIF Comms Node stopped", config=self._config)
         try:
@@ -184,12 +194,12 @@ class RifCommsNode(TransportNode):
     # TODO exception handling rif comms client
     def send_message(self, payload: str, recipient: Address):
         # Check if we have a subscription for that receiver address
-        is_subscribed_to_receiver_topic = self._client.has_subscription(recipient).value
+        is_subscribed_to_receiver_topic = self._comms_client.has_subscription(recipient).value
         if not is_subscribed_to_receiver_topic:
             # If not, create the topic subscription
-            self._client.subscribe(recipient)  # TODO is this really needed in order to send msg to receiver?
+            self._comms_client.subscribe(recipient)  # TODO is this really needed in order to send msg to receiver?
         # Send the message
-        self._client.send_message(recipient, payload)
+        self._comms_client.send_message(recipient, payload)
         self.log.info(
             "RIF Comms send raw", recipient=pex(recipient), data=payload.replace("\n", "\\n")
         )

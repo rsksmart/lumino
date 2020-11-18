@@ -11,7 +11,6 @@ from gevent.event import Event
 from gevent.queue import JoinableQueue
 from matrix_client.errors import MatrixRequestError
 from matrix_client.user import User
-
 from raiden.constants import DISCOVERY_DEFAULT_ROOM
 from raiden.exceptions import InvalidAddress, UnknownAddress, UnknownTokenAddress
 from raiden.message_handler import MessageHandler
@@ -179,7 +178,7 @@ class MatrixNode(TransportNode):
 
         # (re)start any _RetryQueue which was initialized before start
         for retrier in self._address_to_retrier.values():
-            if not retrier:
+            if not retrier.greenlet:
                 self.log.debug("Starting retrier", retrier=retrier)
                 retrier.start()
 
