@@ -194,7 +194,7 @@ class MatrixNode(TransportNode):
         self.greenlet.name = f"MatrixTransport._run node:{pex(self._raiden_service.address)}"
         self._raiden_service.handle_and_track_state_change(state_change)
         try:
-            # waits on _stop_event.ready()
+            # waits on stop_event.ready()
             self._global_send_worker()
             # children crashes should throw an exception here
         except gevent.GreenletExit:  # killed without exception
@@ -1216,7 +1216,7 @@ class MatrixLightClientNode(MatrixNode):
         self.greenlet.name = f"MatrixLightClientTransport._run light_client:{to_canonical_address(self.address)}"
         self._raiden_service.handle_and_track_state_change(state_change)
         try:
-            # waits on _stop_event.ready()
+            # waits on stop_event.ready()
             self._global_send_worker()
             # children crashes should throw an exception here
         except gevent.GreenletExit:  # killed without exception

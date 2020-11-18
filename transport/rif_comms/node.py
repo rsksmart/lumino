@@ -37,30 +37,31 @@ class RifCommsNode(TransportNode):
 
     def __init__(self, address: Address, config: dict):
         TransportNode.__init__(self, address)
+
+        # set instance variables
         self._config = config
         self._raiden_service: RaidenService = None
 
+        # set up comms node
         self._rif_comms_connect_stream: Notification = None
         self._our_topic_stream: Notification = None
         self._our_topic_thread: Greenlet = None
-
         self._comms_client = RifCommsClient(to_checksum_address(address), self._config["grpc_endpoint"])
-        print("RifCommsNode init on grpc endpoint: {}".format(self._config["grpc_endpoint"]))
+        print("RifCommsNode init on GRPC endpoint: {}".format(self._config["grpc_endpoint"]))
 
+        # initialize message queues
         self._address_to_message_queue: Dict[Address, MessageQueue] = dict()
-
-        self._stop_event = Event()
-        self._stop_event.set()
 
         self._log = log.bind(node_address=pex(self.address))
 
     def start(self, raiden_service: RaidenService, message_handler: MessageHandler, prev_auth_data: str):
-        self._raiden_service = raiden_service
+        # set raiden service
+        self._raiden_service = raiden_service  # TODO: this should be set in __init__
 
         # check if node is already running
-        if not self._stop_event.ready():
+        if not self.stop_event.ready():
             raise RuntimeError(f"{self!r} already started")
-        self._stop_event.clear()
+        self.stop_event.clear()
 
         # connect to rif comms node
         # TODO: this shouldn't need to be assigned, it is only done because otherwise the code hangs
@@ -91,12 +92,12 @@ class RifCommsNode(TransportNode):
         # dispatch auth data on first scheduling after start
         self.greenlet.name = f"RifCommsNode._run node:{pex(self._raiden_service.address)}"
         try:
-            # waits on _stop_event.ready()
+            # waits on stop_event.ready()
             # children crashes should throw an exception here
             # TODO: figure out if something else is needed here
             self.log.info("RIF Comms _run")
         except GreenletExit:  # killed without exception
-            self._stop_event.set()
+            self.stop_event.set()
             killall(self._our_topic_thread)  # kill children
             raise  # re-raise to keep killed status
         except Exception:
@@ -113,9 +114,9 @@ class RifCommsNode(TransportNode):
 
         Disconnects from RIF Communications node
         """
-        if self._stop_event.ready():
+        if self.stop_event.ready():
             return
-        self._stop_event.set()
+        self.stop_event.set()
 
         for message_queue in self._address_to_message_queue.values():
             if message_queue.greenlet:
@@ -193,7 +194,7 @@ class RifCommsNode(TransportNode):
     def _handle_message(self, topic_id, data) -> bool:
         """ Handle text messages sent received on a topic  """
         if (
-            self._stop_event.ready()
+            self.stop_event.ready()
         ):
             # Ignore when stopped
             return False
