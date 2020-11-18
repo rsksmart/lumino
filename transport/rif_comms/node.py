@@ -174,7 +174,7 @@ class RifCommsNode(TransportNode):
         else:
             self.log.warning("unexpected type of message received", message=message)
 
-    def _ack_message(self, message: RaidenMessage):
+    def _ack_message(self, message: (Delivered, Processed, SignedRetrieableMessage)):
         """
         Acknowledge a received Raiden message by sending a Delivered-type message back.
         If the received Raiden message is of the Delivered type, no action is taken.
