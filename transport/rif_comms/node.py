@@ -119,8 +119,8 @@ class RifCommsNode(TransportNode):
         for notification in self._our_topic_stream:
             raiden_message = self._notification_to_message(notification.channelNewData)
             if raiden_message:
-                # TODO: handle message
-                self.log.info(raiden_message)
+                self.log.info("incoming message", message=raiden_message)
+                self._handle_message(raiden_message)
 
     @staticmethod
     def _notification_to_message(notification_data: ChannelNewData) -> RaidenMessage:
@@ -144,9 +144,55 @@ class RifCommsNode(TransportNode):
             # the message is inside the notification data, encoded by the RIF Comms GRPC api
             message_string = bytes(content["data"]).decode()
             message_dict = json.loads(message_string)
-            raiden_message = message_from_dict(message_dict)
-            return raiden_message
+            return message_from_dict(message_dict)
         return None
+
+    def _handle_message(self, raiden_message):
+        """
+        Handle received Raiden message.
+        """
+        # ignore when stopped
+        if self.stop_event.ready():
+            return
+
+        if not isinstance(raiden_message, (SignedRetrieableMessage, SignedMessage)):
+            self.log.warning("Received invalid message", message=raiden_message)
+        if isinstance(raiden_message, Delivered):
+            self._receive_delivered(raiden_message)
+        elif isinstance(raiden_message, Processed):
+            self._receive_message(raiden_message)
+        else:
+            assert isinstance(raiden_message, SignedRetrieableMessage)
+            self._receive_message(raiden_message)
+
+    def _receive_delivered(self, delivered: Delivered):
+        self.log.info(
+            "Delivered message received", sender=pex(delivered.sender), message=delivered
+        )
+
+        self._raiden_service.on_message(delivered)
+
+    def _receive_message(self, message: Union[SignedRetrieableMessage, Processed]):
+        self.log.info(
+            "RIF Comms Message received",
+            node=pex(self._raiden_service.address),
+            message=message,
+            sender=pex(message.sender),
+        )
+
+        try:
+            delivered_message = Delivered(delivered_message_identifier=message.message_identifier)
+            self._raiden_service.sign(delivered_message)
+
+            queue_identifier = QueueIdentifier(
+                recipient=message.sender, channel_identifier=CHANNEL_IDENTIFIER_GLOBAL_QUEUE
+            )
+            self.send_message(*TransportMessage.wrap(queue_identifier, delivered_message))
+            self._raiden_service.on_message(message)
+
+        except (InvalidAddress, UnknownAddress, UnknownTokenAddress):
+            self.log.warning("Exception while processing message", exc_info=True)
+            return
 
     def stop(self):
         """
@@ -169,7 +215,7 @@ class RifCommsNode(TransportNode):
         self._stop_message_listener()  # stop sync_thread, wait for client's greenlets
 
         # wait for our own greenlets, no need to get on them, exceptions should be raised in _run()
-        wait(self._our_topic_thread + [r.greenlet for r in self._address_to_message_queue.values()])
+        wait([self._our_topic_thread] + [r.greenlet for r in self._address_to_message_queue.values()])
 
         self._comms_client.disconnect()
 
@@ -274,69 +320,6 @@ class RifCommsNode(TransportNode):
     @property
     def log(self):
         return self._log
-
-    def _handle_message(self, topic_id, data) -> bool:
-        """
-        Handle Raiden messages received on a topic.
-        """
-        # ignore when stopped
-        if self.stop_event.ready():
-            return False
-
-        # TODO validate signature of the message
-
-        messages = list()  # TODO validate_and_parse_message(event["content"]["body"], peer_address)
-
-        if not messages:
-            return False
-
-        self.log.info(
-            "Incoming messages",
-            messages=messages,
-            topic_id=pex(topic_id),
-        )
-
-        for message in messages:
-            if not isinstance(message, (SignedRetrieableMessage, SignedMessage)):
-                self.log.warning("Received invalid message", message=message)
-            if isinstance(message, Delivered):
-                self._receive_delivered(message)
-            elif isinstance(message, Processed):
-                self._receive_message(message)
-            else:
-                assert isinstance(message, SignedRetrieableMessage)
-                self._receive_message(message)
-
-        return True
-
-    def _receive_delivered(self, delivered: Delivered):
-        self.log.info(
-            "Delivered message received", sender=pex(delivered.sender), message=delivered
-        )
-
-        self._raiden_service.on_message(delivered)
-
-    def _receive_message(self, message: Union[SignedRetrieableMessage, Processed]):
-        self.log.info(
-            "RIF Comms Message received",
-            node=pex(self._raiden_service.address),
-            message=message,
-            sender=pex(message.sender),
-        )
-
-        try:
-            delivered_message = Delivered(delivered_message_identifier=message.message_identifier)
-            self._raiden_service.sign(delivered_message)
-
-            queue_identifier = QueueIdentifier(
-                recipient=message.sender, channel_identifier=CHANNEL_IDENTIFIER_GLOBAL_QUEUE
-            )
-            self.send_message(*TransportMessage.wrap(queue_identifier, delivered_message))
-            self._raiden_service.on_message(message)
-
-        except (InvalidAddress, UnknownAddress, UnknownTokenAddress):
-            self.log.warning("Exception while processing message", exc_info=True)
-            return
 
     def __repr__(self):
         node = f" node:{pex(self._raiden_service.address)}" if self._raiden_service else ""
