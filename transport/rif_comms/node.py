@@ -1,5 +1,5 @@
 import json
-from typing import Any, Dict, Union
+from typing import Any, Dict
 
 import structlog
 from eth_utils import to_checksum_address, is_binary_address
@@ -10,7 +10,7 @@ from raiden.message_handler import MessageHandler
 from raiden.messages import (
     Message as RaidenMessage,
     SignedRetrieableMessage,
-    SignedMessage, Delivered,
+    Delivered,
     Processed,
     Ping,
     Pong,
@@ -74,10 +74,10 @@ class RifCommsNode(TransportNode):
         # start pre-loaded message queues
         for message_queue in self._address_to_message_queue.values():
             if not message_queue.greenlet:
-                self.log.debug("Starting message_queue", message_queue=message_queue)
+                self.log.debug("starting message_queue", message_queue=message_queue)
                 message_queue.start()
 
-        self.log.debug("RIF Comms Node started", config=self._config)
+        self.log.debug("RIF Comms Node start", config=self._config)
 
         # start greenlet through the Runnable class; this will eventually call _run
         Runnable.start(self)
@@ -92,7 +92,7 @@ class RifCommsNode(TransportNode):
             # waits on stop_event.ready()
             # children crashes should throw an exception here
             # TODO: figure out if something else is needed here
-            self.log.info("RIF Comms _run")
+            self.log.info("RIF Comms Node _run")
         except GreenletExit:  # killed without exception
             self.stop_event.set()
             killall(self._our_topic_thread)  # kill children
@@ -147,52 +147,47 @@ class RifCommsNode(TransportNode):
             return message_from_dict(message_dict)
         return None
 
-    def _handle_message(self, raiden_message):
+    def _handle_message(self, message: RaidenMessage):
         """
         Handle received Raiden message.
         """
-        # ignore when stopped
         if self.stop_event.ready():
-            return
+            return  # ignore when node is stopped
 
-        if not isinstance(raiden_message, (SignedRetrieableMessage, SignedMessage)):
-            self.log.warning("Received invalid message", message=raiden_message)
-        if isinstance(raiden_message, Delivered):
-            self._receive_delivered(raiden_message)
-        elif isinstance(raiden_message, Processed):
-            self._receive_message(raiden_message)
+        if isinstance(message, (Delivered, Processed, SignedRetrieableMessage)):
+            self.log.info(
+                "Raiden message received",
+                type=type(message),
+                node=pex(self._raiden_service.address),
+                message=message,
+                sender=pex(message.sender),
+            )
+
+            try:
+                self._ack_message(message)
+            except (InvalidAddress, UnknownAddress, UnknownTokenAddress):
+                self.log.warning("exception while processing message", exc_info=True)
+                return
+
+            # pass to raiden service for business logic
+            self._raiden_service.on_message(message)
         else:
-            assert isinstance(raiden_message, SignedRetrieableMessage)
-            self._receive_message(raiden_message)
+            self.log.warning("unexpected type of message received", message=message)
 
-    def _receive_delivered(self, delivered: Delivered):
-        self.log.info(
-            "Delivered message received", sender=pex(delivered.sender), message=delivered
-        )
-
-        self._raiden_service.on_message(delivered)
-
-    def _receive_message(self, message: Union[SignedRetrieableMessage, Processed]):
-        self.log.info(
-            "RIF Comms Message received",
-            node=pex(self._raiden_service.address),
-            message=message,
-            sender=pex(message.sender),
-        )
-
-        try:
+    def _ack_message(self, message: RaidenMessage):
+        """
+        Acknowledge a received Raiden message by sending a Delivered-type message back.
+        If the received Raiden message is of the Delivered type, no action is taken.
+        """
+        if not isinstance(message, Delivered):
+            # put together Delivered-typed message to reply with
             delivered_message = Delivered(delivered_message_identifier=message.message_identifier)
             self._raiden_service.sign(delivered_message)
 
             queue_identifier = QueueIdentifier(
                 recipient=message.sender, channel_identifier=CHANNEL_IDENTIFIER_GLOBAL_QUEUE
             )
-            self.send_message(*TransportMessage.wrap(queue_identifier, delivered_message))
-            self._raiden_service.on_message(message)
-
-        except (InvalidAddress, UnknownAddress, UnknownTokenAddress):
-            self.log.warning("Exception while processing message", exc_info=True)
-            return
+            self.enqueue_message(*TransportMessage.wrap(queue_identifier, delivered_message))
 
     def stop(self):
         """
@@ -219,7 +214,7 @@ class RifCommsNode(TransportNode):
 
         self._comms_client.disconnect()
 
-        self.log.debug("RIF Comms Node stopped", config=self._config)
+        self.log.debug("RIF Comms Node stop", config=self._config)
         try:
             del self._log
         except AttributeError:
@@ -251,12 +246,10 @@ class RifCommsNode(TransportNode):
 
         # these are not protocol messages, but transport-specific messages
         if isinstance(raiden_message, (Ping, Pong)):
-            raise ValueError(
-                "Do not use send_message for {} messages".format(raiden_message.__class__.__name__)
-            )
+            raise ValueError("Do not use send_message for {} messages".format(raiden_message.__class__.__name__))
 
         self.log.info(
-            "Enqueue message",
+            "RIF Comms enqueue message",
             recipient=pex(recipient),
             message=raiden_message,
             queue_identifier=queue_identifier,
