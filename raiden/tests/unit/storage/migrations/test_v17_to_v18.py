@@ -58,7 +58,7 @@ def test_upgrade_v17_to_v18(tmp_path):
     _, snapshot = storage.get_latest_state_snapshot()
 
     snapshot_data = json.loads(snapshot)
-    secrethash = list(snapshot_data["payment_mapping"]["secrethashes_to_task"].keys())[0]
-    mediator_task = snapshot_data["payment_mapping"]["secrethashes_to_task"][secrethash]
+    secrethash = list(snapshot_data["payment_states_by_address"]["secrethashes_to_task"].keys())[0]
+    mediator_task = snapshot_data["payment_states_by_address"]["secrethashes_to_task"][secrethash]
     assert mediator_task["mediator_state"]["waiting_transfer"] is not None
     assert mediator_task["mediator_state"]["routes"]
