@@ -117,20 +117,20 @@ class RifCommsNode(TransportNode):
         Iterate over the Notification stream and blocks thread to receive messages
         """
         for notification in self._our_topic_stream:
-            raiden_message = self.notification_to_message(notification.channelNewData)
+            raiden_message = self._notification_to_message(notification.channelNewData)
             if raiden_message:
                 # TODO: handle message
                 self.log.info(raiden_message)
 
     @staticmethod
-    def notification_to_message(notification_data: ChannelNewData) -> RaidenMessage:
+    def _notification_to_message(notification_data: ChannelNewData) -> RaidenMessage:
         """
         :param notification_data: raw data received by the RIF Comms GRPC API
         :return: a raiden.Message
         """
-        content = notification_data.data
+        content_text = notification_data.data
         """
-            topic_new_data has the following structure:
+        ChannelNewData has the following structure:
             from: "16Uiu2HAm8wq7GpkmTDqBxb4eKGfa2Yos79DabTgSXXF4PcHaDhWJ"
             data: "{\"type\":\"Buffer\",\"data\":[104,101,121]}"
             nonce: "\216f\225\232d\023e{"
@@ -138,21 +138,15 @@ class RifCommsNode(TransportNode):
               channelId: "16Uiu2HAm9otWzXBcFm7WC2Qufp2h1mpRxK1oox289omHTcKgrpRA"
             }
         """
-        if content:
-            # We first transform the content of the topic new data to an object
-            object_data = json.loads(content.decode())
-            """
-                Since the message is assigned to the 'data' key and encoded by the RIF Comms GRPC api
-                we need to convert it to string.
-
-                    data: "{\"type\":\"Buffer\",\"data\":[104,101,121]}"
-            """
-            string_message = bytes(object_data["data"]).decode()
-            message_dict = json.loads(string_message)
-            message = message_from_dict(message_dict)
-            return message
-        else:
-            return None
+        if content_text:
+            # we first transform the content of the notification data to a dictionary
+            content = json.loads(content_text.decode())
+            # the message is inside the notification data, encoded by the RIF Comms GRPC api
+            message_string = bytes(content["data"]).decode()
+            message_dict = json.loads(message_string)
+            raiden_message = message_from_dict(message_dict)
+            return raiden_message
+        return None
 
     def stop(self):
         """
