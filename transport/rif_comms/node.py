@@ -154,6 +154,7 @@ class RifCommsNode(TransportNode):
         if self.stop_event.ready():
             return  # ignore when node is stopped
 
+        # process message if its type is expected
         if isinstance(message, (Delivered, Processed, SignedRetrieableMessage)):
             self.log.info(
                 "Raiden message received",
@@ -164,15 +165,22 @@ class RifCommsNode(TransportNode):
             )
 
             try:
+                # acknowledge to sender that their message was received
                 self._ack_message(message)
             except (InvalidAddress, UnknownAddress, UnknownTokenAddress):
                 self.log.warning("exception while processing message", exc_info=True)
                 return
 
-            # pass to raiden service for business logic
+            # once acknowledged, pass message to raiden service for business logic
             self._raiden_service.on_message(message)
+
         else:
-            self.log.warning("unexpected type of message received", message=message)
+            self.log.warning(
+                "unexpected type of message received",
+                type=type(message),
+                node=pex(self._raiden_service.address),
+                message=message,
+            )
 
     def _ack_message(self, message: (Delivered, Processed, SignedRetrieableMessage)):
         """
