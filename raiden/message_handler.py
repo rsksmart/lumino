@@ -169,7 +169,7 @@ class MessageHandler:
         from_transfer = lockedtransfersigned_from_message(message)
 
         role = views.get_transfer_role(
-            chain_state=chain_state, node_address=message.recipient, secrethash=from_transfer.lock.secrethash
+            chain_state=chain_state, message_receiver_address=message.recipient, secrethash=from_transfer.lock.secrethash
         )
         state_change: StateChange
         if role == "initiator":
