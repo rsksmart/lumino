@@ -173,11 +173,8 @@ class RifCommsNode(TransportNode):
             queue_identifier=queue_identifier,
         )
 
-        self._enqueue_message(queue_identifier, raiden_message)
-
-    def _enqueue_message(self, queue_identifier: QueueIdentifier, message: Message):
         queue = self._get_queue(queue_identifier.recipient)
-        queue.enqueue(queue_identifier=queue_identifier, message=message)
+        queue.enqueue(queue_identifier=queue_identifier, message=raiden_message)
 
     def _get_queue(self, recipient: Address) -> MessageQueue:
         """ Construct and return a MessageQueue for recipient """
