@@ -1,7 +1,4 @@
-import copy
-
 from raiden.lightclient.models.light_client_protocol_message import LightClientProtocolMessageType
-from raiden.tests.unit.fixtures import chain_state
 from raiden.transfer import channel, token_network, views
 from raiden.transfer.architecture import (
     ContractReceiveStateChange,
@@ -48,7 +45,7 @@ from raiden.transfer.state import (
     TargetTask,
     TokenNetworkState,
     LightClientTransportState,
-    NodeTransportState, PaymentMappingState)
+    NodeTransportState)
 from raiden.transfer.state_change import (
     ActionChangeNodeNetworkState,
     ActionChannelClose,
@@ -859,8 +856,9 @@ def handle_receive_lock_expired_light(
 def handle_receive_transfer_refund(
     chain_state: ChainState, state_change: ReceiveTransferRefund
 ) -> TransitionResult[ChainState]:
+    # this state it's only for mediator nodes so the node address here should be always our address
     return subdispatch_to_paymenttask(
-        chain_state, state_change, state_change.transfer.initiator, state_change.transfer.lock.secrethash
+        chain_state, state_change, chain_state.our_address, state_change.transfer.lock.secrethash
     )
 
 

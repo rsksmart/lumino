@@ -519,7 +519,7 @@ class MatrixTransport(Runnable):
             )
 
         self.log.info(
-            f"----------------->>> Sending Message from {self.get_address()} to {to_checksum_address(receiver_address)}"
+            f"----------------->>> Sending Message from {to_checksum_address(self.get_address())} to {to_checksum_address(receiver_address)}"
         )
         self.log.info(f"----------------->>> Message Content {str(message)}")
 
