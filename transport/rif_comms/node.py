@@ -18,10 +18,8 @@ from raiden.messages import (
     from_dict as message_from_dict
 )
 from raiden.raiden_service import RaidenService
-from raiden.transfer import views
 from raiden.transfer.identifiers import QueueIdentifier
 from raiden.transfer.mediated_transfer.events import CHANNEL_IDENTIFIER_GLOBAL_QUEUE
-from raiden.transfer.state import QueueIdsToQueues
 from raiden.utils import pex
 from raiden.utils.runnable import Runnable
 from raiden.utils.typing import Address
@@ -56,11 +54,6 @@ class RifCommsNode(TransportNode):
         self._stop_event.set()
 
         self._log = log.bind(node_address=pex(self.address))
-
-    @property
-    def _queueids_to_queues(self) -> QueueIdsToQueues:
-        chain_state = views.state_from_raiden(self._raiden_service)
-        return views.get_all_messagequeues(chain_state)
 
     def start(self, raiden_service: RaidenService, message_handler: MessageHandler, prev_auth_data: str):
         self._raiden_service = raiden_service
