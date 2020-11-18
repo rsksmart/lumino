@@ -310,7 +310,7 @@ class MatrixNode(TransportNode):
             )
 
         self.log.info(
-            "Send message",
+            "Enqueue message",
             recipient=pex(recipient),
             message=raiden_message,
             queue_identifier=queue_identifier,
