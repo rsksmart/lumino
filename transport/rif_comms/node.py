@@ -1,5 +1,5 @@
 import json
-from typing import Any, List, Dict, Union
+from typing import Any, Dict, Union
 
 import structlog
 from eth_utils import to_checksum_address, is_binary_address
@@ -47,7 +47,6 @@ class RifCommsNode(TransportNode):
         self._comms_client = RifCommsClient(to_checksum_address(address), self._config["grpc_endpoint"])
         print("RifCommsNode init on grpc endpoint: {}".format(self._config["grpc_endpoint"]))
 
-        self._greenlets: List[Greenlet] = list()
         self._address_to_message_queue: Dict[Address, MessageQueue] = dict()
 
         self._stop_event = Event()
@@ -122,7 +121,7 @@ class RifCommsNode(TransportNode):
         self.stop_listener_thread()  # stop sync_thread, wait for client's greenlets
 
         # wait for our own greenlets, no need to get on them, exceptions should be raised in _run()
-        wait(self._greenlets + [r.greenlet for r in self._address_to_message_queue.values()])
+        wait(self._our_topic_thread + [r.greenlet for r in self._address_to_message_queue.values()])
 
         self._comms_client.disconnect()
 
@@ -278,7 +277,6 @@ class RifCommsNode(TransportNode):
         self._comms_client.get_peer_id(our_address)
         self._our_topic_thread = spawn(self._receive_messages)
         self._our_topic_thread.name = f"RifCommsClient.listen_messages rsk_address:{self.address}"
-        self._greenlets = [self._our_topic_thread]
 
     def _receive_messages(self):
         """
