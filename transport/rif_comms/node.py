@@ -8,7 +8,7 @@ from greenlet import GreenletExit
 from raiden.exceptions import InvalidAddress, UnknownAddress, UnknownTokenAddress
 from raiden.message_handler import MessageHandler
 from raiden.messages import (
-    Message,
+    Message as RaidenMessage,
     SignedRetrieableMessage,
     SignedMessage, Delivered,
     Processed,
@@ -117,10 +117,42 @@ class RifCommsNode(TransportNode):
         Iterate over the Notification stream and blocks thread to receive messages
         """
         for notification in self._our_topic_stream:
-            parsed_message = self.parse_topic_new_data(notification.channelNewData)
-            if parsed_message:
+            raiden_message = self.notification_to_message(notification.channelNewData)
+            if raiden_message:
                 # TODO: handle message
-                self.log.info(parsed_message)
+                self.log.info(raiden_message)
+
+    @staticmethod
+    def notification_to_message(notification_data: ChannelNewData) -> RaidenMessage:
+        """
+        :param notification_data: raw data received by the RIF Comms GRPC API
+        :return: a raiden.Message
+        """
+        content = notification_data.data
+        """
+            topic_new_data has the following structure:
+            from: "16Uiu2HAm8wq7GpkmTDqBxb4eKGfa2Yos79DabTgSXXF4PcHaDhWJ"
+            data: "{\"type\":\"Buffer\",\"data\":[104,101,121]}"
+            nonce: "\216f\225\232d\023e{"
+            channel {
+              channelId: "16Uiu2HAm9otWzXBcFm7WC2Qufp2h1mpRxK1oox289omHTcKgrpRA"
+            }
+        """
+        if content:
+            # We first transform the content of the topic new data to an object
+            object_data = json.loads(content.decode())
+            """
+                Since the message is assigned to the 'data' key and encoded by the RIF Comms GRPC api
+                we need to convert it to string.
+
+                    data: "{\"type\":\"Buffer\",\"data\":[104,101,121]}"
+            """
+            string_message = bytes(object_data["data"]).decode()
+            message_dict = json.loads(string_message)
+            message = message_from_dict(message_dict)
+            return message
+        else:
+            return None
 
     def stop(self):
         """
@@ -311,39 +343,6 @@ class RifCommsNode(TransportNode):
         except (InvalidAddress, UnknownAddress, UnknownTokenAddress):
             self.log.warning("Exception while processing message", exc_info=True)
             return
-
-    @staticmethod
-    def parse_topic_new_data(topic_new_data: ChannelNewData) -> Message:
-        """
-        :param topic_new_data: raw data received by the RIF Comms GRPC api
-        :return: a raiden.Message
-        """
-        content = topic_new_data.data
-        """
-            topic_new_data has the following structure:
-            from: "16Uiu2HAm8wq7GpkmTDqBxb4eKGfa2Yos79DabTgSXXF4PcHaDhWJ"
-            data: "{\"type\":\"Buffer\",\"data\":[104,101,121]}"
-            nonce: "\216f\225\232d\023e{"
-            channel {
-              channelId: "16Uiu2HAm9otWzXBcFm7WC2Qufp2h1mpRxK1oox289omHTcKgrpRA"
-            }
-
-        """
-        if content:
-            # We first transform the content of the topic new data to an object
-            object_data = json.loads(content.decode())
-            """
-                Since the message is assigned to the 'data' key and encoded by the RIF Comms GRPC api
-                we need to convert it to string.
-
-                    data: "{\"type\":\"Buffer\",\"data\":[104,101,121]}"
-            """
-            string_message = bytes(object_data["data"]).decode()
-            message_dict = json.loads(string_message)
-            message = message_from_dict(message_dict)
-            return message
-        else:
-            return None
 
     def __repr__(self):
         node = f" node:{pex(self._raiden_service.address)}" if self._raiden_service else ""
