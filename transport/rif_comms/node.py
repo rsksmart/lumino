@@ -43,7 +43,7 @@ class RifCommsNode(TransportNode):
         self._raiden_service: RaidenService = None
 
         self._rif_comms_connect_stream: Notification = None
-        self._our_topic: Notification = None
+        self._our_topic_stream: Notification = None
         self._our_topic_thread: Greenlet = None
 
         self._comms_client = RifCommsClient(to_checksum_address(address), self._config["grpc_endpoint"])
@@ -74,14 +74,8 @@ class RifCommsNode(TransportNode):
         # TODO: this shouldn't need to be assigned, it is only done because otherwise the code hangs
         self._rif_comms_connect_stream = self._comms_client.connect()
 
-        # subscribe to our own topic
-        self._our_topic = self._comms_client.subscribe(to_checksum_address(raiden_service.address))
-        # TODO: remove this after GRPC API request blocking is fixed
-        self._comms_client.get_peer_id(
-            to_checksum_address(raiden_service.address)
-        )
-        self.start_listener_thread()
-        self._greenlets = [self._our_topic_thread]
+        # subscribe to our own topic to receive messages
+        self._listen_for_messages()
 
         # start pre-loaded message queues
         for message_queue in self._address_to_message_queue.values():
@@ -281,32 +275,34 @@ class RifCommsNode(TransportNode):
     def join(self, timeout=None):
         self.greenlet.join(timeout)
 
-    def listen_for_messages(
-        self
-    ):
-        """
-        Iterate over the Notification stream and blocks thread to receive messages
-        """
-        for notification_stream in self._our_topic:
-            parsed_message = self.parse_topic_new_data(notification_stream.channelNewData)
-            if parsed_message:
-                self.log.info(parsed_message)
-
-    def start_listener_thread(self):
+    def _listen_for_messages(self):
         """
         Start a listener greenlet to listen for received messages in the background.
         """
-        self._our_topic_thread = spawn(self.listen_for_messages)
+        our_address = to_checksum_address(self.raiden_service.address)
+        self._our_topic_stream = self._comms_client.subscribe(our_address)
+        # TODO: remove this after GRPC API request blocking is fixed
+        self._comms_client.get_peer_id(our_address)
+        self._our_topic_thread = spawn(self._receive_messages)
         self._our_topic_thread.name = f"RifCommsClient.listen_messages rsk_address:{self.address}"
+        self._greenlets = [self._our_topic_thread]
+
+    def _receive_messages(self):
+        """
+        Iterate over the Notification stream and blocks thread to receive messages
+        """
+        for notification in self._our_topic_stream:
+            parsed_message = self.parse_topic_new_data(notification.channelNewData)
+            if parsed_message:
+                # TODO: handle message
+                self.log.info(parsed_message)
 
     def stop_listener_thread(self):
         """ Kills message listener greenlet  """
-        if self._our_topic:
-            self._our_topic.kill()
-            self._our_topic.get()
-        if self._our_topic is not None:
-            self._our_topic.get()
-        self._our_topic = None
+        if self._our_topic_thread:
+            self._our_topic_thread.kill()
+            self._our_topic_thread.get()
+        self._our_topic_thread = None
 
     @staticmethod
     def parse_topic_new_data(topic_new_data: ChannelNewData) -> Message:
