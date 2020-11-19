@@ -8,8 +8,7 @@ from transport.rif_comms.proto.api_pb2 import (
     Msg,
     RskAddress,
     Void,
-    Subscriber,
-    BooleanResponse
+    Subscriber
 )
 from transport.rif_comms.proto.api_pb2_grpc import CommunicationsApiStub
 
@@ -22,7 +21,7 @@ class RifCommsClient:
     def __init__(self, rsk_address: Address, grpc_api_endpoint: str):
         """
         Constructs the RIF Communications Client.
-        :param rsk_address: address of the node that wants to use the RIF Communications server
+        :param rsk_address: RSK address of the node that wants to use the RIF Communications server
         :param grpc_api_endpoint: GRPC URI of the RIF Communications pub-sub node
         """
         self.rsk_address = RskAddress(address=rsk_address)
@@ -33,8 +32,8 @@ class RifCommsClient:
         """
         Connects to RIF Communications Node.
         Invokes ConnectToCommunicationsNode GRPC API endpoint.
-        Adds the client RSK Address under the RIF Communications node Peer ID.
-        :return: Notification stream
+        Adds the client RSK address under the RIF Communications node peer ID.
+        :return: notification stream
         """
         return self.stub.ConnectToCommunicationsNode(self.rsk_address)
 
@@ -43,62 +42,67 @@ class RifCommsClient:
         Subscribes to a pub-sub topic in order to send messages to or receive messages from an address.
         Invokes CreateTopicWithRskAddress GRPC API endpoint.
         The resulting notification stream should only be used for receiving messages; use send_message for sending.
-        :param rsk_address: destination RSK Address for message sending.
-        :return: Notification stream for receiving messages.
+        :param rsk_address: destination RSK address for message sending
+        :return: notification stream for receiving messages
         """
         # TODO: catch already subscribed and any error
         return self.stub.CreateTopicWithRskAddress(RskAddress(address=rsk_address))
 
-    # TODO review params and create docstring. It has no sense to use both peer id and rsk_address
-    def has_subscription(self, rsk_address: Address) -> BooleanResponse:
-        peer_id = self.get_peer_id(rsk_address)
+    def is_subscribed_to(self, rsk_address: Address) -> bool:
+        """
+        Returns whether or not the client's underlying RIF Communications node is subscribed to the topic
+        which corresponds to the given RSK address.
+        Invokes HasSubscriber GRPC API endpoint.
+        :param rsk_address: RSK address which corresponds to the topic which is being checked for subscription
+        :return: boolean value indicating whether the client is subscribed or not
+        """
+        our_peer_id = self._get_peer_id(self.rsk_address)
+        topic_id = self._get_peer_id(rsk_address)
         return self.stub.HasSubscriber(
             Subscriber(
-                peerId=peer_id,
-                channel=Channel(channelId=rsk_address)
+                peerId=our_peer_id,
+                channel=Channel(channelId=topic_id)
             )
-        )
+        ).value
 
-    def send_message(self, topic_id: str, data: str) -> Void:
+    def send_message(self, message_payload: str, rsk_address: Address):
         """
-        Sends a message to a topic.
-        Invokes the SendMessageToTopic grpc api endpoint
-        :param topic_id: topic identifier
-        :param message: the message data
-        :return: void
+        Sends a message to a destination RSK address.
+        Invokes the SendMessageToTopic GRPC API endpoint.
+        :param message_payload: the message data to be sent
+        :param rsk_address: the destination for the message to be sent to
         """
-
-        # TODO message encoding
-        return self.stub.SendMessageToTopic(
+        topic_id = self._get_peer_id(rsk_address)
+        # TODO: message encoding
+        self.stub.SendMessageToTopic(
             PublishPayload(
                 topic=Channel(channelId=topic_id),
-                message=Msg(payload=str.encode(data))
+                message=Msg(payload=str.encode(message_payload))
             )
         )
 
-    def unsubscribe(self, topic_id: str) -> Void:
+    def unsubscribe(self, rsk_address: str):
         """
-        This unsubscribe the node from the topic.
-        Invokes the CloseTopic grpc api endpoint.
-        :param topic_id: topic identifier
-        :return: void
+        Unsubscribes from a topic which corresponds to the given RSK address.
+        Invokes the CloseTopic GRPC API endpoint.
+        :param rsk_address: RSK address which corresponds to the topic which the client is unsubscribing from.
         """
+        topic_id = self._get_peer_id(rsk_address)
         self.stub.CloseTopic(Channel(channelId=topic_id))
 
-    def disconnect(self) -> Void:
+    def disconnect(self):
         """
         Disconnects from RIF Communications Node.
         Invokes the EndCommunication GRPC API endpoint.
-        :return: void
         """
         self.stub.EndCommunication(Void())
         self.grpc_channel.unsubscribe(lambda: self.grpc_channel.close())
 
-    def get_peer_id(self, rsk_address: Address) -> str:
+    def _get_peer_id(self, rsk_address: Address) -> str:
         """
-        Gets the peer ID associated with a node address
-        :param rsk_address: the node address to locate
-        :return: a string that represents the peer ID
+        Gets the peer ID associated with a node RSK address.
+        :param rsk_address: the RSK address which corresponds to the node to locate
+        :return: a string that represents the peer ID that matches the given address
         :raises:
             - No peers from routing table:
                 exception: _InactiveRpcError

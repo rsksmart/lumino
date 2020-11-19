@@ -89,7 +89,7 @@ class RifCommsNode(TransportNode):
         our_address = to_checksum_address(self.raiden_service.address)
         self._our_topic_stream = self._comms_client.subscribe(our_address)
         # TODO: remove this after GRPC API request blocking is fixed
-        self._comms_client.get_peer_id(our_address)
+        self._comms_client._get_peer_id(our_address)
         self._our_topic_thread = spawn(self._receive_messages)
         self._our_topic_thread.name = f"RifCommsClient.listen_messages rsk_address:{self.address}"
 
@@ -288,14 +288,14 @@ class RifCommsNode(TransportNode):
         Send text message through the RIF Comms client.
         """
         # check if we have a subscription for that receiver address
-        is_subscribed_to_receiver_topic = self._comms_client.has_subscription(recipient).value
+        is_subscribed_to_receiver_topic = self._comms_client.is_subscribed_to(recipient)
         # if not, create the topic subscription
         if not is_subscribed_to_receiver_topic:
             self._comms_client.subscribe(recipient)
         # send the message
-        self._comms_client.send_message(recipient, payload)  # TODO: exception handling for RIF Comms client
+        self._comms_client.send_message(payload, recipient)  # TODO: exception handling for RIF Comms client
         self.log.info(
-            "RIF Comms send message", recipient=pex(recipient), data=payload.replace("\n", "\\n")
+            "RIF Comms send message", message_payload=payload.replace("\n", "\\n"), recipient=pex(recipient)
         )
 
     def start_health_check(self, address: Address):
