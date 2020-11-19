@@ -24,14 +24,14 @@ from raiden.utils.runnable import Runnable
 from raiden.utils.typing import Address
 from transport.message import Message as TransportMessage
 from transport.node import Node as TransportNode
-from transport.rif_comms.client import RifCommsClient
+from transport.rif_comms.client import Client as RIFCommsClient
 from transport.rif_comms.proto.api_pb2 import Notification, ChannelNewData
 from transport.utils import MessageQueue
 
 log = structlog.get_logger(__name__)
 
 
-class RifCommsNode(TransportNode):
+class Node(TransportNode):
     _log = log
 
     def __init__(self, address: Address, config: dict):
@@ -45,7 +45,7 @@ class RifCommsNode(TransportNode):
         self._rif_comms_connect_stream: Notification = None
         self._our_topic_stream: Notification = None
         self._our_topic_thread: Greenlet = None
-        self._comms_client = RifCommsClient(to_checksum_address(address), self._config["grpc_endpoint"])
+        self._comms_client = RIFCommsClient(to_checksum_address(address), self._config["grpc_endpoint"])
         print("RifCommsNode init on GRPC endpoint: {}".format(self._config["grpc_endpoint"]))
 
         # initialize message queues
@@ -91,7 +91,7 @@ class RifCommsNode(TransportNode):
         # TODO: remove this after GRPC API request blocking is fixed
         self._comms_client._get_peer_id(our_address)
         self._our_topic_thread = spawn(self._receive_messages)
-        self._our_topic_thread.name = f"RifCommsClient.listen_messages rsk_address:{self.address}"
+        self._our_topic_thread.name = f"RIFCommsClient.listen_messages rsk_address:{self.address}"
 
     def _receive_messages(self):
         """
@@ -183,7 +183,7 @@ class RifCommsNode(TransportNode):
         Runnable main method, perform wait on long-running subtasks.
         """
         # dispatch auth data on first scheduling after start
-        self.greenlet.name = f"RifCommsNode._run node:{pex(self._raiden_service.address)}"
+        self.greenlet.name = f"RIFCommsNode._run node:{pex(self._raiden_service.address)}"
         try:
             # waits on stop_event.ready()
             # children crashes should throw an exception here
@@ -327,7 +327,7 @@ class RifCommsNode(TransportNode):
         return f"<{self.__class__.__name__}{node} id:{id(self)}>"
 
 
-class RifCommsLightClientNode(RifCommsNode):
+class LightClientNode(Node):
 
     def __init__(self, address: Address, config: dict, auth_params: dict):
-        RifCommsNode.__init__(self, address, config)
+        Node.__init__(self, address, config)

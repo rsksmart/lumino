@@ -13,7 +13,7 @@ from transport.rif_comms.proto.api_pb2 import (
 from transport.rif_comms.proto.api_pb2_grpc import CommunicationsApiStub
 
 
-class RifCommsClient:
+class Client:
     """
     Class to connect and operate against a RIF Communications pub-sub node.
     """

@@ -1,13 +1,13 @@
 from raiden.utils import Address
-from transport.node import Node as TransportNode
-from transport.rif_comms.node import RifCommsNode
 from transport.layer import Layer as TransportLayer
+from transport.node import Node as TransportNode
+from transport.rif_comms.node import Node as RIFCommsTransportNode
 
 
-class RifCommsLayer(TransportLayer[RifCommsNode]):
+class Layer(TransportLayer[RIFCommsTransportNode]):
 
     def construct_full_node(self, config):
-        return RifCommsNode(config["address"], config["transport"]["rif_comms"])
+        return RIFCommsTransportNode(config["address"], config["transport"]["rif_comms"])
 
     def construct_light_clients_nodes(self, config):
         return []
@@ -17,4 +17,3 @@ class RifCommsLayer(TransportLayer[RifCommsNode]):
 
     def register_light_client(self, raiden_api: 'RaidenAPI', registration_data: dict) -> TransportNode:
         pass
-

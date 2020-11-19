@@ -8,8 +8,7 @@ from coincurve import PublicKey
 from eth_utils import to_checksum_address
 from grpc._channel import _InactiveRpcError
 from sha3 import keccak_256
-
-from transport.rif_comms.client import RifCommsClient
+from transport.rif_comms.client import Client as RIFCommsClient
 from transport.rif_comms.proto.api_pb2 import RskAddress, Channel, Subscriber, PublishPayload, Msg
 from transport.rif_comms.proto.api_pb2_grpc import CommunicationsApiStub
 
@@ -33,7 +32,7 @@ UNREGISTERED_ADDRESS = get_random_address_str()
 @pytest.mark.usefixtures("rif_comms_client")
 @pytest.fixture(scope="class")
 def rif_comms_client(request):
-    rif_comms_client = RifCommsClient(LUMINO_1_ADDRESS, LUMINO_1_COMMS_API)
+    rif_comms_client = RIFCommsClient(LUMINO_1_ADDRESS, LUMINO_1_COMMS_API)
 
     def teardown():
         rif_comms_client.disconnect()
