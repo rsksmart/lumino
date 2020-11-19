@@ -46,7 +46,7 @@ class Node(TransportNode):
         self._our_topic_stream: Notification = None
         self._our_topic_thread: Greenlet = None
         self._comms_client = RIFCommsClient(to_checksum_address(address), self._config["grpc_endpoint"])
-        print("RifCommsNode init on GRPC endpoint: {}".format(self._config["grpc_endpoint"]))
+        print("RIFCommsNode init on GRPC endpoint: {}".format(self._config["grpc_endpoint"]))
 
         # initialize message queues
         self._address_to_message_queue: Dict[Address, MessageQueue] = dict()
