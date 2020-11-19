@@ -87,7 +87,7 @@ from raiden.utils.typing import (
     Union,
     Address, AddressHex)
 
-from eth_utils import to_canonical_address
+from eth_utils import to_canonical_address, to_checksum_address
 
 import structlog
 log = structlog.get_logger(__name__)  # pylint: disable=invalid-name
@@ -697,9 +697,7 @@ def handle_node_change_network_state(
 ) -> TransitionResult[ChainState]:
     events: List[Event] = list()
 
-    node_address = state_change.node_address
-    network_state = state_change.network_state
-    chain_state.nodeaddresses_to_networkstates[node_address] = network_state
+    chain_state.nodeaddresses_to_networkstates[state_change.node_address] = state_change.network_state
 
     for payment_state in chain_state.get_payment_states():
         for secrethash, subtask in payment_state.secrethashes_to_task.items():
@@ -709,7 +707,7 @@ def handle_node_change_network_state(
             result = subdispatch_mediatortask(
                 chain_state=chain_state,
                 state_change=state_change,
-                node_address=node_address,
+                node_address=chain_state.our_address,
                 secrethash=secrethash,
                 token_network_identifier=subtask.token_network_identifier,
                 storage=storage

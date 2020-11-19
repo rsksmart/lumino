@@ -806,7 +806,7 @@ class MatrixTransport(Runnable):
             if not isinstance(message, (SignedRetrieableMessage, SignedMessage)):
                 self.log.warning("Received invalid message", message=message)
             self.log.info(f"<<<----------------- Receiving Message "
-                          f"from {to_checksum_address(message.sender)} to {self.get_address()}")
+                          f"from {to_checksum_address(message.sender)} to {to_checksum_address(self.get_address())}")
             self.log.info(f"<<<----------------- Message Content {str(message)}")
             if isinstance(message, Delivered):
                 self._receive_delivered(message)
@@ -1709,7 +1709,7 @@ class MatrixLightClientTransport(MatrixTransport):
             if not isinstance(message, (SignedRetrieableMessage, SignedMessage)):
                 self.log.warning("Received invalid message", message=message)
             self.log.info(f"<<<----------------- Receiving Message "
-                          f"from {to_checksum_address(message.sender)} to {self.get_address()}")
+                          f"from {to_checksum_address(message.sender)} to {to_checksum_address(self.get_address())}")
             self.log.info(f"<<<----------------- Message Content {str(message)}")
             if isinstance(message, Delivered):
                 self._receive_delivered_to_lc(message)
