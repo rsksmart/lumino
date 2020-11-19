@@ -82,25 +82,6 @@ class RifCommsNode(TransportNode):
         # start greenlet through the Runnable class; this will eventually call _run
         Runnable.start(self)
 
-    def _run(self, *args: Any, **kwargs: Any) -> None:
-        """
-        Runnable main method, perform wait on long-running subtasks.
-        """
-        # dispatch auth data on first scheduling after start
-        self.greenlet.name = f"RifCommsNode._run node:{pex(self._raiden_service.address)}"
-        try:
-            # waits on stop_event.ready()
-            # children crashes should throw an exception here
-            # TODO: figure out if something else is needed here
-            self.log.info("RIF Comms Node _run")
-        except GreenletExit:  # killed without exception
-            self.stop_event.set()
-            killall(self._our_topic_thread)  # kill children
-            raise  # re-raise to keep killed status
-        except Exception:
-            self.stop()  # ensure cleanup and wait on subtasks
-            raise
-
     def _start_message_listener(self):
         """
         Start a listener greenlet to listen for received messages in the background.
@@ -114,7 +95,7 @@ class RifCommsNode(TransportNode):
 
     def _receive_messages(self):
         """
-        Iterate over the Notification stream and blocks thread to receive messages
+        Iterate over the Notification stream and block thread to receive messages.
         """
         for notification in self._our_topic_stream:
             raiden_message = self._notification_to_message(notification.channelNewData)
@@ -196,6 +177,25 @@ class RifCommsNode(TransportNode):
                 recipient=message.sender, channel_identifier=CHANNEL_IDENTIFIER_GLOBAL_QUEUE
             )
             self.enqueue_message(*TransportMessage.wrap(queue_identifier, delivered_message))
+
+    def _run(self, *args: Any, **kwargs: Any) -> None:
+        """
+        Runnable main method, perform wait on long-running subtasks.
+        """
+        # dispatch auth data on first scheduling after start
+        self.greenlet.name = f"RifCommsNode._run node:{pex(self._raiden_service.address)}"
+        try:
+            # waits on stop_event.ready()
+            # children crashes should throw an exception here
+            # TODO: figure out if something else is needed here
+            self.log.info("RIF Comms Node _run")
+        except GreenletExit:  # killed without exception
+            self.stop_event.set()
+            killall(self._our_topic_thread)  # kill children
+            raise  # re-raise to keep killed status
+        except Exception:
+            self.stop()  # ensure cleanup and wait on subtasks
+            raise
 
     def stop(self):
         """

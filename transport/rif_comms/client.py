@@ -26,26 +26,28 @@ class RifCommsClient:
         :param grpc_api_endpoint: GRPC URI of the RIF Communications pub-sub node
         """
         self.rsk_address = RskAddress(address=rsk_address)
-        self.grpc_channel = insecure_channel(grpc_api_endpoint)
+        self.grpc_channel = insecure_channel(grpc_api_endpoint)  # TODO: how to make this secure?
         self.stub = CommunicationsApiStub(self.grpc_channel)
 
     def connect(self) -> Notification:
         """
         Connects to RIF Communications Node.
-        Invokes ConnectToCommunicationsNode grpc api endpoint.
+        Invokes ConnectToCommunicationsNode GRPC API endpoint.
+        Adds the client RSK Address under the RIF Communications node Peer ID.
         :return: Notification stream
         """
         return self.stub.ConnectToCommunicationsNode(self.rsk_address)
 
-    def subscribe(self, topic_id: str) -> Notification:
+    def subscribe(self, rsk_address: Address) -> Notification:
         """
-        Subscribes to a pub-sub topic between self.rsk_address and partner_address.
-        Invokes CreateTopicWithRskAddress grpc api endpoint.
-        :param topic_id: ID of the topic to subscribe
-        :return: Notification stream
+        Subscribes to a pub-sub topic in order to send messages to or receive messages from an address.
+        Invokes CreateTopicWithRskAddress GRPC API endpoint.
+        The resulting notification stream should only be used for receiving messages; use send_message for sending.
+        :param rsk_address: destination RSK Address for message sending.
+        :return: Notification stream for receiving messages.
         """
-        # TODO catch already subscribed and any error
-        return self.stub.CreateTopicWithRskAddress(RskAddress(address=topic_id))
+        # TODO: catch already subscribed and any error
+        return self.stub.CreateTopicWithRskAddress(RskAddress(address=rsk_address))
 
     # TODO review params and create docstring. It has no sense to use both peer id and rsk_address
     def has_subscription(self, rsk_address: Address) -> BooleanResponse:
@@ -70,7 +72,7 @@ class RifCommsClient:
         return self.stub.SendMessageToTopic(
             PublishPayload(
                 topic=Channel(channelId=topic_id),
-                message=Msg(payload=str.encode("Test message"))
+                message=Msg(payload=str.encode(data))
             )
         )
 
@@ -86,7 +88,7 @@ class RifCommsClient:
     def disconnect(self) -> Void:
         """
         Disconnects from RIF Communications Node.
-        Invokes the EndCommunication grpc api endpoint.
+        Invokes the EndCommunication GRPC API endpoint.
         :return: void
         """
         self.stub.EndCommunication(Void())
