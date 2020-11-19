@@ -65,11 +65,11 @@ class Client:
             )
         ).value
 
-    def send_message(self, message_payload: str, rsk_address: Address):
+    def send_message(self, payload: str, rsk_address: Address):
         """
         Sends a message to a destination RSK address.
         Invokes the SendMessageToTopic GRPC API endpoint.
-        :param message_payload: the message data to be sent
+        :param payload: the message data to be sent
         :param rsk_address: the destination for the message to be sent to
         """
         topic_id = self._get_peer_id(rsk_address)
@@ -77,7 +77,7 @@ class Client:
         self.stub.SendMessageToTopic(
             PublishPayload(
                 topic=Channel(channelId=topic_id),
-                message=Msg(payload=str.encode(message_payload))
+                message=Msg(payload=str.encode(payload))
             )
         )
 
