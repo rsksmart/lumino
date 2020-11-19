@@ -74,7 +74,7 @@ class TestRiffCommsClient(unittest.TestCase):
     def test_create_random_topic_id_without_connection(self):
         notification = self.rif_comms_client.connect()
         peer_id = self.rif_comms_client._get_peer_id(LUMINO_1_ADDRESS)
-        channel = self.rif_comms_client.subscribe(get_random_address_str())
+        channel = self.rif_comms_client.subscribe_to(get_random_address_str())
         peer_id = self.rif_comms_client._get_peer_id(LUMINO_1_ADDRESS)
 
     @pytest.mark.skip(reason="ignore")

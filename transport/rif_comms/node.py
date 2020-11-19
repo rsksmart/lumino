@@ -87,7 +87,7 @@ class RifCommsNode(TransportNode):
         Start a listener greenlet to listen for received messages in the background.
         """
         our_address = to_checksum_address(self.raiden_service.address)
-        self._our_topic_stream = self._comms_client.subscribe(our_address)
+        self._our_topic_stream = self._comms_client.subscribe_to(our_address)
         # TODO: remove this after GRPC API request blocking is fixed
         self._comms_client._get_peer_id(our_address)
         self._our_topic_thread = spawn(self._receive_messages)
@@ -291,7 +291,7 @@ class RifCommsNode(TransportNode):
         is_subscribed_to_receiver_topic = self._comms_client.is_subscribed_to(recipient)
         # if not, create the topic subscription
         if not is_subscribed_to_receiver_topic:
-            self._comms_client.subscribe(recipient)
+            self._comms_client.subscribe_to(recipient)
         # send the message
         self._comms_client.send_message(payload, recipient)  # TODO: exception handling for RIF Comms client
         self.log.info(
