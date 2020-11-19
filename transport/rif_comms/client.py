@@ -81,7 +81,7 @@ class Client:
             )
         )
 
-    def unsubscribe(self, rsk_address: str):
+    def unsubscribe_from(self, rsk_address: Address):
         """
         Unsubscribes from a topic which corresponds to the given RSK address.
         Invokes the CloseTopic GRPC API endpoint.
