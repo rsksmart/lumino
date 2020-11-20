@@ -177,7 +177,7 @@ class Node(TransportNode):
             self.log.info("RIF Comms Node _run. Listening for messages.")
         except GreenletExit:  # killed without exception
             self.stop_event.set()
-            killall(self._our_topic_thread)  # kill children
+            killall(self.greenlet)  # kill children
             raise  # re-raise to keep killed status
         except Exception:
             self.stop()  # ensure cleanup and wait on subtasks
