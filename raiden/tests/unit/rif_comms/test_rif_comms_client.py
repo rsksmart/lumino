@@ -118,6 +118,7 @@ class TestRiffCommsClient(unittest.TestCase):
         peer_id = self.rif_comms_client._get_peer_id(LUMINO_1_ADDRESS)
         self.rif_comms_client.disconnect()
 
+    @pytest.mark.skip(reason="ignore")
     def test_send_lumino_message(self):
         channel = grpc.insecure_channel(LUMINO_2_COMMS_API)
         stub = CommunicationsApiStub(channel)
