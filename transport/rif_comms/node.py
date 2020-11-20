@@ -3,9 +3,8 @@ from typing import Any, Dict
 
 import structlog
 from eth_utils import is_binary_address
-from gevent import wait
+from gevent import killall, wait
 from greenlet import GreenletExit
-
 from raiden.exceptions import InvalidAddress, UnknownAddress, UnknownTokenAddress
 from raiden.message_handler import MessageHandler
 from raiden.messages import (
@@ -67,6 +66,8 @@ class Node(TransportNode):
         # connect to rif comms node
         # TODO: this shouldn't need to be assigned, it is only done because otherwise the code hangs
         self._rif_comms_connect_stream = self._comms_client.connect()
+
+        # subscribe to our own topic to receive messages
         self._start_message_listener()
 
         # start pre-loaded message queues
@@ -86,7 +87,6 @@ class Node(TransportNode):
         """
         our_address = self.raiden_service.address
         self._our_topic_stream = self._comms_client.subscribe_to(our_address)
-
 
     def _receive_messages(self):
         """
@@ -186,9 +186,9 @@ class Node(TransportNode):
             self.log.info("RIF Comms Node _run")
         except GreenletExit:  # killed without exception
             self.stop_event.set()
+            killall(self._our_topic_thread)  # kill children
             raise  # re-raise to keep killed status
-        except Exception as e:
-            print(e)
+        except Exception:
             self.stop()  # ensure cleanup and wait on subtasks
             raise
 
@@ -283,13 +283,12 @@ class Node(TransportNode):
         Send text message through the RIF Comms client.
         """
         # check if we have a subscription for that receiver address
-        to_checksum_recipient = to_checksum_address(recipient)
-        is_subscribed_to_receiver_topic = self._comms_client.is_subscribed_to(to_checksum_recipient)
+        is_subscribed_to_receiver_topic = self._comms_client.is_subscribed_to(recipient)
         # if not, create the topic subscription
         if not is_subscribed_to_receiver_topic:
-            self._comms_client.subscribe_to(to_checksum_recipient)
+            self._comms_client.subscribe_to(recipient)
         # send the message
-        self._comms_client.send_message(payload, to_checksum_recipient)  # TODO: exception handling for RIF Comms client
+        self._comms_client.send_message(payload, recipient)  # TODO: exception handling for RIF Comms client
         self.log.info(
             "RIF Comms send message", message_payload=payload.replace("\n", "\\n"), recipient=pex(recipient)
         )
