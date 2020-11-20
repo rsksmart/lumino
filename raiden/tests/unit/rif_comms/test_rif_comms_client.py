@@ -67,10 +67,12 @@ class TestRiffCommsClient(unittest.TestCase):
 
     @pytest.mark.skip(reason="ignore")
     def test_locate_unregistered_peer_id(self):
+        # TODO: this should be fixed with the next RIF Comms pub-sub release
         self.assertRaises(_InactiveRpcError, lambda: self.rif_comms_client._get_peer_id(UNREGISTERED_ADDRESS))
 
     @pytest.mark.skip(reason="ignore")
     def test_create_random_topic_id_without_connection(self):
+        # TODO: this should be fixed with the next RIF Comms pub-sub release
         notification = self.rif_comms_client.connect()
         peer_id = self.rif_comms_client._get_peer_id(LUMINO_1_ADDRESS)
         channel = self.rif_comms_client.subscribe_to(get_random_address_str())
@@ -78,6 +80,7 @@ class TestRiffCommsClient(unittest.TestCase):
 
     @pytest.mark.skip(reason="ignore")
     def test_subscribe(self):
+        # TODO: this is failing with "peer is not subscribed to"
         channel = grpc.insecure_channel(LUMINO_1_COMMS_API)
         stub = CommunicationsApiStub(channel)
         rsk_address = RskAddress(address=LUMINO_1_ADDRESS)
@@ -87,6 +90,7 @@ class TestRiffCommsClient(unittest.TestCase):
 
     @pytest.mark.skip(reason="ignore")
     def test_has_subscriber(self):
+        # TODO: test with RSK address instead of peer ID
         channel = grpc.insecure_channel(LUMINO_1_COMMS_API)
         stub = CommunicationsApiStub(channel)
         rsk_address = RskAddress(address=LUMINO_1_ADDRESS)
@@ -119,7 +123,9 @@ class TestRiffCommsClient(unittest.TestCase):
         channel = grpc.insecure_channel(LUMINO_2_COMMS_API)
         stub = CommunicationsApiStub(channel)
         channel = stub.Subscribe(Channel(
-            channelId="16Uiu2HAm9otWzXBcFm7WC2Qufp2h1mpRxK1oox289omHTcKgrpRA"))  # got this from subscription of lumino node
+            channelId="16Uiu2HAm9otWzXBcFm7WC2Qufp2h1mpRxK1oox289omHTcKgrpRA")
+            # got this from subscription of lumino node
+        )
 
         some_raiden_message = {
             'type': 'LockedTransfer',
