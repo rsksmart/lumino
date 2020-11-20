@@ -57,7 +57,7 @@ class Client:
         :param rsk_address: RSK address which corresponds to the topic which is being checked for subscription
         :return: boolean value indicating whether the client is subscribed or not
         """
-        our_peer_id = self._get_peer_id(self.rsk_address)
+        our_peer_id = self._get_peer_id(self.rsk_address.address)
         topic_id = self._get_peer_id(to_checksum_address(rsk_address))
         return self.stub.HasSubscriber(
             Subscriber(

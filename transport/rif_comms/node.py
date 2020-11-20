@@ -283,13 +283,12 @@ class Node(TransportNode):
         Send text message through the RIF Comms client.
         """
         # check if we have a subscription for that receiver address
-        to_checksum_recipient = to_checksum_address(recipient)
-        is_subscribed_to_receiver_topic = self._comms_client.is_subscribed_to(to_checksum_recipient)
+        is_subscribed_to_receiver_topic = self._comms_client.is_subscribed_to(recipient)
         # if not, create the topic subscription
         if not is_subscribed_to_receiver_topic:
-            self._comms_client.subscribe_to(to_checksum_recipient)
+            self._comms_client.subscribe_to(recipient)
         # send the message
-        self._comms_client.send_message(payload, to_checksum_recipient)  # TODO: exception handling for RIF Comms client
+        self._comms_client.send_message(payload, recipient)  # TODO: exception handling for RIF Comms client
         self.log.info(
             "RIF Comms send message", message_payload=payload.replace("\n", "\\n"), recipient=pex(recipient)
         )
