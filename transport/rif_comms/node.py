@@ -3,7 +3,7 @@ from typing import Any, Dict
 
 import structlog
 from eth_utils import is_binary_address
-from gevent import wait
+from gevent import killall, wait
 from greenlet import GreenletExit
 
 from raiden.exceptions import InvalidAddress, UnknownAddress, UnknownTokenAddress
@@ -46,16 +46,16 @@ class Node(TransportNode):
         self._rif_comms_connect_stream: Notification = None
         self._our_topic_stream: Notification = None
         self._comms_client = RIFCommsClient(address, self._config["grpc_endpoint"])
-        print("RIFCommsNode init on GRPC endpoint: {}".format(self._config["grpc_endpoint"]))
 
         # initialize message queues
         self._address_to_message_queue: Dict[Address, MessageQueue] = dict()
 
         self._log = log.bind(node_address=pex(self.address))
+        self.log.info("RIFCommsNode init on GRPC endpoint: {}".format(self._config["grpc_endpoint"]))
 
     def start(self, raiden_service: RaidenService, message_handler: MessageHandler, prev_auth_data: str):
         """
-        Initialize transport fields, subscribe to own topic in order to listen for messages, and start as Runnable.
+        Initialize transport fields, connect to RIF Comms Node, and start as Runnable.
         """
         self._raiden_service = raiden_service  # TODO: this should be set in __init__
 
@@ -67,26 +67,16 @@ class Node(TransportNode):
         # connect to rif comms node
         # TODO: this shouldn't need to be assigned, it is only done because otherwise the code hangs
         self._rif_comms_connect_stream = self._comms_client.connect()
-        self._start_message_listener()
-
         # start pre-loaded message queues
         for message_queue in self._address_to_message_queue.values():
             if not message_queue.greenlet:
                 self.log.debug("starting message_queue", message_queue=message_queue)
                 message_queue.start()
 
-        self.log.debug("RIF Comms Node start", config=self._config)
+        self.log.info("RIF Comms Node start", config=self._config)
 
         # start greenlet through the Runnable class; this will eventually call _run
         Runnable.start(self)
-
-    def _start_message_listener(self):
-        """
-        Start a listener greenlet to listen for received messages in the background.
-        """
-        our_address = self.raiden_service.address
-        self._our_topic_stream = self._comms_client.subscribe_to(our_address)
-
 
     def _receive_messages(self):
         """
@@ -175,20 +165,21 @@ class Node(TransportNode):
 
     def _run(self, *args: Any, **kwargs: Any) -> None:
         """
-        Runnable main method, perform wait on long-running subtasks.
+        Runnable main method. Start a listener greenlet to listen for received messages in the background.
         """
-        # dispatch auth data on first scheduling after start
         self.greenlet.name = f"RIFCommsNode._run node:{pex(self._raiden_service.address)}"
+        our_address = self.raiden_service.address
+        self._our_topic_stream = self._comms_client.subscribe_to(our_address)
         try:
             # waits on stop_event.ready()
             # children crashes should throw an exception here
             self._receive_messages()
-            self.log.info("RIF Comms Node _run")
+            self.log.info("RIF Comms Node _run. Listening for messages.")
         except GreenletExit:  # killed without exception
             self.stop_event.set()
+            killall(self._our_topic_thread)  # kill children
             raise  # re-raise to keep killed status
-        except Exception as e:
-            print(e)
+        except Exception:
             self.stop()  # ensure cleanup and wait on subtasks
             raise
 
@@ -210,7 +201,10 @@ class Node(TransportNode):
             if message_queue.greenlet:
                 message_queue.notify()  # if we need to send something, this is the time
 
-        self._stop_message_listener()  # stop sync_thread, wait for client's greenlets
+        if self.greenlet:
+            self.greenlet.kill()
+            self.greenlet.get()
+        self.greenlet = None
 
         # wait for our own greenlets, no need to get on them, exceptions should be raised in _run()
         wait([self.greenlet] + [r.greenlet for r in self._address_to_message_queue.values()])
@@ -225,15 +219,6 @@ class Node(TransportNode):
             pass
         # parent may want to call get() after stop(), to ensure _run errors are re-raised
         # we don't call it here to avoid deadlock when self crashes and calls stop() on finally
-
-    def _stop_message_listener(self):
-        """
-        Kill message listener greenlet.
-        """
-        if self.greenlet:
-            self.greenlet.kill()
-            self.greenlet.get()
-        self.greenlet = None
 
     def enqueue_message(self, message: TransportMessage, recipient: Address):
         """
