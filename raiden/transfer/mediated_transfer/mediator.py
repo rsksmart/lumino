@@ -35,7 +35,7 @@ from raiden.transfer.state import (
     NODE_NETWORK_UNREACHABLE,
     NettingChannelState,
     RouteState,
-    message_identifier_from_prng,
+    message_identifier_from_prng, NODE_NETWORK_UNKNOWN,
 )
 from raiden.transfer.state_change import (
     ActionChangeNodeNetworkState,
@@ -191,8 +191,9 @@ def filter_reachable_routes(
         node_network_state = nodeaddresses_to_networkstates.get(
             route.node_address, NODE_NETWORK_UNREACHABLE
         )
-
-        if node_network_state == NODE_NETWORK_REACHABLE:
+        # TODO: jonaf2103 NODE_NETWORK_UNKNOWN should be
+        #  removed from this comparison after fixing the reachability issues
+        if node_network_state == NODE_NETWORK_REACHABLE or node_network_state == NODE_NETWORK_UNKNOWN:
             reachable_routes.append(route)
 
     return reachable_routes
