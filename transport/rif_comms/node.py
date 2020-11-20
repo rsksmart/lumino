@@ -147,7 +147,9 @@ class Node(TransportNode):
 
             try:
                 # acknowledge to sender that their message was received
-                self._ack_message(message)
+                # if the received Raiden message is of the Delivered type, no action needs to be taken
+                if not isinstance(message, Delivered):
+                    self._ack_message(message)
             except (InvalidAddress, UnknownAddress, UnknownTokenAddress):
                 self.log.warning("exception while processing message", exc_info=True)
                 return
@@ -163,20 +165,18 @@ class Node(TransportNode):
                 message=message,
             )
 
-    def _ack_message(self, message: (Delivered, Processed, SignedRetrieableMessage)):
+    def _ack_message(self, message: (Processed, SignedRetrieableMessage)):
         """
         Acknowledge a received Raiden message by sending a Delivered-type message back.
-        If the received Raiden message is of the Delivered type, no action is taken.
         """
-        if not isinstance(message, Delivered):
-            # put together Delivered-typed message to reply with
-            delivered_message = Delivered(delivered_message_identifier=message.message_identifier)
-            self._raiden_service.sign(delivered_message)
+        # put together Delivered-typed message to reply with
+        delivered_message = Delivered(delivered_message_identifier=message.message_identifier)
+        self._raiden_service.sign(delivered_message)
 
-            queue_identifier = QueueIdentifier(
-                recipient=message.sender, channel_identifier=CHANNEL_IDENTIFIER_GLOBAL_QUEUE
-            )
-            self.enqueue_message(*TransportMessage.wrap(queue_identifier, delivered_message))
+        queue_identifier = QueueIdentifier(
+            recipient=message.sender, channel_identifier=CHANNEL_IDENTIFIER_GLOBAL_QUEUE
+        )
+        self.enqueue_message(*TransportMessage.wrap(queue_identifier, delivered_message))
 
     def _run(self, *args: Any, **kwargs: Any) -> None:
         """
