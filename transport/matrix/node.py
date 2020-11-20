@@ -11,7 +11,6 @@ from gevent.event import Event
 from gevent.queue import JoinableQueue
 from matrix_client.errors import MatrixRequestError
 from matrix_client.user import User
-
 from raiden.constants import DISCOVERY_DEFAULT_ROOM
 from raiden.exceptions import InvalidAddress, UnknownAddress, UnknownTokenAddress
 from raiden.message_handler import MessageHandler
@@ -179,7 +178,7 @@ class MatrixNode(TransportNode):
 
         # (re)start any _RetryQueue which was initialized before start
         for retrier in self._address_to_retrier.values():
-            if not retrier:
+            if not retrier.greenlet:
                 self.log.debug("Starting retrier", retrier=retrier)
                 retrier.start()
 
@@ -195,7 +194,7 @@ class MatrixNode(TransportNode):
         self.greenlet.name = f"MatrixTransport._run node:{pex(self._raiden_service.address)}"
         self._raiden_service.handle_and_track_state_change(state_change)
         try:
-            # waits on _stop_event.ready()
+            # waits on stop_event.ready()
             self._global_send_worker()
             # children crashes should throw an exception here
         except gevent.GreenletExit:  # killed without exception
@@ -311,7 +310,7 @@ class MatrixNode(TransportNode):
             )
 
         self.log.info(
-            "Send message",
+            "Enqueue message",
             recipient=pex(recipient),
             message=raiden_message,
             queue_identifier=queue_identifier,
@@ -1217,7 +1216,7 @@ class MatrixLightClientNode(MatrixNode):
         self.greenlet.name = f"MatrixLightClientTransport._run light_client:{to_canonical_address(self.address)}"
         self._raiden_service.handle_and_track_state_change(state_change)
         try:
-            # waits on _stop_event.ready()
+            # waits on stop_event.ready()
             self._global_send_worker()
             # children crashes should throw an exception here
         except gevent.GreenletExit:  # killed without exception

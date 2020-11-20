@@ -5,11 +5,11 @@ import unittest
 import grpc
 import pytest
 from coincurve import PublicKey
-from eth_utils import to_checksum_address
+from eth_utils import to_checksum_address, to_canonical_address
 from grpc._channel import _InactiveRpcError
 from sha3 import keccak_256
 
-from transport.rif_comms.client import RifCommsClient
+from transport.rif_comms.client import Client as RIFCommsClient
 from transport.rif_comms.proto.api_pb2 import RskAddress, Channel, Subscriber, PublishPayload, Msg
 from transport.rif_comms.proto.api_pb2_grpc import CommunicationsApiStub
 
@@ -21,14 +21,13 @@ def get_random_address_str() -> str:
     return to_checksum_address(addr)
 
 
-LUMINO_1_ADDRESS = "0xe717e81105471648a152381aE6De4c878343E2sb2"
+LUMINO_1_ADDRESS = to_canonical_address("0x8cb891510dF75C223C53f910A98c3b61B9083c3B")
 LUMINO_1_COMMS_API = "localhost:5013"
 
 LUMINO_2_COMMS_API = "localhost:5016"
-LUMINO_2_ADDRESS = "0x138af366e0ed7cc4b9747a935d1b5f75a86b9d83"
+LUMINO_2_ADDRESS = to_canonical_address("0xeBfF0EEe8E2b6952E589B0475e3F0E34dA0655B1")
 
 LUMINO_3_ADDRESS = "0x636BA79E46E0594ECbbEBb4F74B9336Fd4454442"
-
 
 UNREGISTERED_ADDRESS = get_random_address_str()
 
@@ -36,8 +35,8 @@ UNREGISTERED_ADDRESS = get_random_address_str()
 @pytest.mark.usefixtures("rif_comms_client")
 @pytest.fixture(scope="class")
 def rif_comms_client(request):
-    rif_comms_client1 = RifCommsClient(LUMINO_1_ADDRESS, LUMINO_1_COMMS_API)
-    rif_comms_client2 = RifCommsClient(LUMINO_3_ADDRESS, LUMINO_1_COMMS_API)
+    rif_comms_client1 = RIFCommsClient(LUMINO_1_ADDRESS, LUMINO_1_COMMS_API)
+    rif_comms_client2 = RIFCommsClient(LUMINO_3_ADDRESS, LUMINO_1_COMMS_API)
 
     def teardown():
         rif_comms_client1.disconnect()
@@ -67,14 +66,14 @@ class TestRiffCommsClient(unittest.TestCase):
 
     @pytest.mark.skip(reason="ignore")
     def test_locate_peer_id(self):
-        response = self.rif_comms_client1.connect()
-        peer_id = self.rif_comms_client1.get_peer_id(LUMINO_1_ADDRESS)
+        response = self.rif_comms_client.connect()
+        peer_id = self.rif_comms_client._get_peer_id(LUMINO_1_ADDRESS)
         print(f"test_locate_peer_id peer_id = {peer_id}")
         assert peer_id is not None
 
     @pytest.mark.skip(reason="ignore")
     def test_locate_unregistered_peer_id(self):
-        self.assertRaises(_InactiveRpcError, lambda: self.rif_comms_client1.get_peer_id(UNREGISTERED_ADDRESS))
+        self.assertRaises(_InactiveRpcError, lambda: self.rif_comms_client1._get_peer_id(UNREGISTERED_ADDRESS))
 
     @pytest.mark.skip(reason="ignore")
     def test_create_random_topic_id_without_connection(self):
@@ -82,9 +81,20 @@ class TestRiffCommsClient(unittest.TestCase):
         peer_id = self.rif_comms_client1.get_peer_id(LUMINO_1_ADDRESS)
         channel = self.rif_comms_client1.subscribe(get_random_address_str())
         peer_id = self.rif_comms_client1.get_peer_id(LUMINO_1_ADDRESS)
+        # TODO: this should be fixed with the next RIF Comms pub-sub release
+        self.assertRaises(_InactiveRpcError, lambda: self.rif_comms_client._get_peer_id(UNREGISTERED_ADDRESS))
+
+    @pytest.mark.skip(reason="ignore")
+    def test_create_random_topic_id_without_connection(self):
+        # TODO: this should be fixed with the next RIF Comms pub-sub release
+        notification = self.rif_comms_client.connect()
+        peer_id = self.rif_comms_client._get_peer_id(LUMINO_1_ADDRESS)
+        channel = self.rif_comms_client.subscribe_to(get_random_address_str())
+        peer_id = self.rif_comms_client._get_peer_id(LUMINO_1_ADDRESS)
 
     @pytest.mark.skip(reason="ignore")
     def test_subscribe(self):
+        # TODO: this is failing with "peer is not subscribed to"
         channel = grpc.insecure_channel(LUMINO_1_COMMS_API)
         stub = CommunicationsApiStub(channel)
         rsk_address = RskAddress(address=LUMINO_1_ADDRESS)
@@ -94,6 +104,7 @@ class TestRiffCommsClient(unittest.TestCase):
 
     @pytest.mark.skip(reason="ignore")
     def test_has_subscriber(self):
+        # TODO: test with RSK address instead of peer ID
         channel = grpc.insecure_channel(LUMINO_1_COMMS_API)
         stub = CommunicationsApiStub(channel)
         rsk_address = RskAddress(address=LUMINO_1_ADDRESS)
@@ -117,16 +128,18 @@ class TestRiffCommsClient(unittest.TestCase):
 
     @pytest.mark.skip(reason="ignore")
     def test_disconnect(self):
-        notification = self.rif_comms_client1.connect()
-        peer_id = self.rif_comms_client1.get_peer_id(LUMINO_1_ADDRESS)
-        self.rif_comms_client1.disconnect()
+        notification = self.rif_comms_client.connect()
+        peer_id = self.rif_comms_client._get_peer_id(LUMINO_1_ADDRESS)
+        self.rif_comms_client.disconnect()
 
     @pytest.mark.skip(reason="ignore")
     def test_send_lumino_message(self):
         channel = grpc.insecure_channel(LUMINO_2_COMMS_API)
         stub = CommunicationsApiStub(channel)
         channel = stub.Subscribe(Channel(
-            channelId="16Uiu2HAm9otWzXBcFm7WC2Qufp2h1mpRxK1oox289omHTcKgrpRA"))  # got this from subscription of lumino node
+            channelId="16Uiu2HAm9otWzXBcFm7WC2Qufp2h1mpRxK1oox289omHTcKgrpRA")
+            # got this from subscription of lumino node
+        )
 
         some_raiden_message = {
             'type': 'LockedTransfer',
@@ -179,7 +192,6 @@ class TestRiffCommsClient(unittest.TestCase):
 
         subscription2 = self.rif_comms_client2.subscribe(random_topic_id)
 
-
     @pytest.mark.skip(reason="ignore")
     def test_two_clients_different_topic_subscription(self):
         """
@@ -228,8 +240,3 @@ class TestRiffCommsClient(unittest.TestCase):
 
         for resp in subscription2:
             print("Response for already subscribed ", resp)
-
-
-
-
-

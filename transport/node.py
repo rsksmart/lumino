@@ -1,9 +1,9 @@
 from abc import ABC, abstractmethod
 from typing import Any
 
-from raiden.messages import Message
 from raiden.utils import Address
 from raiden.utils.runnable import Runnable
+from transport.message import Message
 
 
 class Node(ABC, Runnable):
