@@ -68,6 +68,7 @@ from raiden.transfer.state_change import (
     ContractReceiveRouteClosed,
     ContractReceiveRouteNew,
     ContractReceiveSecretReveal,
+    ContractReceiveSecretRevealLight,
     ContractReceiveUpdateTransfer,
     ReceiveDelivered,
     ReceiveProcessed,
@@ -93,6 +94,7 @@ from raiden.utils.typing import (
 from eth_utils import to_canonical_address
 
 import structlog
+
 log = structlog.get_logger(__name__)  # pylint: disable=invalid-name
 
 # All State changes that are subdispatched as token network actions
@@ -204,7 +206,7 @@ def subdispatch_to_all_lockedtransfers(
 ) -> TransitionResult[ChainState]:
     events = list()
     for node_address, payment_mapping in chain_state.get_payment_states_by_address():
-        for secrethash in payment_mapping.secrethashes_to_task:
+        for secrethash in list(payment_mapping.secrethashes_to_task):
             result = subdispatch_to_paymenttask(chain_state, state_change, node_address, secrethash, storage)
             events.extend(result.events)
     return TransitionResult(chain_state, events)
@@ -392,7 +394,7 @@ def subdispatch_initiatortask(
                 sub_task = InitiatorTask(token_network_identifier, iteration.new_state)
                 chain_state.create_payment_task(node_address, secrethash, sub_task)
             elif chain_state.get_payment_task(node_address, secrethash) and \
-                    not isinstance(state_change, ActionInitInitiatorLight):
+                not isinstance(state_change, ActionInitInitiatorLight):
                 # We dont delete the payment task when is a light payment,
                 # thats because we need the previous payment task for refunds.
                 # TODO marcosmartinez7, are the p2p payments being removed?
@@ -769,9 +771,25 @@ def handle_secret_reveal(
 
 
 def handle_contract_secret_reveal(
-    chain_state: ChainState, state_change: ContractReceiveSecretReveal
+    chain_state: ChainState, state_change: ContractReceiveSecretReveal, storage=None
 ) -> TransitionResult[ChainState]:
-    return subdispatch_to_paymenttask(chain_state, state_change, chain_state.our_address, state_change.secrethash)
+    events = list()
+    for node_address, payment_mapping in chain_state.get_payment_states_by_address():
+        for secrethash in list(payment_mapping.secrethashes_to_task):
+            if secrethash == state_change.secrethash:
+                state_change_to_dispatch = state_change \
+                    if node_address == chain_state.our_address \
+                    else ContractReceiveSecretRevealLight(
+                    transaction_hash=state_change.transaction_hash,
+                    secret_registry_address=state_change.secret_registry_address,
+                    secrethash=state_change.secrethash,
+                    secret=state_change.secret,
+                    block_number=state_change.block_number,
+                    block_hash=state_change.block_hash
+                )
+                result = subdispatch_to_paymenttask(chain_state, state_change_to_dispatch, node_address, secrethash, storage)
+            events.extend(result.events)
+    return TransitionResult(chain_state, events)
 
 
 def handle_init_initiator(
@@ -792,7 +810,8 @@ def handle_init_initiator_light(
     secrethash = received_transfer.secrethash
 
     return subdispatch_initiatortask(
-        chain_state, state_change, received_transfer.token_network_identifier, state_change.signed_locked_transfer.sender, secrethash
+        chain_state, state_change, received_transfer.token_network_identifier,
+        state_change.signed_locked_transfer.sender, secrethash
     )
 
 
@@ -820,7 +839,8 @@ def handle_init_mediator(
     token_network_identifier = transfer.balance_proof.token_network_identifier
 
     return subdispatch_mediatortask(
-        chain_state, state_change, TokenNetworkID(token_network_identifier), chain_state.our_address, secrethash, storage
+        chain_state, state_change, TokenNetworkID(token_network_identifier), chain_state.our_address, secrethash,
+        storage
     )
 
 
@@ -853,7 +873,8 @@ def handle_receive_lock_expired(
 def handle_receive_lock_expired_light(
     chain_state: ChainState, state_change: ReceiveLockExpiredLight, storage
 ) -> TransitionResult[ChainState]:
-    return subdispatch_to_paymenttask(chain_state, state_change, state_change.lock_expired.recipient, state_change.secrethash, storage)
+    return subdispatch_to_paymenttask(chain_state, state_change, state_change.lock_expired.recipient,
+                                      state_change.secrethash, storage)
 
 
 def handle_receive_transfer_refund(
@@ -867,7 +888,6 @@ def handle_receive_transfer_refund(
 def handle_receive_transfer_refund_cancel_route(
     chain_state: ChainState, state_change: ActionTransferReroute, storage
 ) -> TransitionResult[ChainState]:
-
     new_secret_hash = state_change.secrethash
 
     chain_state.clone_payment_task(chain_state.our_address, state_change.transfer.lock.secrethash, new_secret_hash)
@@ -1039,7 +1059,7 @@ def handle_state_change(
         iteration = handle_token_network_action(chain_state, state_change)
     elif type(state_change) == ContractReceiveSecretReveal:
         assert isinstance(state_change, ContractReceiveSecretReveal), MYPY_ANNOTATION
-        iteration = handle_contract_secret_reveal(chain_state, state_change)
+        iteration = handle_contract_secret_reveal(chain_state, state_change, storage)
     elif type(state_change) == ContractReceiveUpdateTransfer:
         assert isinstance(state_change, ContractReceiveUpdateTransfer), MYPY_ANNOTATION
         iteration = handle_token_network_action(chain_state, state_change)

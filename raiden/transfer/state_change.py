@@ -1083,6 +1083,77 @@ class ContractReceiveSecretReveal(ContractReceiveStateChange):
         )
 
 
+class ContractReceiveSecretRevealLight(ContractReceiveStateChange):
+    """ A new secret was registered with the SecretRegistry contract. """
+
+    def __init__(
+        self,
+        transaction_hash: TransactionHash,
+        secret_registry_address: SecretRegistryAddress,
+        secrethash: SecretHash,
+        secret: Secret,
+        block_number: BlockNumber,
+        block_hash: BlockHash,
+    ) -> None:
+        if not isinstance(secret_registry_address, T_SecretRegistryAddress):
+            raise ValueError("secret_registry_address must be of type SecretRegistryAddress")
+        if not isinstance(secrethash, T_SecretHash):
+            raise ValueError("secrethash must be of type SecretHash")
+        if not isinstance(secret, T_Secret):
+            raise ValueError("secret must be of type Secret")
+
+        super().__init__(transaction_hash, block_number, block_hash)
+
+        self.secret_registry_address = secret_registry_address
+        self.secrethash = secrethash
+        self.secret = secret
+
+    def __repr__(self) -> str:
+        return (
+            "<ContractReceiveSecretRevealLight"
+            " secret_registry:{} secrethash:{} secret:{} block:{}"
+            ">"
+        ).format(
+            pex(self.secret_registry_address),
+            pex(self.secrethash),
+            pex(self.secret),
+            self.block_number,
+        )
+
+    def __eq__(self, other: Any) -> bool:
+        return (
+            isinstance(other, ContractReceiveSecretRevealLight)
+            and self.secret_registry_address == other.secret_registry_address
+            and self.secrethash == other.secrethash
+            and self.secret == other.secret
+            and super().__eq__(other)
+        )
+
+    def __ne__(self, other: Any) -> bool:
+        return not self.__eq__(other)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "transaction_hash": serialize_bytes(self.transaction_hash),
+            "secret_registry_address": to_checksum_address(self.secret_registry_address),
+            "secrethash": serialize_bytes(self.secrethash),
+            "secret": serialize_bytes(self.secret),
+            "block_number": str(self.block_number),
+            "block_hash": serialize_bytes(self.block_hash),
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "ContractReceiveSecretRevealLight":
+        return cls(
+            transaction_hash=deserialize_transactionhash(data["transaction_hash"]),
+            secret_registry_address=to_canonical_address(data["secret_registry_address"]),
+            secrethash=deserialize_secret_hash(data["secrethash"]),
+            secret=deserialize_secret(data["secret"]),
+            block_number=BlockNumber(int(data["block_number"])),
+            block_hash=BlockHash(deserialize_bytes(data["block_hash"])),
+        )
+
+
 class ContractReceiveChannelBatchUnlock(ContractReceiveStateChange):
     """ All the locks were claimed via the blockchain.
 
