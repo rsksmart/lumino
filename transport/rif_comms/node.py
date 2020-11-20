@@ -2,7 +2,7 @@ import json
 from typing import Any, Dict
 
 import structlog
-from eth_utils import to_checksum_address, is_binary_address
+from eth_utils import is_binary_address
 from gevent import Greenlet, killall, wait, spawn
 from greenlet import GreenletExit
 from raiden.exceptions import InvalidAddress, UnknownAddress, UnknownTokenAddress
@@ -45,7 +45,7 @@ class Node(TransportNode):
         self._rif_comms_connect_stream: Notification = None
         self._our_topic_stream: Notification = None
         self._our_topic_thread: Greenlet = None
-        self._comms_client = RIFCommsClient(to_checksum_address(address), self._config["grpc_endpoint"])
+        self._comms_client = RIFCommsClient(address, self._config["grpc_endpoint"])
         print("RIFCommsNode init on GRPC endpoint: {}".format(self._config["grpc_endpoint"]))
 
         # initialize message queues
@@ -86,7 +86,7 @@ class Node(TransportNode):
         """
         Start a listener greenlet to listen for received messages in the background.
         """
-        our_address = to_checksum_address(self.raiden_service.address)
+        our_address = self.raiden_service.address
         self._our_topic_stream = self._comms_client.subscribe_to(our_address)
         # TODO: remove this after GRPC API request blocking is fixed
         self._comms_client._get_peer_id(our_address)
