@@ -71,7 +71,10 @@ class App:  # pylint: disable=too-few-public-methods
                 "server": "auto",
             },
             "rif_comms": {
-                "grpc_endpoint": DEFAULT_RIF_COMMS_GRPC_ENDPOINT
+                "grpc_endpoint": DEFAULT_RIF_COMMS_GRPC_ENDPOINT,
+                "retries_before_backoff": DEFAULT_TRANSPORT_RETRIES_BEFORE_BACKOFF,
+                "retry_interval": DEFAULT_TRANSPORT_MATRIX_RETRY_INTERVAL
+
             }
         },
         "rpc": True,

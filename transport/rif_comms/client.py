@@ -1,3 +1,4 @@
+from eth_utils import to_checksum_address
 from grpc import insecure_channel
 
 from raiden.utils import Address
@@ -24,7 +25,7 @@ class Client:
         :param rsk_address: RSK address of the node that wants to use the RIF Communications server
         :param grpc_api_endpoint: GRPC URI of the RIF Communications pub-sub node
         """
-        self.rsk_address = RskAddress(address=rsk_address)
+        self.rsk_address = RskAddress(address=to_checksum_address(rsk_address))
         self.grpc_channel = insecure_channel(grpc_api_endpoint)  # TODO: how to make this secure?
         self.stub = CommunicationsApiStub(self.grpc_channel)
 
@@ -46,7 +47,7 @@ class Client:
         :return: notification stream for receiving messages
         """
         # TODO: catch already subscribed and any error
-        return self.stub.CreateTopicWithRskAddress(RskAddress(address=rsk_address))
+        return self.stub.CreateTopicWithRskAddress(RskAddress(address=to_checksum_address(rsk_address)))
 
     def is_subscribed_to(self, rsk_address: Address) -> bool:
         """
@@ -57,7 +58,7 @@ class Client:
         :return: boolean value indicating whether the client is subscribed or not
         """
         our_peer_id = self._get_peer_id(self.rsk_address)
-        topic_id = self._get_peer_id(rsk_address)
+        topic_id = self._get_peer_id(to_checksum_address(rsk_address))
         return self.stub.HasSubscriber(
             Subscriber(
                 peerId=our_peer_id,
@@ -72,7 +73,7 @@ class Client:
         :param payload: the message data to be sent
         :param rsk_address: the destination for the message to be sent to
         """
-        topic_id = self._get_peer_id(rsk_address)
+        topic_id = self._get_peer_id(to_checksum_address(rsk_address))
         # TODO: message encoding
         self.stub.SendMessageToTopic(
             PublishPayload(
@@ -87,7 +88,7 @@ class Client:
         Invokes the CloseTopic GRPC API endpoint.
         :param rsk_address: RSK address which corresponds to the topic which the client is unsubscribing from.
         """
-        topic_id = self._get_peer_id(rsk_address)
+        topic_id = self._get_peer_id(to_checksum_address(rsk_address))
         self.stub.CloseTopic(Channel(channelId=topic_id))
 
     def disconnect(self):
@@ -109,4 +110,4 @@ class Client:
                 status = StatusCode.UNKNOWN
                 details = "Failed to lookup key! No peers from routing table!"
         """
-        return self.stub.LocatePeerId(RskAddress(address=rsk_address)).address
+        return self.stub.LocatePeerId(RskAddress(address=to_checksum_address(rsk_address))).address

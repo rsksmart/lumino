@@ -5,7 +5,7 @@ import unittest
 import grpc
 import pytest
 from coincurve import PublicKey
-from eth_utils import to_checksum_address
+from eth_utils import to_checksum_address, to_canonical_address
 from grpc._channel import _InactiveRpcError
 from sha3 import keccak_256
 from transport.rif_comms.client import Client as RIFCommsClient
@@ -20,11 +20,11 @@ def get_random_address_str() -> str:
     return to_checksum_address(addr)
 
 
-LUMINO_1_ADDRESS = "0xe717e81105471648a152381aE6De4c878343E2sb2"
+LUMINO_1_ADDRESS = to_canonical_address("0x8cb891510dF75C223C53f910A98c3b61B9083c3B")
 LUMINO_1_COMMS_API = "localhost:5013"
 
 LUMINO_2_COMMS_API = "localhost:5016"
-LUMINO_2_ADDRESS = "0x138af366e0ed7cc4b9747a935d1b5f75a86b9d83"
+LUMINO_2_ADDRESS = to_canonical_address("0xeBfF0EEe8E2b6952E589B0475e3F0E34dA0655B1")
 
 UNREGISTERED_ADDRESS = get_random_address_str()
 
@@ -118,7 +118,6 @@ class TestRiffCommsClient(unittest.TestCase):
         peer_id = self.rif_comms_client._get_peer_id(LUMINO_1_ADDRESS)
         self.rif_comms_client.disconnect()
 
-    @pytest.mark.skip(reason="ignore")
     def test_send_lumino_message(self):
         channel = grpc.insecure_channel(LUMINO_2_COMMS_API)
         stub = CommunicationsApiStub(channel)

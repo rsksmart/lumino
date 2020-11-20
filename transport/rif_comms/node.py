@@ -3,8 +3,9 @@ from typing import Any, Dict
 
 import structlog
 from eth_utils import is_binary_address
-from gevent import Greenlet, killall, wait, spawn
+from gevent import wait
 from greenlet import GreenletExit
+
 from raiden.exceptions import InvalidAddress, UnknownAddress, UnknownTokenAddress
 from raiden.message_handler import MessageHandler
 from raiden.messages import (
@@ -44,7 +45,6 @@ class Node(TransportNode):
         # set up comms node
         self._rif_comms_connect_stream: Notification = None
         self._our_topic_stream: Notification = None
-        self._our_topic_thread: Greenlet = None
         self._comms_client = RIFCommsClient(address, self._config["grpc_endpoint"])
         print("RIFCommsNode init on GRPC endpoint: {}".format(self._config["grpc_endpoint"]))
 
@@ -67,8 +67,6 @@ class Node(TransportNode):
         # connect to rif comms node
         # TODO: this shouldn't need to be assigned, it is only done because otherwise the code hangs
         self._rif_comms_connect_stream = self._comms_client.connect()
-
-        # subscribe to our own topic to receive messages
         self._start_message_listener()
 
         # start pre-loaded message queues
@@ -88,10 +86,7 @@ class Node(TransportNode):
         """
         our_address = self.raiden_service.address
         self._our_topic_stream = self._comms_client.subscribe_to(our_address)
-        # TODO: remove this after GRPC API request blocking is fixed
-        self._comms_client._get_peer_id(our_address)
-        self._our_topic_thread = spawn(self._receive_messages)
-        self._our_topic_thread.name = f"RIFCommsClient.listen_messages rsk_address:{self.address}"
+
 
     def _receive_messages(self):
         """
@@ -187,13 +182,13 @@ class Node(TransportNode):
         try:
             # waits on stop_event.ready()
             # children crashes should throw an exception here
-            # TODO: figure out if something else is needed here
+            self._receive_messages()
             self.log.info("RIF Comms Node _run")
         except GreenletExit:  # killed without exception
             self.stop_event.set()
-            killall(self._our_topic_thread)  # kill children
             raise  # re-raise to keep killed status
-        except Exception:
+        except Exception as e:
+            print(e)
             self.stop()  # ensure cleanup and wait on subtasks
             raise
 
@@ -218,7 +213,7 @@ class Node(TransportNode):
         self._stop_message_listener()  # stop sync_thread, wait for client's greenlets
 
         # wait for our own greenlets, no need to get on them, exceptions should be raised in _run()
-        wait([self._our_topic_thread] + [r.greenlet for r in self._address_to_message_queue.values()])
+        wait([self.greenlet] + [r.greenlet for r in self._address_to_message_queue.values()])
 
         self._comms_client.disconnect()
 
@@ -235,10 +230,10 @@ class Node(TransportNode):
         """
         Kill message listener greenlet.
         """
-        if self._our_topic_thread:
-            self._our_topic_thread.kill()
-            self._our_topic_thread.get()
-        self._our_topic_thread = None
+        if self.greenlet:
+            self.greenlet.kill()
+            self.greenlet.get()
+        self.greenlet = None
 
     def enqueue_message(self, message: TransportMessage, recipient: Address):
         """
@@ -288,12 +283,13 @@ class Node(TransportNode):
         Send text message through the RIF Comms client.
         """
         # check if we have a subscription for that receiver address
-        is_subscribed_to_receiver_topic = self._comms_client.is_subscribed_to(recipient)
+        to_checksum_recipient = to_checksum_address(recipient)
+        is_subscribed_to_receiver_topic = self._comms_client.is_subscribed_to(to_checksum_recipient)
         # if not, create the topic subscription
         if not is_subscribed_to_receiver_topic:
-            self._comms_client.subscribe_to(recipient)
+            self._comms_client.subscribe_to(to_checksum_recipient)
         # send the message
-        self._comms_client.send_message(payload, recipient)  # TODO: exception handling for RIF Comms client
+        self._comms_client.send_message(payload, to_checksum_recipient)  # TODO: exception handling for RIF Comms client
         self.log.info(
             "RIF Comms send message", message_payload=payload.replace("\n", "\\n"), recipient=pex(recipient)
         )
