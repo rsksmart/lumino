@@ -3,8 +3,9 @@ from typing import Any, Dict
 
 import structlog
 from eth_utils import is_binary_address
-from gevent import killall, wait
+from gevent import wait
 from greenlet import GreenletExit
+
 from raiden.exceptions import InvalidAddress, UnknownAddress, UnknownTokenAddress
 from raiden.message_handler import MessageHandler
 from raiden.messages import (
@@ -66,8 +67,6 @@ class Node(TransportNode):
         # connect to rif comms node
         # TODO: this shouldn't need to be assigned, it is only done because otherwise the code hangs
         self._rif_comms_connect_stream = self._comms_client.connect()
-
-        # subscribe to our own topic to receive messages
         self._start_message_listener()
 
         # start pre-loaded message queues
@@ -87,6 +86,7 @@ class Node(TransportNode):
         """
         our_address = self.raiden_service.address
         self._our_topic_stream = self._comms_client.subscribe_to(our_address)
+
 
     def _receive_messages(self):
         """
@@ -186,9 +186,9 @@ class Node(TransportNode):
             self.log.info("RIF Comms Node _run")
         except GreenletExit:  # killed without exception
             self.stop_event.set()
-            killall(self._our_topic_thread)  # kill children
             raise  # re-raise to keep killed status
-        except Exception:
+        except Exception as e:
+            print(e)
             self.stop()  # ensure cleanup and wait on subtasks
             raise
 
