@@ -1,5 +1,6 @@
 import json
 import secrets
+import time
 import unittest
 
 import grpc
@@ -36,13 +37,13 @@ UNREGISTERED_ADDRESS = get_random_address_str()
 @pytest.fixture(scope="class")
 def rif_comms_client(request):
     rif_comms_client1 = RIFCommsClient(LUMINO_1_ADDRESS, LUMINO_1_COMMS_API)
-    rif_comms_client2 = RIFCommsClient(LUMINO_3_ADDRESS, LUMINO_1_COMMS_API)
+    rif_comms_client2 = RIFCommsClient(LUMINO_2_ADDRESS, LUMINO_2_COMMS_API)
 
     def teardown():
         rif_comms_client1.disconnect()
         rif_comms_client2.disconnect()
 
-    request.addfinalizer(teardown)
+    #request.addfinalizer(teardown)
     request.cls.rif_comms_client1 = rif_comms_client1
     request.cls.rif_comms_client2 = rif_comms_client2
 
@@ -59,78 +60,57 @@ class TestRiffCommsClient(unittest.TestCase):
     - Others uses both LUMINO_1_ADDRESS and LUMINO_2_ADDRESS to represent two separeted peers
     - ALl the tests assumes that there is a RIF COMMS node already running
     """
-
     @pytest.mark.skip(reason="ignore")
     def test_initialization(self):
+        response = self.rif_comms_client1.connect()
         assert self.rif_comms_client1 is not None
+        time.sleep(5)
 
     @pytest.mark.skip(reason="ignore")
     def test_locate_peer_id(self):
-        response = self.rif_comms_client.connect()
-        peer_id = self.rif_comms_client._get_peer_id(LUMINO_1_ADDRESS)
+        response = self.rif_comms_client1.connect()
+        peer_id = self.rif_comms_client1._get_peer_id(LUMINO_1_ADDRESS)
         print(f"test_locate_peer_id peer_id = {peer_id}")
         assert peer_id is not None
 
     @pytest.mark.skip(reason="ignore")
-    def test_locate_unregistered_peer_id(self):
-        self.assertRaises(_InactiveRpcError, lambda: self.rif_comms_client1._get_peer_id(UNREGISTERED_ADDRESS))
+    def test_locate_other_peer_id(self):
+        response = self.rif_comms_client1.connect()
+        peer_id = self.rif_comms_client1._get_peer_id(LUMINO_3_ADDRESS)
+        print(f"test_locate_peer_id peer_id = {peer_id}")
+        assert peer_id is ""
 
-    @pytest.mark.skip(reason="ignore")
+    @pytest.mark.skipif(reason="rif comms issue infinite loop")
     def test_create_random_topic_id_without_connection(self):
         notification = self.rif_comms_client1.connect()
-        peer_id = self.rif_comms_client1.get_peer_id(LUMINO_1_ADDRESS)
-        channel = self.rif_comms_client1.subscribe(get_random_address_str())
-        peer_id = self.rif_comms_client1.get_peer_id(LUMINO_1_ADDRESS)
-        # TODO: this should be fixed with the next RIF Comms pub-sub release
-        self.assertRaises(_InactiveRpcError, lambda: self.rif_comms_client._get_peer_id(UNREGISTERED_ADDRESS))
+        channel = self.rif_comms_client1.subscribe_to(get_random_address_str())
+        peer_id = self.rif_comms_client1._get_peer_id(LUMINO_3_ADDRESS)
 
-    @pytest.mark.skip(reason="ignore")
-    def test_create_random_topic_id_without_connection(self):
-        # TODO: this should be fixed with the next RIF Comms pub-sub release
-        notification = self.rif_comms_client.connect()
-        peer_id = self.rif_comms_client._get_peer_id(LUMINO_1_ADDRESS)
-        channel = self.rif_comms_client.subscribe_to(get_random_address_str())
-        peer_id = self.rif_comms_client._get_peer_id(LUMINO_1_ADDRESS)
 
-    @pytest.mark.skip(reason="ignore")
-    def test_subscribe(self):
-        # TODO: this is failing with "peer is not subscribed to"
-        channel = grpc.insecure_channel(LUMINO_1_COMMS_API)
-        stub = CommunicationsApiStub(channel)
-        rsk_address = RskAddress(address=LUMINO_1_ADDRESS)
-        notification = stub.ConnectToCommunicationsNode(rsk_address)
-        channel = stub.CreateTopicWithRskAddress(rsk_address)
-        subscribers = stub.GetSubscribers(Channel(channelId=LUMINO_1_ADDRESS))
-
-    @pytest.mark.skip(reason="ignore")
+    @pytest.mark.skip(reason="rif comms issue infinite loop")
     def test_has_subscriber(self):
-        # TODO: test with RSK address instead of peer ID
-        channel = grpc.insecure_channel(LUMINO_1_COMMS_API)
-        stub = CommunicationsApiStub(channel)
-        rsk_address = RskAddress(address=LUMINO_1_ADDRESS)
-        notification = stub.ConnectToCommunicationsNode(rsk_address)
-        channel = stub.CreateTopicWithPeerId(rsk_address)
-        peer_id = stub.LocatePeerId(rsk_address)
+        notification = self.rif_comms_client1.connect()
+        notification2 = self.rif_comms_client2.connect()
+        channel = self.rif_comms_client1.subscribe_to(LUMINO_2_ADDRESS)
+        time.sleep(10)
+        subscribed = self.rif_comms_client1.is_subscribed_to(LUMINO_2_ADDRESS)
+        print("Subscribed: ", subscribed)
 
-        """
-        message Subscriber {
-            string peerId = 1;
-            Channel channel = 2;
-        }
-        """
-        has_subscriber = stub.HasSubscriber(
-            Subscriber(
-                peerId=peer_id.address,
-                channel=Channel(channelId=LUMINO_1_ADDRESS)
-            )
-        )
-        print("has_subscriber", has_subscriber)
+
+
+    @pytest.mark.skip(reason="works but subscribed equals False")
+    def test_has_subscriber_self(self):
+        notification = self.rif_comms_client1.connect()
+        channel = self.rif_comms_client1.subscribe_to(LUMINO_1_ADDRESS)
+        subscribed = self.rif_comms_client1.is_subscribed_to(LUMINO_1_ADDRESS)
+        print("Subscribed: ", subscribed)
 
     @pytest.mark.skip(reason="ignore")
     def test_disconnect(self):
         notification = self.rif_comms_client.connect()
         peer_id = self.rif_comms_client._get_peer_id(LUMINO_1_ADDRESS)
         self.rif_comms_client.disconnect()
+        # TODO check if end comms deletes topics
 
     @pytest.mark.skip(reason="ignore")
     def test_send_lumino_message(self):
@@ -175,68 +155,34 @@ class TestRiffCommsClient(unittest.TestCase):
         )
 
     @pytest.mark.skip(reason="ignore")
-    def test_two_clients_same_topic_subscription(self):
-        """
-         Right now this works but fails on the rif comms node because of this.peer_id.eq is not a function.
-         We can only subscribe to the registered address
-
-        """
+    def test_two_clients_topic_subscription(self):
         notification_stream_1 = self.rif_comms_client1.connect()
-        peer_id_1 = self.rif_comms_client1.get_peer_id(LUMINO_1_ADDRESS)
 
         notification_stream_2 = self.rif_comms_client2.connect()
-        peer_id_2 = self.rif_comms_client2.get_peer_id(LUMINO_1_ADDRESS)
 
-        random_topic_id = get_random_address_str()
-        subscription1 = self.rif_comms_client1.subscribe(random_topic_id)
+        one_own_sub = self.rif_comms_client1.subscribe_to(LUMINO_1_ADDRESS)
+        one_two_sub = self.rif_comms_client1.subscribe_to(LUMINO_2_ADDRESS)
 
-        subscription2 = self.rif_comms_client2.subscribe(random_topic_id)
+        two_own_sub = self.rif_comms_client2.subscribe_to(LUMINO_2_ADDRESS)
+        two_one_sub = self.rif_comms_client2.subscribe_to(LUMINO_1_ADDRESS)
+
+        peer_id_1 = self.rif_comms_client2._get_peer_id(LUMINO_2_ADDRESS)
 
     @pytest.mark.skip(reason="ignore")
-    def test_two_clients_different_topic_subscription(self):
-        """
-         This actually works but only because the client1 registered address is lumino 1 and
-         the client2 registered address is lumino 3 specifically.
+    def test_two_clients_listen_same_topic(self):
 
-        """
         notification_stream_1 = self.rif_comms_client1.connect()
-        peer_id_1 = self.rif_comms_client1.get_peer_id(LUMINO_1_ADDRESS)
 
         notification_stream_2 = self.rif_comms_client2.connect()
-        peer_id_2 = self.rif_comms_client2.get_peer_id(LUMINO_1_ADDRESS)
 
-        subscription1 = self.rif_comms_client1.subscribe(LUMINO_1_ADDRESS)
+        one_own_sub = self.rif_comms_client1.subscribe_to(LUMINO_1_ADDRESS)
+        two_one_sub = self.rif_comms_client2.subscribe_to(LUMINO_1_ADDRESS)
 
-        subscription2 = self.rif_comms_client2.subscribe(LUMINO_3_ADDRESS)
+        peer_id_1 = self.rif_comms_client2._get_peer_id(LUMINO_2_ADDRESS)
 
-    @pytest.mark.skip(reason="ignore")
-    def test_two_clients_same_topic_subscription_using_subscribe(self):
-        """
-         Right now this works but fails on the rif comms node because of this.peer_id.eq is not a function.
-         We can only subscribe to the registered address
+        for resp in one_own_sub:
+            print("Respone for 1: ", resp)
 
-        """
-        notification_stream_1 = self.rif_comms_client1.connect()
-        peer_id_1 = self.rif_comms_client1.get_peer_id(LUMINO_1_ADDRESS)
+        for resp in two_one_sub:
+            print("Respone for 2: ", resp)
 
-        notification_stream_2 = self.rif_comms_client2.connect()
-        peer_id_2 = self.rif_comms_client2.get_peer_id(LUMINO_1_ADDRESS)
-
-        random_topic_id = get_random_address_str()
-
-        subscription1 = self.rif_comms_client1.stub.Subscribe(Channel(channelId=random_topic_id))
-        subscription2 = self.rif_comms_client2.stub.Subscribe(Channel(channelId=random_topic_id))
-
-        """
-            connectToCommunicationsNode {"address":"0xe717e81105471648a152381aE6De4c878343E2sb2","exclusive":false}
-            Adding RSKADDRESS PEER= 16Uiu2HAm9otWzXBcFm7WC2Qufp2h1mpRxK1oox289omHTcKgrpRA  : RSKADDRESS= 0xe717e81105471648a152381aE6De4c878343E2sb2
-            locatePeerID "0xe717e81105471648a152381aE6De4c878343E2sb2" 
-            connectToCommunicationsNode {"address":"0x636BA79E46E0594ECbbEBb4F74B9336Fd4454442","exclusive":false}
-            Adding RSKADDRESS PEER= 16Uiu2HAm9otWzXBcFm7WC2Qufp2h1mpRxK1oox289omHTcKgrpRA  : RSKADDRESS= 0x636BA79E46E0594ECbbEBb4F74B9336Fd4454442
-             - New subscription to 0xe2C21982c47986618C971d917ba99D4aad299401
-            already subscribed
-
-        """
-
-        for resp in subscription2:
-            print("Response for already subscribed ", resp)
