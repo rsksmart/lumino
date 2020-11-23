@@ -701,18 +701,16 @@ def handle_node_change_network_state(
 
     for payment_state in chain_state.get_payment_states():
         for secrethash, subtask in payment_state.secrethashes_to_task.items():
-            # This assert would not have been needed if token_network_identifier, a common attribute
-            # for all TransferTasks was part of the TransferTasks superclass.
-            assert isinstance(subtask, (InitiatorTask, MediatorTask, TargetTask))
-            result = subdispatch_mediatortask(
-                chain_state=chain_state,
-                state_change=state_change,
-                node_address=chain_state.our_address,
-                secrethash=secrethash,
-                token_network_identifier=subtask.token_network_identifier,
-                storage=storage
-            )
-            events.extend(result.events)
+            if isinstance(subtask, MediatorTask):
+                result = subdispatch_mediatortask(
+                    chain_state=chain_state,
+                    state_change=state_change,
+                    node_address=chain_state.our_address,
+                    secrethash=secrethash,
+                    token_network_identifier=subtask.token_network_identifier,
+                    storage=storage
+                )
+                events.extend(result.events)
     return TransitionResult(chain_state, events)
 
 
