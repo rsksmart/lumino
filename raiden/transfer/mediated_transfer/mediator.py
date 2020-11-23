@@ -35,7 +35,8 @@ from raiden.transfer.state import (
     NODE_NETWORK_UNREACHABLE,
     NettingChannelState,
     RouteState,
-    message_identifier_from_prng, NODE_NETWORK_UNKNOWN,
+    message_identifier_from_prng,
+    NODE_NETWORK_UNKNOWN
 )
 from raiden.transfer.state_change import (
     ActionChangeNodeNetworkState,
