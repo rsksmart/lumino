@@ -300,7 +300,7 @@ class Node(TransportNode):
         return self._log
 
     def __repr__(self):
-        node = f" node:{pex(self._raiden_service.address)}" if self._raiden_service else ""
+        node = f" RIF Comms Transport node:{pex(self.address)}"
         return f"<{self.__class__.__name__}{node} id:{id(self)}>"
 
 
@@ -308,3 +308,30 @@ class LightClientNode(Node):
 
     def __init__(self, address: Address, config: dict):
         Node.__init__(self, address, config)
+
+    def _handle_message(self, message: RaidenMessage):
+        """
+        Handle received Raiden message.
+        """
+        if self.stop_event.ready():
+            return  # ignore when node is stopped
+
+        # process message if its type is expected
+        if isinstance(message, (Delivered, Processed, SignedRetrieableMessage)):
+            self.log.info(
+                "Raiden message received",
+                type=type(message),
+                node=pex(self._raiden_service.address),
+                message=message,
+                sender=pex(message.sender),
+            )
+            # Pass message to raiden service for business logic. The message will be stored on the HUB database.
+            self._raiden_service.on_message(message, True)
+        else:
+            self.log.warning(
+                "unexpected type of message received",
+                type=type(message),
+                node=pex(self._raiden_service.address),
+                message=message,
+            )
+
