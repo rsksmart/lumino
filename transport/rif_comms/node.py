@@ -125,7 +125,7 @@ class Node(TransportNode):
             self.log.info(
                 "Raiden message received",
                 type=type(message),
-                node=pex(self._raiden_service.address),
+                node=pex(self.address),
                 message=message,
                 sender=pex(message.sender),
             )
@@ -146,7 +146,7 @@ class Node(TransportNode):
             self.log.warning(
                 "unexpected type of message received",
                 type=type(message),
-                node=pex(self._raiden_service.address),
+                node=pex(self.address),
                 message=message,
             )
 
@@ -167,9 +167,8 @@ class Node(TransportNode):
         """
         Runnable main method. Start a listener greenlet to listen for received messages in the background.
         """
-        self.greenlet.name = f"RIFCommsNode._run node:{pex(self._raiden_service.address)}"
-        our_address = self.raiden_service.address
-        self._our_topic_stream = self._comms_client.subscribe_to(our_address)
+        self.greenlet.name = f"RIFCommsNode._run node:{pex(self.address)}"
+        self._our_topic_stream = self._comms_client.subscribe_to(self.address)
         try:
             # waits on stop_event.ready()
             # children crashes should throw an exception here
@@ -320,7 +319,7 @@ class LightClientNode(Node):
             self.log.info(
                 "Raiden message received",
                 type=type(message),
-                node=pex(self._raiden_service.address),
+                node=pex(self.address),
                 message=message,
                 sender=pex(message.sender),
             )
@@ -330,7 +329,7 @@ class LightClientNode(Node):
             self.log.warning(
                 "unexpected type of message received",
                 type=type(message),
-                node=pex(self._raiden_service.address),
+                node=pex(self.address),
                 message=message,
             )
 
