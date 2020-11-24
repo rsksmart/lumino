@@ -333,3 +333,9 @@ class LightClientNode(Node):
                 message=message,
             )
 
+    def _ack_message(self, message: (Processed, SignedRetrieableMessage)):
+        """
+        Acks must be signed by the Light client first, therefore the transport is not in charge to create and send
+        the Delivered messages.
+        """
+        raise Exception("Do not use _ack_message for light client transport")
