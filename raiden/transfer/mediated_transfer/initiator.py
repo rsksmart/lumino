@@ -254,7 +254,7 @@ def try_new_route_light(
             reason="none of the available routes could be used",
         )
         events.append(transfer_failed)
-
+R
         initiator_state = None
 
     else:

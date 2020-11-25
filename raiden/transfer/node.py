@@ -1,7 +1,4 @@
-import copy
-
 from raiden.lightclient.models.light_client_protocol_message import LightClientProtocolMessageType
-from raiden.tests.unit.fixtures import chain_state
 from raiden.transfer import channel, token_network, views
 from raiden.transfer.architecture import (
     ContractReceiveStateChange,
@@ -48,7 +45,7 @@ from raiden.transfer.state import (
     TargetTask,
     TokenNetworkState,
     LightClientTransportState,
-    NodeTransportState, PaymentMappingState)
+    NodeTransportState)
 from raiden.transfer.state_change import (
     ActionChangeNodeNetworkState,
     ActionChannelClose,
@@ -91,7 +88,7 @@ from raiden.utils.typing import (
     Union,
     Address, AddressHex)
 
-from eth_utils import to_canonical_address
+from eth_utils import to_canonical_address, to_checksum_address
 
 import structlog
 
@@ -205,8 +202,8 @@ def subdispatch_to_all_lockedtransfers(
     chain_state: ChainState, state_change: StateChange, storage=None
 ) -> TransitionResult[ChainState]:
     events = list()
-    for node_address, payment_mapping in chain_state.get_payment_states_by_address():
-        for secrethash in list(payment_mapping.secrethashes_to_task):
+    for node_address, payment_state in chain_state.get_payment_states_by_address():
+        for secrethash in list(payment_state.secrethashes_to_task):
             result = subdispatch_to_paymenttask(chain_state, state_change, node_address, secrethash, storage)
             events.extend(result.events)
     return TransitionResult(chain_state, events)
@@ -702,24 +699,20 @@ def handle_node_change_network_state(
 ) -> TransitionResult[ChainState]:
     events: List[Event] = list()
 
-    node_address = state_change.node_address
-    network_state = state_change.network_state
-    chain_state.nodeaddresses_to_networkstates[node_address] = network_state
+    chain_state.nodeaddresses_to_networkstates[state_change.node_address] = state_change.network_state
 
-    for payment_mapping in chain_state.get_payment_states():
-        for secrethash, subtask in payment_mapping.secrethashes_to_task.items():
-            # This assert would not have been needed if token_network_identifier, a common attribute
-            # for all TransferTasks was part of the TransferTasks superclass.
-            assert isinstance(subtask, (InitiatorTask, MediatorTask, TargetTask))
-            result = subdispatch_mediatortask(
-                chain_state=chain_state,
-                state_change=state_change,
-                node_address=node_address,
-                secrethash=secrethash,
-                token_network_identifier=subtask.token_network_identifier,
-                storage=storage
-            )
-            events.extend(result.events)
+    for payment_state in chain_state.get_payment_states():
+        for secrethash, subtask in payment_state.secrethashes_to_task.items():
+            if isinstance(subtask, MediatorTask):
+                result = subdispatch_mediatortask(
+                    chain_state=chain_state,
+                    state_change=state_change,
+                    node_address=chain_state.our_address,
+                    secrethash=secrethash,
+                    token_network_identifier=subtask.token_network_identifier,
+                    storage=storage
+                )
+                events.extend(result.events)
     return TransitionResult(chain_state, events)
 
 
@@ -880,8 +873,9 @@ def handle_receive_lock_expired_light(
 def handle_receive_transfer_refund(
     chain_state: ChainState, state_change: ReceiveTransferRefund
 ) -> TransitionResult[ChainState]:
+    # this state it's only for mediator nodes so the node address here should be always our address
     return subdispatch_to_paymenttask(
-        chain_state, state_change, state_change.transfer.initiator, state_change.transfer.lock.secrethash
+        chain_state, state_change, chain_state.our_address, state_change.transfer.lock.secrethash
     )
 
 
