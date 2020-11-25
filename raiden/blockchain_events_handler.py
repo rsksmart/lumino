@@ -327,7 +327,7 @@ def handle_channel_closed(raiden: "RaidenService", event: Event):
         else:
             # Must be a light client
             latest_non_closing_balance_proof = LightClientMessageHandler.get_latest_light_client_non_closing_balance_proof(
-                channel_state.identifier, channel_state.partner_state.address, raiden.wal.storage
+                channel_state.identifier, channel_state.our_state.address, raiden.wal.storage
             )
             channel_closed = ContractReceiveChannelClosedLight(
                 transaction_hash=transaction_hash,
@@ -335,8 +335,8 @@ def handle_channel_closed(raiden: "RaidenService", event: Event):
                 canonical_identifier=channel_state.canonical_identifier,
                 block_number=block_number,
                 block_hash=block_hash,
-                closing_participant=channel_state.our_state.address,
-                non_closing_participant=channel_state.partner_state.address,
+                closing_participant=channel_state.partner_state.address,
+                non_closing_participant=channel_state.our_state.address,
                 latest_update_non_closing_balance_proof_data=latest_non_closing_balance_proof
             )
             raiden.handle_and_track_state_change(channel_closed)
