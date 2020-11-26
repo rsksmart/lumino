@@ -8,20 +8,20 @@ from transport.rif_comms.client import Client as RIFCommsClient
 from transport.rif_comms.proto.api_pb2 import Channel, PublishPayload, Msg
 from transport.rif_comms.proto.api_pb2_grpc import CommunicationsApiStub
 
-test_nodes = [
-    {
+test_nodes = dict([
+    (1, {
         "address": to_canonical_address("0x8cb891510dF75C223C53f910A98c3b61B9083c3B"),
         "comms-api": "localhost:5013",
-    },
-    {
+    }),
+    (2, {
         "address": to_canonical_address("0xeBfF0EEe8E2b6952E589B0475e3F0E34dA0655B1"),
         "comms-api": "localhost:5016",
-    },
-    {
+    }),
+    (3, {
         "address": to_canonical_address("0x636BA79E46E0594ECbbEBb4F74B9336Fd4454442"),
         "comms-api": "localhost:5019",
-    },
-]
+    }),
+])
 
 
 @pytest.mark.usefixtures("rif_comms_client")
@@ -79,7 +79,7 @@ class TestRIFCommsClient(unittest.TestCase):
         response = self.client_1.connect()
         assert self.client_1._get_peer_id(self.address_2) is ""
 
-    @pytest.mark.skip(reason="works but subscribed equals False")
+    @pytest.mark.skip(reason="ignore")
     def test_has_subscriber_self(self):
         # register node 1, subscribe to self, check subscription
         notification = self.client_1.connect()
