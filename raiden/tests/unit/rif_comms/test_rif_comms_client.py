@@ -7,11 +7,9 @@ import grpc
 import pytest
 from coincurve import PublicKey
 from eth_utils import to_checksum_address, to_canonical_address
-from grpc._channel import _InactiveRpcError
 from sha3 import keccak_256
-
 from transport.rif_comms.client import Client as RIFCommsClient
-from transport.rif_comms.proto.api_pb2 import RskAddress, Channel, Subscriber, PublishPayload, Msg
+from transport.rif_comms.proto.api_pb2 import Channel, PublishPayload, Msg
 from transport.rif_comms.proto.api_pb2_grpc import CommunicationsApiStub
 
 
@@ -30,8 +28,6 @@ LUMINO_2_ADDRESS = to_canonical_address("0xeBfF0EEe8E2b6952E589B0475e3F0E34dA065
 
 LUMINO_3_ADDRESS = "0x636BA79E46E0594ECbbEBb4F74B9336Fd4454442"
 
-UNREGISTERED_ADDRESS = get_random_address_str()
-
 
 @pytest.mark.usefixtures("rif_comms_client")
 @pytest.fixture(scope="class")
@@ -43,7 +39,7 @@ def rif_comms_client(request):
         rif_comms_client1.disconnect()
         rif_comms_client2.disconnect()
 
-    #request.addfinalizer(teardown)
+    # request.addfinalizer(teardown)
     request.cls.rif_comms_client1 = rif_comms_client1
     request.cls.rif_comms_client2 = rif_comms_client2
 
@@ -60,50 +56,48 @@ class TestRiffCommsClient(unittest.TestCase):
     - Others uses both LUMINO_1_ADDRESS and LUMINO_2_ADDRESS to represent two separeted peers
     - ALl the tests assumes that there is a RIF COMMS node already running
     """
+
     @pytest.mark.skip(reason="ignore")
-    def test_initialization(self):
+    def test_connect(self):
         response = self.rif_comms_client1.connect()
         assert self.rif_comms_client1 is not None
         time.sleep(5)
 
     @pytest.mark.skip(reason="ignore")
-    def test_locate_peer_id(self):
+    def test_locate_own_peer_id(self):
         response = self.rif_comms_client1.connect()
         peer_id = self.rif_comms_client1._get_peer_id(LUMINO_1_ADDRESS)
         print(f"test_locate_peer_id peer_id = {peer_id}")
         assert peer_id is not None
 
     @pytest.mark.skip(reason="ignore")
-    def test_locate_other_peer_id(self):
+    def test_locate_unregistered_peer_id(self):
         response = self.rif_comms_client1.connect()
         peer_id = self.rif_comms_client1._get_peer_id(LUMINO_3_ADDRESS)
         print(f"test_locate_peer_id peer_id = {peer_id}")
         assert peer_id is ""
 
-    @pytest.mark.skipif(reason="rif comms issue infinite loop")
+    @pytest.mark.skip(reason="ignore")
     def test_create_random_topic_id_without_connection(self):
         notification = self.rif_comms_client1.connect()
         channel = self.rif_comms_client1.subscribe_to(get_random_address_str())
         peer_id = self.rif_comms_client1._get_peer_id(LUMINO_3_ADDRESS)
 
-
-    @pytest.mark.skip(reason="rif comms issue infinite loop")
+    @pytest.mark.skip(reason="ignore")
     def test_has_subscriber(self):
         notification = self.rif_comms_client1.connect()
         notification2 = self.rif_comms_client2.connect()
         channel = self.rif_comms_client1.subscribe_to(LUMINO_2_ADDRESS)
         time.sleep(10)
         subscribed = self.rif_comms_client1.is_subscribed_to(LUMINO_2_ADDRESS)
-        print("Subscribed: ", subscribed)
-
-
+        assert subscribed is True
 
     @pytest.mark.skip(reason="works but subscribed equals False")
     def test_has_subscriber_self(self):
         notification = self.rif_comms_client1.connect()
         channel = self.rif_comms_client1.subscribe_to(LUMINO_1_ADDRESS)
         subscribed = self.rif_comms_client1.is_subscribed_to(LUMINO_1_ADDRESS)
-        print("Subscribed: ", subscribed)
+        assert subscribed is True
 
     @pytest.mark.skip(reason="ignore")
     def test_disconnect(self):
@@ -185,4 +179,3 @@ class TestRiffCommsClient(unittest.TestCase):
 
         for resp in two_one_sub:
             print("Respone for 2: ", resp)
-
