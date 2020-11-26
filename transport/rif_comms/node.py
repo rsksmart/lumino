@@ -2,8 +2,8 @@ import json
 from typing import Any, Dict
 
 import structlog
-from eth_utils import is_binary_address
-from gevent import killall, wait
+from eth_utils import is_binary_address, to_canonical_address
+from gevent import killall, wait, time
 from greenlet import GreenletExit
 
 from raiden.exceptions import InvalidAddress, UnknownAddress, UnknownTokenAddress
@@ -109,6 +109,7 @@ class Node(TransportNode):
             content = json.loads(content_text.decode())
             # the message is inside the notification data, encoded by the RIF Comms GRPC api
             message_string = bytes(content["data"]).decode()
+            print("Message received", message_string)
             message_dict = json.loads(message_string)
             return message_from_dict(message_dict)
         return None
@@ -168,7 +169,21 @@ class Node(TransportNode):
         Runnable main method. Start a listener greenlet to listen for received messages in the background.
         """
         self.greenlet.name = f"RIFCommsNode._run node:{pex(self.address)}"
-        self._our_topic_stream = self._comms_client.subscribe_to(self.address)
+        our_peer_id, topic_stream = self._comms_client.subscribe_to(self.address)
+        self._our_topic_stream = topic_stream
+
+        # TODO Remove this before merge. This should be a test case.
+        # BEGIN POC
+        time.sleep(10)
+
+        # subscribe to the other node topic and wait
+        peer_id, other_node_topic_stream = self._comms_client.subscribe_to(
+            to_canonical_address("0x138aF366e0ED7Cc4b9747a935D1b5F75A86b9D83"))
+
+        # now send a message to the other node that is already subscribed
+        self._comms_client.send_message("hello from lumino node",
+                                        peer_id)
+        # END POC
         try:
             # waits on stop_event.ready()
             # children crashes should throw an exception here
@@ -266,9 +281,9 @@ class Node(TransportNode):
         is_subscribed_to_receiver_topic = self._comms_client.is_subscribed_to(recipient)
         # if not, create the topic subscription
         if not is_subscribed_to_receiver_topic:
-            self._comms_client.subscribe_to(recipient)
+            topic_id, _ = self._comms_client.subscribe_to(recipient)
         # send the message
-        self._comms_client.send_message(payload, recipient)  # TODO: exception handling for RIF Comms client
+        self._comms_client.send_message(payload, topic_id)  # TODO: exception handling for RIF Comms client
         self.log.info(
             "RIF Comms send message", message_payload=payload.replace("\n", "\\n"), recipient=pex(recipient)
         )

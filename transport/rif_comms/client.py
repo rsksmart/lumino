@@ -44,10 +44,16 @@ class Client:
         Invokes CreateTopicWithRskAddress GRPC API endpoint.
         The resulting notification stream should only be used for receiving messages; use send_message for sending.
         :param rsk_address: destination RSK address for message sending
-        :return: notification stream for receiving messages
+        :return: peer id and notification stream for receiving messages
         """
+        topic_id = None
         # TODO: catch already subscribed and any error
-        return self.stub.CreateTopicWithRskAddress(RskAddress(address=to_checksum_address(rsk_address)))
+        topic = self.stub.CreateTopicWithRskAddress(RskAddress(address=to_checksum_address(rsk_address)))
+        for response in topic:
+            topic_id = response.channelPeerJoined.peerId
+            break
+        return topic_id, topic
+
 
     def is_subscribed_to(self, rsk_address: Address) -> bool:
         """
@@ -66,14 +72,13 @@ class Client:
             )
         ).value
 
-    def send_message(self, payload: str, rsk_address: Address):
+    def send_message(self, payload: str, topic_id: str):
         """
         Sends a message to a destination RSK address.
         Invokes the SendMessageToTopic GRPC API endpoint.
         :param payload: the message data to be sent
-        :param rsk_address: the destination for the message to be sent to
+        :param topic_id: the topic identifier to be sent to
         """
-        topic_id = self._get_peer_id(to_checksum_address(rsk_address))
         # TODO: message encoding
         self.stub.SendMessageToTopic(
             PublishPayload(
