@@ -61,7 +61,7 @@ class TestRiffCommsClient(unittest.TestCase):
     - ALl the tests assumes that there is a RIF COMMS node already running
     """
     @pytest.mark.skip(reason="ignore")
-    def test_initialization(self):
+    def test_connect(self):
         response = self.rif_comms_client1.connect()
         assert self.rif_comms_client1 is not None
         time.sleep(5)
