@@ -99,7 +99,7 @@ class TestRIFCommsClient(unittest.TestCase):
         # register node 1, get own peer id, disconnect
         notification = self.client_1.connect()
         peer_id = self.client_1._get_peer_id(self.address_1)
-        self.rif_comms_client.disconnect()
+        self.client_1.disconnect()
         # TODO check if end comms deletes topics
 
     @pytest.mark.skip(reason="ignore")
