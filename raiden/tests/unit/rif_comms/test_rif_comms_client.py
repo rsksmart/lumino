@@ -74,27 +74,27 @@ class TestRiffCommsClient(unittest.TestCase):
         assert peer_id is not None
 
     @pytest.mark.skip(reason="ignore")
-    def test_locate_other_peer_id(self):
+    def test_locate_unregistered_peer_id(self):
         response = self.rif_comms_client1.connect()
         peer_id = self.rif_comms_client1._get_peer_id(LUMINO_3_ADDRESS)
         print(f"test_locate_peer_id peer_id = {peer_id}")
         assert peer_id is ""
 
-    @pytest.mark.skipif(reason="rif comms issue infinite loop")
+    @pytest.mark.skip(reason="ignore")
     def test_create_random_topic_id_without_connection(self):
         notification = self.rif_comms_client1.connect()
         channel = self.rif_comms_client1.subscribe_to(get_random_address_str())
         peer_id = self.rif_comms_client1._get_peer_id(LUMINO_3_ADDRESS)
 
 
-    @pytest.mark.skip(reason="rif comms issue infinite loop")
+    @pytest.mark.skip(reason="ignore")
     def test_has_subscriber(self):
         notification = self.rif_comms_client1.connect()
         notification2 = self.rif_comms_client2.connect()
         channel = self.rif_comms_client1.subscribe_to(LUMINO_2_ADDRESS)
         time.sleep(10)
         subscribed = self.rif_comms_client1.is_subscribed_to(LUMINO_2_ADDRESS)
-        print("Subscribed: ", subscribed)
+        assert subscribed is True
 
 
 
@@ -103,7 +103,7 @@ class TestRiffCommsClient(unittest.TestCase):
         notification = self.rif_comms_client1.connect()
         channel = self.rif_comms_client1.subscribe_to(LUMINO_1_ADDRESS)
         subscribed = self.rif_comms_client1.is_subscribed_to(LUMINO_1_ADDRESS)
-        print("Subscribed: ", subscribed)
+        assert subscribed is True
 
     @pytest.mark.skip(reason="ignore")
     def test_disconnect(self):
@@ -185,4 +185,3 @@ class TestRiffCommsClient(unittest.TestCase):
 
         for resp in two_one_sub:
             print("Respone for 2: ", resp)
-
