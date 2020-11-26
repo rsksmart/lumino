@@ -7,11 +7,9 @@ import grpc
 import pytest
 from coincurve import PublicKey
 from eth_utils import to_checksum_address, to_canonical_address
-from grpc._channel import _InactiveRpcError
 from sha3 import keccak_256
-
 from transport.rif_comms.client import Client as RIFCommsClient
-from transport.rif_comms.proto.api_pb2 import RskAddress, Channel, Subscriber, PublishPayload, Msg
+from transport.rif_comms.proto.api_pb2 import Channel, PublishPayload, Msg
 from transport.rif_comms.proto.api_pb2_grpc import CommunicationsApiStub
 
 
@@ -43,7 +41,7 @@ def rif_comms_client(request):
         rif_comms_client1.disconnect()
         rif_comms_client2.disconnect()
 
-    #request.addfinalizer(teardown)
+    # request.addfinalizer(teardown)
     request.cls.rif_comms_client1 = rif_comms_client1
     request.cls.rif_comms_client2 = rif_comms_client2
 
@@ -60,6 +58,7 @@ class TestRiffCommsClient(unittest.TestCase):
     - Others uses both LUMINO_1_ADDRESS and LUMINO_2_ADDRESS to represent two separeted peers
     - ALl the tests assumes that there is a RIF COMMS node already running
     """
+
     @pytest.mark.skip(reason="ignore")
     def test_connect(self):
         response = self.rif_comms_client1.connect()
@@ -86,7 +85,6 @@ class TestRiffCommsClient(unittest.TestCase):
         channel = self.rif_comms_client1.subscribe_to(get_random_address_str())
         peer_id = self.rif_comms_client1._get_peer_id(LUMINO_3_ADDRESS)
 
-
     @pytest.mark.skip(reason="ignore")
     def test_has_subscriber(self):
         notification = self.rif_comms_client1.connect()
@@ -95,8 +93,6 @@ class TestRiffCommsClient(unittest.TestCase):
         time.sleep(10)
         subscribed = self.rif_comms_client1.is_subscribed_to(LUMINO_2_ADDRESS)
         assert subscribed is True
-
-
 
     @pytest.mark.skip(reason="works but subscribed equals False")
     def test_has_subscriber_self(self):
