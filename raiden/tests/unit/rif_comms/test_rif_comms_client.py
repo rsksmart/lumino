@@ -67,7 +67,7 @@ class TestRiffCommsClient(unittest.TestCase):
         time.sleep(5)
 
     @pytest.mark.skip(reason="ignore")
-    def test_locate_peer_id(self):
+    def test_locate_own_peer_id(self):
         response = self.rif_comms_client1.connect()
         peer_id = self.rif_comms_client1._get_peer_id(LUMINO_1_ADDRESS)
         print(f"test_locate_peer_id peer_id = {peer_id}")
