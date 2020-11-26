@@ -28,8 +28,6 @@ LUMINO_2_ADDRESS = to_canonical_address("0xeBfF0EEe8E2b6952E589B0475e3F0E34dA065
 
 LUMINO_3_ADDRESS = "0x636BA79E46E0594ECbbEBb4F74B9336Fd4454442"
 
-UNREGISTERED_ADDRESS = get_random_address_str()
-
 
 @pytest.mark.usefixtures("rif_comms_client")
 @pytest.fixture(scope="class")
