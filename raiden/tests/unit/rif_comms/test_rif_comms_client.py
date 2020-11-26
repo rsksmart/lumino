@@ -11,15 +11,15 @@ from transport.rif_comms.proto.api_pb2_grpc import CommunicationsApiStub
 test_nodes = [
     {
         "address": to_canonical_address("0x8cb891510dF75C223C53f910A98c3b61B9083c3B"),
-        "comms_api": "localhost:5013",
+        "comms-api": "localhost:5013",
     },
     {
         "address": to_canonical_address("0xeBfF0EEe8E2b6952E589B0475e3F0E34dA0655B1"),
-        "comms_api": "localhost:5016",
+        "comms-api": "localhost:5016",
     },
     {
         "address": to_canonical_address("0x636BA79E46E0594ECbbEBb4F74B9336Fd4454442"),
-        "comms_api": "localhost:5019",
+        "comms-api": "localhost:5019",
     },
 ]
 
@@ -65,13 +65,13 @@ class TestRIFCommsClient(unittest.TestCase):
     @pytest.mark.skip(reason="ignore")
     def test_connect(self):
         response = self.client_1.connect()
-        assert self.client_1 is not None
+        assert response is not None
 
     @pytest.mark.skip(reason="ignore")
     def test_locate_own_peer_id(self):
         # register node 1, locate node 1
         response = self.client_1.connect()
-        assert self.client_2._get_peer_id(self.address_1) is not ""
+        assert self.client_1._get_peer_id(self.address_1) is not ""
 
     @pytest.mark.skip(reason="ignore")
     def test_locate_unregistered_peer_id(self):
