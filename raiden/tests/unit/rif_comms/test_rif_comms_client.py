@@ -1,119 +1,118 @@
 import json
-import secrets
-import time
 import unittest
 
 import grpc
 import pytest
-from coincurve import PublicKey
-from eth_utils import to_checksum_address, to_canonical_address
-from sha3 import keccak_256
+from eth_utils import to_canonical_address
 from transport.rif_comms.client import Client as RIFCommsClient
 from transport.rif_comms.proto.api_pb2 import Channel, PublishPayload, Msg
 from transport.rif_comms.proto.api_pb2_grpc import CommunicationsApiStub
 
-
-def get_random_address_str() -> str:
-    private_key = keccak_256(secrets.token_bytes(32)).digest()
-    public_key = PublicKey.from_valid_secret(private_key).format(compressed=False)[1:]
-    addr = keccak_256(public_key).digest()[-20:]
-    return to_checksum_address(addr)
-
-
-LUMINO_1_ADDRESS = to_canonical_address("0x8cb891510dF75C223C53f910A98c3b61B9083c3B")
-LUMINO_1_COMMS_API = "localhost:5013"
-
-LUMINO_2_COMMS_API = "localhost:5016"
-LUMINO_2_ADDRESS = to_canonical_address("0xeBfF0EEe8E2b6952E589B0475e3F0E34dA0655B1")
-
-LUMINO_3_ADDRESS = "0x636BA79E46E0594ECbbEBb4F74B9336Fd4454442"
+test_nodes = [
+    {
+        "address": to_canonical_address("0x8cb891510dF75C223C53f910A98c3b61B9083c3B"),
+        "comms_api": "localhost:5013",
+    },
+    {
+        "address": to_canonical_address("0xeBfF0EEe8E2b6952E589B0475e3F0E34dA0655B1"),
+        "comms_api": "localhost:5016",
+    },
+    {
+        "address": to_canonical_address("0x636BA79E46E0594ECbbEBb4F74B9336Fd4454442"),
+        "comms_api": "localhost:5019",
+    },
+]
 
 
 @pytest.mark.usefixtures("rif_comms_client")
 @pytest.fixture(scope="class")
 def rif_comms_client(request):
-    rif_comms_client1 = RIFCommsClient(LUMINO_1_ADDRESS, LUMINO_1_COMMS_API)
-    rif_comms_client2 = RIFCommsClient(LUMINO_2_ADDRESS, LUMINO_2_COMMS_API)
+    address_1 = test_nodes[1]["address"]
+    api_1 = test_nodes[1]["comms-api"]
+    client_1 = RIFCommsClient(test_nodes[1]["address"], test_nodes[1]["comms-api"])
+
+    address_2 = test_nodes[2]["address"]
+    api_2 = test_nodes[2]["comms-api"]
+    client_2 = RIFCommsClient(test_nodes[2]["address"], test_nodes[2]["comms-api"])
 
     def teardown():
-        rif_comms_client1.disconnect()
-        rif_comms_client2.disconnect()
+        client_1.disconnect()
+        client_2.disconnect()
 
     # request.addfinalizer(teardown)
-    request.cls.rif_comms_client1 = rif_comms_client1
-    request.cls.rif_comms_client2 = rif_comms_client2
+    request.cls.client_1 = client_1
+    request.cls.address_1 = address_1
+    request.cls.api_1 = api_1
+
+    request.cls.client_2 = client_2
+    request.cls.address_2 = address_2
+    request.cls.api_2 = api_2
 
 
 @pytest.mark.usefixtures("rif_comms_client")
-class TestRiffCommsClient(unittest.TestCase):
+class TestRIFCommsClient(unittest.TestCase):
     """
     Test for RIFCommsClient. This class is for test the basic operations of the client.
 
     How to use it:
 
-    - Modify the LUMINO_1_COMMS_API, LUMINO_2_COMMS_API, LUMINO_1_ADDRESS and LUMINO_2_ADDRESS
-    - Some tests uses LUMINO_1_ADDRESS as a representation of the Lumino keystore
-    - Others uses both LUMINO_1_ADDRESS and LUMINO_2_ADDRESS to represent two separeted peers
-    - ALl the tests assumes that there is a RIF COMMS node already running
+    - modify the test_nodes address and rif_comms_api fields
+    - addresses are used as representations of the Lumino keystore
+    - each of the nodes is used as a separate peer
+    - all tests assume that there is a RIF COMMS node already running
     """
 
     @pytest.mark.skip(reason="ignore")
     def test_connect(self):
-        response = self.rif_comms_client1.connect()
-        assert self.rif_comms_client1 is not None
-        time.sleep(5)
+        response = self.client_1.connect()
+        assert self.client_1 is not None
 
     @pytest.mark.skip(reason="ignore")
     def test_locate_own_peer_id(self):
-        response = self.rif_comms_client1.connect()
-        peer_id = self.rif_comms_client1._get_peer_id(LUMINO_1_ADDRESS)
-        print(f"test_locate_peer_id peer_id = {peer_id}")
-        assert peer_id is not None
+        # register node 1, locate node 1
+        response = self.client_1.connect()
+        assert self.client_2._get_peer_id(self.address_1) is not ""
 
     @pytest.mark.skip(reason="ignore")
     def test_locate_unregistered_peer_id(self):
-        response = self.rif_comms_client1.connect()
-        peer_id = self.rif_comms_client1._get_peer_id(LUMINO_3_ADDRESS)
-        print(f"test_locate_peer_id peer_id = {peer_id}")
-        assert peer_id is ""
-
-    @pytest.mark.skip(reason="ignore")
-    def test_create_random_topic_id_without_connection(self):
-        notification = self.rif_comms_client1.connect()
-        channel = self.rif_comms_client1.subscribe_to(get_random_address_str())
-        peer_id = self.rif_comms_client1._get_peer_id(LUMINO_3_ADDRESS)
-
-    @pytest.mark.skip(reason="ignore")
-    def test_has_subscriber(self):
-        notification = self.rif_comms_client1.connect()
-        notification2 = self.rif_comms_client2.connect()
-        channel = self.rif_comms_client1.subscribe_to(LUMINO_2_ADDRESS)
-        time.sleep(10)
-        subscribed = self.rif_comms_client1.is_subscribed_to(LUMINO_2_ADDRESS)
-        assert subscribed is True
+        # register node 1, locate node 2
+        response = self.client_1.connect()
+        assert self.client_1._get_peer_id(self.address_2) is ""
 
     @pytest.mark.skip(reason="works but subscribed equals False")
     def test_has_subscriber_self(self):
-        notification = self.rif_comms_client1.connect()
-        channel = self.rif_comms_client1.subscribe_to(LUMINO_1_ADDRESS)
-        subscribed = self.rif_comms_client1.is_subscribed_to(LUMINO_1_ADDRESS)
-        assert subscribed is True
+        # register node 1, subscribe to self, check subscription
+        notification = self.client_1.connect()
+        self.client_1.subscribe_to(self.address_1)
+        assert self.client_1.is_subscribed_to(self.address_1) is True
+
+    @pytest.mark.skip(reason="ignore")
+    def test_has_subscriber(self):
+        # register nodes 1 and 2, subscribe from 1 to 2, check subscription
+        notification_1 = self.client_1.connect()
+        notification_2 = self.client_2.connect()
+        self.client_1.subscribe_to(self.address_2)
+        assert self.client_1.is_subscribed_to(self.address_2) is True
 
     @pytest.mark.skip(reason="ignore")
     def test_disconnect(self):
-        notification = self.rif_comms_client.connect()
-        peer_id = self.rif_comms_client._get_peer_id(LUMINO_1_ADDRESS)
+        # register node 1, get own peer id, disconnect
+        notification = self.client_1.connect()
+        peer_id = self.client_1._get_peer_id(self.address_1)
         self.rif_comms_client.disconnect()
         # TODO check if end comms deletes topics
 
     @pytest.mark.skip(reason="ignore")
     def test_send_lumino_message(self):
-        channel = grpc.insecure_channel(LUMINO_2_COMMS_API)
+        # this test requires a lumino node started with a comms api matching test_nodes[1]["comms_api"]
+        channel = grpc.insecure_channel(self.api_1)
         stub = CommunicationsApiStub(channel)
-        channel = stub.Subscribe(Channel(
-            channelId="16Uiu2HAm9otWzXBcFm7WC2Qufp2h1mpRxK1oox289omHTcKgrpRA")
-            # got this from subscription of lumino node
-        )
+
+        # TODO: obtain this programmatically
+        channel_id = "16Uiu2HAm9otWzXBcFm7WC2Qufp2h1mpRxK1oox289omHTcKgrpRA"
+        # got this from subscription of lumino node
+
+        channel = stub.Subscribe(Channel(channelId=channel_id))
 
         some_raiden_message = {
             'type': 'LockedTransfer',
@@ -143,39 +142,51 @@ class TestRiffCommsClient(unittest.TestCase):
 
         stub.SendMessageToTopic(
             PublishPayload(
-                topic=Channel(channelId="16Uiu2HAm9otWzXBcFm7WC2Qufp2h1mpRxK1oox289omHTcKgrpRA"),
+                topic=Channel(channelId=channel_id),
                 message=Msg(payload=str.encode(json.dumps(some_raiden_message)))
             )
         )
 
     @pytest.mark.skip(reason="ignore")
-    def test_two_clients_topic_subscription(self):
-        notification_stream_1 = self.rif_comms_client1.connect()
+    def test_two_clients_cross_subscription(self):
+        # register nodes 1 and 2
+        notification_1 = self.client_1.connect()
+        notification_2 = self.client_2.connect()
 
-        notification_stream_2 = self.rif_comms_client2.connect()
+        # subscribe to 1 and 2 on both nodes
+        self.client_1.subscribe_to(self.address_1)
+        self.client_1.subscribe_to(self.address_2)
+        self.client_2.subscribe_to(self.address_1)
+        self.client_2.subscribe_to(self.address_2)
 
-        one_own_sub = self.rif_comms_client1.subscribe_to(LUMINO_1_ADDRESS)
-        one_two_sub = self.rif_comms_client1.subscribe_to(LUMINO_2_ADDRESS)
-
-        two_own_sub = self.rif_comms_client2.subscribe_to(LUMINO_2_ADDRESS)
-        two_one_sub = self.rif_comms_client2.subscribe_to(LUMINO_1_ADDRESS)
-
-        peer_id_1 = self.rif_comms_client2._get_peer_id(LUMINO_2_ADDRESS)
+        assert self.client_1.is_subscribed_to(self.address_1) is True
+        assert self.client_1.is_subscribed_to(self.address_2) is True
+        assert self.client_2.is_subscribed_to(self.address_1) is True
+        assert self.client_2.is_subscribed_to(self.address_2) is True
 
     @pytest.mark.skip(reason="ignore")
-    def test_two_clients_listen_same_topic(self):
+    def test_two_clients_cross_messaging_same_topic(self):
+        # register nodes 1 and 2
+        notification_1 = self.client_1.connect()
+        notification_2 = self.client_2.connect()
 
-        notification_stream_1 = self.rif_comms_client1.connect()
+        # subscribe to 1 on both nodes
+        one_sub_one = self.client_1.subscribe_to(self.address_1)
+        two_sub_one = self.client_2.subscribe_to(self.address_1)
 
-        notification_stream_2 = self.rif_comms_client2.connect()
+        # peer_id_1 = self.client_2._get_peer_id(self.address_2)
 
-        one_own_sub = self.rif_comms_client1.subscribe_to(LUMINO_1_ADDRESS)
-        two_one_sub = self.rif_comms_client2.subscribe_to(LUMINO_1_ADDRESS)
+        expected_messages = 1
+        i, j = 0
 
-        peer_id_1 = self.rif_comms_client2._get_peer_id(LUMINO_2_ADDRESS)
-
-        for resp in one_own_sub:
+        for resp in one_sub_one:
+            i += 1
             print("Respone for 1: ", resp)
+            if i == expected_messages:
+                break
 
-        for resp in two_one_sub:
+        for resp in two_sub_one:
+            j += 1
             print("Respone for 2: ", resp)
+            if j == expected_messages:
+                break
