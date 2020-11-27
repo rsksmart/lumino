@@ -590,7 +590,6 @@ class RaidenEventHandler(EventHandler):
         participant = channel_unlock_event.participant
 
         payment_channel: PaymentChannel = raiden.chain.payment_channel(
-            creator_address=participant,
             canonical_identifier=canonical_identifier
         )
 
@@ -632,85 +631,23 @@ class RaidenEventHandler(EventHandler):
             return
 
         if search_state_changes:
-            state_change_record = get_state_change_with_balance_proof_by_locksroot(
-                storage=raiden.wal.storage,
-                canonical_identifier=canonical_identifier,
-                locksroot=partner_locksroot,
-                sender=partner_address,
-            )
-            state_change_identifier = state_change_record.state_change_identifier
-
-            if not state_change_identifier:
-                raise RaidenUnrecoverableError(
-                    f"Failed to find state that matches the current channel locksroots. "
-                    f"chain_id:{raiden.chain.network_id} "
-                    f"token_network:{to_checksum_address(token_network_identifier)} "
-                    f"channel:{channel_identifier} "
-                    f"participant:{to_checksum_address(participant)} "
-                    f"our_locksroot:{to_hex(our_locksroot)} "
-                    f"partner_locksroot:{to_hex(partner_locksroot)} "
-                )
-
-            restored_channel_state = channel_state_until_state_change(
-                raiden=raiden,
-                canonical_identifier=canonical_identifier,
-                state_change_identifier=state_change_identifier,
-            )
-            assert restored_channel_state is not None
-
-            gain = get_batch_unlock_gain(restored_channel_state)
-
-            skip_unlock = (
-                restored_channel_state.partner_state.address == participant
-                and gain.from_partner_locks == 0
-            )
-            if not skip_unlock:
+            gain = get_batch_unlock_gain(channel_state)
+            if gain.from_partner_locks > 0:
                 unlock(
                     raiden=raiden,
                     payment_channel=payment_channel,
-                    end_state=restored_channel_state.partner_state,
+                    end_state=channel_state.partner_state,
                     participant=our_address,
                     partner=partner_address,
                 )
 
         if search_events:
-            event_record = get_event_with_balance_proof_by_locksroot(
-                storage=raiden.wal.storage,
-                canonical_identifier=canonical_identifier,
-                locksroot=our_locksroot,
-                recipient=partner_address,
-            )
-            state_change_identifier = event_record.state_change_identifier
-
-            if not state_change_identifier:
-                raise RaidenUnrecoverableError(
-                    f"Failed to find event that match current channel locksroots. "
-                    f"chain_id:{raiden.chain.network_id} "
-                    f"token_network:{to_checksum_address(token_network_identifier)} "
-                    f"channel:{channel_identifier} "
-                    f"participant:{to_checksum_address(participant)} "
-                    f"our_locksroot:{to_hex(our_locksroot)} "
-                    f"partner_locksroot:{to_hex(partner_locksroot)} "
-                )
-
-            restored_channel_state = channel_state_until_state_change(
-                raiden=raiden,
-                canonical_identifier=canonical_identifier,
-                state_change_identifier=state_change_identifier,
-            )
-            assert restored_channel_state is not None
-
-            gain = get_batch_unlock_gain(restored_channel_state)
-
-            skip_unlock = (
-                restored_channel_state.our_state.address == participant
-                and gain.from_our_locks == 0
-            )
-            if not skip_unlock:
+            gain = get_batch_unlock_gain(channel_state)
+            if gain.from_our_locks > 0:
                 unlock(
                     raiden=raiden,
                     payment_channel=payment_channel,
-                    end_state=restored_channel_state.our_state,
+                    end_state=channel_state.our_state,
                     participant=partner_address,
                     partner=our_address,
                 )
