@@ -4,7 +4,7 @@ from eth_utils import to_canonical_address
 
 from raiden.constants import MAXIMUM_PENDING_TRANSFERS
 from raiden.lightclient.models.light_client_protocol_message import LightClientProtocolMessageType
-from raiden.messages import LockedTransfer, Unlock
+from raiden.messages import LockedTransfer, Unlock, RevealSecret
 from raiden.settings import DEFAULT_WAIT_BEFORE_LOCK_REMOVAL
 from raiden.transfer import channel
 from raiden.transfer.architecture import Event, TransitionResult
@@ -32,7 +32,8 @@ from raiden.transfer.state import (
     NettingChannelState,
     RouteState,
     message_identifier_from_prng)
-from raiden.transfer.state_change import Block, ContractReceiveSecretReveal, StateChange
+from raiden.transfer.state_change import Block, ContractReceiveSecretReveal, StateChange, \
+    ContractReceiveSecretRevealLight
 from raiden.transfer.utils import is_valid_secret_reveal
 from raiden.utils.typing import (
     MYPY_ANNOTATION,
@@ -721,6 +722,77 @@ def handle_onchain_secretreveal(
     return iteration
 
 
+def handle_onchain_secretreveal_light(
+    initiator_state: InitiatorTransferState,
+    state_change: ContractReceiveSecretRevealLight,
+    channel_state: NettingChannelState,
+    pseudo_random_generator: random.Random,
+) -> TransitionResult[InitiatorTransferState]:
+    """ When a secret is revealed on-chain all nodes learn the secret.
+
+    This check the on-chain secret corresponds to the one used by the
+    initiator, and if valid a new balance proof is sent to the next hop with
+    the current lock removed from the merkle tree and the transferred amount
+    updated.
+    """
+    iteration: TransitionResult[InitiatorTransferState]
+    secret = state_change.secret
+    secrethash = initiator_state.transfer_description.secrethash
+    is_valid_secret = is_valid_secret_reveal(
+        state_change=state_change, transfer_secrethash=secrethash, secret=secret
+    )
+    is_channel_open = channel.get_status(channel_state) == CHANNEL_STATE_OPENED
+    is_lock_expired = state_change.block_number > initiator_state.transfer.lock.expiration
+
+    is_lock_unlocked = is_valid_secret and not is_lock_expired
+
+    if is_lock_unlocked:
+        channel.register_onchain_secret(
+            channel_state=channel_state,
+            secret=secret,
+            secrethash=secrethash,
+            secret_reveal_block_number=state_change.block_number,
+        )
+
+    if is_lock_unlocked and is_channel_open:
+        unlock_events = events_for_unlock_base(
+            initiator_state=initiator_state,
+            channel_state=channel_state,
+            secret=state_change.secret,
+        )
+
+        transfer_description = initiator_state.transfer_description
+
+        message_identifier = message_identifier_from_prng(pseudo_random_generator)
+        unlock_lock = channel.send_unlock(
+            channel_state=channel_state,
+            message_identifier=message_identifier,
+            payment_identifier=transfer_description.payment_identifier,
+            secret=state_change.secret,
+            secrethash=state_change.secrethash,
+        )
+        unlock_msg = Unlock.from_event(unlock_lock)
+        reveal_secret = RevealSecret(secret=state_change.secret, message_identifier=message_identifier_from_prng(pseudo_random_generator))
+        store_received_secret_reveal_event = StoreMessageEvent(message_id=reveal_secret.message_identifier,
+                                                               payment_id=transfer_description.payment_identifier,
+                                                               message_order=9,
+                                                               message=reveal_secret,
+                                                               is_signed=True,
+                                                               message_type=LightClientProtocolMessageType.PaymentSuccessful,
+                                                               light_client_address=transfer_description.initiator)
+        store_created_unlock_event = StoreMessageEvent(message_id=message_identifier,
+                                                       payment_id=transfer_description.payment_identifier,
+                                                       message_order=11,
+                                                       message=unlock_msg,
+                                                       is_signed=False,
+                                                       message_type=LightClientProtocolMessageType.PaymentSuccessful,
+                                                       light_client_address=transfer_description.initiator)
+        events = [store_received_secret_reveal_event, store_created_unlock_event] + unlock_events
+        return TransitionResult(None, events)
+        
+    return TransitionResult(initiator_state, [])
+
+
 def state_transition(
     initiator_state: InitiatorTransferState,
     state_change: StateChange,
@@ -755,6 +827,11 @@ def state_transition(
     elif type(state_change) == ContractReceiveSecretReveal:
         assert isinstance(state_change, ContractReceiveSecretReveal), MYPY_ANNOTATION
         iteration = handle_onchain_secretreveal(
+            initiator_state, state_change, channel_state, pseudo_random_generator
+        )
+    elif type(state_change) == ContractReceiveSecretRevealLight:
+        assert isinstance(state_change, ContractReceiveSecretRevealLight), MYPY_ANNOTATION
+        iteration = handle_onchain_secretreveal_light(
             initiator_state, state_change, channel_state, pseudo_random_generator
         )
     elif type(state_change) == ActionSendSecretRevealLight:

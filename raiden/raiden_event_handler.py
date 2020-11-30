@@ -687,6 +687,7 @@ class RaidenEventHandler(EventHandler):
                     end_state=channel_state.our_state
                 )
 
+
     @staticmethod
     def handle_contract_send_channelsettle(
         raiden: "RaidenService", channel_settle_event: ContractSendChannelSettle
