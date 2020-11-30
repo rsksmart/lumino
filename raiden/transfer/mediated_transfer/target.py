@@ -494,7 +494,7 @@ def handle_onchain_secretreveal(
     state_change: Union[ContractReceiveSecretReveal, ContractReceiveSecretRevealLight],
     channel_state: NettingChannelState,
 ) -> TransitionResult[TargetTransferState]:
-    """ Validates and handles a ContractReceiveSecretReveal state change.
+    """ Validates and handles a ContractReceiveSecretReveal state change. """
     valid_secret = is_valid_secret_reveal(
         state_change=state_change,
         transfer_secrethash=target_state.transfer.lock.secrethash,
@@ -511,7 +511,6 @@ def handle_onchain_secretreveal(
 
         target_state.state = TargetTransferState.ONCHAIN_UNLOCK
         target_state.secret = state_change.secret
-    """
     return TransitionResult(target_state, list())
 
 
