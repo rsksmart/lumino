@@ -734,7 +734,7 @@ def handle_onchain_secretreveal_light(
     initiator, and if valid a new balance proof is sent to the next hop with
     the current lock removed from the merkle tree and the transferred amount
     updated.
-
+    """
     iteration: TransitionResult[InitiatorTransferState]
     secret = state_change.secret
     secrethash = initiator_state.transfer_description.secrethash
@@ -789,8 +789,7 @@ def handle_onchain_secretreveal_light(
                                                        light_client_address=transfer_description.initiator)
         events = [store_received_secret_reveal_event, store_created_unlock_event] + unlock_events
         return TransitionResult(None, events)
-
-    """
+        
     return TransitionResult(initiator_state, [])
 
 

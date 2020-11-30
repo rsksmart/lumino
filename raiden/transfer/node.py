@@ -766,23 +766,13 @@ def handle_secret_reveal(
 def handle_contract_secret_reveal(
     chain_state: ChainState, state_change: ContractReceiveSecretReveal, storage=None
 ) -> TransitionResult[ChainState]:
-    events = list()
-    for node_address, payment_mapping in chain_state.get_payment_states_by_address():
-        for secrethash in list(payment_mapping.secrethashes_to_task):
-            if secrethash == state_change.secrethash:
-                state_change_to_dispatch = state_change \
-                    if node_address == chain_state.our_address \
-                    else ContractReceiveSecretRevealLight(
-                    transaction_hash=state_change.transaction_hash,
-                    secret_registry_address=state_change.secret_registry_address,
-                    secrethash=state_change.secrethash,
-                    secret=state_change.secret,
-                    block_number=state_change.block_number,
-                    block_hash=state_change.block_hash
-                )
-                result = subdispatch_to_paymenttask(chain_state, state_change_to_dispatch, node_address, secrethash, storage)
-            events.extend(result.events)
-    return TransitionResult(chain_state, events)
+    return subdispatch_to_paymenttask(chain_state, state_change, chain_state.our_address, state_change.secrethash)
+
+
+def handle_contract_secret_reveal_light(
+    chain_state: ChainState, state_change: ContractReceiveSecretRevealLight, storage=None
+) -> TransitionResult[ChainState]:
+    return subdispatch_to_paymenttask(chain_state, state_change, state_change.lc_address, state_change.secrethash)
 
 
 def handle_init_initiator(
@@ -1054,6 +1044,9 @@ def handle_state_change(
     elif type(state_change) == ContractReceiveSecretReveal:
         assert isinstance(state_change, ContractReceiveSecretReveal), MYPY_ANNOTATION
         iteration = handle_contract_secret_reveal(chain_state, state_change, storage)
+    elif type(state_change) == ContractReceiveSecretRevealLight:
+        assert isinstance(state_change, ContractReceiveSecretRevealLight), MYPY_ANNOTATION
+        iteration = handle_contract_secret_reveal_light(chain_state, state_change, storage)
     elif type(state_change) == ContractReceiveUpdateTransfer:
         assert isinstance(state_change, ContractReceiveUpdateTransfer), MYPY_ANNOTATION
         iteration = handle_token_network_action(chain_state, state_change)

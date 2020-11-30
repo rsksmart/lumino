@@ -1094,6 +1094,7 @@ class ContractReceiveSecretRevealLight(ContractReceiveStateChange):
         secret: Secret,
         block_number: BlockNumber,
         block_hash: BlockHash,
+        lc_address: Address
     ) -> None:
         if not isinstance(secret_registry_address, T_SecretRegistryAddress):
             raise ValueError("secret_registry_address must be of type SecretRegistryAddress")
@@ -1107,16 +1108,18 @@ class ContractReceiveSecretRevealLight(ContractReceiveStateChange):
         self.secret_registry_address = secret_registry_address
         self.secrethash = secrethash
         self.secret = secret
+        self.lc_address = lc_address
 
     def __repr__(self) -> str:
         return (
             "<ContractReceiveSecretRevealLight"
-            " secret_registry:{} secrethash:{} secret:{} block:{}"
+            " secret_registry:{} secrethash:{} secret:{} block:{} lc_address:{}"
             ">"
         ).format(
             pex(self.secret_registry_address),
             pex(self.secrethash),
             pex(self.secret),
+            pex(self.lc_address),
             self.block_number,
         )
 
@@ -1126,6 +1129,7 @@ class ContractReceiveSecretRevealLight(ContractReceiveStateChange):
             and self.secret_registry_address == other.secret_registry_address
             and self.secrethash == other.secrethash
             and self.secret == other.secret
+            and self.lc_address == other.lc_address
             and super().__eq__(other)
         )
 
@@ -1140,6 +1144,7 @@ class ContractReceiveSecretRevealLight(ContractReceiveStateChange):
             "secret": serialize_bytes(self.secret),
             "block_number": str(self.block_number),
             "block_hash": serialize_bytes(self.block_hash),
+            "lc_address": to_checksum_address(self.lc_address),
         }
 
     @classmethod
@@ -1151,6 +1156,7 @@ class ContractReceiveSecretRevealLight(ContractReceiveStateChange):
             secret=deserialize_secret(data["secret"]),
             block_number=BlockNumber(int(data["block_number"])),
             block_hash=BlockHash(deserialize_bytes(data["block_hash"])),
+            lc_address=to_canonical_address(data["lc_address"]),
         )
 
 

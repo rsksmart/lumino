@@ -1,5 +1,5 @@
 const backendUrl='http://localhost:5002'; 
-const nodeAddress = '0x2Cd53d83E5ca1F3c66EDC7bf307139c6B1989C9a'; 
+const nodeAddress = '0x6dd4d8005E5D2DEA818ae4A8d57c8FA1B5c492C8'; 
 const rnsDomain = null 
 const chainEndpoint = 'http://localhost:4444'; 
 
