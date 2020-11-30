@@ -664,24 +664,28 @@ class RaidenEventHandler(EventHandler):
             canonical_identifier=channel_unlock_event.canonical_identifier,
             participant=channel_unlock_event.participant,
             our_address=channel_unlock_event.client)
-        if should_search_events(channel_state):
-            unlock_light(
-                raiden=raiden,
-                chain_state=chain_state,
-                channel_unlock_event=channel_unlock_event,
-                participant=channel_state.partner_state.address,
-                partner=channel_state.our_state.address,
-                end_state=channel_state.our_state
-            )
         if should_search_state_changes(channel_state):
-            unlock_light(
-                raiden=raiden,
-                chain_state=chain_state,
-                channel_unlock_event=channel_unlock_event,
-                participant=channel_state.our_state.address,
-                partner=channel_state.partner_state.address,
-                end_state=channel_state.partner_state
-            )
+            gain = get_batch_unlock_gain(channel_state)
+            if gain.from_partner_locks > 0:
+                unlock_light(
+                    raiden=raiden,
+                    chain_state=chain_state,
+                    channel_unlock_event=channel_unlock_event,
+                    participant=channel_state.our_state.address,
+                    partner=channel_state.partner_state.address,
+                    end_state=channel_state.partner_state
+                )
+        if should_search_events(channel_state):
+            gain = get_batch_unlock_gain(channel_state)
+            if gain.from_our_locks > 0:
+                unlock_light(
+                    raiden=raiden,
+                    chain_state=chain_state,
+                    channel_unlock_event=channel_unlock_event,
+                    participant=channel_state.partner_state.address,
+                    partner=channel_state.our_state.address,
+                    end_state=channel_state.our_state
+                )
 
     @staticmethod
     def handle_contract_send_channelsettle(
