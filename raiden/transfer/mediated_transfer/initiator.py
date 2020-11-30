@@ -741,7 +741,6 @@ def handle_onchain_secretreveal_light(
     is_valid_secret = is_valid_secret_reveal(
         state_change=state_change, transfer_secrethash=secrethash, secret=secret
     )
-    is_channel_open = channel.get_status(channel_state) == CHANNEL_STATE_OPENED
     is_lock_expired = state_change.block_number > initiator_state.transfer.lock.expiration
 
     is_lock_unlocked = is_valid_secret and not is_lock_expired
@@ -754,42 +753,6 @@ def handle_onchain_secretreveal_light(
             secret_reveal_block_number=state_change.block_number,
         )
 
-    if is_lock_unlocked and is_channel_open:
-        unlock_events = events_for_unlock_base(
-            initiator_state=initiator_state,
-            channel_state=channel_state,
-            secret=state_change.secret,
-        )
-
-        transfer_description = initiator_state.transfer_description
-
-        message_identifier = message_identifier_from_prng(pseudo_random_generator)
-        unlock_lock = channel.send_unlock(
-            channel_state=channel_state,
-            message_identifier=message_identifier,
-            payment_identifier=transfer_description.payment_identifier,
-            secret=state_change.secret,
-            secrethash=state_change.secrethash,
-        )
-        unlock_msg = Unlock.from_event(unlock_lock)
-        reveal_secret = RevealSecret(secret=state_change.secret, message_identifier=message_identifier_from_prng(pseudo_random_generator))
-        store_received_secret_reveal_event = StoreMessageEvent(message_id=reveal_secret.message_identifier,
-                                                               payment_id=transfer_description.payment_identifier,
-                                                               message_order=9,
-                                                               message=reveal_secret,
-                                                               is_signed=True,
-                                                               message_type=LightClientProtocolMessageType.PaymentSuccessful,
-                                                               light_client_address=transfer_description.initiator)
-        store_created_unlock_event = StoreMessageEvent(message_id=message_identifier,
-                                                       payment_id=transfer_description.payment_identifier,
-                                                       message_order=11,
-                                                       message=unlock_msg,
-                                                       is_signed=False,
-                                                       message_type=LightClientProtocolMessageType.PaymentSuccessful,
-                                                       light_client_address=transfer_description.initiator)
-        events = [store_received_secret_reveal_event, store_created_unlock_event] + unlock_events
-        return TransitionResult(None, events)
-        
     return TransitionResult(initiator_state, [])
 
 
