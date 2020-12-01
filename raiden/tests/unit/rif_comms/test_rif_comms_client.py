@@ -15,11 +15,11 @@ test_nodes = dict([
     }),
     (2, {
         "address": to_canonical_address("0xeBfF0EEe8E2b6952E589B0475e3F0E34dA0655B1"),
-        "comms-api": "localhost:5016",
+        "comms-api": "localhost:6013",
     }),
     (3, {
         "address": to_canonical_address("0x636BA79E46E0594ECbbEBb4F74B9336Fd4454442"),
-        "comms-api": "localhost:5019",
+        "comms-api": "localhost:7013",
     }),
 ])
 
@@ -88,11 +88,14 @@ class TestRIFCommsClient(unittest.TestCase):
 
     @pytest.mark.skip(reason="ignore")
     def test_has_subscriber(self):
-        # register nodes 1 and 2, subscribe from 1 to 2, check subscription
+        # register nodes 1 and 2, subscribe from 1 to 2, check subscriptions
         notification_1 = self.client_1.connect()
         notification_2 = self.client_2.connect()
-        self.client_1.subscribe_to(self.address_2)
+        _, _ = self.client_1.subscribe_to(self.address_2)
+        assert self.client_1.is_subscribed_to(self.address_1) is False
         assert self.client_1.is_subscribed_to(self.address_2) is True
+        assert self.client_2.is_subscribed_to(self.address_2) is False
+        assert self.client_2.is_subscribed_to(self.address_2) is False
 
     @pytest.mark.skip(reason="ignore")
     def test_disconnect(self):
