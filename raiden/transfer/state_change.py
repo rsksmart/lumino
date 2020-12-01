@@ -445,7 +445,6 @@ class ContractReceiveChannelClosedLight(ContractReceiveStateChange):
         canonical_identifier: CanonicalIdentifier,
         block_number: BlockNumber,
         block_hash: BlockHash,
-        closing_participant: Address,
         non_closing_participant: Address,
         latest_update_non_closing_balance_proof_data: LightClientNonClosingBalanceProof
     ) -> None:
@@ -453,9 +452,12 @@ class ContractReceiveChannelClosedLight(ContractReceiveStateChange):
 
         self.transaction_from = transaction_from
         self.canonical_identifier = canonical_identifier
-        self.closing_participant = closing_participant
         self.non_closing_participant = non_closing_participant
         self.latest_update_non_closing_balance_proof_data = latest_update_non_closing_balance_proof_data
+
+    @property
+    def closing_participant(self) -> Address:
+        return self.transaction_from
 
     @property
     def channel_identifier(self) -> ChannelID:
