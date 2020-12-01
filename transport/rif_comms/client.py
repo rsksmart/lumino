@@ -38,7 +38,7 @@ class Client:
         """
         return self.stub.ConnectToCommunicationsNode(self.rsk_address)
 
-    def subscribe_to(self, rsk_address: Address) -> Notification:
+    def subscribe_to(self, rsk_address: Address) -> (str, Notification):
         """
         Subscribes to a pub-sub topic in order to send messages to or receive messages from an address.
         Invokes CreateTopicWithRskAddress GRPC API endpoint.
