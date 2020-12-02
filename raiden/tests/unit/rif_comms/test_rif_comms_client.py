@@ -62,18 +62,18 @@ class TestRIFCommsClient(unittest.TestCase):
     - all tests assume that there is a RIF COMMS node already running
     """
 
-    @pytest.mark.skip(reason="ignore")
+    @pytest.mark.skip(reason="succeeds no matter what")
     def test_connect(self):
         response = self.client_1.connect()
         assert response is not None
 
-    @pytest.mark.skip(reason="ignore")
+    @pytest.mark.skip(reason="fails without the response assignment")
     def test_locate_own_peer_id(self):
         # register node 1, locate node 1
         response = self.client_1.connect()
         assert self.client_1._get_peer_id(self.address_1) is not ""
 
-    @pytest.mark.skip(reason="ignore")
+    @pytest.mark.skip(reason="causes ERR_NO_PEERS_IN_ROUTING_TABLE in comms node although it passes")
     def test_locate_unregistered_peer_id(self):
         # register node 1, locate node 2
         response = self.client_1.connect()
@@ -96,6 +96,23 @@ class TestRIFCommsClient(unittest.TestCase):
         assert self.client_1.is_subscribed_to(self.address_2) is True
         assert self.client_2.is_subscribed_to(self.address_2) is False
         assert self.client_2.is_subscribed_to(self.address_2) is False
+
+    @pytest.mark.skip(reason="ignore")
+    def test_two_clients_cross_subscription(self):
+        # register nodes 1 and 2
+        notification_1 = self.client_1.connect()
+        notification_2 = self.client_2.connect()
+
+        # subscribe to 1 and 2 on both nodes
+        self.client_1.subscribe_to(self.address_1)
+        self.client_1.subscribe_to(self.address_2)
+        self.client_2.subscribe_to(self.address_1)
+        self.client_2.subscribe_to(self.address_2)
+
+        assert self.client_1.is_subscribed_to(self.address_1) is True
+        assert self.client_1.is_subscribed_to(self.address_2) is True
+        assert self.client_2.is_subscribed_to(self.address_1) is True
+        assert self.client_2.is_subscribed_to(self.address_2) is True
 
     @pytest.mark.skip(reason="ignore")
     def test_disconnect(self):
@@ -149,23 +166,6 @@ class TestRIFCommsClient(unittest.TestCase):
                 message=Msg(payload=str.encode(json.dumps(some_raiden_message)))
             )
         )
-
-    @pytest.mark.skip(reason="ignore")
-    def test_two_clients_cross_subscription(self):
-        # register nodes 1 and 2
-        notification_1 = self.client_1.connect()
-        notification_2 = self.client_2.connect()
-
-        # subscribe to 1 and 2 on both nodes
-        self.client_1.subscribe_to(self.address_1)
-        self.client_1.subscribe_to(self.address_2)
-        self.client_2.subscribe_to(self.address_1)
-        self.client_2.subscribe_to(self.address_2)
-
-        assert self.client_1.is_subscribed_to(self.address_1) is True
-        assert self.client_1.is_subscribed_to(self.address_2) is True
-        assert self.client_2.is_subscribed_to(self.address_1) is True
-        assert self.client_2.is_subscribed_to(self.address_2) is True
 
     @pytest.mark.skip(reason="ignore")
     def test_two_clients_cross_messaging_same_topic(self):
