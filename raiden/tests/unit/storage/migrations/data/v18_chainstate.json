@@ -817,7 +817,7 @@
     "0xE9BcB446bBA6987EdCDF85c922664AF539A90068": "reachable"
   },
   "our_address": "0x3274021a160310a3e91Db88BB1295265303AdB3a",
-  "payment_mapping": {
+  "payment_states_by_address": {
     "secrethashes_to_task": {
       "0x9ce7d317f4139372e10f9d84ef4f5f372bbbb26838df6a98a85a44ee45f052fc": {
         "token_network_identifier": "0x52b99B4b1a495a384313eB9C7e2Be7177005d874",
