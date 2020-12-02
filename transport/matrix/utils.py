@@ -1,6 +1,5 @@
 import json
 import re
-from binascii import Error as DecodeError
 from collections import defaultdict
 from enum import Enum
 from operator import attrgetter, itemgetter
@@ -21,12 +20,15 @@ from urllib.parse import urlparse
 
 import gevent
 import structlog
+from binascii import Error as DecodeError
 from cachetools import LRUCache, cached
 from ecies import decrypt
 from eth_utils import decode_hex, encode_hex, to_canonical_address, to_normalized_address
 from gevent.event import Event
 from gevent.lock import Semaphore
 from matrix_client.errors import MatrixError, MatrixRequestError
+from raiden_contracts.constants import ID_TO_NETWORKNAME
+
 from raiden.exceptions import InvalidProtocolMessage, InvalidSignature, TransportError
 from raiden.messages import (
     Message,
@@ -38,7 +40,6 @@ from raiden.network.utils import get_http_rtt
 from raiden.utils import pex
 from raiden.utils.signer import Signer, recover
 from raiden.utils.typing import Address, ChainID, Signature
-from raiden_contracts.constants import ID_TO_NETWORKNAME
 from transport.matrix.client import GMatrixClient, Room, User
 
 log = structlog.get_logger(__name__)
@@ -552,85 +553,6 @@ def make_room_alias(chain_id: ChainID, *suffixes: str) -> str:
     """
     network_name = ID_TO_NETWORKNAME.get(chain_id, str(chain_id))
     return ROOM_NAME_SEPARATOR.join([ROOM_NAME_PREFIX, network_name, *suffixes])
-
-
-def validate_and_parse_message(data, peer_address) -> List[Message]:
-    messages = list()
-
-    if not isinstance(data, str):
-        log.warning(
-            "Received ToDevice Message body not a string",
-            message_data=data,
-            peer_address=pex(peer_address),
-        )
-        return []
-
-    if data.startswith("0x"):
-        try:
-            message = message_from_bytes(decode_hex(data))
-            if not message:
-                raise InvalidProtocolMessage
-        except (DecodeError, AssertionError) as ex:
-            log.warning(
-                "Can't parse ToDevice Message binary data",
-                message_data=data,
-                peer_address=pex(peer_address),
-                _exc=ex,
-            )
-            return []
-        except InvalidProtocolMessage as ex:
-            log.warning(
-                "Received ToDevice Message binary data is not a valid message",
-                message_data=data,
-                peer_address=pex(peer_address),
-                _exc=ex,
-            )
-            return []
-        else:
-            messages.append(message)
-
-    else:
-        for line in data.splitlines():
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                message_dict = json.loads(line)
-                message = message_from_dict(message_dict)
-            except (UnicodeDecodeError, json.JSONDecodeError) as ex:
-                log.warning(
-                    "Can't parse ToDevice Message data JSON",
-                    message_data=line,
-                    peer_address=pex(peer_address),
-                    _exc=ex,
-                )
-                continue
-            except InvalidProtocolMessage as ex:
-                log.warning(
-                    "ToDevice Message data JSON are not a valid ToDevice Message",
-                    message_data=line,
-                    peer_address=pex(peer_address),
-                    _exc=ex,
-                )
-                continue
-            if not isinstance(message, SignedMessage):
-                log.warning(
-                    "ToDevice Message not a SignedMessage!",
-                    message=message,
-                    peer_address=pex(peer_address),
-                )
-                continue
-            if message.sender != peer_address:
-                log.warning(
-                    "ToDevice Message not signed by sender!",
-                    message=message,
-                    signer=message.sender,
-                    peer_address=pex(peer_address),
-                )
-                continue
-            messages.append(message)
-
-    return messages
 
 
 def get_available_servers_from_config(config: dict):

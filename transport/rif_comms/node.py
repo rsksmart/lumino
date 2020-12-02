@@ -1,5 +1,5 @@
 import json
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 import structlog
 from eth_utils import is_binary_address, to_canonical_address
@@ -27,7 +27,7 @@ from transport.message import Message as TransportMessage
 from transport.node import Node as TransportNode
 from transport.rif_comms.client import Client as RIFCommsClient
 from transport.rif_comms.proto.api_pb2 import Notification, ChannelNewData
-from transport.utils import MessageQueue
+from transport.utils import MessageQueue, validate_and_parse_message
 
 log = structlog.get_logger(__name__)
 
@@ -83,16 +83,17 @@ class Node(TransportNode):
         Iterate over the Notification stream and block thread to receive messages.
         """
         for notification in self._our_topic_stream:
-            raiden_message = self._notification_to_message(notification.channelNewData)
-            if raiden_message:
-                self.log.info("incoming message", message=raiden_message)
-                self._handle_message(raiden_message)
+            raiden_messages = self._notification_to_messages(notification.channelNewData)
+            if raiden_messages:
+                self.log.info("incoming messages", messages=raiden_messages)
+                for raiden_message in raiden_messages:
+                    self._handle_message(raiden_message)
 
     @staticmethod
-    def _notification_to_message(notification_data: ChannelNewData) -> RaidenMessage:
+    def _notification_to_messages(notification_data: ChannelNewData) -> List[RaidenMessage]:
         """
         :param notification_data: raw data received by the RIF Comms GRPC API
-        :return: a raiden.Message
+        :return: a list of raiden.Message
         """
         content_text = notification_data.data
         """
@@ -108,10 +109,13 @@ class Node(TransportNode):
             # we first transform the content of the notification data to a dictionary
             content = json.loads(content_text.decode())
             # the message is inside the notification data, encoded by the RIF Comms GRPC api
-            message_string = bytes(content["data"]).decode()
-            print("Message received", message_string)
-            message_dict = json.loads(message_string)
-            return message_from_dict(message_dict)
+            comms_message_string = bytes(content["data"]).decode()
+            # a comms message can contain one or N raiden messages, therefore it must be parsed
+            messages = validate_and_parse_message(comms_message_string, None)
+            if not messages:
+                return None
+            print("Messages received", messages)
+            return messages
         return None
 
     def _handle_message(self, message: RaidenMessage):
@@ -172,18 +176,6 @@ class Node(TransportNode):
         our_peer_id, topic_stream = self._comms_client.subscribe_to(self.address)
         self._our_topic_stream = topic_stream
 
-        # TODO Remove this before merge. This should be a test case.
-        # BEGIN POC
-        time.sleep(10)
-
-        # subscribe to the other node topic and wait
-        peer_id, other_node_topic_stream = self._comms_client.subscribe_to(
-            to_canonical_address("0x138aF366e0ED7Cc4b9747a935D1b5F75A86b9D83"))
-
-        # now send a message to the other node that is already subscribed
-        self._comms_client.send_message("hello from lumino node",
-                                        peer_id)
-        # END POC
         try:
             # waits on stop_event.ready()
             # children crashes should throw an exception here
@@ -277,11 +269,8 @@ class Node(TransportNode):
         """
         Send text message through the RIF Comms client.
         """
-        # check if we have a subscription for that receiver address
-        is_subscribed_to_receiver_topic = self._comms_client.is_subscribed_to(recipient)
-        # if not, create the topic subscription
-        if not is_subscribed_to_receiver_topic:
-            topic_id, _ = self._comms_client.subscribe_to(recipient)
+
+        topic_id, _ = self._comms_client.subscribe_to(recipient)
         # send the message
         self._comms_client.send_message(payload, topic_id)  # TODO: exception handling for RIF Comms client
         self.log.info(
