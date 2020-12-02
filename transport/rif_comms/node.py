@@ -27,7 +27,7 @@ from transport.message import Message as TransportMessage
 from transport.node import Node as TransportNode
 from transport.rif_comms.client import Client as RIFCommsClient
 from transport.rif_comms.proto.api_pb2 import Notification, ChannelNewData
-from transport.utils import MessageQueue, validate_and_parse_message
+from transport.utils import MessageQueue, validate_and_parse_messages
 
 log = structlog.get_logger(__name__)
 
@@ -111,7 +111,7 @@ class Node(TransportNode):
             # the message is inside the notification data, encoded by the RIF Comms GRPC api
             comms_message_string = bytes(content["data"]).decode()
             # a comms message can contain one or N raiden messages, therefore it must be parsed
-            messages = validate_and_parse_message(comms_message_string, None)
+            messages = validate_and_parse_messages(comms_message_string, None)
             if not messages:
                 return None
             print("Messages received", messages)

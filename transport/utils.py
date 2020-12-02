@@ -199,7 +199,7 @@ class MessageQueue(Runnable):
         return f"<{self.__class__.__name__} for {to_normalized_address(self.recipient)}>"
 
 
-def validate_and_parse_message(data, peer_address) -> List[Message]:
+def validate_and_parse_messages(data, peer_address) -> List[Message]:
     messages = list()
     if not isinstance(data, str):
         log.warning(
