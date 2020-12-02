@@ -5,7 +5,7 @@ import structlog
 from eth_utils import is_binary_address
 from gevent import killall, wait
 from greenlet import GreenletExit
-from raiden.exceptions import InvalidAddress, UnknownAddress, UnknownTokenAddress
+from raiden.exceptions import InvalidAddress, UnknownAddress, UnknownTokenAddress, InvalidProtocolMessage
 from raiden.message_handler import MessageHandler
 from raiden.messages import (
     Message as RaidenMessage,
@@ -13,7 +13,8 @@ from raiden.messages import (
     Delivered,
     Processed,
     Ping,
-    Pong
+    Pong,
+    from_dict as message_from_dict
 )
 from raiden.raiden_service import RaidenService
 from raiden.transfer.identifiers import QueueIdentifier
@@ -24,7 +25,8 @@ from raiden.utils.typing import Address
 from transport.message import Message as TransportMessage
 from transport.node import Node as TransportNode
 from transport.rif_comms.client import Client as RIFCommsClient
-from transport.rif_comms.proto.api_pb2 import Notification, ChannelNewData
+from transport.rif_comms.proto.api_pb2 import Notification
+from transport.rif_comms.utils import notification_to_payload
 from transport.utils import MessageQueue
 
 log = structlog.get_logger(__name__)
@@ -81,33 +83,17 @@ class Node(TransportNode):
         Iterate over the Notification stream and block thread to receive messages.
         """
         for notification in self._our_topic_stream:
-            raiden_message = self._notification_to_message(notification)
-            if raiden_message:
-                self.log.info("incoming message", message=raiden_message)
-                self._handle_message(raiden_message)
+            payload = notification_to_payload(notification)
 
-    @staticmethod
-    def _notification_to_message(notification_data: ChannelNewData) -> str:
-        """
-        :param notification_data: raw data received by the RIF Comms GRPC API
-        :return: a message payload
-        """
-        content_text = notification_data.channelNewData.data
-        """
-        ChannelNewData has the following structure:
-            from: "16Uiu2HAm8wq7GpkmTDqBxb4eKGfa2Yos79DabTgSXXF4PcHaDhWJ"
-            data: "{\"type\":\"Buffer\",\"data\":[104,101,121]}"
-            nonce: "\216f\225\232d\023e{"
-            channel {
-              channelId: "16Uiu2HAm9otWzXBcFm7WC2Qufp2h1mpRxK1oox289omHTcKgrpRA"
-            }
-        """
-        if content_text:
-            # we first transform the content of the notification data to a dictionary
-            content = json.loads(content_text.decode())
-            # the message is inside the notification data, encoded by the RIF Comms GRPC api
-            return bytes(content["data"]).decode()
-        return None
+            try:
+                message_dict = json.loads(payload)
+                raiden_message = message_from_dict(message_dict)
+
+                if raiden_message:
+                    self.log.info("incoming message", message=raiden_message)
+                    self._handle_message(raiden_message)
+            except (TypeError, InvalidProtocolMessage):
+                self.log.error("incoming message could not be processed", payload=payload)
 
     def _handle_message(self, message: RaidenMessage):
         """

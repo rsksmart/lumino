@@ -3,7 +3,7 @@ import unittest
 import pytest
 from eth_utils import to_canonical_address
 from transport.rif_comms.client import Client as RIFCommsClient
-from transport.rif_comms.node import Node as RIFCommsNode
+from transport.rif_comms.utils import notification_to_payload
 
 test_nodes = dict([
     (1, {
@@ -135,11 +135,11 @@ class TestRIFCommsClient(unittest.TestCase):
         self.client_2.send_message(payload_2, self.address_1)
 
         for resp in one_sub_two:
-            received_message = RIFCommsNode._notification_to_message(resp)
+            received_message = notification_to_payload(resp)
             assert received_message == payload_1
             break  # only 1 message is expected
 
         for resp in two_sub_one:
-            received_message = RIFCommsNode._notification_to_message(resp)
+            received_message = notification_to_payload(resp)
             assert received_message == payload_2
             break  # only 1 message is expected
