@@ -79,14 +79,14 @@ class TestRIFCommsClient(unittest.TestCase):
         response = self.client_1.connect()
         assert self.client_1._get_peer_id(self.address_2) is ""
 
-    @pytest.mark.skip(reason="ignore")
+    @pytest.mark.skip(reason="requires running rif comms node")
     def test_has_subscriber_self(self):
         # register node 1, subscribe to self, check subscription
         notification = self.client_1.connect()
         self.client_1.subscribe_to(self.address_1)
         assert self.client_1.is_subscribed_to(self.address_1) is True
 
-    @pytest.mark.skip(reason="ignore")
+    @pytest.mark.skip(reason="hangs when attempting to sub 1 to 2 without subbing 2 to 2 before")
     def test_has_subscriber(self):
         # register nodes 1 and 2, subscribe from 1 to 2, check subscriptions
         notification_1 = self.client_1.connect()
@@ -97,7 +97,7 @@ class TestRIFCommsClient(unittest.TestCase):
         assert self.client_2.is_subscribed_to(self.address_2) is False
         assert self.client_2.is_subscribed_to(self.address_2) is False
 
-    @pytest.mark.skip(reason="ignore")
+    @pytest.mark.skip(reason="hangs when attempting to sub 1 to 2 without subbing 2 to 2 before")
     def test_two_clients_cross_subscription(self):
         # register nodes 1 and 2
         notification_1 = self.client_1.connect()
@@ -114,7 +114,7 @@ class TestRIFCommsClient(unittest.TestCase):
         assert self.client_2.is_subscribed_to(self.address_1) is True
         assert self.client_2.is_subscribed_to(self.address_2) is True
 
-    @pytest.mark.skip(reason="ignore")
+    @pytest.mark.skip(reason="incomplete test")
     def test_disconnect(self):
         # register node 1, get own peer id, disconnect
         notification = self.client_1.connect()
@@ -122,17 +122,16 @@ class TestRIFCommsClient(unittest.TestCase):
         self.client_1.disconnect()
         # TODO check if end comms deletes topics
 
-    @pytest.mark.skip(reason="ignore")
     def test_send_lumino_message(self):
         # this test requires a lumino node started with a comms api matching test_nodes[1]["comms_api"]
-        channel = grpc.insecure_channel(self.api_1)
-        stub = CommunicationsApiStub(channel)
+        stub = CommunicationsApiStub(grpc.insecure_channel(self.api_1))
 
         # TODO: obtain this programmatically
-        channel_id = "16Uiu2HAm9otWzXBcFm7WC2Qufp2h1mpRxK1oox289omHTcKgrpRA"
+        channel_id = "16Uiu2HAmQmHFGepf3eaptGCkPhhw8ggipsrJzZyLTrnd5TJKWDHk"
         # got this from subscription of lumino node
 
-        channel = stub.Subscribe(Channel(channelId=channel_id))
+        sub = stub.Subscribe(Channel(channelId=channel_id))
+        print("sub")
 
         some_raiden_message = {
             'type': 'LockedTransfer',
@@ -184,12 +183,12 @@ class TestRIFCommsClient(unittest.TestCase):
 
         for resp in one_sub_one:
             i += 1
-            print("Respone for 1: ", resp)
+            print("response for 1: ", resp)
             if i == expected_messages:
                 break
 
         for resp in two_sub_one:
             j += 1
-            print("Respone for 2: ", resp)
+            print("response for 2: ", resp)
             if j == expected_messages:
                 break
