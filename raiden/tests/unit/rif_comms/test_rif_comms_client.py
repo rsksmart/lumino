@@ -1,13 +1,9 @@
-import json
 import unittest
 
-import grpc
 import pytest
 from eth_utils import to_canonical_address
 from transport.rif_comms.client import Client as RIFCommsClient
 from transport.rif_comms.node import Node as RIFCommsNode
-from transport.rif_comms.proto.api_pb2 import Channel, PublishPayload, Msg
-from transport.rif_comms.proto.api_pb2_grpc import CommunicationsApiStub
 
 test_nodes = dict([
     (1, {
@@ -53,14 +49,13 @@ def rif_comms_client(request):
 @pytest.mark.usefixtures("rif_comms_client")
 class TestRIFCommsClient(unittest.TestCase):
     """
-    Test for RIFCommsClient. This class is for test the basic operations of the client.
+    Test class for RIFCommsClient. It covers the basic operations of the client.
 
-    How to use it:
-
-    - modify the test_nodes address and rif_comms_api fields
+    How to use:
+    - modify the `address and `comms-api` fields for the `test_nodes` variable
     - addresses are used as representations of the Lumino keystore
     - each of the nodes is used as a separate peer
-    - all tests assume that there is a RIF COMMS node already running
+    - all tests assume that there is a RIF Comms node already running
     """
 
     @pytest.mark.skip(reason="succeeds no matter what")
@@ -122,51 +117,6 @@ class TestRIFCommsClient(unittest.TestCase):
         peer_id = self.client_1._get_peer_id(self.address_1)
         self.client_1.disconnect()
         # TODO check if end comms deletes topics
-
-    @pytest.mark.skip(reason="fails due to as-of-yet undetermined reason, used to work")
-    def test_send_lumino_message(self):
-        # this test requires a lumino node started with a comms api matching test_nodes[1]["comms_api"]
-        stub = CommunicationsApiStub(grpc.insecure_channel(self.api_1))
-
-        # TODO: obtain this programmatically
-        channel_id = "16Uiu2HAmQmHFGepf3eaptGCkPhhw8ggipsrJzZyLTrnd5TJKWDHk"
-        # got this from subscription of lumino node
-
-        sub = stub.Subscribe(Channel(channelId=channel_id))
-        print("sub")
-
-        some_raiden_message = {
-            'type': 'LockedTransfer',
-            'chain_id': 33,
-            'message_identifier': 9074731958492744333,
-            'payment_identifier': 2958725218135700941,
-            'payment_hash_invoice': '0x0000000000000000000000000000000000000000000000000000000000000000',
-            'nonce': 45,
-            'token_network_address': '0xd548700d98f32f83b3c88756cf340b7f61877d75',
-            'token': '0xf563b16dc42d9cb6d7ca31793f2d62131d586d05',
-            'channel_identifier': 12,
-            'transferred_amount': 17000000000000000000,
-            'locked_amount': 1000000000000000000,
-            'recipient': '0x00e8249ee607ea67127c4add69291a6c412603c5',
-            'locksroot': '0x043c092c72059c4c154cb342409d95364888a98fa87efadece5add9c255dce9a',
-            'lock': {
-                'type': 'Lock',
-                'amount': 1000000000000000000,
-                'expiration': 1165251,
-                'secrethash': '0x2dc5a7ff26be395d443200db5d16b5d2aadae3a83836be648cd4cba8e2e555fe'
-            },
-            'target': '0x00e8249ee607ea67127c4add69291a6c412603c5',
-            'initiator': '0x27633dc87378a551f09f2fcf43a48fc2b3425d43',
-            'fee': 0,
-            'signature': '0xbaa4df61ab23ab8fdddf4a90fd5db7dd04da364795ebb717426bdd1fcefb411759e1b41d71c3c54b2a75c3eba0f2a2c54c846a0139120ee794f51b0e2a0d954d1c'
-        }
-
-        stub.SendMessageToTopic(
-            PublishPayload(
-                topic=Channel(channelId=channel_id),
-                message=Msg(payload=str.encode(json.dumps(some_raiden_message)))
-            )
-        )
 
     @pytest.mark.skip(reason="hangs when attempting to sub to a node without it having subbed to itself first")
     def test_two_clients_cross_messaging_same_topic(self):

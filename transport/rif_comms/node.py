@@ -5,7 +5,6 @@ import structlog
 from eth_utils import is_binary_address
 from gevent import killall, wait
 from greenlet import GreenletExit
-
 from raiden.exceptions import InvalidAddress, UnknownAddress, UnknownTokenAddress
 from raiden.message_handler import MessageHandler
 from raiden.messages import (
@@ -14,8 +13,7 @@ from raiden.messages import (
     Delivered,
     Processed,
     Ping,
-    Pong,
-    from_dict as message_from_dict
+    Pong
 )
 from raiden.raiden_service import RaidenService
 from raiden.transfer.identifiers import QueueIdentifier
