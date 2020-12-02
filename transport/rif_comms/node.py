@@ -83,18 +83,18 @@ class Node(TransportNode):
         Iterate over the Notification stream and block thread to receive messages.
         """
         for notification in self._our_topic_stream:
-            raiden_message = self._notification_to_message(notification.channelNewData)
+            raiden_message = self._notification_to_message(notification)
             if raiden_message:
                 self.log.info("incoming message", message=raiden_message)
                 self._handle_message(raiden_message)
 
     @staticmethod
-    def _notification_to_message(notification_data: ChannelNewData) -> RaidenMessage:
+    def _notification_to_message(notification_data: ChannelNewData) -> str:
         """
         :param notification_data: raw data received by the RIF Comms GRPC API
-        :return: a raiden.Message
+        :return: a message payload
         """
-        content_text = notification_data.data
+        content_text = notification_data.channelNewData.data
         """
         ChannelNewData has the following structure:
             from: "16Uiu2HAm8wq7GpkmTDqBxb4eKGfa2Yos79DabTgSXXF4PcHaDhWJ"
@@ -108,9 +108,7 @@ class Node(TransportNode):
             # we first transform the content of the notification data to a dictionary
             content = json.loads(content_text.decode())
             # the message is inside the notification data, encoded by the RIF Comms GRPC api
-            message_string = bytes(content["data"]).decode()
-            message_dict = json.loads(message_string)
-            return message_from_dict(message_dict)
+            return bytes(content["data"]).decode()
         return None
 
     def _handle_message(self, message: RaidenMessage):
