@@ -3,11 +3,16 @@ import time
 from typing import NamedTuple, Iterator, List, Iterable, Callable
 
 import gevent
+import structlog
 from eth_utils import to_normalized_address, decode_hex
 from urllib3.exceptions import DecodeError
 
 from raiden.exceptions import InvalidProtocolMessage
 from raiden.messages import Message, RetrieableMessage, Delivered, Ping, Pong, SignedMessage
+from raiden.messages import (
+    from_dict as message_from_dict,
+    decode as message_from_bytes
+)
 from raiden.transfer import views
 from raiden.transfer.identifiers import QueueIdentifier
 from raiden.transfer.state import QueueIdsToQueues
@@ -16,13 +21,7 @@ from raiden.utils.runnable import Runnable
 from transport.node import Node as TransportNode
 from transport.udp import utils as udp_utils
 
-import structlog
 log = structlog.get_logger(__name__)
-
-from raiden.messages import (
-    from_dict as message_from_dict,
-    decode as message_from_bytes
-)
 
 
 class MessageQueue(Runnable):
@@ -200,6 +199,12 @@ class MessageQueue(Runnable):
 
 
 def validate_and_parse_messages(data, peer_address) -> List[Message]:
+    """
+    This function receives a string data that represents one or more raiden messages. The function parses
+    the data and convert it into one or many Raiden Messages.
+    @param data: a string that contains one or more messages
+    @param peer_address: the sender of that data
+    """
     messages = list()
     if not isinstance(data, str):
         log.warning(

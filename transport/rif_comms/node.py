@@ -111,12 +111,8 @@ class Node(TransportNode):
             # the message is inside the notification data, encoded by the RIF Comms GRPC api
             comms_message_string = bytes(content["data"]).decode()
             # a comms message can contain one or N raiden messages, therefore it must be parsed
-            messages = validate_and_parse_messages(comms_message_string, None)
-            if not messages:
-                return None
-            print("Messages received", messages)
-            return messages
-        return None
+            return validate_and_parse_messages(comms_message_string, None)
+        return []
 
     def _handle_message(self, message: RaidenMessage):
         """
