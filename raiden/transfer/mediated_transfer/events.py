@@ -5,7 +5,6 @@ from raiden.lightclient.models.light_client_protocol_message import LightClientP
 from raiden.messages import RevealSecret, Unlock, Message, SecretRequest, LockExpired, LockedTransfer
 
 from raiden.transfer.architecture import Event, SendMessageEvent
-from raiden.transfer.identifiers import CanonicalIdentifier
 from raiden.transfer.mediated_transfer.state import LockedTransferUnsignedState
 from raiden.transfer.state import BalanceProofUnsignedState, balanceproof_from_envelope
 from raiden.utils import pex, sha3
