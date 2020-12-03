@@ -33,7 +33,8 @@ from raiden.transfer.state_change import (
     ContractReceiveSecretReveal,
     ContractReceiveUpdateTransfer,
     ContractReceiveChannelClosedLight,
-    ContractReceiveChannelSettledLight, ContractReceiveSecretRevealLight
+    ContractReceiveChannelSettledLight,
+    ContractReceiveSecretRevealLight
 )
 from raiden.transfer.utils import (
     get_event_with_balance_proof_by_locksroot,

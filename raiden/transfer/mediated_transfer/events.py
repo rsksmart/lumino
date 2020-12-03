@@ -7,7 +7,7 @@ from raiden.messages import RevealSecret, Unlock, Message, SecretRequest, LockEx
 from raiden.transfer.architecture import Event, SendMessageEvent
 from raiden.transfer.identifiers import CanonicalIdentifier
 from raiden.transfer.mediated_transfer.state import LockedTransferUnsignedState
-from raiden.transfer.state import BalanceProofUnsignedState
+from raiden.transfer.state import BalanceProofUnsignedState, balanceproof_from_envelope
 from raiden.utils import pex, sha3
 from raiden.utils.serialization import deserialize_secret, deserialize_secret_hash, serialize_bytes
 from raiden.utils.typing import (
@@ -181,7 +181,7 @@ class SendLockExpiredLight(SendMessageEvent):
 
     def __repr__(self) -> str:
         return "<SendLockExpiredLight msgid:{} secrethash:{} recipient:{}>".format(
-            self.message_identifier,  pex(self.secrethash), pex(self.recipient)
+            self.message_identifier, pex(self.secrethash), pex(self.recipient)
         )
 
     def __eq__(self, other: Any) -> bool:
@@ -298,19 +298,7 @@ class SendLockedTransferLight(SendMessageEvent):
         super().__init__(recipient, channel_identifier, message_identifier)
 
         self.signed_locked_transfer = signed_locked_transfer
-
-        canonical_identifier = CanonicalIdentifier(
-            channel_identifier=channel_identifier,
-            token_network_address=self.signed_locked_transfer.token_network_address,
-            chain_identifier=self.signed_locked_transfer.chain_id
-        )
-        self.balance_proof = BalanceProofUnsignedState(
-            nonce=self.signed_locked_transfer.nonce,
-            transferred_amount=self.signed_locked_transfer.transferred_amount,
-            locked_amount=self.signed_locked_transfer.locked_amount,
-            locksroot=self.signed_locked_transfer.locksroot,
-            canonical_identifier=canonical_identifier
-        )
+        self.balance_proof = balanceproof_from_envelope(signed_locked_transfer)
 
     def __repr__(self) -> str:
         return "<SendLockedTransferLight msgid:{} signed_locked_transfer:{} recipient:{}>".format(

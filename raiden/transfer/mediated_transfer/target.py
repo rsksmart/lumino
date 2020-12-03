@@ -758,9 +758,7 @@ def state_transition(
         assert target_state, msg
         iteration = handle_onchain_secretreveal(target_state, state_change, channel_state)
     elif type(state_change) == ContractReceiveSecretRevealLight:
-        assert isinstance(state_change, ContractReceiveSecretRevealLight), MYPY_ANNOTATION
-        msg = "ContractReceiveSecretReveal should be accompanied by a valid target state"
-        assert target_state, msg
+        assert target_state, "ContractReceiveSecretReveal should be accompanied by a valid target state"
         iteration = handle_onchain_secretreveal(target_state, state_change, channel_state)
     elif type(state_change) == ReceiveUnlock:
         assert isinstance(state_change, ReceiveUnlock), MYPY_ANNOTATION

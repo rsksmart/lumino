@@ -4,7 +4,7 @@ from eth_utils import to_canonical_address
 
 from raiden.constants import MAXIMUM_PENDING_TRANSFERS
 from raiden.lightclient.models.light_client_protocol_message import LightClientProtocolMessageType
-from raiden.messages import LockedTransfer, Unlock, RevealSecret
+from raiden.messages import LockedTransfer, Unlock
 from raiden.settings import DEFAULT_WAIT_BEFORE_LOCK_REMOVAL
 from raiden.transfer import channel
 from raiden.transfer.architecture import Event, TransitionResult
@@ -730,10 +730,8 @@ def handle_onchain_secretreveal_light(
 ) -> TransitionResult[InitiatorTransferState]:
     """ When a secret is revealed on-chain all nodes learn the secret.
 
-    This check the on-chain secret corresponds to the one used by the
-    initiator, and if valid a new balance proof is sent to the next hop with
-    the current lock removed from the merkle tree and the transferred amount
-    updated.
+    This checks that the on-chain secret corresponds to the one used by the
+    initiator.
     """
     iteration: TransitionResult[InitiatorTransferState]
     secret = state_change.secret
