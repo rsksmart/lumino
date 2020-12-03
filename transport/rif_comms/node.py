@@ -83,11 +83,9 @@ class Node(TransportNode):
         Iterate over the Notification stream and block thread to receive messages.
         """
         for notification in self._our_topic_stream:
-            raiden_messages = self._notification_to_messages(notification.channelNewData)
-            if raiden_messages:
-                self.log.info("incoming messages", messages=raiden_messages)
-                for raiden_message in raiden_messages:
-                    self._handle_message(raiden_message)
+            for raiden_message in self._notification_to_messages(notification.channelNewData):
+                self.log.info("incoming message", message=raiden_messages)
+                self._handle_message(raiden_message)
 
     @staticmethod
     def _notification_to_messages(notification_data: ChannelNewData) -> List[RaidenMessage]:
