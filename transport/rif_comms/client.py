@@ -38,7 +38,7 @@ class Client:
         """
         return self.stub.ConnectToCommunicationsNode(self.rsk_address)
 
-    def subscribe_to(self, rsk_address: Address) -> Notification:
+    def subscribe_to(self, rsk_address: Address) -> (str, Notification):
         """
         Subscribes to a pub-sub topic in order to send messages to or receive messages from an address.
         Invokes CreateTopicWithRskAddress GRPC API endpoint.
@@ -53,7 +53,6 @@ class Client:
             topic_id = response.channelPeerJoined.peerId
             break
         return topic_id, topic
-
 
     def is_subscribed_to(self, rsk_address: Address) -> bool:
         """
@@ -72,13 +71,14 @@ class Client:
             )
         ).value
 
-    def send_message(self, payload: str, topic_id: str):
+    def send_message(self, payload: str, rsk_address: Address):
         """
         Sends a message to a destination RSK address.
         Invokes the SendMessageToTopic GRPC API endpoint.
         :param payload: the message data to be sent
-        :param topic_id: the topic identifier to be sent to
+        :param rsk_address: the destination for the message to be sent to
         """
+        topic_id = self._get_peer_id(to_checksum_address(rsk_address))
         # TODO: message encoding
         self.stub.SendMessageToTopic(
             PublishPayload(
