@@ -204,6 +204,7 @@ def validate_and_parse_messages(data, peer_address) -> List[Message]:
     the data and convert it into one or many Raiden Messages.
     @param data: a string that contains one or more messages
     @param peer_address: the sender of that data
+    @return a list of raiden messages
     """
     messages = list()
     if not isinstance(data, str):
