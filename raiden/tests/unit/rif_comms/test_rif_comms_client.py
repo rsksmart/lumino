@@ -5,20 +5,20 @@ from eth_utils import to_canonical_address
 from transport.rif_comms.client import Client as RIFCommsClient
 from transport.rif_comms.utils import notification_to_payload
 
-test_nodes = dict([
-    (1, {
+test_nodes = {
+    1: {
         "address": to_canonical_address("0x8cb891510dF75C223C53f910A98c3b61B9083c3B"),
         "comms-api": "localhost:5013",
-    }),
-    (2, {
+    },
+    2: {
         "address": to_canonical_address("0xeBfF0EEe8E2b6952E589B0475e3F0E34dA0655B1"),
         "comms-api": "localhost:6013",
-    }),
-    (3, {
+    },
+    3: {
         "address": to_canonical_address("0x636BA79E46E0594ECbbEBb4F74B9336Fd4454442"),
         "comms-api": "localhost:7013",
-    }),
-])
+    },
+}
 
 
 @pytest.mark.usefixtures("rif_comms_client")
