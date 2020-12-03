@@ -8,7 +8,7 @@ def notification_to_payload(notification_data: ChannelNewData) -> str:
     :param notification_data: raw data received by the RIF Comms GRPC API
     :return: a message payload
     """
-    content_text = notification_data.channelNewData.data
+    content_data = notification_data.channelNewData.data
     """
     ChannelNewData has the following structure:
         from: "16Uiu2HAm8wq7GpkmTDqBxb4eKGfa2Yos79DabTgSXXF4PcHaDhWJ"
@@ -18,7 +18,7 @@ def notification_to_payload(notification_data: ChannelNewData) -> str:
           channelId: "16Uiu2HAm9otWzXBcFm7WC2Qufp2h1mpRxK1oox289omHTcKgrpRA"
         }
     """
-    if content_text:
-        content = json.loads(content_text.decode())  # deserialize `data` dict
+    if content_data:
+        content = json.loads(content_data.decode())  # deserialize `data` dict
         return bytes(content["data"]).decode()  # deserialize `data.data` field
-    return None
+    return ""

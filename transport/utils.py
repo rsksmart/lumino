@@ -3,8 +3,16 @@ import time
 from typing import NamedTuple, Iterator, List, Iterable, Callable
 
 import gevent
-from eth_utils import to_normalized_address
-from raiden.messages import Message, RetrieableMessage, Delivered, Ping, Pong
+import structlog
+from eth_utils import to_normalized_address, decode_hex
+from urllib3.exceptions import DecodeError
+
+from raiden.exceptions import InvalidProtocolMessage
+from raiden.messages import Message, RetrieableMessage, Delivered, Ping, Pong, SignedMessage
+from raiden.messages import (
+    from_dict as message_from_dict,
+    decode as message_from_bytes
+)
 from raiden.transfer import views
 from raiden.transfer.identifiers import QueueIdentifier
 from raiden.transfer.state import QueueIdsToQueues
@@ -12,6 +20,8 @@ from raiden.utils import Address, pex
 from raiden.utils.runnable import Runnable
 from transport.node import Node as TransportNode
 from transport.udp import utils as udp_utils
+
+log = structlog.get_logger(__name__)
 
 
 class MessageQueue(Runnable):
@@ -186,3 +196,80 @@ class MessageQueue(Runnable):
 
     def __repr__(self):
         return f"<{self.__class__.__name__} for {to_normalized_address(self.recipient)}>"
+
+
+def validate_and_parse_messages(data, peer_address) -> List[Message]:
+    """
+    This function receives a string data that represents one or more raiden messages. The function parses
+    the data and convert it into one or many Raiden Messages.
+    @param data: a string that contains one or more messages
+    @param peer_address: the sender of that data
+    @return a list of raiden messages
+    """
+    messages = list()
+    if not isinstance(data, str):
+        log.warning(
+            "Received ToDevice Message body not a string",
+            message_data=data,
+            peer_address=pex(peer_address),
+        )
+        return []
+
+    if data.startswith("0x"):
+        try:
+            message = message_from_bytes(decode_hex(data))
+            if not message:
+                raise InvalidProtocolMessage
+        except (DecodeError, AssertionError) as ex:
+            log.warning(
+                "Can't parse ToDevice Message binary data",
+                message_data=data,
+                peer_address=pex(peer_address),
+                _exc=ex,
+            )
+            return []
+        except InvalidProtocolMessage as ex:
+            log.warning(
+                "Received ToDevice Message binary data is not a valid message",
+                message_data=data,
+                peer_address=pex(peer_address),
+                _exc=ex,
+            )
+            return []
+        else:
+            messages.append(message)
+
+    else:
+        for line in data.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                message_dict = json.loads(line)
+                message = message_from_dict(message_dict)
+            except (UnicodeDecodeError, json.JSONDecodeError) as ex:
+                log.warning(
+                    "Can't parse ToDevice Message data JSON",
+                    message_data=line,
+                    peer_address=pex(peer_address),
+                    _exc=ex,
+                )
+                continue
+            except InvalidProtocolMessage as ex:
+                log.warning(
+                    "ToDevice Message data JSON are not a valid ToDevice Message",
+                    message_data=line,
+                    peer_address=pex(peer_address),
+                    _exc=ex,
+                )
+                continue
+            if not isinstance(message, SignedMessage):
+                log.warning(
+                    "ToDevice Message not a SignedMessage!",
+                    message=message,
+                    peer_address=pex(peer_address),
+                )
+                continue
+            # TODO message must be signed by sender
+            messages.append(message)
+    return messages

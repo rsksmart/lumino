@@ -1,10 +1,10 @@
-import json
 from typing import Any, Dict
 
 import structlog
 from eth_utils import is_binary_address
 from gevent import killall, wait
 from greenlet import GreenletExit
+
 from raiden.exceptions import InvalidAddress, UnknownAddress, UnknownTokenAddress, InvalidProtocolMessage
 from raiden.message_handler import MessageHandler
 from raiden.messages import (
@@ -13,8 +13,7 @@ from raiden.messages import (
     Delivered,
     Processed,
     Ping,
-    Pong,
-    from_dict as message_from_dict
+    Pong
 )
 from raiden.raiden_service import RaidenService
 from raiden.transfer.identifiers import QueueIdentifier
@@ -28,6 +27,7 @@ from transport.rif_comms.client import Client as RIFCommsClient
 from transport.rif_comms.proto.api_pb2 import Notification
 from transport.rif_comms.utils import notification_to_payload
 from transport.utils import MessageQueue
+from transport.utils import validate_and_parse_messages
 
 log = structlog.get_logger(__name__)
 
@@ -84,15 +84,11 @@ class Node(TransportNode):
         """
         for notification in self._our_topic_stream:
             payload = notification_to_payload(notification)
-
             try:
-                message_dict = json.loads(payload)
-                raiden_message = message_from_dict(message_dict)
-
-                if raiden_message:
+                for raiden_message in validate_and_parse_messages(payload, None):
                     self.log.info("incoming message", message=raiden_message)
                     self._handle_message(raiden_message)
-            except (TypeError, InvalidProtocolMessage):
+            except InvalidProtocolMessage:
                 self.log.error("incoming message could not be processed", payload=payload)
 
     def _handle_message(self, message: RaidenMessage):
@@ -244,11 +240,7 @@ class Node(TransportNode):
         """
         Send text message through the RIF Comms client.
         """
-        # check if we have a subscription for that receiver address
-        is_subscribed_to_receiver_topic = self._comms_client.is_subscribed_to(recipient)
-        # if not, create the topic subscription
-        if not is_subscribed_to_receiver_topic:
-            self._comms_client.subscribe_to(recipient)
+        self._comms_client.subscribe_to(recipient)
         # send the message
         self._comms_client.send_message(payload, recipient)  # TODO: exception handling for RIF Comms client
         self.log.info(
