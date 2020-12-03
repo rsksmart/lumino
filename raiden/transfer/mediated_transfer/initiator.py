@@ -32,7 +32,8 @@ from raiden.transfer.state import (
     NettingChannelState,
     RouteState,
     message_identifier_from_prng)
-from raiden.transfer.state_change import Block, ContractReceiveSecretReveal, StateChange
+from raiden.transfer.state_change import Block, ContractReceiveSecretReveal, StateChange, \
+    ContractReceiveSecretRevealLight
 from raiden.transfer.utils import is_valid_secret_reveal
 from raiden.utils.typing import (
     MYPY_ANNOTATION,
@@ -721,6 +722,38 @@ def handle_onchain_secretreveal(
     return iteration
 
 
+def handle_onchain_secretreveal_light(
+    initiator_state: InitiatorTransferState,
+    state_change: ContractReceiveSecretRevealLight,
+    channel_state: NettingChannelState,
+    pseudo_random_generator: random.Random,
+) -> TransitionResult[InitiatorTransferState]:
+    """ When a secret is revealed on-chain all nodes learn the secret.
+
+    This checks that the on-chain secret corresponds to the one used by the
+    initiator.
+    """
+    iteration: TransitionResult[InitiatorTransferState]
+    secret = state_change.secret
+    secrethash = initiator_state.transfer_description.secrethash
+    is_valid_secret = is_valid_secret_reveal(
+        state_change=state_change, transfer_secrethash=secrethash, secret=secret
+    )
+    is_lock_expired = state_change.block_number > initiator_state.transfer.lock.expiration
+
+    is_lock_unlocked = is_valid_secret and not is_lock_expired
+
+    if is_lock_unlocked:
+        channel.register_onchain_secret(
+            channel_state=channel_state,
+            secret=secret,
+            secrethash=secrethash,
+            secret_reveal_block_number=state_change.block_number,
+        )
+
+    return TransitionResult(initiator_state, [])
+
+
 def state_transition(
     initiator_state: InitiatorTransferState,
     state_change: StateChange,
@@ -755,6 +788,11 @@ def state_transition(
     elif type(state_change) == ContractReceiveSecretReveal:
         assert isinstance(state_change, ContractReceiveSecretReveal), MYPY_ANNOTATION
         iteration = handle_onchain_secretreveal(
+            initiator_state, state_change, channel_state, pseudo_random_generator
+        )
+    elif type(state_change) == ContractReceiveSecretRevealLight:
+        assert isinstance(state_change, ContractReceiveSecretRevealLight), MYPY_ANNOTATION
+        iteration = handle_onchain_secretreveal_light(
             initiator_state, state_change, channel_state, pseudo_random_generator
         )
     elif type(state_change) == ActionSendSecretRevealLight:

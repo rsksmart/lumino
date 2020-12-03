@@ -17,7 +17,6 @@ from raiden.messages import RequestRegisterSecret, UnlockLightRequest, Settlemen
 from raiden.network.proxies.payment_channel import PaymentChannel
 from raiden.network.proxies.token_network import TokenNetwork
 from raiden.network.resolver.client import reveal_secret_with_resolver
-from raiden.storage.restore import channel_state_until_state_change
 from raiden.transfer import views
 from raiden.transfer.architecture import Event
 from raiden.transfer.balance_proof import pack_balance_proof_update
@@ -64,8 +63,6 @@ from raiden.transfer.unlock import get_channel_state, should_search_events, shou
 from raiden.transfer.utils import (
     get_event_with_balance_proof_by_balance_hash,
     get_state_change_with_balance_proof_by_balance_hash,
-    get_state_change_with_balance_proof_by_locksroot,
-    get_event_with_balance_proof_by_locksroot,
 )
 from raiden.transfer.views import get_channelstate_by_token_network_and_partner
 from raiden.utils import pex
@@ -586,7 +583,6 @@ class RaidenEventHandler(EventHandler):
 
         canonical_identifier = channel_unlock_event.canonical_identifier
         token_network_identifier = canonical_identifier.token_network_address
-        channel_identifier = canonical_identifier.channel_identifier
         participant = channel_unlock_event.participant
 
         payment_channel: PaymentChannel = raiden.chain.payment_channel(
@@ -632,85 +628,23 @@ class RaidenEventHandler(EventHandler):
             return
 
         if search_state_changes:
-            state_change_record = get_state_change_with_balance_proof_by_locksroot(
-                storage=raiden.wal.storage,
-                canonical_identifier=canonical_identifier,
-                locksroot=partner_locksroot,
-                sender=partner_address,
-            )
-            state_change_identifier = state_change_record.state_change_identifier
-
-            if not state_change_identifier:
-                raise RaidenUnrecoverableError(
-                    f"Failed to find state that matches the current channel locksroots. "
-                    f"chain_id:{raiden.chain.network_id} "
-                    f"token_network:{to_checksum_address(token_network_identifier)} "
-                    f"channel:{channel_identifier} "
-                    f"participant:{to_checksum_address(participant)} "
-                    f"our_locksroot:{to_hex(our_locksroot)} "
-                    f"partner_locksroot:{to_hex(partner_locksroot)} "
-                )
-
-            restored_channel_state = channel_state_until_state_change(
-                raiden=raiden,
-                canonical_identifier=canonical_identifier,
-                state_change_identifier=state_change_identifier,
-            )
-            assert restored_channel_state is not None
-
-            gain = get_batch_unlock_gain(restored_channel_state)
-
-            skip_unlock = (
-                restored_channel_state.partner_state.address == participant
-                and gain.from_partner_locks == 0
-            )
-            if not skip_unlock:
+            gain = get_batch_unlock_gain(channel_state)
+            if gain.from_partner_locks > 0:
                 unlock(
                     raiden=raiden,
                     payment_channel=payment_channel,
-                    end_state=restored_channel_state.partner_state,
+                    end_state=channel_state.partner_state,
                     participant=our_address,
                     partner=partner_address,
                 )
 
         if search_events:
-            event_record = get_event_with_balance_proof_by_locksroot(
-                storage=raiden.wal.storage,
-                canonical_identifier=canonical_identifier,
-                locksroot=our_locksroot,
-                recipient=partner_address,
-            )
-            state_change_identifier = event_record.state_change_identifier
-
-            if not state_change_identifier:
-                raise RaidenUnrecoverableError(
-                    f"Failed to find event that match current channel locksroots. "
-                    f"chain_id:{raiden.chain.network_id} "
-                    f"token_network:{to_checksum_address(token_network_identifier)} "
-                    f"channel:{channel_identifier} "
-                    f"participant:{to_checksum_address(participant)} "
-                    f"our_locksroot:{to_hex(our_locksroot)} "
-                    f"partner_locksroot:{to_hex(partner_locksroot)} "
-                )
-
-            restored_channel_state = channel_state_until_state_change(
-                raiden=raiden,
-                canonical_identifier=canonical_identifier,
-                state_change_identifier=state_change_identifier,
-            )
-            assert restored_channel_state is not None
-
-            gain = get_batch_unlock_gain(restored_channel_state)
-
-            skip_unlock = (
-                restored_channel_state.our_state.address == participant
-                and gain.from_our_locks == 0
-            )
-            if not skip_unlock:
+            gain = get_batch_unlock_gain(channel_state)
+            if gain.from_our_locks > 0:
                 unlock(
                     raiden=raiden,
                     payment_channel=payment_channel,
-                    end_state=restored_channel_state.our_state,
+                    end_state=channel_state.our_state,
                     participant=partner_address,
                     partner=our_address,
                 )
@@ -727,24 +661,29 @@ class RaidenEventHandler(EventHandler):
             canonical_identifier=channel_unlock_event.canonical_identifier,
             participant=channel_unlock_event.participant,
             our_address=channel_unlock_event.client)
-        if should_search_events(channel_state):
-            unlock_light(
-                raiden=raiden,
-                chain_state=chain_state,
-                channel_unlock_event=channel_unlock_event,
-                participant=channel_state.partner_state.address,
-                partner=channel_state.our_state.address,
-                end_state=channel_state.our_state
-            )
         if should_search_state_changes(channel_state):
-            unlock_light(
-                raiden=raiden,
-                chain_state=chain_state,
-                channel_unlock_event=channel_unlock_event,
-                participant=channel_state.our_state.address,
-                partner=channel_state.partner_state.address,
-                end_state=channel_state.partner_state
-            )
+            gain = get_batch_unlock_gain(channel_state)
+            if gain.from_partner_locks > 0:
+                unlock_light(
+                    raiden=raiden,
+                    chain_state=chain_state,
+                    channel_unlock_event=channel_unlock_event,
+                    participant=channel_state.our_state.address,
+                    partner=channel_state.partner_state.address,
+                    end_state=channel_state.partner_state
+                )
+        if should_search_events(channel_state):
+            gain = get_batch_unlock_gain(channel_state)
+            if gain.from_our_locks > 0:
+                unlock_light(
+                    raiden=raiden,
+                    chain_state=chain_state,
+                    channel_unlock_event=channel_unlock_event,
+                    participant=channel_state.partner_state.address,
+                    partner=channel_state.our_state.address,
+                    end_state=channel_state.our_state
+                )
+
 
     @staticmethod
     def handle_contract_send_channelsettle(

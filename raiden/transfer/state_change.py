@@ -445,7 +445,6 @@ class ContractReceiveChannelClosedLight(ContractReceiveStateChange):
         canonical_identifier: CanonicalIdentifier,
         block_number: BlockNumber,
         block_hash: BlockHash,
-        closing_participant: Address,
         non_closing_participant: Address,
         latest_update_non_closing_balance_proof_data: LightClientNonClosingBalanceProof
     ) -> None:
@@ -453,9 +452,12 @@ class ContractReceiveChannelClosedLight(ContractReceiveStateChange):
 
         self.transaction_from = transaction_from
         self.canonical_identifier = canonical_identifier
-        self.closing_participant = closing_participant
         self.non_closing_participant = non_closing_participant
         self.latest_update_non_closing_balance_proof_data = latest_update_non_closing_balance_proof_data
+
+    @property
+    def closing_participant(self) -> Address:
+        return self.transaction_from
 
     @property
     def channel_identifier(self) -> ChannelID:
@@ -1080,6 +1082,83 @@ class ContractReceiveSecretReveal(ContractReceiveStateChange):
             secret=deserialize_secret(data["secret"]),
             block_number=BlockNumber(int(data["block_number"])),
             block_hash=BlockHash(deserialize_bytes(data["block_hash"])),
+        )
+
+
+class ContractReceiveSecretRevealLight(ContractReceiveStateChange):
+    """ A new secret was registered with the SecretRegistry contract. """
+
+    def __init__(
+        self,
+        transaction_hash: TransactionHash,
+        secret_registry_address: SecretRegistryAddress,
+        secrethash: SecretHash,
+        secret: Secret,
+        block_number: BlockNumber,
+        block_hash: BlockHash,
+        lc_address: Address
+    ) -> None:
+        if not isinstance(secret_registry_address, T_SecretRegistryAddress):
+            raise ValueError("secret_registry_address must be of type SecretRegistryAddress")
+        if not isinstance(secrethash, T_SecretHash):
+            raise ValueError("secrethash must be of type SecretHash")
+        if not isinstance(secret, T_Secret):
+            raise ValueError("secret must be of type Secret")
+
+        super().__init__(transaction_hash, block_number, block_hash)
+
+        self.secret_registry_address = secret_registry_address
+        self.secrethash = secrethash
+        self.secret = secret
+        self.lc_address = lc_address
+
+    def __repr__(self) -> str:
+        return (
+            "<ContractReceiveSecretRevealLight"
+            " secret_registry:{} secrethash:{} secret:{} block:{} lc_address:{}"
+            ">"
+        ).format(
+            pex(self.secret_registry_address),
+            pex(self.secrethash),
+            pex(self.secret),
+            pex(self.lc_address),
+            self.block_number,
+        )
+
+    def __eq__(self, other: Any) -> bool:
+        return (
+            isinstance(other, ContractReceiveSecretRevealLight)
+            and self.secret_registry_address == other.secret_registry_address
+            and self.secrethash == other.secrethash
+            and self.secret == other.secret
+            and self.lc_address == other.lc_address
+            and super().__eq__(other)
+        )
+
+    def __ne__(self, other: Any) -> bool:
+        return not self.__eq__(other)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "transaction_hash": serialize_bytes(self.transaction_hash),
+            "secret_registry_address": to_checksum_address(self.secret_registry_address),
+            "secrethash": serialize_bytes(self.secrethash),
+            "secret": serialize_bytes(self.secret),
+            "block_number": str(self.block_number),
+            "block_hash": serialize_bytes(self.block_hash),
+            "lc_address": to_checksum_address(self.lc_address),
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "ContractReceiveSecretRevealLight":
+        return cls(
+            transaction_hash=deserialize_transactionhash(data["transaction_hash"]),
+            secret_registry_address=to_canonical_address(data["secret_registry_address"]),
+            secrethash=deserialize_secret_hash(data["secrethash"]),
+            secret=deserialize_secret(data["secret"]),
+            block_number=BlockNumber(int(data["block_number"])),
+            block_hash=BlockHash(deserialize_bytes(data["block_hash"])),
+            lc_address=to_canonical_address(data["lc_address"]),
         )
 
 

@@ -2,11 +2,11 @@
 from eth_utils import to_canonical_address, to_checksum_address
 
 from raiden.lightclient.models.light_client_protocol_message import LightClientProtocolMessageType
-from raiden.messages import RevealSecret, Unlock, Message, SecretRequest, LockExpired
+from raiden.messages import RevealSecret, Unlock, Message, SecretRequest, LockExpired, LockedTransfer
 
 from raiden.transfer.architecture import Event, SendMessageEvent
 from raiden.transfer.mediated_transfer.state import LockedTransferUnsignedState
-from raiden.transfer.state import BalanceProofUnsignedState
+from raiden.transfer.state import BalanceProofUnsignedState, balanceproof_from_envelope
 from raiden.utils import pex, sha3
 from raiden.utils.serialization import deserialize_secret, deserialize_secret_hash, serialize_bytes
 from raiden.utils.typing import (
@@ -180,7 +180,7 @@ class SendLockExpiredLight(SendMessageEvent):
 
     def __repr__(self) -> str:
         return "<SendLockExpiredLight msgid:{} secrethash:{} recipient:{}>".format(
-            self.message_identifier,  pex(self.secrethash), pex(self.recipient)
+            self.message_identifier, pex(self.secrethash), pex(self.recipient)
         )
 
     def __eq__(self, other: Any) -> bool:
@@ -292,11 +292,12 @@ class SendLockedTransferLight(SendMessageEvent):
         recipient: Address,
         channel_identifier: ChannelID,
         message_identifier: MessageID,
-        signed_locked_transfer: LockedTransferUnsignedState
+        signed_locked_transfer: LockedTransfer
     ) -> None:
         super().__init__(recipient, channel_identifier, message_identifier)
 
         self.signed_locked_transfer = signed_locked_transfer
+        self.balance_proof = balanceproof_from_envelope(signed_locked_transfer)
 
     def __repr__(self) -> str:
         return "<SendLockedTransferLight msgid:{} signed_locked_transfer:{} recipient:{}>".format(
@@ -319,6 +320,7 @@ class SendLockedTransferLight(SendMessageEvent):
             "channel_identifier": str(self.queue_identifier.channel_identifier),
             "message_identifier": str(self.message_identifier),
             "signed_locked_transfer": self.signed_locked_transfer,
+            "balance_proof": self.balance_proof
         }
 
         return result
