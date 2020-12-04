@@ -26,10 +26,16 @@ from raiden.transfer.mediated_transfer.state_change import (
     ReceiveSecretRequest,
     ReceiveSecretReveal,
     ActionTransferReroute,
-    ActionInitInitiatorLight, ReceiveSecretRequestLight, ActionSendSecretRevealLight, ReceiveSecretRevealLight,
-    ReceiveTransferCancelRoute, StoreRefundTransferLight)
+    ActionInitInitiatorLight,
+    ReceiveSecretRequestLight,
+    ActionSendSecretRevealLight,
+    ReceiveSecretRevealLight,
+    ReceiveTransferCancelRoute,
+    StoreRefundTransferLight
+)
 from raiden.transfer.state import RouteState
-from raiden.transfer.state_change import ActionCancelPayment, Block, ContractReceiveSecretReveal
+from raiden.transfer.state_change import ActionCancelPayment, Block, ContractReceiveSecretReveal, \
+    ContractReceiveSecretRevealLight
 from raiden.utils.typing import (
     MYPY_ANNOTATION,
     BlockNumber,
@@ -39,6 +45,7 @@ from raiden.utils.typing import (
     SecretHash,
     TokenNetworkID,
     cast,
+    Union
 )
 
 
@@ -489,7 +496,7 @@ def handle_offchain_secretreveal(
 
 def handle_onchain_secretreveal(
     payment_state: InitiatorPaymentState,
-    state_change: ContractReceiveSecretReveal,
+    state_change: Union[ContractReceiveSecretReveal, ContractReceiveSecretRevealLight],
     channelidentifiers_to_channels: ChannelMap,
     pseudo_random_generator: random.Random,
 ) -> TransitionResult[InitiatorPaymentState]:
@@ -746,6 +753,15 @@ def state_transition(
         assert isinstance(state_change, ContractReceiveSecretReveal), MYPY_ANNOTATION
         msg = "ContractReceiveSecretReveal should be accompanied by a valid payment state"
         assert payment_state, msg
+        iteration = handle_onchain_secretreveal(
+            payment_state=payment_state,
+            state_change=state_change,
+            channelidentifiers_to_channels=channelidentifiers_to_channels,
+            pseudo_random_generator=pseudo_random_generator,
+        )
+    elif type(state_change) == ContractReceiveSecretReveal or type(state_change) == ContractReceiveSecretRevealLight:
+        assert payment_state, "ContractReceiveSecretReveal and ContractReceiveSecretRevealLight " \
+                              "should be accompanied by a valid payment state"
         iteration = handle_onchain_secretreveal(
             payment_state=payment_state,
             state_change=state_change,

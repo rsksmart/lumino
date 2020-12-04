@@ -1,6 +1,7 @@
 import random
 
 from datetime import date
+from typing import Union
 
 from raiden.lightclient.handlers.light_client_message_handler import LightClientMessageHandler
 from raiden.lightclient.handlers.light_client_service import LightClientService
@@ -27,7 +28,8 @@ from raiden.transfer.mediated_transfer.state_change import (
     ActionInitTargetLight, ActionSendSecretRequestLight, ReceiveSecretRevealLight, ActionSendSecretRevealLight,
     ReceiveLockExpiredLight)
 from raiden.transfer.state import NettingChannelState, message_identifier_from_prng
-from raiden.transfer.state_change import Block, ContractReceiveSecretReveal, ReceiveUnlock, ReceiveUnlockLight
+from raiden.transfer.state_change import Block, ContractReceiveSecretReveal, ReceiveUnlock, ReceiveUnlockLight, \
+    ContractReceiveSecretRevealLight
 from raiden.transfer.utils import is_valid_secret_reveal
 from raiden.utils.typing import (
     MYPY_ANNOTATION,
@@ -489,7 +491,7 @@ def handle_offchain_secretreveal_light(
 
 def handle_onchain_secretreveal(
     target_state: TargetTransferState,
-    state_change: ContractReceiveSecretReveal,
+    state_change: Union[ContractReceiveSecretReveal, ContractReceiveSecretRevealLight],
     channel_state: NettingChannelState,
 ) -> TransitionResult[TargetTransferState]:
     """ Validates and handles a ContractReceiveSecretReveal state change. """
@@ -509,7 +511,6 @@ def handle_onchain_secretreveal(
 
         target_state.state = TargetTransferState.ONCHAIN_UNLOCK
         target_state.secret = state_change.secret
-
     return TransitionResult(target_state, list())
 
 
@@ -755,6 +756,9 @@ def state_transition(
         assert isinstance(state_change, ContractReceiveSecretReveal), MYPY_ANNOTATION
         msg = "ContractReceiveSecretReveal should be accompanied by a valid target state"
         assert target_state, msg
+        iteration = handle_onchain_secretreveal(target_state, state_change, channel_state)
+    elif type(state_change) == ContractReceiveSecretRevealLight:
+        assert target_state, "ContractReceiveSecretReveal should be accompanied by a valid target state"
         iteration = handle_onchain_secretreveal(target_state, state_change, channel_state)
     elif type(state_change) == ReceiveUnlock:
         assert isinstance(state_change, ReceiveUnlock), MYPY_ANNOTATION

@@ -33,7 +33,8 @@ from raiden.transfer.state_change import (
     ContractReceiveSecretReveal,
     ContractReceiveUpdateTransfer,
     ContractReceiveChannelClosedLight,
-    ContractReceiveChannelSettledLight
+    ContractReceiveChannelSettledLight,
+    ContractReceiveSecretRevealLight
 )
 from raiden.transfer.utils import (
     get_event_with_balance_proof_by_locksroot,
@@ -326,17 +327,20 @@ def handle_channel_closed(raiden: "RaidenService", event: Event):
             raiden.handle_and_track_state_change(channel_closed)
         else:
             # Must be a light client
+            closing_participant = args["closing_participant"]
+            non_closing_participant = channel_state.partner_state.address \
+                if channel_state.our_state.address == closing_participant \
+                else channel_state.our_state.address
             latest_non_closing_balance_proof = LightClientMessageHandler.get_latest_light_client_non_closing_balance_proof(
-                channel_state.identifier, channel_state.partner_state.address, raiden.wal.storage
+                channel_state.identifier, non_closing_participant, raiden.wal.storage
             )
             channel_closed = ContractReceiveChannelClosedLight(
                 transaction_hash=transaction_hash,
-                transaction_from=args["closing_participant"],
+                transaction_from=closing_participant,
                 canonical_identifier=channel_state.canonical_identifier,
                 block_number=block_number,
                 block_hash=block_hash,
-                closing_participant=channel_state.our_state.address,
-                non_closing_participant=channel_state.partner_state.address,
+                non_closing_participant=non_closing_participant,
                 latest_update_non_closing_balance_proof_data=latest_non_closing_balance_proof
             )
             raiden.handle_and_track_state_change(channel_closed)
@@ -588,16 +592,32 @@ def handle_secret_revealed(raiden: "RaidenService", event: Event):
     block_number = data["block_number"]
     block_hash = data["block_hash"]
     transaction_hash = data["transaction_hash"]
-    registeredsecret_state_change = ContractReceiveSecretReveal(
-        transaction_hash=transaction_hash,
-        secret_registry_address=secret_registry_address,
-        secrethash=args["secrethash"],
-        secret=args["secret"],
-        block_number=block_number,
-        block_hash=block_hash,
-    )
-
-    raiden.handle_and_track_state_change(registeredsecret_state_change)
+    secret=args["secret"]
+    secrethash=args["secrethash"]
+    chain_state = views.state_from_raiden(raiden)
+    if chain_state.get_payment_task(raiden.address, secrethash):
+        registeredsecret_state_change = ContractReceiveSecretReveal(
+            transaction_hash=transaction_hash,
+            secret_registry_address=secret_registry_address,
+            secrethash=secrethash,
+            secret=secret,
+            block_number=block_number,
+            block_hash=block_hash,
+        )
+        raiden.handle_and_track_state_change(registeredsecret_state_change)
+    else:
+        for lc_address, payment_state in chain_state.get_payment_states_by_address():
+            if secrethash in set(payment_state.secrethashes_to_task):
+                registeredsecret_state_change = ContractReceiveSecretRevealLight(
+                    transaction_hash=transaction_hash,
+                    secret_registry_address=secret_registry_address,
+                    secrethash=secrethash,
+                    secret=secret,
+                    block_number=block_number,
+                    block_hash=block_hash,
+                    lc_address=lc_address
+                )
+                raiden.handle_and_track_state_change(registeredsecret_state_change)
 
 
 def on_blockchain_event(raiden: "RaidenService", event: Event):
