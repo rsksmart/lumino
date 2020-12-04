@@ -1206,6 +1206,10 @@ class ContractReceiveChannelBatchUnlock(ContractReceiveStateChange):
     def token_network_identifier(self) -> TokenNetworkAddress:
         return TokenNetworkAddress(self.canonical_identifier.token_network_address)
 
+    @property
+    def channel_identifier(self) -> ChannelID:
+        return self.canonical_identifier.channel_identifier
+
     def __repr__(self) -> str:
         return (
             "<ContractReceiveChannelBatchUnlock "

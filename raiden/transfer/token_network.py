@@ -27,6 +27,7 @@ StateChangeWithChannelID = Union[
     ContractReceiveChannelNewBalance,
     ContractReceiveChannelSettled,
     ContractReceiveUpdateTransfer,
+    ContractReceiveChannelBatchUnlock
 ]
 
 
@@ -254,30 +255,19 @@ def handle_batch_unlock(
     block_number: BlockNumber,
     block_hash: BlockHash,
 ) -> TransitionResult:
-    events = list()
-    channel_state = None
-    if token_network_state.channelidentifiers_to_channels.get(state_change.participant) is not None:
-        channel_state = token_network_state.channelidentifiers_to_channels[state_change.participant].get(
-            state_change.canonical_identifier.channel_identifier
-        )
-    if channel_state is not None:
-        sub_iteration = channel.state_transition(
-            channel_state=channel_state,
-            state_change=state_change,
-            block_number=block_number,
-            block_hash=block_hash,
-        )
-        events.extend(sub_iteration.events)
+    participant = None
+    if state_change.participant in token_network_state.channelidentifiers_to_channels:
+        participant = state_change.participant
+    elif state_change.partner in token_network_state.channelidentifiers_to_channels:
+        participant = state_change.partner
 
-        if sub_iteration.new_state is None:
-
-            token_network_state.partneraddresses_to_channelidentifiers[
-                channel_state.partner_state.address
-            ].remove(channel_state.identifier)
-
-            del token_network_state.channelidentifiers_to_channels[state_change.participant][channel_state.identifier]
-
-    return TransitionResult(token_network_state, events)
+    return subdispatch_to_channels_by_participant_address(
+        token_network_state=token_network_state,
+        state_change=state_change,
+        block_number=block_number,
+        block_hash=block_hash,
+        participant_address=participant
+    )
 
 
 def handle_newroute(
