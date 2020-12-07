@@ -27,11 +27,11 @@ from raiden.utils.typing import ChainID, AddressHex
 from transport.matrix.client import Room, GMatrixClient
 from transport.matrix.utils import get_available_servers_from_config, make_client, get_server_url, UserAddressManager, \
     login_or_register, make_room_alias, join_global_room, UserPresence, validate_userid_signature, JOIN_RETRIES, \
-    AddressReachability, validate_and_parse_message, login_or_register_light_client
+    AddressReachability, login_or_register_light_client
 from transport.message import Message as TransportMessage
 from transport.node import Node as TransportNode
 from transport.udp import utils as udp_utils
-from transport.utils import MessageQueue
+from transport.utils import MessageQueue, validate_and_parse_messages
 
 _RoomID = NewType("_RoomID", str)
 log = structlog.get_logger(__name__)
@@ -583,7 +583,7 @@ class MatrixNode(TransportNode):
             self._address_mgr.force_user_presence(user, UserPresence.ONLINE)
             self._address_mgr.refresh_address_presence(peer_address)
 
-        messages = validate_and_parse_message(event["content"]["body"], peer_address)
+        messages = validate_and_parse_messages(event["content"]["body"], peer_address)
 
         if not messages:
             return False
@@ -1100,7 +1100,7 @@ class MatrixNode(TransportNode):
             self._address_mgr.force_user_presence(user, UserPresence.ONLINE)
             self._address_mgr.refresh_address_presence(peer_address)
 
-        messages = validate_and_parse_message(event["content"], peer_address)
+        messages = validate_and_parse_messages(event["content"], peer_address)
 
         if not messages:
             return False
@@ -1466,7 +1466,7 @@ class MatrixLightClientNode(MatrixNode):
             self._address_mgr.force_user_presence(user, UserPresence.ONLINE)
             self._address_mgr.refresh_address_presence(peer_address)
 
-        messages = validate_and_parse_message(event["content"]["body"], peer_address)
+        messages = validate_and_parse_messages(event["content"]["body"], peer_address)
 
         if not messages:
             return False

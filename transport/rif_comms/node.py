@@ -1,4 +1,3 @@
-import json
 from typing import Any, Dict
 
 import structlog
@@ -6,7 +5,7 @@ from eth_utils import is_binary_address
 from gevent import killall, wait
 from greenlet import GreenletExit
 
-from raiden.exceptions import InvalidAddress, UnknownAddress, UnknownTokenAddress
+from raiden.exceptions import InvalidAddress, UnknownAddress, UnknownTokenAddress, InvalidProtocolMessage
 from raiden.message_handler import MessageHandler
 from raiden.messages import (
     Message as RaidenMessage,
@@ -14,8 +13,7 @@ from raiden.messages import (
     Delivered,
     Processed,
     Ping,
-    Pong,
-    from_dict as message_from_dict
+    Pong
 )
 from raiden.raiden_service import RaidenService
 from raiden.transfer.identifiers import QueueIdentifier
@@ -26,8 +24,10 @@ from raiden.utils.typing import Address
 from transport.message import Message as TransportMessage
 from transport.node import Node as TransportNode
 from transport.rif_comms.client import Client as RIFCommsClient
-from transport.rif_comms.proto.api_pb2 import Notification, ChannelNewData
+from transport.rif_comms.proto.api_pb2 import Notification
+from transport.rif_comms.utils import notification_to_payload
 from transport.utils import MessageQueue
+from transport.utils import validate_and_parse_messages
 
 log = structlog.get_logger(__name__)
 
@@ -83,35 +83,13 @@ class Node(TransportNode):
         Iterate over the Notification stream and block thread to receive messages.
         """
         for notification in self._our_topic_stream:
-            raiden_message = self._notification_to_message(notification.channelNewData)
-            if raiden_message:
-                self.log.info("incoming message", message=raiden_message)
-                self._handle_message(raiden_message)
-
-    @staticmethod
-    def _notification_to_message(notification_data: ChannelNewData) -> RaidenMessage:
-        """
-        :param notification_data: raw data received by the RIF Comms GRPC API
-        :return: a raiden.Message
-        """
-        content_text = notification_data.data
-        """
-        ChannelNewData has the following structure:
-            from: "16Uiu2HAm8wq7GpkmTDqBxb4eKGfa2Yos79DabTgSXXF4PcHaDhWJ"
-            data: "{\"type\":\"Buffer\",\"data\":[104,101,121]}"
-            nonce: "\216f\225\232d\023e{"
-            channel {
-              channelId: "16Uiu2HAm9otWzXBcFm7WC2Qufp2h1mpRxK1oox289omHTcKgrpRA"
-            }
-        """
-        if content_text:
-            # we first transform the content of the notification data to a dictionary
-            content = json.loads(content_text.decode())
-            # the message is inside the notification data, encoded by the RIF Comms GRPC api
-            message_string = bytes(content["data"]).decode()
-            message_dict = json.loads(message_string)
-            return message_from_dict(message_dict)
-        return None
+            payload = notification_to_payload(notification)
+            try:
+                for raiden_message in validate_and_parse_messages(payload, None):
+                    self.log.info("incoming message", message=raiden_message)
+                    self._handle_message(raiden_message)
+            except InvalidProtocolMessage:
+                self.log.error("incoming message could not be processed", payload=payload)
 
     def _handle_message(self, message: RaidenMessage):
         """
@@ -125,7 +103,7 @@ class Node(TransportNode):
             self.log.info(
                 "Raiden message received",
                 type=type(message),
-                node=pex(self._raiden_service.address),
+                node=pex(self.address),
                 message=message,
                 sender=pex(message.sender),
             )
@@ -146,7 +124,7 @@ class Node(TransportNode):
             self.log.warning(
                 "unexpected type of message received",
                 type=type(message),
-                node=pex(self._raiden_service.address),
+                node=pex(self.address),
                 message=message,
             )
 
@@ -167,9 +145,8 @@ class Node(TransportNode):
         """
         Runnable main method. Start a listener greenlet to listen for received messages in the background.
         """
-        self.greenlet.name = f"RIFCommsNode._run node:{pex(self._raiden_service.address)}"
-        our_address = self.raiden_service.address
-        self._our_topic_stream = self._comms_client.subscribe_to(our_address)
+        self.greenlet.name = f"RIFCommsNode._run node:{pex(self.address)}"
+        _, self._our_topic_stream = self._comms_client.subscribe_to(self.address)
         try:
             # waits on stop_event.ready()
             # children crashes should throw an exception here
@@ -177,7 +154,7 @@ class Node(TransportNode):
             self.log.info("RIF Comms Node _run. Listening for messages.")
         except GreenletExit:  # killed without exception
             self.stop_event.set()
-            killall(self.greenlet)  # kill children
+            killall([self.greenlet])  # kill comms listener thread
             raise  # re-raise to keep killed status
         except Exception:
             self.stop()  # ensure cleanup and wait on subtasks
@@ -186,11 +163,9 @@ class Node(TransportNode):
     def stop(self):
         """
         Try to gracefully stop the underlying greenlet synchronously.
-
         Stop isn't expected to re-raise greenlet _run exception
         (use self.greenlet.get() for that),
         but it should raise any stop-time exception.
-
         Also disconnect from RIF Communications node.
         """
         if self.stop_event.ready():
@@ -204,7 +179,6 @@ class Node(TransportNode):
         if self.greenlet:
             self.greenlet.kill()
             self.greenlet.get()
-        self.greenlet = None
 
         # wait for our own greenlets, no need to get on them, exceptions should be raised in _run()
         wait([self.greenlet] + [r.greenlet for r in self._address_to_message_queue.values()])
@@ -223,7 +197,6 @@ class Node(TransportNode):
     def enqueue_message(self, message: TransportMessage, recipient: Address):
         """
         Queue the message for sending to recipient.
-
         It may be called before transport is started, to initialize message queues.
         The actual sending is started only when the transport is started.
         """
@@ -267,11 +240,7 @@ class Node(TransportNode):
         """
         Send text message through the RIF Comms client.
         """
-        # check if we have a subscription for that receiver address
-        is_subscribed_to_receiver_topic = self._comms_client.is_subscribed_to(recipient)
-        # if not, create the topic subscription
-        if not is_subscribed_to_receiver_topic:
-            self._comms_client.subscribe_to(recipient)
+        self._comms_client.subscribe_to(recipient)
         # send the message
         self._comms_client.send_message(payload, recipient)  # TODO: exception handling for RIF Comms client
         self.log.info(
@@ -303,11 +272,44 @@ class Node(TransportNode):
         return self._log
 
     def __repr__(self):
-        node = f" node:{pex(self._raiden_service.address)}" if self._raiden_service else ""
+        node = f" RIF Comms Transport node:{pex(self.address)}"
         return f"<{self.__class__.__name__}{node} id:{id(self)}>"
 
 
 class LightClientNode(Node):
 
-    def __init__(self, address: Address, config: dict, auth_params: dict):
+    def __init__(self, address: Address, config: dict):
         Node.__init__(self, address, config)
+
+    def _handle_message(self, message: RaidenMessage):
+        """
+        Handle received Raiden message.
+        """
+        if self.stop_event.ready():
+            return  # ignore when node is stopped
+
+        # process message if its type is expected
+        if isinstance(message, (Delivered, Processed, SignedRetrieableMessage)):
+            self.log.info(
+                "Raiden message received",
+                type=type(message),
+                node=pex(self.address),
+                message=message,
+                sender=pex(message.sender),
+            )
+            # Pass message to raiden service for business logic. The message will be stored on the HUB database.
+            self._raiden_service.on_message(message, True)
+        else:
+            self.log.warning(
+                "unexpected type of message received",
+                type=type(message),
+                node=pex(self.address),
+                message=message,
+            )
+
+    def _ack_message(self, message: (Processed, SignedRetrieableMessage)):
+        """
+        Acks must be signed by the Light client first, therefore the transport is not in charge to create and send
+        the Delivered messages.
+        """
+        raise Exception("Do not use _ack_message for light client transport")
