@@ -12,15 +12,16 @@
 
 ## Running
 
-# Run this script into the directory in which Lumino was git cloned
+# Run this script in the directory in which Lumino was git cloned
 # Specify the flags that are part of ARGUMENT_LIST, i.e
 #
-#. /startLuminoWithRIFComms.sh --KEYSTORE_PATH="/home/marcos/rsk/keystore" --TOKEN_NETWORK_REGISTRY="0x07e1CD1ea2123e3a0f624553761EaD1c1e150CC3" --SECRET_REGISTRY="0xfA8Bc06C815BD4C4bB641ccb00EBF9CB8BEB2d67" --ENDPOINT_REGISTRY="0xC14E9A67A87949bC131b9f22a4EB5cd9d9A6728e" --HUB_MODE=0 --RSK_ENDPOINT="http://localhost:4444" --LUMINO_API_ENDPOINT="http://localhost:5001" --NETWORK_ID=33 --RIF_COMMS_NODE_CONFIGURATION="nodeA" --RIF_COMMS_NODE_PORT=5013
+#. /startLuminoWithRIFComms.sh --RIF_COMMS_NODE_DIR="~/rsk/rif-communications-pubsub-bootnode" --KEYSTORE_PATH="/home/marcos/rsk/keystore" --TOKEN_NETWORK_REGISTRY="0x07e1CD1ea2123e3a0f624553761EaD1c1e150CC3" --SECRET_REGISTRY="0xfA8Bc06C815BD4C4bB641ccb00EBF9CB8BEB2d67" --ENDPOINT_REGISTRY="0xC14E9A67A87949bC131b9f22a4EB5cd9d9A6728e" --HUB_MODE=0 --RSK_ENDPOINT="http://localhost:4444" --LUMINO_API_ENDPOINT="http://localhost:5001" --NETWORK_ID=33 --RIF_COMMS_NODE_CONFIGURATION="nodeA" --RIF_COMMS_NODE_PORT=5013
 #
 # The output log for rif comms node is on rif-communications-pubsub-bootnode under the commsNodeLog.txt name
 
 
 ARGUMENT_LIST=(
+    "RIF_COMMS_NODE_DIR"
     "KEYSTORE_PATH"
     "TOKEN_NETWORK_REGISTRY"
     "SECRET_REGISTRY"
@@ -46,6 +47,10 @@ eval set --$opts
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
+        --RIF_COMMS_NODE_DIR)
+            RIF_COMMS_NODE_DIR=$2
+            shift 2
+            ;;
         --KEYSTORE_PATH)
             KEYSTORE_PATH=$2
             shift 2
@@ -94,7 +99,7 @@ done
 
 # Start rif comms node
 export NODE_ENV=$RIF_COMMS_NODE_CONFIGURATION
-npm run api-server --prefix=~/rsk/rif-communications-pubsub-bootnode > commsNodeLog.log 2>&1 &
+npm run api-server --prefix="${RIF_COMMS_NODE_DIR}" > commsNodeLog.log 2>&1 &
 
 echo "Rif comms running, logs at "$(pwd)"/commsNodeLog.log"
 

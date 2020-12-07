@@ -3,6 +3,11 @@
 # How it works
 
 # This script is to start lumino using an environment called clientEnv
+
+# Preconditions:
+# 1. You must have a venv activated, called clientEnv
+
+# Usage:
 # You must specify the arguments that are part of ARGUMENT_LIST, i.e:
 ## ./startLumino.sh --KEYSTORE_PATH="/home/marcos/rsk/keystore" --TOKEN_NETWORK_REGISTRY="0x07e1CD1ea2123e3a0f624553761EaD1c1e150CC3" --SECRET_REGISTRY="0xfA8Bc06C815BD4C4bB641ccb00EBF9CB8BEB2d67" --ENDPOINT_REGISTRY="0xC14E9A67A87949bC131b9f22a4EB5cd9d9A6728e" --HUB_MODE=0 --RSK_ENDPOINT="http://localhost:4444" --LUMINO_API_ENDPOINT="http://localhost:5001" --NETWORK_ID=33
 
