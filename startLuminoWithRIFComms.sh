@@ -4,8 +4,7 @@
 
 ## This script assumes:
 
-# You have NVM installed
-# You have NVM 14.13.1 installed
+# You have node 14.13.1 installed
 # You have ran npm install on the rif communications pub sub bootnode project
 # You have created the config files for the rif communications pub sub bootnode (i.e /config/nodeA and keys/nodeA)
 # You already know and configured the PORT in which rif comms node is going to run
@@ -16,9 +15,21 @@
 # Specify the flags that are part of ARGUMENT_LIST, i.e
 #
 #. /startLuminoWithRIFComms.sh --RIF_COMMS_NODE_DIR="~/rsk/rif-communications-pubsub-bootnode" --KEYSTORE_PATH="/home/marcos/rsk/keystore" --TOKEN_NETWORK_REGISTRY="0x07e1CD1ea2123e3a0f624553761EaD1c1e150CC3" --SECRET_REGISTRY="0xfA8Bc06C815BD4C4bB641ccb00EBF9CB8BEB2d67" --ENDPOINT_REGISTRY="0xC14E9A67A87949bC131b9f22a4EB5cd9d9A6728e" --HUB_MODE=0 --RSK_ENDPOINT="http://localhost:4444" --LUMINO_API_ENDPOINT="http://localhost:5001" --NETWORK_ID=33 --RIF_COMMS_NODE_CONFIGURATION="nodeA" --RIF_COMMS_NODE_PORT=5013
-#
-# The output log for rif comms node is on rif-communications-pubsub-bootnode under the commsNodeLog.txt name
 
+## Here some explanation of the parameters:
+
+## TOKEN_NETWORK_REGISTRY: The token network registry contract address to be used by the node.
+## SECRET_REGISTRY: The secret registry contract address to be used by the node.
+## ENDPOINT_REGISTRY: The endpoint registry contract address to be used by the node.
+## HUB_MODE: If set, the node will work as a hub
+## RSK_ENDPOINT: The RSK node endpoint URL
+## LUMINO_API_ENDPOINT: The expose url to use by the lumino node
+## NETWORK_ID: the blockchain network ID to connect to
+## RIF_COMMS_NODE_CONFIGURATION: config file of the rif comms node
+## RIF_COMMS_NODE_PORT: port in which rif comms node is going to start
+
+
+# The output log for rif comms node is on rif-communications-pubsub-bootnode under the commsNodeLog.txt name
 
 ARGUMENT_LIST=(
     "RIF_COMMS_NODE_DIR"
