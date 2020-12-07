@@ -1,7 +1,10 @@
+import time
 import unittest
 
 import pytest
 from eth_utils import to_canonical_address
+
+from raiden.tests.integration.network.transport.utils import generate_address
 from transport.rif_comms.client import Client as RIFCommsClient
 from transport.rif_comms.utils import notification_to_payload
 
@@ -19,6 +22,38 @@ test_nodes = {
         "comms-api": "localhost:7013",
     },
 }
+
+
+@pytest.fixture()
+@pytest.mark.parametrize("amount_of_clients")
+def comms_clients(amount_of_clients):
+    clients = []
+    # TODO: connect() calls should not need assigments
+    connections = {}  # hack to get around the fact that each connect() call needs to be assigned
+
+    def generate_comms_port(node_number: int) -> str:
+        starting_port = 5013
+        return "localhost:" + str(starting_port + node_number * 1000)  # 5013, 6013, 7013...
+
+    for i in range(amount_of_clients):
+        client = RIFCommsClient(generate_address(), generate_comms_port(i))
+        print("connecting", client)
+        connections[i] = client.connect()
+        clients.append(client)
+
+    yield clients
+
+    # TODO: connect() should block
+    time.sleep(5)  # hack to wait for connect() to finish in case it has not
+
+    for client in clients:
+        print("disconnecting", client)
+        client.disconnect()
+
+
+@pytest.mark.parametrize("amount_of_clients", [2])
+def test_fixtures(comms_clients):
+    print("test")
 
 
 @pytest.mark.usefixtures("rif_comms_client")
