@@ -1998,8 +1998,7 @@ def handle_channel_settled_light(
     if state_change.channel_identifier == channel_state.identifier:
         set_settled(channel_state, state_change.block_number)
 
-        our_locksroot = state_change.our_onchain_locksroot
-        partner_locksroot = state_change.partner_onchain_locksroot
+        our_locksroot, partner_locksroot = get_locksroot_from_state_change(channel_state.our_state.address, state_change)
 
         should_clear_channel = (
             our_locksroot == EMPTY_MERKLE_ROOT and partner_locksroot == EMPTY_MERKLE_ROOT
@@ -2020,6 +2019,14 @@ def handle_channel_settled_light(
         )
         events.append(onchain_unlock)
     return TransitionResult(channel_state, events)
+
+
+def get_locksroot_from_state_change(our_address: Address, state_change: ContractReceiveChannelSettledLight):
+    if our_address == state_change.participant1:
+        return state_change.our_onchain_locksroot, state_change.partner_onchain_locksroot
+    else:
+        return state_change.partner_onchain_locksroot, state_change.our_onchain_locksroot
+
 
 def handle_channel_newbalance(
     channel_state: NettingChannelState,
