@@ -5,7 +5,7 @@ from typing import NamedTuple, Iterator, List, Iterable, Callable
 import gevent
 import structlog
 from eth_utils import to_normalized_address, decode_hex
-from urllib3.exceptions import DecodeError
+from binascii import Error as DecodeError
 
 from raiden.exceptions import InvalidProtocolMessage
 from raiden.messages import Message, RetrieableMessage, Delivered, Ping, Pong, SignedMessage
