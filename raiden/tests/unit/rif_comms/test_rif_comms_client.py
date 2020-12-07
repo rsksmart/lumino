@@ -1,3 +1,6 @@
+import os
+import signal
+import subprocess
 import time
 
 import pytest
@@ -15,12 +18,22 @@ class CommsNode:
         self.address = address
         self.api = api
         self.client = RIFCommsClient(rsk_address=address, grpc_api_endpoint=api)
-        self.start()
+        self. process = self.start()
         self.connect()
 
     def start(self):
-        # TODO: start shell process
-        pass
+        # TODO: these should be dependencies within the project
+        # TODO: look int ousing shell = False
+        process = subprocess.Popen(
+            "NODE_ENV=development2 npm run api-server",
+            cwd=r"/home/rafa/repos/github/rsksmart/rif-communications-pubsub-node",
+            shell=True,
+            preexec_fn=os.setsid,  # necessary to kill children
+        )
+
+        # TODO: we need some sort of ping to know the node is up
+        time.sleep(5)
+        return process
 
     def connect(self):
         # TODO: connect() calls should not need assignment (let alone to a module variable!)
@@ -29,6 +42,7 @@ class CommsNode:
     def disconnect(self):
         del connections[self.address]
         self.client.disconnect()
+        os.killpg(os.getpgid(self.process.pid), signal.SIGTERM)
 
 
 @pytest.fixture()
