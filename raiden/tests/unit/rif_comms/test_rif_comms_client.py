@@ -28,15 +28,15 @@ test_nodes = {
 @pytest.mark.parametrize("amount_of_clients")
 def comms_clients(amount_of_clients):
     clients = []
-    # TODO: connect() calls should not need assigments
+    # TODO: connect() calls should not need assignment
     connections = {}  # hack to get around the fact that each connect() call needs to be assigned
 
-    def generate_comms_port(node_number: int) -> str:
+    def generate_comms_api(node_number: int) -> str:
         starting_port = 5013
         return "localhost:" + str(starting_port + node_number * 1000)  # 5013, 6013, 7013...
 
     for i in range(amount_of_clients):
-        client = RIFCommsClient(generate_address(), generate_comms_port(i))
+        client = RIFCommsClient(generate_address(), generate_comms_api(i))
         print("connecting", client)
         connections[i] = client.connect()
         clients.append(client)
