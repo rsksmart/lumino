@@ -6,16 +6,27 @@ from raiden.tests.integration.network.transport.utils import generate_address
 from transport.rif_comms.client import Client as RIFCommsClient
 from transport.rif_comms.utils import notification_to_payload
 
+connections = {}  # hack to get around the fact that each connect() call needs to be assigned
+
 
 class CommsNode:
     def __init__(self, address, api):
         self.address = address
         self.api = api
         self.client = RIFCommsClient(rsk_address=address, grpc_api_endpoint=api)
-        # TODO: connect() calls should not need assignment
-        self.connection = self.client.connect()
+        self.start()
+        self.connect()
+
+    def start(self):
+        # TODO: start shell process
+        pass
+
+    def connect(self):
+        # TODO: connect() calls should not need assignment (let alone to a module variable!)
+        connections[self.address] = self.client.connect()
 
     def disconnect(self):
+        del connections[self.address]
         self.client.disconnect()
 
 
@@ -26,7 +37,7 @@ def comms_nodes(amount_of_nodes):
 
     def generate_comms_api(node_number: int) -> str:
         starting_port = 5013
-        return "localhost:" + str(starting_port + node_number * 1000)  # 5013, 6013, 7013...
+        return "localhost:" + str(starting_port + (node_number - 1) * 1000)  # 5013, 6013, 7013...
 
     # setup
     for i in range(1, amount_of_nodes + 1):
@@ -44,17 +55,17 @@ def comms_nodes(amount_of_nodes):
 
 @pytest.mark.parametrize("amount_of_nodes", [1])
 def test_locate_own_peer_id(comms_nodes):
-    # register node 1, locate node 1
     comms_node = comms_nodes[1]
     client = comms_node.client
     assert client._get_peer_id(comms_node.address) is not ""
 
 
-@pytest.mark.skip(reason="causes ERR_NO_PEERS_IN_ROUTING_TABLE in comms node although it passes")
-def test_locate_unregistered_peer_id(self):
-    # register node 1, locate node 2
-    response = self.client_1.connect()
-    assert self.client_1._get_peer_id(self.address_2) is ""
+# TODO: causes ERR_NO_PEERS_IN_ROUTING_TABLE in comms node although it passes
+@pytest.mark.parametrize("amount_of_nodes", [1])
+def test_locate_unregistered_peer_id(comms_nodes):
+    comms_node = comms_nodes[1]
+    client = comms_node.client
+    assert client._get_peer_id(generate_address()) is ""
 
 
 @pytest.mark.skip(reason="requires running rif comms node")
