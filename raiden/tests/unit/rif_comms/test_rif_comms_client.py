@@ -3,6 +3,7 @@ import time
 import pytest
 
 from raiden.tests.integration.network.transport.utils import generate_address
+from raiden.utils import Address
 from transport.rif_comms.client import Client as RIFCommsClient
 from transport.rif_comms.utils import notification_to_payload
 
@@ -10,7 +11,7 @@ connections = {}  # hack to get around the fact that each connect() call needs t
 
 
 class CommsNode:
-    def __init__(self, address, api):
+    def __init__(self, address: Address, api: str):
         self.address = address
         self.api = api
         self.client = RIFCommsClient(rsk_address=address, grpc_api_endpoint=api)
@@ -32,7 +33,7 @@ class CommsNode:
 
 @pytest.fixture()
 @pytest.mark.parametrize("amount_of_nodes")
-def comms_nodes(amount_of_nodes):
+def comms_nodes(amount_of_nodes) -> {CommsNode}:
     nodes = {}
 
     def generate_comms_api(node_number: int) -> str:
@@ -56,24 +57,27 @@ def comms_nodes(amount_of_nodes):
 @pytest.mark.parametrize("amount_of_nodes", [1])
 def test_locate_own_peer_id(comms_nodes):
     comms_node = comms_nodes[1]
-    client = comms_node.client
-    assert client._get_peer_id(comms_node.address) is not ""
+    assert comms_node.client._get_peer_id(comms_node.address) is not ""
 
 
 # TODO: causes ERR_NO_PEERS_IN_ROUTING_TABLE in comms node although it passes
 @pytest.mark.parametrize("amount_of_nodes", [1])
 def test_locate_unregistered_peer_id(comms_nodes):
     comms_node = comms_nodes[1]
+    assert comms_node.client._get_peer_id(generate_address()) is ""
+
+
+# TODO: comms node prints strange ServerUnaryCall message
+@pytest.mark.parametrize("amount_of_nodes", [1])
+def test_has_subscriber_self(comms_nodes):
+    comms_node = comms_nodes[1]
+
     client = comms_node.client
-    assert client._get_peer_id(generate_address()) is ""
+    address = comms_node.address
 
+    client.subscribe_to(address)
 
-@pytest.mark.skip(reason="requires running rif comms node")
-def test_has_subscriber_self(self):
-    # register node 1, subscribe to self, check subscription
-    notification = self.client_1.connect()
-    self.client_1.subscribe_to(self.address_1)
-    assert self.client_1.is_subscribed_to(self.address_1) is True
+    assert client.is_subscribed_to(address) is True
 
 
 @pytest.mark.skip(reason="hangs when attempting to sub 1 to 2 without subbing 2 to 2 before")
