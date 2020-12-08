@@ -40,11 +40,11 @@ class Node:
         return process
 
     def stop(self):
-        # FIXME: this isn't always working as expected, we need a better way to stop the comms node process
         try:
+            # FIXME: deleting entries in the connections dictionary is causing non-crashing thread exceptions
             self.client.disconnect()
-            del connections[self.address]
         finally:
+            # FIXME: we need some sort of terminate call; a better way to stop the comms node process
             # terminate children and process group
             for child in psutil.Process(self.process.pid).children(recursive=True):
                 child.kill()
