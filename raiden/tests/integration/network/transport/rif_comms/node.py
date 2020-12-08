@@ -44,7 +44,7 @@ class Node:
             # FIXME: deleting entries in the connections dictionary is causing non-crashing thread exceptions
             self.client.disconnect()
         finally:
-            # FIXME: we need some sort of terminate call; a better way to stop the comms node process
+            # TODO: we need a better way to stop the comms node process
             # terminate children and process group
             for child in psutil.Process(self.process.pid).children(recursive=True):
                 child.kill()

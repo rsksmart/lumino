@@ -19,7 +19,6 @@ def comms_nodes(amount_of_nodes) -> {int, CommsNode}:
 
     # teardown
     for node in nodes.values():
-        # FIXME: this isn't always working as expected, we need a better way to stop the comms node process
         node.stop()
 
 
