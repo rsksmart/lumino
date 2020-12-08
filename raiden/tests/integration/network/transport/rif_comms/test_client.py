@@ -52,7 +52,7 @@ def test_has_subscriber_self(comms_nodes):
 
 
 @pytest.mark.parametrize("amount_of_nodes", [2])
-@pytest.mark.xfail("underlying stub hasSubscriber method does not work properly")
+@pytest.mark.xfail(reason="underlying stub.hasSubscriber method does not work properly")
 def test_has_subscriber(comms_nodes):
     comms_node_1 = comms_nodes[1]
     client_1 = comms_node_1.client
@@ -75,7 +75,7 @@ def test_has_subscriber(comms_nodes):
 
 
 @pytest.mark.parametrize("amount_of_nodes", [2])
-@pytest.mark.xfail("underlying stub hasSubscriber method does not work properly")
+@pytest.mark.xfail(reason="underlying stub.hasSubscriber method does not work properly")
 def test_two_clients_cross_subscription(comms_nodes):
     comms_node_1 = comms_nodes[1]
     client_1 = comms_node_1.client
