@@ -19,6 +19,7 @@ def comms_nodes(amount_of_nodes) -> {int, CommsNode}:
 
     # teardown
     for node in nodes.values():
+        # FIXME: this isn't always working as expected, we need a better way to stop the comms node process
         node.stop()
 
 
@@ -60,11 +61,11 @@ def test_has_subscriber(comms_nodes):
     client_2 = comms_node_2.client
 
     # FIXME: nodes shouldn't have to subscribe to themselves for this to work
-    _, _ = client_1.subscribe_to(comms_node_1.address)
-    _, _ = client_2.subscribe_to(comms_node_2.address)
+    client_1.subscribe_to(comms_node_1.address)
+    client_2.subscribe_to(comms_node_2.address)
 
     # subscribe from node 1 to 2
-    _, _ = client_1.subscribe_to(comms_node_2.address)
+    client_1.subscribe_to(comms_node_2.address)
 
     # check subscriptions
     assert client_1.is_subscribed_to(comms_node_1.address) is True
@@ -83,12 +84,12 @@ def test_two_clients_cross_subscription(comms_nodes):
     client_2 = comms_node_2.client
 
     # FIXME: nodes shouldn't have to subscribe to themselves for this to work
-    _, _ = client_1.subscribe_to(comms_node_1.address)
-    _, _ = client_2.subscribe_to(comms_node_2.address)
+    client_1.subscribe_to(comms_node_1.address)
+    client_2.subscribe_to(comms_node_2.address)
 
     # subscribe both nodes to each other
-    _, _ = client_1.subscribe_to(comms_node_2.address)
-    _, _ = client_2.subscribe_to(comms_node_1.address)
+    client_1.subscribe_to(comms_node_2.address)
+    client_2.subscribe_to(comms_node_1.address)
 
     # check subscriptions
     assert client_1.is_subscribed_to(comms_node_1.address) is True
@@ -99,28 +100,33 @@ def test_two_clients_cross_subscription(comms_nodes):
     assert client_2.is_subscribed_to(comms_node_2.address) is True
 
 
-@pytest.mark.skip(reason="hangs when attempting to sub to a node without it having subbed to itself first")
-def test_two_clients_cross_messaging_same_topic(self):
-    # register nodes 1 and 2
-    notification_1 = self.client_1.connect()
-    notification_2 = self.client_2.connect()
+@pytest.mark.parametrize("amount_of_nodes", [2])
+def test_two_clients_cross_messaging_same_topic(comms_nodes):
+    comms_node_1 = comms_nodes[1]
+    client_1 = comms_node_1.client
+    comms_node_2 = comms_nodes[2]
+    client_2 = comms_node_2.client
 
-    # cross-subscribe both nodes
-    _, one_sub_two = self.client_1.subscribe_to(self.address_2)
-    _, two_sub_one = self.client_2.subscribe_to(self.address_1)
+    # FIXME: nodes shouldn't have to subscribe to themselves for this to work
+    client_1.subscribe_to(comms_node_1.address)
+    client_2.subscribe_to(comms_node_2.address)
+
+    # subscribe both nodes to each other
+    _, sub_1_to_2 = client_1.subscribe_to(comms_node_2.address)
+    _, sub_2_to_1 = client_2.subscribe_to(comms_node_1.address)
 
     payload_1 = "hello from 1"
     payload_2 = "hello from 2"
 
-    self.client_1.send_message(payload_1, self.address_2)
-    self.client_2.send_message(payload_2, self.address_1)
+    client_1.send_message(payload_1, comms_node_2.address)
+    client_2.send_message(payload_2, comms_node_1.address)
 
-    for resp in one_sub_two:
+    for resp in sub_1_to_2:
         received_message = notification_to_payload(resp)
         assert received_message == payload_1
         break  # only 1 message is expected
 
-    for resp in two_sub_one:
+    for resp in sub_2_to_1:
         received_message = notification_to_payload(resp)
         assert received_message == payload_2
         break  # only 1 message is expected

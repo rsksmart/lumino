@@ -31,7 +31,7 @@ class Node:
             preexec_fn=os.setsid,  # set to later kill process group
         )
 
-        # FIXME: we need some sort of ping call
+        # FIXME: we need some sort of ping call, this will sometimes not be enough
         time.sleep(5)  # hack to get around calling the comms node before it is ready
 
         # FIXME: client.connect() calls should not need assignment (let alone to a module variable!)
@@ -40,6 +40,7 @@ class Node:
         return process
 
     def stop(self):
+        # FIXME: this isn't always working as expected, we need a better way to stop the comms node process
         try:
             self.client.disconnect()
             del connections[self.address]
