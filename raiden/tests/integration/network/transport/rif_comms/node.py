@@ -39,9 +39,11 @@ class Node:
         connections[self.address] = self.client.connect()
 
     def disconnect(self):
-        self.client.disconnect()
-        os.killpg(os.getpgid(self.process.pid), signal.SIGTERM)
-        del connections[self.address]
+        try:
+            self.client.disconnect()
+            del connections[self.address]
+        finally:
+            os.killpg(os.getpgid(self.process.pid), signal.SIGTERM)
 
 
 class Config:
