@@ -2,6 +2,7 @@ import os
 import signal
 import subprocess
 import time
+from pathlib import Path
 
 import json5
 import psutil
@@ -13,16 +14,17 @@ connections = {}  # hack to get around the fact that each connect() call needs t
 
 
 class Config:
-    comms_path = r"/home/rafa/repos/github/rsksmart/rif-communications-pubsub-node"
+    # FIXME: this should be a dependency within the project
+    comms_path = Path(__file__).parents[7].joinpath('rif-communications-pubsub-node')
     api_endpoint_prefix = "localhost"
     env_file_prefix = "testing_"
 
     def __init__(self, node_number: int):
         # TODO: generate these files
         self.env_name = self.env_file_prefix + str(node_number)
-        self.env_file = self.comms_path + '/config/' + self.env_name + '.json5'
+        self.env_file = self.comms_path.joinpath('config/' + self.env_name + '.json5')
 
-        # read config file
+        # load config from file
         with open(self.env_file, 'r') as reader:
             config = json5.loads(reader.read())
             self.listening_port = config['grpcPort']
@@ -41,7 +43,6 @@ class Node:
         self.process = self.start()
 
     def start(self):
-        # TODO: these should be dependencies within the project
         # TODO: look into using shell=False
         # FIXME: write output to memory or disk
         process = subprocess.Popen(
@@ -64,7 +65,7 @@ class Node:
             # FIXME: deleting entries in the connections dictionary is causing non-crashing thread exceptions
             self.client.disconnect()
         finally:
-            # TODO: we need a better way to stop the comms node process
+            # FIXME: we need a better way to stop the comms node process
             # terminate children and process group
             for child in psutil.Process(self.process.pid).children(recursive=True):
                 child.kill()
