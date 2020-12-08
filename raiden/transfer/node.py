@@ -88,7 +88,7 @@ from raiden.utils.typing import (
     Union,
     Address, AddressHex)
 
-from eth_utils import to_canonical_address, to_checksum_address
+from eth_utils import to_canonical_address
 
 import structlog
 

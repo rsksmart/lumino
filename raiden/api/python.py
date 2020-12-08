@@ -1,4 +1,3 @@
-import copy
 from http import HTTPStatus
 
 import gevent
