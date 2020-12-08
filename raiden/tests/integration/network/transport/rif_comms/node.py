@@ -1,28 +1,28 @@
-import os
-import signal
-import subprocess
-import time
-from pathlib import Path
+from subprocess import Popen
 
 import json5
-import psutil
 
+from raiden.tests.integration.network.transport.rif_comms.process import RIF_COMMS_PATH, Process as CommsProcess
 from raiden.tests.integration.network.transport.utils import generate_address
 from transport.rif_comms.client import Client as RIFCommsClient
 
-connections = {}  # hack to get around the fact that each connect() call needs to be assigned
-
 
 class Config:
-    # FIXME: this should be a dependency within the project
-    comms_path = Path(__file__).parents[7].joinpath('rif-communications-pubsub-node')
+    """
+    Class to load and set configuration attributes for a RIF Comms node to be run.
+    """
+
     api_endpoint_prefix = "localhost"
     env_file_prefix = "testing_"
 
     def __init__(self, node_number: int):
-        # TODO: generate these files
+        """
+        Load and set a configuration attributes for a RIF Comms node.
+        A valid configuration file must exist at RIF_COMMS_PATH/config/testing_<node_number>.json5
+        """
         self.env_name = self.env_file_prefix + str(node_number)
-        self.env_file = self.comms_path.joinpath('config/' + self.env_name + '.json5')
+        # TODO: generate these files if needed
+        self.env_file = RIF_COMMS_PATH.joinpath('config/' + self.env_name + '.json5')
 
         # load config from file
         with open(self.env_file, 'r') as reader:
@@ -34,6 +34,11 @@ class Config:
 
 
 class Node:
+    """
+    Class for RIF Comms node program.
+    """
+    connections = {}  # hack to get around the fact that each connect() call needs to be assigned
+
     def __init__(self, config: Config):
         self.address = config.address
         self.api_endpoint = config.api_endpoint
@@ -42,31 +47,21 @@ class Node:
         self.client = RIFCommsClient(rsk_address=self.address, grpc_api_endpoint=self.api_endpoint)
         self.process = self.start()
 
-    def start(self):
-        # TODO: look into using shell=False
-        # FIXME: write output to memory or disk
-        process = subprocess.Popen(
-            "NODE_ENV=" + self.env_name + " npm run api-server",
-            cwd=Config.comms_path,
-            shell=True,
-            preexec_fn=os.setsid,  # set to later kill process group
-        )
-
-        # FIXME: we need some sort of ping call, this will sometimes not be enough
-        time.sleep(5)  # hack to get around calling the comms node before it is ready
-
-        # FIXME: client.connect() calls should not need assignment (let alone to a module variable!)
-        connections[self.address] = self.client.connect()
-
+    def start(self) -> Popen:
+        """
+        Start a RIF Comms node process and connect to it.
+        """
+        process = CommsProcess.start(env_name=self.env_name)
+        # FIXME: client.connect() calls should not need assignment
+        self.connections[self.address] = self.client.connect()
         return process
 
     def stop(self):
+        """
+        Disconnect from RIF Comms node program, and stop its process.
+        """
         try:
             # FIXME: deleting entries in the connections dictionary is causing non-crashing thread exceptions
             self.client.disconnect()
         finally:
-            # FIXME: we need a better way to stop the comms node process
-            # terminate children and process group
-            for child in psutil.Process(self.process.pid).children(recursive=True):
-                child.kill()
-            os.killpg(os.getpgid(self.process.pid), signal.SIGTERM)
+            CommsProcess.stop(process=self.process)
