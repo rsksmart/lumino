@@ -519,9 +519,9 @@ def handle_channel_batch_unlock(raiden: "RaidenService", event: Event):
     )
     assert token_network_state is not None
 
-    if participant1 == raiden.address:
+    if participant1 == raiden.address or participant1 in token_network_state.channelidentifiers_to_channels:
         partner = participant2
-    elif participant2 == raiden.address:
+    elif participant2 == raiden.address or participant2 in token_network_state.channelidentifiers_to_channels:
         partner = participant1
     else:
         log.debug(
