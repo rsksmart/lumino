@@ -1,78 +1,22 @@
-import os
-import signal
-import subprocess
-import time
-
 import pytest
 
+from raiden.tests.integration.network.transport.rif_comms.node import Node as CommsNode, Config as CommsConfig
 from raiden.tests.integration.network.transport.utils import generate_address
-from raiden.utils import Address
-from transport.rif_comms.client import Client as RIFCommsClient
 from transport.rif_comms.utils import notification_to_payload
 
-connections = {}  # hack to get around the fact that each connect() call needs to be assigned
-
-class CommsNode:
-    def __init__(self, config: 'CommsConfig'):
-        self.address = config.address
-        self.api_endpoint = config.api_endpoint
-        self.env_file = config.env_file
-
-        self.client = RIFCommsClient(rsk_address=self.address, grpc_api_endpoint=self.api_endpoint)
-
-        self.process = self.start()
-        self.connect()
-
-    def start(self):
-        # TODO: these should be dependencies within the project
-        # TODO: look into using shell=False
-        process = subprocess.Popen(
-            "NODE_ENV=" + self.env_file + " npm run api-server",
-            cwd=r"/home/rafa/repos/github/rsksmart/rif-communications-pubsub-node",
-            shell=True,
-            preexec_fn=os.setsid,  # necessary to kill children
-        )
-
-        # TODO: we need some sort of ping to know the node is up
-        time.sleep(5)
-
-        return process
-
-    def connect(self):
-        # TODO: connect() calls should not need assignment (let alone to a module variable!)
-        connections[self.address] = self.client.connect()
-
-    def disconnect(self):
-        del connections[self.address]
-        self.client.disconnect()
-        os.killpg(os.getpgid(self.process.pid), signal.SIGTERM)
-
-class CommsConfig:
-    starting_port = 5013
-    api_endpoint_prefix = "localhost"
-    env_file_prefix = "development"
-
-    def __init__(self, node_number: int):
-        self.address = generate_address()
-        self.api_endpoint = self.api_endpoint_prefix + ":" + str(
-            self.starting_port + (node_number - 1) * 1000  # 5013, 6013, 7013...
-        )
-        # TODO: generate these files
-        self.env_file = self.env_file_prefix + str(1 + node_number)
 
 @pytest.fixture()
 @pytest.mark.parametrize("amount_of_nodes")
-def comms_nodes(amount_of_nodes) -> {CommsNode}:
+def comms_nodes(amount_of_nodes) -> {int, CommsNode}:
     nodes = {}
 
     # setup
     for i in range(1, amount_of_nodes + 1):
-        nodes[i] = CommsNode(CommsConfig(i))
+        node = CommsNode(CommsConfig(i))
+        node.connect()
+        nodes[i] = node
 
     yield nodes
-
-    # TODO: connect() should block
-    time.sleep(5)  # hack to wait for connect() to finish in case it has not
 
     # teardown
     for node in nodes.values():
@@ -81,47 +25,50 @@ def comms_nodes(amount_of_nodes) -> {CommsNode}:
 
 @pytest.mark.parametrize("amount_of_nodes", [1])
 def test_locate_own_peer_id(comms_nodes):
-    # attempt to locate self
     comms_node = comms_nodes[1]
+
+    # attempt to locate self
     assert comms_node.client._get_peer_id(comms_node.address) is not ""
 
 
-# TODO: causes ERR_NO_PEERS_IN_ROUTING_TABLE in comms node although it passes
+# FIXME: causes ERR_NO_PEERS_IN_ROUTING_TABLE in comms node although it passes
 @pytest.mark.parametrize("amount_of_nodes", [1])
 def test_locate_unregistered_peer_id(comms_nodes):
-    # attempt to locate an unregistered peer
     comms_node = comms_nodes[1]
+
+    # attempt to locate an unregistered peer
     assert comms_node.client._get_peer_id(generate_address()) is ""
 
 
-# TODO: comms node prints strange ServerUnaryCall message
+# FIXME: comms node prints strange ServerUnaryCall message
 @pytest.mark.parametrize("amount_of_nodes", [1])
 def test_has_subscriber_self(comms_nodes):
-    # subscribe to self and check subscription
     comms_node = comms_nodes[1]
     client = comms_node.client
     address = comms_node.address
     client.subscribe_to(address)
 
+    # subscribe to self and check subscription
     assert client.is_subscribed_to(address) is True
 
 
 @pytest.mark.parametrize("amount_of_nodes", [2])
 def test_has_subscriber(comms_nodes):
-    # subscribe fromm node 1 to 2 and check subscriptionss
     comms_node_1 = comms_nodes[1]
     client_1 = comms_node_1.client
     comms_node_2 = comms_nodes[2]
     client_2 = comms_node_2.client
 
-    # TODO: nodes shouldn't have to subscribe to themselves for this to work
+    # FIXME: nodes shouldn't have to subscribe to themselves for this to work
     _, _ = client_1.subscribe_to(comms_node_1.address)
     _, _ = client_2.subscribe_to(comms_node_2.address)
 
+    # subscribe from node 1 to 2
     _, _ = client_1.subscribe_to(comms_node_2.address)
 
+    # check subscriptions
     assert client_1.is_subscribed_to(comms_node_1.address) is True
-    # TODO: have comms node hasSubscriber call fixed
+    # FIXME: have comms node hasSubscriber call work properly
     assert client_1.is_subscribed_to(comms_node_2.address) is True
     assert client_2.is_subscribed_to(comms_node_1.address) is False
     assert client_2.is_subscribed_to(comms_node_2.address) is True
