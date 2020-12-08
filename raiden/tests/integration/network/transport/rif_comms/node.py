@@ -1,3 +1,5 @@
+import os
+import signal
 import subprocess
 import time
 
@@ -26,6 +28,7 @@ class Node:
             "NODE_ENV=" + self.env_file + " npm run api-server",
             cwd=r"/home/rafa/repos/github/rsksmart/rif-communications-pubsub-node",
             shell=True,
+            preexec_fn=os.setsid,  # set to later kill process group
         )
 
         # FIXME: we need some sort of ping call
@@ -41,9 +44,10 @@ class Node:
             self.client.disconnect()
             del connections[self.address]
         finally:
+            # terminate children and process group
             for child in psutil.Process(self.process.pid).children(recursive=True):
                 child.kill()
-            self.process.kill()
+            os.killpg(os.getpgid(self.process.pid), signal.SIGTERM)
 
 
 class Config:
