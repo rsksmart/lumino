@@ -241,11 +241,11 @@ class Node(TransportNode):
         Send text message through the RIF Comms client.
         """
         self.log.info(
-            "RIF Comms sending message", message_payload=payload.replace("\n", "\\n"), recipient=pex(recipient)
+            "sending message", message_payload=payload.replace("\n", "\\n"), transport="rif_comms", recipient=pex(recipient)
         )
         if not self._comms_client.is_subscribed_to(recipient):
             self.log.info(
-                "RIF Comms sending message not subscribed to recipient. Subscribing...", recipient=pex(recipient)
+                "subscribing to recipient", transport="rif_comms", recipient=pex(recipient)
             )
             self._comms_client.subscribe_to(recipient)
         # send the message
