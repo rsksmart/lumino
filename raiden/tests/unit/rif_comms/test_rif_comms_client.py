@@ -12,20 +12,22 @@ from transport.rif_comms.utils import notification_to_payload
 
 connections = {}  # hack to get around the fact that each connect() call needs to be assigned
 
-
 class CommsNode:
-    def __init__(self, address: Address, api: str):
-        self.address = address
-        self.api = api
-        self.client = RIFCommsClient(rsk_address=address, grpc_api_endpoint=api)
-        self. process = self.start()
+    def __init__(self, config: 'CommsConfig'):
+        self.address = config.address
+        self.api_endpoint = config.api_endpoint
+        self.env_file = config.env_file
+
+        self.client = RIFCommsClient(rsk_address=self.address, grpc_api_endpoint=self.api_endpoint)
+
+        self.process = self.start()
         self.connect()
 
     def start(self):
         # TODO: these should be dependencies within the project
-        # TODO: look int ousing shell = False
+        # TODO: look into using shell=False
         process = subprocess.Popen(
-            "NODE_ENV=development2 npm run api-server",
+            "NODE_ENV=" + self.env_file + " npm run api-server",
             cwd=r"/home/rafa/repos/github/rsksmart/rif-communications-pubsub-node",
             shell=True,
             preexec_fn=os.setsid,  # necessary to kill children
@@ -33,6 +35,7 @@ class CommsNode:
 
         # TODO: we need some sort of ping to know the node is up
         time.sleep(5)
+
         return process
 
     def connect(self):
@@ -44,19 +47,27 @@ class CommsNode:
         self.client.disconnect()
         os.killpg(os.getpgid(self.process.pid), signal.SIGTERM)
 
+class CommsConfig:
+    starting_port = 5013
+    api_endpoint_prefix = "localhost"
+    env_file_prefix = "development"
+
+    def __init__(self, node_number: int):
+        self.address = generate_address()
+        self.api_endpoint = self.api_endpoint_prefix + ":" + str(
+            self.starting_port + (node_number - 1) * 1000  # 5013, 6013, 7013...
+        )
+        # TODO: generate these files
+        self.env_file = self.env_file_prefix + str(1 + node_number)
 
 @pytest.fixture()
 @pytest.mark.parametrize("amount_of_nodes")
 def comms_nodes(amount_of_nodes) -> {CommsNode}:
     nodes = {}
 
-    def generate_comms_api(node_number: int) -> str:
-        starting_port = 5013
-        return "localhost:" + str(starting_port + (node_number - 1) * 1000)  # 5013, 6013, 7013...
-
     # setup
     for i in range(1, amount_of_nodes + 1):
-        nodes[i] = CommsNode(generate_address(), generate_comms_api(i))
+        nodes[i] = CommsNode(CommsConfig(i))
 
     yield nodes
 
@@ -70,6 +81,7 @@ def comms_nodes(amount_of_nodes) -> {CommsNode}:
 
 @pytest.mark.parametrize("amount_of_nodes", [1])
 def test_locate_own_peer_id(comms_nodes):
+    # attempt to locate self
     comms_node = comms_nodes[1]
     assert comms_node.client._get_peer_id(comms_node.address) is not ""
 
@@ -77,6 +89,7 @@ def test_locate_own_peer_id(comms_nodes):
 # TODO: causes ERR_NO_PEERS_IN_ROUTING_TABLE in comms node although it passes
 @pytest.mark.parametrize("amount_of_nodes", [1])
 def test_locate_unregistered_peer_id(comms_nodes):
+    # attempt to locate an unregistered peer
     comms_node = comms_nodes[1]
     assert comms_node.client._get_peer_id(generate_address()) is ""
 
@@ -84,26 +97,34 @@ def test_locate_unregistered_peer_id(comms_nodes):
 # TODO: comms node prints strange ServerUnaryCall message
 @pytest.mark.parametrize("amount_of_nodes", [1])
 def test_has_subscriber_self(comms_nodes):
+    # subscribe to self and check subscription
     comms_node = comms_nodes[1]
-
     client = comms_node.client
     address = comms_node.address
-
     client.subscribe_to(address)
 
     assert client.is_subscribed_to(address) is True
 
 
-@pytest.mark.skip(reason="hangs when attempting to sub 1 to 2 without subbing 2 to 2 before")
-def test_has_subscriber(self):
-    # register nodes 1 and 2, subscribe from 1 to 2, check subscriptions
-    notification_1 = self.client_1.connect()
-    notification_2 = self.client_2.connect()
-    _, _ = self.client_1.subscribe_to(self.address_2)
-    assert self.client_1.is_subscribed_to(self.address_1) is False
-    assert self.client_1.is_subscribed_to(self.address_2) is True
-    assert self.client_2.is_subscribed_to(self.address_2) is False
-    assert self.client_2.is_subscribed_to(self.address_2) is False
+@pytest.mark.parametrize("amount_of_nodes", [2])
+def test_has_subscriber(comms_nodes):
+    # subscribe fromm node 1 to 2 and check subscriptionss
+    comms_node_1 = comms_nodes[1]
+    client_1 = comms_node_1.client
+    comms_node_2 = comms_nodes[2]
+    client_2 = comms_node_2.client
+
+    # TODO: nodes shouldn't have to subscribe to themselves for this to work
+    _, _ = client_1.subscribe_to(comms_node_1.address)
+    _, _ = client_2.subscribe_to(comms_node_2.address)
+
+    _, _ = client_1.subscribe_to(comms_node_2.address)
+
+    assert client_1.is_subscribed_to(comms_node_1.address) is True
+    # TODO: have comms node hasSubscriber call fixed
+    assert client_1.is_subscribed_to(comms_node_2.address) is True
+    assert client_2.is_subscribed_to(comms_node_1.address) is False
+    assert client_2.is_subscribed_to(comms_node_2.address) is True
 
 
 @pytest.mark.skip(reason="hangs when attempting to sub 1 to 2 without subbing 2 to 2 before")
