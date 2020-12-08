@@ -43,6 +43,7 @@ class Node:
             self.client.disconnect()
             del connections[self.address]
         finally:
+            # FIXME: this does not seem to properly kill all subprocesses
             os.killpg(os.getpgid(self.process.pid), signal.SIGTERM)
 
 
