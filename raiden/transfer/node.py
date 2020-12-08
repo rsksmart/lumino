@@ -1148,7 +1148,13 @@ def is_transaction_effect_satisfied(
         and isinstance(transaction, ContractSendChannelClose)
         and state_change.token_network_identifier == transaction.token_network_identifier
         and state_change.channel_identifier == transaction.channel_identifier
+    ) or (
+        isinstance(state_change, ContractReceiveChannelClosedLight)
+        and isinstance(transaction, ContractSendChannelClose)
+        and state_change.token_network_identifier == transaction.token_network_identifier
+        and state_change.channel_identifier == transaction.channel_identifier
     )
+
     if is_valid_close:
         return True
 
@@ -1158,6 +1164,7 @@ def is_transaction_effect_satisfied(
         and state_change.token_network_identifier == transaction.token_network_identifier
         and state_change.channel_identifier == transaction.channel_identifier
     )
+
     if is_valid_settle:
         return True
 
@@ -1309,7 +1316,8 @@ def update_queues(iteration: TransitionResult[ChainState], state_change: StateCh
             queue.append(event)
 
         if isinstance(event, ContractSendEvent):
-            chain_state.pending_transactions.append(event)
+            if is_transaction_pending(chain_state, event, state_change):
+                chain_state.pending_transactions.append(event)
 
 
 def state_transition(
