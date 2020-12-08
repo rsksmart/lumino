@@ -144,7 +144,6 @@ class MessageHandler:
     @staticmethod
     def handle_message_lockexpired(raiden: RaidenService,
                                    message: LockExpired,
-                                   message_receiver_address: Address,
                                    is_light_client=False) -> None:
         balance_proof = balanceproof_from_envelope(message)
         if is_light_client:
