@@ -2121,8 +2121,8 @@ class RestAPI:
         return api_response(invoice)
 
     def light_client_onboarding_data(self, address):
-        data_to_sign = self.raiden_api.raiden.transport.light_client_onboarding_data(address)
-        return api_response(data_to_sign)
+        onboarding_data = self.raiden_api.raiden.transport.light_client_onboarding_data(address)
+        return api_response(onboarding_data)
 
     def register_light_client(self, registration_data: dict):
         new_light_client = self.raiden_api.raiden.transport.register_light_client(self.raiden_api, registration_data)

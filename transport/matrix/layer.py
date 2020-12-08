@@ -115,6 +115,7 @@ class MatrixLayer(TransportLayer[MatrixTransportNode]):
         server_url = client.api.base_url
         server_name = urlparse(server_url).netloc
         return {
+            "transport_mode": "matrix",
             "display_name_to_sign": "@" + to_normalized_address(address) + ":" + server_name,
             "password_to_sign": server_name,
             "seed_retry": "seed",
@@ -158,7 +159,8 @@ class MatrixLayer(TransportLayer[MatrixTransportNode]):
             signed_password,
             password,
             signed_display_name,
-            signed_seed_retry
+            signed_seed_retry,
+            "matrix"
         )
 
         if light_client and light_client["result_code"] == 200:

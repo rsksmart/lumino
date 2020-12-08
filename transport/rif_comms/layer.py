@@ -3,10 +3,11 @@ import sys
 from typing import List
 
 import click
-from eth_utils import to_canonical_address
+from eth_utils import to_canonical_address, remove_0x_prefix
 
 from raiden.exceptions import RaidenError
 from raiden.storage import sqlite, serialize
+from raiden.transfer import views
 from raiden.utils import Address
 from transport.layer import Layer as TransportLayer
 from transport.node import Node as TransportNode
@@ -44,7 +45,32 @@ class Layer(TransportLayer[RIFCommsTransportNode]):
             sys.exit(1)
 
     def light_client_onboarding_data(self, address: Address) -> dict:
-        pass
+        return {
+            "transport_mode": "rif-comms",
+        }
 
     def register_light_client(self, raiden_api: 'RaidenAPI', registration_data: dict) -> TransportNode:
-        pass
+        config = raiden_api.raiden.config["transport"]["rif_comms"]
+        address = bytearray.fromhex(remove_0x_prefix(registration_data['address']))
+
+        light_client = raiden_api.save_light_client(
+            address,
+            "",
+            "",
+            "",
+            "",
+            "rif-comms"
+        )
+
+        if light_client and light_client["result_code"] == 200:
+            light_client_transport = LightClientNode(
+                address=light_client["address"],
+                config=config
+            )
+            raiden_api.raiden.start_transport_in_runtime(
+                transport=light_client_transport,
+                chain_state=views.state_from_raiden(raiden_api.raiden)
+            )
+            self.add_light_client(light_client_transport)
+
+        return light_client

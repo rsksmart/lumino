@@ -1716,22 +1716,26 @@ class RaidenAPI:
                           signed_password,
                           server_name,
                           signed_display_name,
-                          signed_seed_retry):
+                          signed_seed_retry,
+                          transport_mode):
 
         address = to_checksum_address(address)
 
         light_client = self.raiden.wal.storage.get_light_client(address)
 
-        pubhex = self.raiden.config["pubkey"].hex()
-        encrypt_signed_password = encrypt(pubhex, signed_password.encode())
-        encrypt_signed_display_name = encrypt(pubhex, signed_display_name.encode())
-        encrypt_signed_seed_retry = encrypt(pubhex, signed_seed_retry.encode())
+        if light_client:
+            return {"address": address,
+                    "message": "Already registered",
+                    "result_code": 409}
 
-        if light_client is None:
+        api_key = hexlify(os.urandom(20))
+        api_key = api_key.decode("utf-8")
 
-            api_key = hexlify(os.urandom(20))
-            api_key = api_key.decode("utf-8")
-            # Check for limit light client
+        if transport_mode == "matrix":
+            pubhex = self.raiden.config["pubkey"].hex()
+            encrypt_signed_password = encrypt(pubhex, signed_password.encode())
+            encrypt_signed_display_name = encrypt(pubhex, signed_display_name.encode())
+            encrypt_signed_seed_retry = encrypt(pubhex, signed_seed_retry.encode())
             result = self.raiden.wal.storage.save_light_client(
                 api_key=api_key,
                 address=address,
@@ -1741,28 +1745,34 @@ class RaidenAPI:
                 current_server_name=server_name,
                 pending_for_deletion=0
             )
-
             if result > 0:
-                result = {"address": address,
-                          "encrypt_signed_password": encrypt_signed_password.hex(),
-                          "encrypt_signed_display_name": encrypt_signed_display_name.hex(),
-                          "api_key": api_key,
-                          "encrypt_signed_seed_retry": encrypt_signed_seed_retry.hex(),
-                          "message": "successfully registered",
-                          "result_code": 200}
+                return {"address": address,
+                        "encrypt_signed_password": encrypt_signed_password.hex(),
+                        "encrypt_signed_display_name": encrypt_signed_display_name.hex(),
+                        "api_key": api_key,
+                        "encrypt_signed_seed_retry": encrypt_signed_seed_retry.hex(),
+                        "message": "successfully registered",
+                        "result_code": 200}
             else:
-                result = {"message": "An unexpected error has occurred.",
-                          "result_code": 500}
+                return {"message": "An unexpected error has occurred.",
+                        "result_code": 500}
         else:
-            result = {"address": address,
-                      "encrypt_signed_password": encrypt_signed_password.hex(),
-                      "encrypt_signed_display_name": encrypt_signed_display_name.hex(),
-                      "api_key": light_client['api_key'],
-                      "encrypt_signed_seed_retry": encrypt_signed_seed_retry.hex(),
-                      "message": "Already registered",
-                      "result_code": 409}
-
-        return result
+            result = self.raiden.wal.storage.save_light_client(
+                api_key=api_key,
+                address=address,
+                encrypt_signed_password="",
+                encrypt_signed_display_name="",
+                encrypt_signed_seed_retry="",
+                current_server_name="",
+                pending_for_deletion=0
+            )
+            if result > 0:
+                return {"address": address,
+                        "message": "successfully registered",
+                        "result_code": 200}
+            else:
+                return {"message": "An unexpected error has occurred.",
+                        "result_code": 500}
 
     def create_light_client_payment(
         self,
