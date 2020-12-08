@@ -31,13 +31,12 @@ class Node:
         # FIXME: we need some sort of ping call
         time.sleep(5)  # hack to get around calling the comms node before it is ready
 
-        return process
-
-    def connect(self):
         # FIXME: client.connect() calls should not need assignment (let alone to a module variable!)
         connections[self.address] = self.client.connect()
 
-    def disconnect(self):
+        return process
+
+    def stop(self):
         try:
             self.client.disconnect()
             del connections[self.address]
