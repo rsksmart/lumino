@@ -1,7 +1,7 @@
-import os
-import signal
 import subprocess
 import time
+
+import psutil
 
 from raiden.tests.integration.network.transport.utils import generate_address
 from transport.rif_comms.client import Client as RIFCommsClient
@@ -26,7 +26,6 @@ class Node:
             "NODE_ENV=" + self.env_file + " npm run api-server",
             cwd=r"/home/rafa/repos/github/rsksmart/rif-communications-pubsub-node",
             shell=True,
-            preexec_fn=os.setsid,  # necessary to kill children
         )
 
         # FIXME: we need some sort of ping call
@@ -43,8 +42,9 @@ class Node:
             self.client.disconnect()
             del connections[self.address]
         finally:
-            # FIXME: this does not seem to properly kill all subprocesses
-            os.killpg(os.getpgid(self.process.pid), signal.SIGTERM)
+            for child in psutil.Process(self.process.pid).children(recursive=True):
+                child.kill()
+            self.process.kill()
 
 
 class Config:
