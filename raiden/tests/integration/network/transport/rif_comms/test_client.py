@@ -74,31 +74,29 @@ def test_has_subscriber(comms_nodes):
     assert client_2.is_subscribed_to(comms_node_2.address) is True
 
 
-@pytest.mark.skip(reason="hangs when attempting to sub 1 to 2 without subbing 2 to 2 before")
-def test_two_clients_cross_subscription(self):
-    # register nodes 1 and 2
-    notification_1 = self.client_1.connect()
-    notification_2 = self.client_2.connect()
+@pytest.mark.parametrize("amount_of_nodes", [2])
+@pytest.mark.xfail("underlying stub hasSubscriber method does not work properly")
+def test_two_clients_cross_subscription(comms_nodes):
+    comms_node_1 = comms_nodes[1]
+    client_1 = comms_node_1.client
+    comms_node_2 = comms_nodes[2]
+    client_2 = comms_node_2.client
 
-    # subscribe to 1 and 2 on both nodes
-    self.client_1.subscribe_to(self.address_1)
-    self.client_1.subscribe_to(self.address_2)
-    self.client_2.subscribe_to(self.address_1)
-    self.client_2.subscribe_to(self.address_2)
+    # FIXME: nodes shouldn't have to subscribe to themselves for this to work
+    _, _ = client_1.subscribe_to(comms_node_1.address)
+    _, _ = client_2.subscribe_to(comms_node_2.address)
 
-    assert self.client_1.is_subscribed_to(self.address_1) is True
-    assert self.client_1.is_subscribed_to(self.address_2) is True
-    assert self.client_2.is_subscribed_to(self.address_1) is True
-    assert self.client_2.is_subscribed_to(self.address_2) is True
+    # subscribe both nodes to each other
+    _, _ = client_1.subscribe_to(comms_node_2.address)
+    _, _ = client_2.subscribe_to(comms_node_1.address)
 
-
-@pytest.mark.skip(reason="incomplete test")
-def test_disconnect(self):
-    # register node 1, get own peer id, disconnect
-    notification = self.client_1.connect()
-    peer_id = self.client_1._get_peer_id(self.address_1)
-    self.client_1.stop()
-    # TODO check if end comms deletes topics
+    # check subscriptions
+    assert client_1.is_subscribed_to(comms_node_1.address) is True
+    # FIXME: have comms node hasSubscriber call work properly
+    assert client_1.is_subscribed_to(comms_node_2.address) is True
+    # FIXME: have comms node hasSubscriber call work properly
+    assert client_2.is_subscribed_to(comms_node_1.address) is True
+    assert client_2.is_subscribed_to(comms_node_2.address) is True
 
 
 @pytest.mark.skip(reason="hangs when attempting to sub to a node without it having subbed to itself first")
