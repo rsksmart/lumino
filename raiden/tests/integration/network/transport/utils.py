@@ -1,10 +1,9 @@
 import secrets
 
 from coincurve import PublicKey
+from eth_typing import Address
 from eth_utils import to_canonical_address, to_checksum_address
 from sha3 import keccak_256
-
-from raiden.utils import Address
 
 
 def generate_address() -> Address:
