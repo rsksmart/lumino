@@ -6,12 +6,11 @@ from urllib.parse import urlparse
 import click
 import structlog
 from eth_utils import to_normalized_address, decode_hex, remove_0x_prefix
+
 from raiden.api.python import RaidenAPI
 from raiden.constants import PATH_FINDING_BROADCASTING_ROOM, MONITORING_BROADCASTING_ROOM
 from raiden.exceptions import RaidenError
-from transport.matrix.node import MatrixNode as MatrixTransportNode, \
-    MatrixLightClientNode as MatrixLightClientTransportNode
-from transport.matrix.utils import get_available_servers_from_config, server_is_available, make_client
+from raiden.lightclient.handlers.light_client_service import LightClientService
 from raiden.settings import DEFAULT_MATRIX_KNOWN_SERVERS
 from raiden.storage import sqlite, serialize
 from raiden.transfer import views
@@ -19,6 +18,9 @@ from raiden.utils import typing
 from raiden.utils.cli import get_matrix_servers
 from raiden.utils.signer import recover
 from transport.layer import Layer as TransportLayer
+from transport.matrix.node import MatrixNode as MatrixTransportNode, \
+    MatrixLightClientNode as MatrixLightClientTransportNode
+from transport.matrix.utils import get_available_servers_from_config, server_is_available, make_client
 from transport.node import Node as TransportNode
 
 log = structlog.get_logger(__name__)
@@ -116,7 +118,7 @@ class MatrixLayer(TransportLayer[MatrixTransportNode]):
         server_url = client.api.base_url
         server_name = urlparse(server_url).netloc
         return {
-            "transport_mode": self.transport_type,
+            "transport_type": self.transport_type,
             "display_name_to_sign": "@" + to_normalized_address(address) + ":" + server_name,
             "password_to_sign": server_name,
             "seed_retry": "seed",
@@ -148,18 +150,20 @@ class MatrixLayer(TransportLayer[MatrixTransportNode]):
             signature=decode_hex(signed_seed_retry)
         )
 
-        address = bytearray.fromhex(remove_0x_prefix(registration_data['address']))
-        if address_recovered_from_signed_password != address or \
-            address_recovered_from_signed_display_name != address or \
-            address_recovered_from_signed_seed_retry != address:
+        lc_address = bytearray.fromhex(remove_0x_prefix(registration_data['address']))
+        if address_recovered_from_signed_password != lc_address or \
+            address_recovered_from_signed_display_name != lc_address or \
+            address_recovered_from_signed_seed_retry != lc_address:
             return None  # an error has occurred, so no light client is returned
 
-        light_client = raiden_api.store_matrix_light_client(
-            address,
+        light_client = LightClientService.store_matrix_light_client(
+            lc_address,
             signed_password,
             password,
             signed_display_name,
-            signed_seed_retry
+            signed_seed_retry,
+            raiden_api.raiden.wal.storage,
+            raiden_api.raiden.config["pubkey"].hex()
         )
 
         if light_client and light_client["result_code"] == 200:
@@ -182,7 +186,3 @@ class MatrixLayer(TransportLayer[MatrixTransportNode]):
             self.add_light_client(light_client_transport)
 
         return light_client
-
-
-
-
