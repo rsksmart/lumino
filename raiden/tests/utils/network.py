@@ -19,7 +19,7 @@ from raiden.tests.utils.protocol import HoldRaidenEventHandler, WaitForMessage
 from raiden.transfer.identifiers import CanonicalIdentifier
 from raiden.transfer.views import state_from_raiden
 from raiden.ui.app import _setup_matrix
-from raiden.utils import BlockNumber, merge_dict, pex
+from raiden.utils import BlockNumber, merge_dict, pex, privatekey_to_address
 from raiden.utils.typing import Address, Optional
 from raiden.waiting import wait_for_payment_network
 
@@ -44,8 +44,14 @@ def check_channel(
         token_network_address=token_network_identifier,
         channel_identifier=channel_identifier,
     )
-    netcontract1 = app1.raiden.chain.payment_channel(canonical_identifier=canonical_identifier)
-    netcontract2 = app2.raiden.chain.payment_channel(canonical_identifier=canonical_identifier)
+    netcontract1 = app1.raiden.chain.payment_channel(
+        creator_address=app1.raiden.address,
+        canonical_identifier=canonical_identifier
+    )
+    netcontract2 = app2.raiden.chain.payment_channel(
+        creator_address=app2.raiden.address,
+        canonical_identifier=canonical_identifier
+    )
 
     # Check a valid settle timeout was used, the netting contract has an
     # enforced minimum and maximum
@@ -106,6 +112,7 @@ def payment_channel_open_and_deposit(app0, app1, token_address, deposit, settle_
         # Use each app's own chain because of the private key / local signing
         token = app.raiden.chain.token(token_address)
         payment_channel_proxy = app.raiden.chain.payment_channel(
+            creator_address=app.raiden.address,
             canonical_identifier=canonical_identifier
         )
 
@@ -297,6 +304,7 @@ def create_apps(
         database_path = database_from_privatekey(base_dir=database_basedir, app_number=idx)
 
         config = {
+            "address": address,
             "chain_id": chain_id,
             "environment_type": environment_type,
             "unrecoverable_error_should_crash": unrecoverable_error_should_crash,
@@ -472,7 +480,7 @@ def wait_for_usable_channel(
     is reachable.
     """
     waiting.wait_for_newchannel(
-        app0.raiden, registry_address, token_address, app1.raiden.address, app0.raiden.address, retry_timeout
+        app0.raiden, registry_address, token_address, app0.raiden.address, app1.raiden.address, retry_timeout
     )
 
     waiting.wait_for_participant_newbalance(
@@ -486,7 +494,7 @@ def wait_for_usable_channel(
     )
 
     waiting.wait_for_participant_newbalance(
-        app0.raiden,
+        app1.raiden,
         registry_address,
         token_address,
         app0.raiden.address,

@@ -1,10 +1,11 @@
 from eth_utils.typing import ChecksumAddress
 
-from raiden.lightclient.models.client_model import ClientModel, ClientType
 from raiden.lightclient.lightclientmessages.hub_response_message import HubResponseMessage
-from raiden.lightclient.models.light_client_payment import LightClientPayment
-from raiden.lightclient.models.light_client_protocol_message import LightClientProtocolMessage, LightClientProtocolMessageType
 from raiden.lightclient.lightclientmessages.payment_hub_message import PaymentHubMessage
+from raiden.lightclient.models.client_model import ClientModel, ClientType
+from raiden.lightclient.models.light_client_payment import LightClientPayment
+from raiden.lightclient.models.light_client_protocol_message import LightClientProtocolMessage, \
+    LightClientProtocolMessageType
 from raiden.storage.sqlite import SerializedSQLiteStorage
 from raiden.storage.wal import WriteAheadLog
 from raiden.utils.typing import List, Optional
@@ -64,6 +65,12 @@ class LightClientService:
     def get_light_client_payment(cls, payment_id, storage: SerializedSQLiteStorage):
         payment = storage.get_light_client_payment(payment_id)
         if payment:
-            payment = LightClientPayment(payment[2], payment[3], payment[4], int(payment[5]), payment[6],
-                                         payment[7], payment[0], payment[1])
+            payment = LightClientPayment(identifier=payment[0],
+                                         creator_address=payment[1],
+                                         partner_address=payment[2],
+                                         is_lc_initiator=payment[3],
+                                         token_network_id=payment[4],
+                                         amount=int(payment[5]),
+                                         created_on=payment[6],
+                                         payment_status=payment[7])
         return payment

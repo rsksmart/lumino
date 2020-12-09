@@ -758,7 +758,7 @@
     "0x87A749D9b9c0c91AC009AeeBd74313D1a736A24C": "reachable"
   },
   "our_address": "0xe3B942e7821A0970EA79185A738BfBd3BC382AAb",
-  "payment_mapping": {
+  "payment_states_by_address": {
     "secrethashes_to_task": {
     },
     "_type": "raiden.transfer.state.PaymentMappingState",

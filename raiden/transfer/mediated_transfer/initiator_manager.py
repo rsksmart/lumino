@@ -26,10 +26,16 @@ from raiden.transfer.mediated_transfer.state_change import (
     ReceiveSecretRequest,
     ReceiveSecretReveal,
     ActionTransferReroute,
-    ActionInitInitiatorLight, ReceiveSecretRequestLight, ActionSendSecretRevealLight, ReceiveSecretRevealLight,
-    ReceiveTransferCancelRoute, StoreRefundTransferLight)
+    ActionInitInitiatorLight,
+    ReceiveSecretRequestLight,
+    ActionSendSecretRevealLight,
+    ReceiveSecretRevealLight,
+    ReceiveTransferCancelRoute,
+    StoreRefundTransferLight
+)
 from raiden.transfer.state import RouteState
-from raiden.transfer.state_change import ActionCancelPayment, Block, ContractReceiveSecretReveal
+from raiden.transfer.state_change import ActionCancelPayment, Block, ContractReceiveSecretReveal, \
+    ContractReceiveSecretRevealLight
 from raiden.utils.typing import (
     MYPY_ANNOTATION,
     BlockNumber,
@@ -39,6 +45,7 @@ from raiden.utils.typing import (
     SecretHash,
     TokenNetworkID,
     cast,
+    Union
 )
 
 
@@ -489,7 +496,7 @@ def handle_offchain_secretreveal(
 
 def handle_onchain_secretreveal(
     payment_state: InitiatorPaymentState,
-    state_change: ContractReceiveSecretReveal,
+    state_change: Union[ContractReceiveSecretReveal, ContractReceiveSecretRevealLight],
     channelidentifiers_to_channels: ChannelMap,
     pseudo_random_generator: random.Random,
 ) -> TransitionResult[InitiatorPaymentState]:
@@ -618,17 +625,15 @@ def handle_secretreveal_light(
 
 
 def handle_store_refund_transfer_light(payment_state: InitiatorPaymentState,
-                                       refund_transfer: RefundTransfer
-                                       ) -> TransitionResult[InitiatorPaymentState]:
-    order = 1
-    store_refund_transfer = StoreMessageEvent(refund_transfer.message_identifier,
-                                              refund_transfer.payment_identifier,
-                                              order,
-                                              refund_transfer,
-                                              True,
-                                              LightClientProtocolMessageType.PaymentRefund, refund_transfer.recipient)
+                                       refund_transfer: RefundTransfer) -> TransitionResult[InitiatorPaymentState]:
+    store_refund_transfer = StoreMessageEvent(message_id=refund_transfer.message_identifier,
+                                              payment_id=refund_transfer.payment_identifier,
+                                              message_order=1,
+                                              message=refund_transfer,
+                                              is_signed=True,
+                                              message_type=LightClientProtocolMessageType.PaymentRefund,
+                                              light_client_address=refund_transfer.recipient)
     return TransitionResult(payment_state, [store_refund_transfer])
-
 
 
 def state_transition(
@@ -754,10 +759,20 @@ def state_transition(
             channelidentifiers_to_channels=channelidentifiers_to_channels,
             pseudo_random_generator=pseudo_random_generator,
         )
+    elif type(state_change) == ContractReceiveSecretReveal or type(state_change) == ContractReceiveSecretRevealLight:
+        assert payment_state, "ContractReceiveSecretReveal and ContractReceiveSecretRevealLight " \
+                              "should be accompanied by a valid payment state"
+        iteration = handle_onchain_secretreveal(
+            payment_state=payment_state,
+            state_change=state_change,
+            channelidentifiers_to_channels=channelidentifiers_to_channels,
+            pseudo_random_generator=pseudo_random_generator,
+        )
     elif type(state_change) == StoreRefundTransferLight:
         assert isinstance(state_change, StoreRefundTransferLight), MYPY_ANNOTATION
         assert payment_state, "StoreRefundTransferLight should be accompanied by a valid payment state"
-        iteration = handle_store_refund_transfer_light(payment_state=payment_state, refund_transfer=state_change.transfer)
+        iteration = handle_store_refund_transfer_light(payment_state=payment_state,
+                                                       refund_transfer=state_change.transfer)
     else:
         iteration = TransitionResult(payment_state, list())
 

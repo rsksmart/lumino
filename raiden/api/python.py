@@ -1,4 +1,3 @@
-import copy
 from http import HTTPStatus
 
 import gevent
@@ -24,7 +23,8 @@ from raiden.constants import (
     GENESIS_BLOCK_NUMBER,
     RED_EYES_PER_TOKEN_NETWORK_LIMIT,
     UINT256_MAX,
-    Environment)
+    Environment,
+    ErrorCode)
 from raiden.exceptions import (
     AlreadyRegisteredTokenAddress,
     ChannelNotFound,
@@ -56,6 +56,7 @@ from raiden.messages import RequestMonitoring, LockedTransfer, RevealSecret, Unl
 from raiden.settings import DEFAULT_RETRY_TIMEOUT, DEVELOPMENT_CONTRACT_VERSION
 
 from raiden.transfer import architecture, views, routes
+from raiden.transfer.channel import get_distributable
 from raiden.transfer.events import (
     EventPaymentReceivedSuccess,
     EventPaymentSentFailed,
@@ -69,7 +70,9 @@ from raiden.transfer.state import (
     NettingChannelState,
     TargetTask,
     TransferTask,
-    ChainState)
+    ChainState,
+    PaymentMappingState
+)
 
 from raiden.transfer.state_change import ActionChannelClose
 from raiden.utils import pex, typing
@@ -193,25 +196,25 @@ def get_transfer_from_task(
 
 
 def transfer_tasks_view(
-    transfer_tasks: Dict[SecretHash, TransferTask],
+    payment_states_by_address: Dict[Address, PaymentMappingState],
     token_address: TokenAddress = None,
     channel_id: ChannelID = None,
 ) -> List[Dict[str, Any]]:
     view = list()
 
-    for secrethash, transfer_task in transfer_tasks.items():
-        transfer, role = get_transfer_from_task(secrethash, transfer_task)
-
-        if transfer is None:
-            continue
-        if token_address is not None:
-            if transfer.token != token_address:
+    for payment_states_by_address in payment_states_by_address.values():
+        for secrethash, transfer_task in payment_states_by_address.secrethashes_to_task.items():
+            transfer, role = get_transfer_from_task(secrethash, transfer_task)
+            if transfer is None:
                 continue
-            elif channel_id is not None:
-                if transfer.balance_proof.channel_identifier != channel_id:
+            if token_address is not None:
+                if transfer.token != token_address:
                     continue
+                elif channel_id is not None:
+                    if transfer.balance_proof.channel_identifier != channel_id:
+                        continue
 
-        view.append(flatten_transfer(transfer, role))
+            view.append(flatten_transfer(transfer, role))
 
     return view
 
@@ -625,13 +628,19 @@ class RaidenAPI:
                                                         and channel.identifier == channel_identifier, settled_channels)
             filtered_settled_channels_list = list(filtered_settled_channels_iterator)
             if filtered_settled_channels_list:
-                raise RaidenRecoverableError("Failed trying to settle a channel that's already settled")
+                raise RaidenRecoverableError(ErrorCode.Settlement.CHANNEL_ALREADY_SETTLED)
             else:
-                raise RaidenRecoverableError("Failed trying to settle a channel that's not in waiting_for_settle state")
+                log.debug("Settlement Light: channel is not in waiting_for_settle state, "
+                          "it was probably settled by the counterparty and removed from memory before this call.")
+                # channel not found, this could be because it was settled and the hub detected that
+                # it doesn't have anything else to unlock so deletes the channel from the memory or
+                # could be a bug, in both cases we assume that the channel is settled so we raise this exception.
+                raise RaidenRecoverableError(ErrorCode.Settlement.CHANNEL_ALREADY_SETTLED)
 
         channel_state = channel_list[0]
 
         channel_proxy = self.raiden.chain.payment_channel(
+            creator_address=creator_address,
             canonical_identifier=channel_state.canonical_identifier
         )
 
@@ -699,10 +708,9 @@ class RaidenAPI:
         )
 
         channel_proxy = self.raiden.chain.payment_channel(
+            creator_address,
             canonical_identifier=channel_state.canonical_identifier
         )
-
-        channel_proxy.swap_participants(creator_address)
 
         channel_proxy.set_total_deposit_light(
             total_deposit=total_deposit,
@@ -766,6 +774,7 @@ class RaidenAPI:
         )
 
         channel_proxy = self.raiden.chain.payment_channel(
+            creator_address,
             canonical_identifier=channel_state.canonical_identifier
         )
 
@@ -826,7 +835,7 @@ class RaidenAPI:
 
     def channel_settle_light(
         self,
-        registry_address: PaymentNetworkID,
+        registry_address: Address,
         token_address: TokenAddress,
         creator_address: Address,
         partner_address: Address,
@@ -1226,6 +1235,7 @@ class RaidenAPI:
             payment_network_id=payment_network_identifier,
             token_address=token_address,
         )
+
         self.raiden.mediated_transfer_async_light(
             token_network_identifier=token_network_identifier,
             amount=amount,
@@ -1483,7 +1493,6 @@ class RaidenAPI:
         self, token_address: TokenAddress = None, partner_address: Address = None
     ) -> List[Dict[str, Any]]:
         chain_state = views.state_from_raiden(self.raiden)
-        transfer_tasks = views.get_all_transfer_tasks(chain_state)
         channel_id = None
 
         if token_address is not None:
@@ -1499,7 +1508,7 @@ class RaidenAPI:
                 )
                 channel_id = partner_channel.identifier
 
-        return transfer_tasks_view(transfer_tasks, token_address, channel_id)
+        return transfer_tasks_view(chain_state.payment_states_by_address, token_address, channel_id)
 
     def get_network_graph(self, token_network_address):
         chain_state = views.state_from_raiden(self.raiden)
@@ -1831,10 +1840,8 @@ class RaidenAPI:
                 privkey=self.raiden.privkey,
             )
             if prev_secrethash:
-                current_payment_task = chain_state.payment_mapping.secrethashes_to_task[prev_secrethash]
-                chain_state.payment_mapping.secrethashes_to_task.update(
-                    {secrethash: copy.deepcopy(current_payment_task)}
-                )
+                current_payment_task = chain_state.get_payment_task(creator_address, prev_secrethash)
+                chain_state.clone_payment_task(creator_address, prev_secrethash, secrethash)
                 possible_routes = routes.filter_acceptable_routes(
                     route_states=possible_routes, blacklisted_channel_ids=current_payment_task.manager_state.cancelled_channels
                 )
@@ -1850,6 +1857,10 @@ class RaidenAPI:
 
         if channel_state:
 
+            # checking the balance before creating the payment
+            if amount > get_distributable(channel_state.our_state, channel_state.partner_state):
+                raise InsufficientFunds("Insufficient funds to create payment")
+
             locked_transfer = LightClientUtils.create_locked_transfer(
                 chain_state=chain_state,
                 channel_state=channel_state,
@@ -1860,25 +1871,26 @@ class RaidenAPI:
             )
 
             # Create the light_client_payment
-            is_lc_initiator = 1
-            payment = LightClientPayment(partner_address,
-                                         is_lc_initiator, channel_state.token_network_identifier,
-                                         amount,
-                                         str(date.today()),
-                                         LightClientPaymentStatus.Pending,
-                                         locked_transfer.payment_identifier)
+            payment = LightClientPayment(partner_address=partner_address,
+                                         is_lc_initiator=1,
+                                         token_network_id=channel_state.token_network_identifier,
+                                         amount=amount,
+                                         created_on=str(date.today()),
+                                         payment_status=LightClientPaymentStatus.Pending,
+                                         identifier=locked_transfer.payment_identifier)
+
             # Persist the light_client_protocol_message associated
             order = 1
             LightClientMessageHandler.store_light_client_payment(payment, self.raiden.wal.storage)
             lcpm_id = LightClientMessageHandler.store_light_client_protocol_message(
-                locked_transfer.message_identifier,
-                locked_transfer,
-                False,
-                creator_address,
-                order,
-                LightClientProtocolMessageType.PaymentSuccessful,
-                self.raiden.wal,
-                payment.payment_id
+                identifier=locked_transfer.message_identifier,
+                message=locked_transfer,
+                signed=False,
+                light_client_address=creator_address,
+                order=order,
+                message_type=LightClientProtocolMessageType.PaymentSuccessful,
+                wal=self.raiden.wal,
+                payment_id=payment.payment_id
             )
             payment_hub_message = PaymentHubMessage(payment_id=payment.payment_id,
                                                     message_order=order,
