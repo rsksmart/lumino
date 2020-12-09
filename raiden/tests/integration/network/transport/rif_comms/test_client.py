@@ -43,8 +43,8 @@ def test_locate_unregistered_peer_id(comms_nodes):
 @pytest.mark.parametrize("amount_of_nodes", [1])
 def test_has_subscriber_self(comms_nodes):
     comms_node = comms_nodes[1]
-    client = comms_node.client
-    address = comms_node.address
+    client, address = comms_node.client, comms_node.address
+
     client.subscribe_to(address)
 
     # subscribe to self and check subscription
@@ -54,71 +54,68 @@ def test_has_subscriber_self(comms_nodes):
 @pytest.mark.parametrize("amount_of_nodes", [2])
 @pytest.mark.xfail(reason="underlying stub.hasSubscriber method does not work properly")
 def test_has_subscriber(comms_nodes):
-    comms_node_1 = comms_nodes[1]
-    client_1 = comms_node_1.client
-    comms_node_2 = comms_nodes[2]
-    client_2 = comms_node_2.client
+    comms_node_1, comms_node_2 = comms_nodes[1], comms_nodes[2]
+    client_1, address_1 = comms_node_1.client, comms_node_1.address
+    client_2, address_2 = comms_node_2.client, comms_node_2.address
 
     # FIXME: nodes shouldn't have to subscribe to themselves for this to work
-    client_1.subscribe_to(comms_node_1.address)
-    client_2.subscribe_to(comms_node_2.address)
+    client_1.subscribe_to(address_1)
+    client_2.subscribe_to(address_2)
 
     # subscribe from node 1 to 2
-    client_1.subscribe_to(comms_node_2.address)
+    client_1.subscribe_to(address_2)
 
     # check subscriptions
-    assert client_1.is_subscribed_to(comms_node_1.address) is True
+    assert client_1.is_subscribed_to(address_1) is True
     # FIXME: have comms node hasSubscriber call work properly
-    assert client_1.is_subscribed_to(comms_node_2.address) is True
-    assert client_2.is_subscribed_to(comms_node_1.address) is False
-    assert client_2.is_subscribed_to(comms_node_2.address) is True
+    assert client_1.is_subscribed_to(address_2) is True
+    assert client_2.is_subscribed_to(address_1) is False
+    assert client_2.is_subscribed_to(address_2) is True
 
 
 @pytest.mark.parametrize("amount_of_nodes", [2])
 @pytest.mark.xfail(reason="underlying stub.hasSubscriber method does not work properly")
 def test_two_clients_cross_subscription(comms_nodes):
-    comms_node_1 = comms_nodes[1]
-    client_1 = comms_node_1.client
-    comms_node_2 = comms_nodes[2]
-    client_2 = comms_node_2.client
+    comms_node_1, comms_node_2 = comms_nodes[1], comms_nodes[2]
+    client_1, address_1 = comms_node_1.client, comms_node_1.address
+    client_2, address_2 = comms_node_2.client, comms_node_2.address
 
     # FIXME: nodes shouldn't have to subscribe to themselves for this to work
-    client_1.subscribe_to(comms_node_1.address)
-    client_2.subscribe_to(comms_node_2.address)
+    client_1.subscribe_to(address_1)
+    client_2.subscribe_to(address_2)
 
     # subscribe both nodes to each other
-    client_1.subscribe_to(comms_node_2.address)
-    client_2.subscribe_to(comms_node_1.address)
+    client_1.subscribe_to(address_2)
+    client_2.subscribe_to(address_1)
 
     # check subscriptions
-    assert client_1.is_subscribed_to(comms_node_1.address) is True
+    assert client_1.is_subscribed_to(address_1) is True
     # FIXME: have comms node hasSubscriber call work properly
-    assert client_1.is_subscribed_to(comms_node_2.address) is True
+    assert client_1.is_subscribed_to(address_2) is True
     # FIXME: have comms node hasSubscriber call work properly
-    assert client_2.is_subscribed_to(comms_node_1.address) is True
-    assert client_2.is_subscribed_to(comms_node_2.address) is True
+    assert client_2.is_subscribed_to(address_1) is True
+    assert client_2.is_subscribed_to(address_2) is True
 
 
 @pytest.mark.parametrize("amount_of_nodes", [2])
 def test_two_clients_cross_messaging_same_topic(comms_nodes):
-    comms_node_1 = comms_nodes[1]
-    client_1 = comms_node_1.client
-    comms_node_2 = comms_nodes[2]
-    client_2 = comms_node_2.client
+    comms_node_1, comms_node_2 = comms_nodes[1], comms_nodes[2]
+    client_1, address_1 = comms_node_1.client, comms_node_1.address
+    client_2, address_2 = comms_node_2.client, comms_node_2.address
 
     # FIXME: nodes shouldn't have to subscribe to themselves for this to work
-    client_1.subscribe_to(comms_node_1.address)
-    client_2.subscribe_to(comms_node_2.address)
+    client_1.subscribe_to(address_1)
+    client_2.subscribe_to(address_2)
 
     # subscribe both nodes to each other
-    _, sub_1_to_2 = client_1.subscribe_to(comms_node_2.address)
-    _, sub_2_to_1 = client_2.subscribe_to(comms_node_1.address)
+    _, sub_1_to_2 = client_1.subscribe_to(address_2)
+    _, sub_2_to_1 = client_2.subscribe_to(address_1)
 
     payload_1 = "hello from 1"
     payload_2 = "hello from 2"
 
-    client_1.send_message(payload_1, comms_node_2.address)
-    client_2.send_message(payload_2, comms_node_1.address)
+    client_1.send_message(payload_1, address_2)
+    client_2.send_message(payload_2, address_1)
 
     for resp in sub_1_to_2:
         received_message = notification_to_payload(resp)
