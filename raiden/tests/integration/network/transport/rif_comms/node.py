@@ -22,15 +22,15 @@ class Config:
         """
         self.env_name = self.env_file_prefix + str(node_number)
         # TODO: generate these files if needed
-        self.env_file = RIF_COMMS_PATH.joinpath('config/' + self.env_name + '.json5')
+        self._env_file = RIF_COMMS_PATH.joinpath('config/' + self.env_name + '.json5')
 
         # load config from file
-        with open(self.env_file, 'r') as reader:
+        with open(self._env_file, 'r') as reader:
             config = json5.loads(reader.read())
-            self.listening_port = config['grpcPort']
+            self._listening_port = config['grpcPort']
 
         self.address = generate_address()
-        self.api_endpoint = self.api_endpoint_prefix + ":" + str(self.listening_port)
+        self.api_endpoint = self.api_endpoint_prefix + ":" + str(self._listening_port)
 
 
 class Node:
@@ -41,17 +41,17 @@ class Node:
 
     def __init__(self, config: Config):
         self.address = config.address
-        self.api_endpoint = config.api_endpoint
-        self.env_name = config.env_name
+        self._api_endpoint = config.api_endpoint
+        self._env_name = config.env_name
 
-        self.client = RIFCommsClient(rsk_address=self.address, grpc_api_endpoint=self.api_endpoint)
-        self.process = self.start()
+        self.client = RIFCommsClient(rsk_address=self.address, grpc_api_endpoint=self._api_endpoint)
+        self._process = self.start()
 
     def start(self) -> Popen:
         """
         Start a RIF Comms node process and connect to it.
         """
-        process = CommsProcess.start(env_name=self.env_name)
+        process = CommsProcess.start(env_name=self._env_name)
         # FIXME: client.connect() calls should not need assignment
         self.connections[self.address] = self.client.connect()
         return process
@@ -64,4 +64,4 @@ class Node:
             # FIXME: deleting entries in the connections dictionary is causing non-crashing thread exceptions
             self.client.disconnect()
         finally:
-            CommsProcess.stop(process=self.process)
+            CommsProcess.stop(process=self._process)
