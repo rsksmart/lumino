@@ -51,7 +51,7 @@ class Layer(TransportLayer[RIFCommsTransportNode]):
             "transport_type": self.transport_type,
         }
 
-    def register_light_client(self, raiden_api: 'RaidenAPI', registration_data: dict) -> TransportNode:
+    def register_light_client(self, raiden_api: 'RaidenAPI', registration_data: dict):
         config = raiden_api.raiden.config["transport"]["rif_comms"]
         lc_address = bytearray.fromhex(remove_0x_prefix(registration_data['address']))
 

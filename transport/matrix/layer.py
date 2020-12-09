@@ -124,7 +124,7 @@ class MatrixLayer(TransportLayer[MatrixTransportNode]):
             "seed_retry": "seed",
         }
 
-    def register_light_client(self, raiden_api: RaidenAPI, registration_data: dict) -> TransportNode:
+    def register_light_client(self, raiden_api: RaidenAPI, registration_data: dict):
         config = raiden_api.raiden.config["transport"]["matrix"]
         password = registration_data["password"]
         signed_password = registration_data["signed_password"]
