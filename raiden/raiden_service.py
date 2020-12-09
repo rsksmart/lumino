@@ -571,7 +571,6 @@ class RaidenService(Runnable):
     def __repr__(self):
         return f"<{self.__class__.__name__} node:{pex(self.address)}>"
 
-    #TODO Remove this!
     def start_transport_in_runtime(self, transport, chain_state: ChainState):
         # Start a transport node
         transport.start(

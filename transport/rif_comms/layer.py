@@ -15,6 +15,7 @@ from transport.rif_comms.node import Node as RIFCommsTransportNode, LightClientN
 
 
 class Layer(TransportLayer[RIFCommsTransportNode]):
+    transport_type = "rif-comms"
 
     def construct_full_node(self, config):
         return RIFCommsTransportNode(config["address"], config["transport"]["rif_comms"])
@@ -46,25 +47,20 @@ class Layer(TransportLayer[RIFCommsTransportNode]):
 
     def light_client_onboarding_data(self, address: Address) -> dict:
         return {
-            "transport_mode": "rif-comms",
+            "transport_mode": self.transport_type,
         }
 
     def register_light_client(self, raiden_api: 'RaidenAPI', registration_data: dict) -> TransportNode:
         config = raiden_api.raiden.config["transport"]["rif_comms"]
         address = bytearray.fromhex(remove_0x_prefix(registration_data['address']))
 
-        light_client = raiden_api.save_light_client(
-            address,
-            "",
-            "",
-            "",
-            "",
-            "rif-comms"
+        light_client = raiden_api.store_rif_comms_light_client(
+            address
         )
 
         if light_client and light_client["result_code"] == 200:
             light_client_transport = LightClientNode(
-                address=light_client["address"],
+                address=address,
                 config=config
             )
             raiden_api.raiden.start_transport_in_runtime(

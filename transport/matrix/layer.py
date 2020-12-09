@@ -25,6 +25,7 @@ log = structlog.get_logger(__name__)
 
 
 class MatrixLayer(TransportLayer[MatrixTransportNode]):
+    transport_type = "matrix"
 
     def __init__(self, config):
         self._prepare_config(config)
@@ -115,7 +116,7 @@ class MatrixLayer(TransportLayer[MatrixTransportNode]):
         server_url = client.api.base_url
         server_name = urlparse(server_url).netloc
         return {
-            "transport_mode": "matrix",
+            "transport_mode": self.transport_type,
             "display_name_to_sign": "@" + to_normalized_address(address) + ":" + server_name,
             "password_to_sign": server_name,
             "seed_retry": "seed",
@@ -123,7 +124,6 @@ class MatrixLayer(TransportLayer[MatrixTransportNode]):
 
     def register_light_client(self, raiden_api: RaidenAPI, registration_data: dict) -> TransportNode:
         config = raiden_api.raiden.config["transport"]["matrix"]
-
         password = registration_data["password"]
         signed_password = registration_data["signed_password"]
         signed_display_name = registration_data["signed_display_name"]
@@ -154,13 +154,12 @@ class MatrixLayer(TransportLayer[MatrixTransportNode]):
             address_recovered_from_signed_seed_retry != address:
             return None  # an error has occurred, so no light client is returned
 
-        light_client = raiden_api.save_light_client(
+        light_client = raiden_api.store_matrix_light_client(
             address,
             signed_password,
             password,
             signed_display_name,
-            signed_seed_retry,
-            "matrix"
+            signed_seed_retry
         )
 
         if light_client and light_client["result_code"] == 200:
@@ -183,5 +182,7 @@ class MatrixLayer(TransportLayer[MatrixTransportNode]):
             self.add_light_client(light_client_transport)
 
         return light_client
+
+
 
 

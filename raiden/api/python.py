@@ -1711,31 +1711,28 @@ class RaidenAPI:
         light_clients = self.raiden.wal.storage.get_all_light_clients()
         return light_clients
 
-    def save_light_client(self,
-                          address,
-                          signed_password,
-                          server_name,
-                          signed_display_name,
-                          signed_seed_retry,
-                          transport_mode):
+    def store_matrix_light_client(self,
+                                  address,
+                                  signed_password=None,
+                                  server_name=None,
+                                  signed_display_name=None,
+                                  signed_seed_retry=None,
+                                  ):
 
         address = to_checksum_address(address)
 
         light_client = self.raiden.wal.storage.get_light_client(address)
 
-        if light_client:
-            return {"address": address,
-                    "message": "Already registered",
-                    "result_code": 409}
+        pubhex = self.raiden.config["pubkey"].hex()
+        encrypt_signed_password = encrypt(pubhex, signed_password.encode())
+        encrypt_signed_display_name = encrypt(pubhex, signed_display_name.encode())
+        encrypt_signed_seed_retry = encrypt(pubhex, signed_seed_retry.encode())
 
-        api_key = hexlify(os.urandom(20))
-        api_key = api_key.decode("utf-8")
+        if light_client is None:
 
-        if transport_mode == "matrix":
-            pubhex = self.raiden.config["pubkey"].hex()
-            encrypt_signed_password = encrypt(pubhex, signed_password.encode())
-            encrypt_signed_display_name = encrypt(pubhex, signed_display_name.encode())
-            encrypt_signed_seed_retry = encrypt(pubhex, signed_seed_retry.encode())
+            api_key = hexlify(os.urandom(20))
+            api_key = api_key.decode("utf-8")
+            # Check for limit light client
             result = self.raiden.wal.storage.save_light_client(
                 api_key=api_key,
                 address=address,
@@ -1745,34 +1742,60 @@ class RaidenAPI:
                 current_server_name=server_name,
                 pending_for_deletion=0
             )
+
             if result > 0:
-                return {"address": address,
-                        "encrypt_signed_password": encrypt_signed_password.hex(),
-                        "encrypt_signed_display_name": encrypt_signed_display_name.hex(),
-                        "api_key": api_key,
-                        "encrypt_signed_seed_retry": encrypt_signed_seed_retry.hex(),
-                        "message": "successfully registered",
-                        "result_code": 200}
+                result = {"address": address,
+                          "encrypt_signed_password": encrypt_signed_password.hex(),
+                          "encrypt_signed_display_name": encrypt_signed_display_name.hex(),
+                          "api_key": api_key,
+                          "encrypt_signed_seed_retry": encrypt_signed_seed_retry.hex(),
+                          "message": "successfully registered",
+                          "result_code": 200}
             else:
-                return {"message": "An unexpected error has occurred.",
-                        "result_code": 500}
+                result = {"message": "An unexpected error has occurred.",
+                          "result_code": 500}
         else:
+            result = {"address": address,
+                      "encrypt_signed_password": encrypt_signed_password.hex(),
+                      "encrypt_signed_display_name": encrypt_signed_display_name.hex(),
+                      "api_key": light_client['api_key'],
+                      "encrypt_signed_seed_retry": encrypt_signed_seed_retry.hex(),
+                      "message": "Already registered",
+                      "result_code": 409}
+
+        return result
+
+    def store_rif_comms_light_client(self, address):
+        address = to_checksum_address(address)
+
+        api_key = hexlify(os.urandom(20))
+        api_key = api_key.decode("utf-8")
+
+        light_client = self.raiden.wal.storage.get_light_client(address)
+
+        if light_client is None:
             result = self.raiden.wal.storage.save_light_client(
                 api_key=api_key,
                 address=address,
-                encrypt_signed_password="",
-                encrypt_signed_display_name="",
-                encrypt_signed_seed_retry="",
-                current_server_name="",
+                encrypt_signed_password=None,
+                encrypt_signed_display_name=None,
+                encrypt_signed_seed_retry=None,
+                current_server_name=None,
                 pending_for_deletion=0
             )
             if result > 0:
                 return {"address": address,
                         "message": "successfully registered",
+                        "api_key": api_key,
                         "result_code": 200}
             else:
                 return {"message": "An unexpected error has occurred.",
                         "result_code": 500}
+        else:
+            return {"address": address,
+                    "api_key": light_client['api_key'],
+                    "message": "Already registered",
+                    "result_code": 409}
 
     def create_light_client_payment(
         self,

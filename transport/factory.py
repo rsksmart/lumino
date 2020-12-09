@@ -10,7 +10,7 @@ class Factory:
 
     @staticmethod
     def create(transport_type: str, config: dict) -> TransportLayer:
-        if transport_type == "rif-comms":
+        if transport_type == RIFCommsTransportLayer.transport_type:
             return RIFCommsTransportLayer(config)
-        elif transport_type == "matrix":
+        elif transport_type == MatrixTransportLayer.transport_type:
             return MatrixTransportLayer(config)
