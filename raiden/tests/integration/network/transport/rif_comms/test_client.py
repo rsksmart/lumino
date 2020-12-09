@@ -52,7 +52,6 @@ def test_has_subscriber_self(comms_nodes):
 
 
 @pytest.mark.parametrize("amount_of_nodes", [2])
-@pytest.mark.xfail(reason="underlying stub.hasSubscriber method does not work properly")
 def test_has_subscriber(comms_nodes):
     comms_node_1, comms_node_2 = comms_nodes[1], comms_nodes[2]
     client_1, address_1 = comms_node_1.client, comms_node_1.address
@@ -67,14 +66,12 @@ def test_has_subscriber(comms_nodes):
 
     # check subscriptions
     assert client_1.is_subscribed_to(address_1) is True
-    # FIXME: have comms node hasSubscriber call work properly
     assert client_1.is_subscribed_to(address_2) is True
     assert client_2.is_subscribed_to(address_1) is False
     assert client_2.is_subscribed_to(address_2) is True
 
 
 @pytest.mark.parametrize("amount_of_nodes", [2])
-@pytest.mark.xfail(reason="underlying stub.hasSubscriber method does not work properly")
 def test_two_clients_cross_subscription(comms_nodes):
     comms_node_1, comms_node_2 = comms_nodes[1], comms_nodes[2]
     client_1, address_1 = comms_node_1.client, comms_node_1.address
@@ -90,9 +87,7 @@ def test_two_clients_cross_subscription(comms_nodes):
 
     # check subscriptions
     assert client_1.is_subscribed_to(address_1) is True
-    # FIXME: have comms node hasSubscriber call work properly
     assert client_1.is_subscribed_to(address_2) is True
-    # FIXME: have comms node hasSubscriber call work properly
     assert client_2.is_subscribed_to(address_1) is True
     assert client_2.is_subscribed_to(address_2) is True
 
