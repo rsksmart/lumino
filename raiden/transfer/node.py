@@ -1144,12 +1144,8 @@ def is_transaction_effect_satisfied(
     # lost a race against a remote close, and the balance proof data would be
     # the one provided by this node's partner
     is_valid_close = (
-        isinstance(state_change, ContractReceiveChannelClosed)
-        and isinstance(transaction, ContractSendChannelClose)
-        and state_change.token_network_identifier == transaction.token_network_identifier
-        and state_change.channel_identifier == transaction.channel_identifier
-    ) or (
-        isinstance(state_change, ContractReceiveChannelClosedLight)
+        (isinstance(state_change, ContractReceiveChannelClosed) or
+         (isinstance(state_change, ContractReceiveChannelClosedLight)))
         and isinstance(transaction, ContractSendChannelClose)
         and state_change.token_network_identifier == transaction.token_network_identifier
         and state_change.channel_identifier == transaction.channel_identifier
