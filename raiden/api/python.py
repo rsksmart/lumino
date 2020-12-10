@@ -1,17 +1,14 @@
 import copy
 import hashlib
-import os
 import random
-from binascii import hexlify
+import string
 from datetime import datetime, date
 from http import HTTPStatus
 
 import dateutil.parser
 import gevent
-import string
 import structlog
 from dateutil.relativedelta import relativedelta
-from ecies import encrypt
 from eth_utils import is_binary_address, to_checksum_address, to_canonical_address, to_normalized_address, encode_hex
 from gevent import Greenlet
 
@@ -1710,59 +1707,6 @@ class RaidenAPI:
     def get_all_light_clients(self):
         light_clients = self.raiden.wal.storage.get_all_light_clients()
         return light_clients
-
-    def save_light_client(self,
-                          address,
-                          signed_password,
-                          server_name,
-                          signed_display_name,
-                          signed_seed_retry):
-
-        address = to_checksum_address(address)
-
-        light_client = self.raiden.wal.storage.get_light_client(address)
-
-        pubhex = self.raiden.config["pubkey"].hex()
-        encrypt_signed_password = encrypt(pubhex, signed_password.encode())
-        encrypt_signed_display_name = encrypt(pubhex, signed_display_name.encode())
-        encrypt_signed_seed_retry = encrypt(pubhex, signed_seed_retry.encode())
-
-        if light_client is None:
-
-            api_key = hexlify(os.urandom(20))
-            api_key = api_key.decode("utf-8")
-            # Check for limit light client
-            result = self.raiden.wal.storage.save_light_client(
-                api_key=api_key,
-                address=address,
-                encrypt_signed_password=encrypt_signed_password.hex(),
-                encrypt_signed_display_name=encrypt_signed_display_name.hex(),
-                encrypt_signed_seed_retry=encrypt_signed_seed_retry.hex(),
-                current_server_name=server_name,
-                pending_for_deletion=0
-            )
-
-            if result > 0:
-                result = {"address": address,
-                          "encrypt_signed_password": encrypt_signed_password.hex(),
-                          "encrypt_signed_display_name": encrypt_signed_display_name.hex(),
-                          "api_key": api_key,
-                          "encrypt_signed_seed_retry": encrypt_signed_seed_retry.hex(),
-                          "message": "successfully registered",
-                          "result_code": 200}
-            else:
-                result = {"message": "An unexpected error has occurred.",
-                          "result_code": 500}
-        else:
-            result = {"address": address,
-                      "encrypt_signed_password": encrypt_signed_password.hex(),
-                      "encrypt_signed_display_name": encrypt_signed_display_name.hex(),
-                      "api_key": light_client['api_key'],
-                      "encrypt_signed_seed_retry": encrypt_signed_seed_retry.hex(),
-                      "message": "Already registered",
-                      "result_code": 409}
-
-        return result
 
     def create_light_client_payment(
         self,

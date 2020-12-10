@@ -3,10 +3,12 @@ import sys
 from typing import List
 
 import click
-from eth_utils import to_canonical_address
+from eth_utils import to_canonical_address, remove_0x_prefix
 
 from raiden.exceptions import RaidenError
+from raiden.lightclient.handlers.light_client_service import LightClientService
 from raiden.storage import sqlite, serialize
+from raiden.transfer import views
 from raiden.utils import Address
 from transport.layer import Layer as TransportLayer
 from transport.node import Node as TransportNode
@@ -14,6 +16,7 @@ from transport.rif_comms.node import Node as RIFCommsTransportNode, LightClientN
 
 
 class Layer(TransportLayer[RIFCommsTransportNode]):
+    transport_type = "rif-comms"
 
     def construct_full_node(self, config):
         return RIFCommsTransportNode(config["address"], config["transport"]["rif_comms"])
@@ -44,7 +47,27 @@ class Layer(TransportLayer[RIFCommsTransportNode]):
             sys.exit(1)
 
     def light_client_onboarding_data(self, address: Address) -> dict:
-        pass
+        return {
+            "transport_type": self.transport_type,
+        }
 
-    def register_light_client(self, raiden_api: 'RaidenAPI', registration_data: dict) -> TransportNode:
-        pass
+    def register_light_client(self, raiden_api: 'RaidenAPI', registration_data: dict):
+        config = raiden_api.raiden.config["transport"]["rif_comms"]
+        lc_address = bytearray.fromhex(remove_0x_prefix(registration_data['address']))
+
+        light_client = LightClientService.store_rif_comms_light_client(
+            lc_address, raiden_api.raiden.wal.storage
+        )
+
+        if light_client and light_client["result_code"] == 200:
+            light_client_transport = LightClientNode(
+                address=lc_address,
+                config=config
+            )
+            raiden_api.raiden.start_transport_in_runtime(
+                transport=light_client_transport,
+                chain_state=views.state_from_raiden(raiden_api.raiden)
+            )
+            self.add_light_client(light_client_transport)
+
+        return light_client

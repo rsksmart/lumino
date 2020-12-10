@@ -19,6 +19,10 @@ from flask_cors import CORS
 from flask_restful import Api, abort
 from gevent.pywsgi import WSGIServer
 from hexbytes import HexBytes
+from raiden_webui import RAIDEN_WEBUI_PATH
+from web3 import Web3
+from webargs.flaskparser import parser
+
 from raiden.api.objects import AddressList, PartnersPerTokenList
 from raiden.api.objects import DashboardGeneralItem
 from raiden.api.objects import DashboardGraphItem
@@ -137,9 +141,6 @@ from raiden.utils import (
     typing)
 from raiden.utils.rns import is_rns_address
 from raiden.utils.runnable import Runnable
-from raiden_webui import RAIDEN_WEBUI_PATH
-from web3 import Web3
-from webargs.flaskparser import parser
 
 log = structlog.get_logger(__name__)
 
@@ -2121,8 +2122,8 @@ class RestAPI:
         return api_response(invoice)
 
     def light_client_onboarding_data(self, address):
-        data_to_sign = self.raiden_api.raiden.transport.light_client_onboarding_data(address)
-        return api_response(data_to_sign)
+        onboarding_data = self.raiden_api.raiden.transport.light_client_onboarding_data(address)
+        return api_response(onboarding_data)
 
     def register_light_client(self, registration_data: dict):
         new_light_client = self.raiden_api.raiden.transport.register_light_client(self.raiden_api, registration_data)
