@@ -19,6 +19,7 @@
 ## RSK_ENDPOINT: The RSK node endpoint URL
 ## LUMINO_API_ENDPOINT: The expose url to use by the lumino node
 ## NETWORK_ID: the blockchain network ID to connect to
+## RIF_COMMS_ENDPOINT: the RIF Communications pubsub bootndoe URL
 
 ARGUMENT_LIST=(
     "KEYSTORE_PATH"
@@ -29,6 +30,7 @@ ARGUMENT_LIST=(
     "RSK_ENDPOINT"
     "LUMINO_API_ENDPOINT"
     "NETWORK_ID"
+    "RIF_COMMS_ENDPOINT"
 )
 
 
@@ -76,15 +78,18 @@ while [[ $# -gt 0 ]]; do
             NETWORK_ID=$2
             shift 2
             ;;
+         --RIF_COMMS_ENDPOINT)
+            RIF_COMMS_ENDPOINT=$2
+            shift 2
+            ;;
         *)
             break
             ;;
     esac
 done
 
-
 if [[ ${HUB_MODE} == 1 ]]; then
-    lumino  --accept-disclaimer --hub-mode --keystore-path $KEYSTORE_PATH --network-id ${NETWORK_ID} --eth-rpc-endpoint ${RSK_ENDPOINT} --environment-type development --tokennetwork-registry-contract-address=${TOKEN_NETWORK_REGISTRY} --secret-registry-contract-address=${SECRET_REGISTRY} --endpoint-registry-contract-address=${ENDPOINT_REGISTRY} --no-sync-check --api-address=${LUMINO_API_ENDPOINT}
+    lumino  --accept-disclaimer --hub-mode --keystore-path $KEYSTORE_PATH --network-id ${NETWORK_ID} --eth-rpc-endpoint ${RSK_ENDPOINT} --environment-type development --tokennetwork-registry-contract-address=${TOKEN_NETWORK_REGISTRY} --secret-registry-contract-address=${SECRET_REGISTRY} --endpoint-registry-contract-address=${ENDPOINT_REGISTRY} --no-sync-check --api-address=${LUMINO_API_ENDPOINT} --grpc-endpoint=${RIF_COMMS_ENDPOINT}
 else
-    lumino  --accept-disclaimer --keystore-path $KEYSTORE_PATH --network-id ${NETWORK_ID} --eth-rpc-endpoint ${RSK_ENDPOINT} --environment-type development --tokennetwork-registry-contract-address=${TOKEN_NETWORK_REGISTRY} --secret-registry-contract-address=${SECRET_REGISTRY} --endpoint-registry-contract-address=${ENDPOINT_REGISTRY} --no-sync-check --api-address=${LUMINO_API_ENDPOINT}
+    lumino  --accept-disclaimer --keystore-path $KEYSTORE_PATH --network-id ${NETWORK_ID} --eth-rpc-endpoint ${RSK_ENDPOINT} --environment-type development --tokennetwork-registry-contract-address=${TOKEN_NETWORK_REGISTRY} --secret-registry-contract-address=${SECRET_REGISTRY} --endpoint-registry-contract-address=${ENDPOINT_REGISTRY} --no-sync-check --api-address=${LUMINO_API_ENDPOINT} --grpc-endpoint=${RIF_COMMS_ENDPOINT}
 fi
