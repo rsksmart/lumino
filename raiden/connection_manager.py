@@ -185,13 +185,15 @@ class ConnectionManager:
 
         return channels_to_close
 
-    def join_channel(self, partner_address, partner_deposit):
+    def join_channel(self, partner_address, channel_identifier, partner_deposit):
         """Will be called, when we were selected as channel partner by another
         node. It will fund the channel with up to the partners deposit, but
         not more than remaining funds or the initial funding per channel.
 
         If the connection manager has no funds, this is a noop.
         """
+
+        # TODO: this function needs to be reviewed because probably it fails, also is not being used at all.
 
         # Consider this race condition:
         #
@@ -207,9 +209,7 @@ class ConnectionManager:
         # be called only if the channel is still not funded.
         token_network_proxy = self.raiden.chain.token_network(self.token_network_identifier)
 
-        # Wait for any pending operation in the channel to complete, before
-        # deciding on the deposit
-        with self.lock, token_network_proxy.channel_operations_lock[partner_address]:
+        def join_network_channel():
             channel_state = views.get_channelstate_for(
                 chain_state=views.state_from_raiden(self.raiden),
                 payment_network_id=self.token_network_identifier,
@@ -258,6 +258,13 @@ class ConnectionManager:
                     partner=pex(partner_address),
                     funds=joining_funds,
                 )
+
+        # Wait for any pending operation in the channel to complete, before
+        # deciding on the deposit
+        token_network_proxy.lock_and_execute_channel_operation(channel_identifier=channel_identifier,
+                                                               semaphore=self.lock,
+                                                               code_to_block=join_network_channel)
+
 
     def retry_connect(self):
         """Will be called when new channels in the token network are detected.
