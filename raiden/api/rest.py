@@ -10,19 +10,19 @@ import gevent
 import gevent.pool
 import structlog
 from dateutil.relativedelta import relativedelta
-from eth_utils import encode_hex, decode_hex, to_checksum_address
-from eth_utils import (
-    to_canonical_address
-)
+from eth_utils import encode_hex, decode_hex, to_checksum_address, to_canonical_address
 from flask import Flask, make_response, send_from_directory, url_for, request
 from flask_cors import CORS
 from flask_restful import Api, abort
 from gevent.pywsgi import WSGIServer
 from hexbytes import HexBytes
-from raiden.api.objects import AddressList, PartnersPerTokenList
-from raiden.api.objects import DashboardGeneralItem
-from raiden.api.objects import DashboardGraphItem
-from raiden.api.objects import DashboardTableItem
+from raiden.api.objects import (
+    AddressList,
+    PartnersPerTokenList,
+    DashboardGeneralItem,
+    DashboardGraphItem,
+    DashboardTableItem
+)
 from raiden.api.v1.encoding import (
     AddressListSchema,
     ChannelStateSchema,

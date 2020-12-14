@@ -30,7 +30,8 @@ from raiden.exceptions import (
     RaidenRecoverableError,
     RaidenUnrecoverableError,
     InvalidPaymentIdentifier,
-    InsufficientFunds)
+    InsufficientFunds
+)
 from raiden.lightclient.handlers.light_client_message_handler import LightClientMessageHandler
 from raiden.lightclient.handlers.light_client_service import LightClientService
 from raiden.lightclient.models.light_client_protocol_message import LightClientProtocolMessageType
@@ -55,14 +56,16 @@ from raiden.transfer.mediated_transfer.events import SendLockedTransfer, SendLoc
 from raiden.transfer.mediated_transfer.state import (
     TransferDescriptionWithSecretState,
     lockedtransfersigned_from_message,
-    TransferDescriptionWithoutSecretState)
+    TransferDescriptionWithoutSecretState
+)
 from raiden.transfer.mediated_transfer.state_change import (
     ActionInitInitiator,
     ActionInitMediator,
     ActionInitTarget,
     ActionInitTargetLight,
     ActionInitInitiatorLight, ActionSendSecretRevealLight, ActionSendUnlockLight, ActionSendSecretRequestLight,
-    ActionSendLockExpiredLight)
+    ActionSendLockExpiredLight
+)
 from raiden.transfer.state import (
     BalanceProofSignedState,
     BalanceProofUnsignedState,
@@ -94,7 +97,9 @@ from raiden.utils.typing import (
     TargetAddress,
     TokenNetworkAddress,
     TokenNetworkID,
-    PaymentHashInvoice, ChannelID)
+    PaymentHashInvoice,
+    ChannelID
+)
 from raiden.utils.upgrades import UpgradeManager
 from raiden_contracts.contract_manager import ContractManager
 from transport.layer import Layer as TransportLayer
@@ -1335,6 +1340,16 @@ class RaidenService(Runnable):
                 wal=self.wal
             )
             if not exists:
+                LightClientMessageHandler.store_light_client_protocol_message(
+                    identifier=delivered.delivered_message_identifier,
+                    message=delivered,
+                    signed=True,
+                    light_client_address=sender_address,
+                    order=msg_order,
+                    message_type=message_type,
+                    wal=self.wal,
+                    payment_id=payment_id
+                )
                 queue_identifier = QueueIdentifier(
                     recipient=receiver_address, channel_identifier=CHANNEL_IDENTIFIER_GLOBAL_QUEUE
                 )

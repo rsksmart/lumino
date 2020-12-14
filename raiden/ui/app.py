@@ -8,8 +8,7 @@ import click
 import filelock
 import structlog
 from definitions import ROOT_DIR
-from eth_utils import encode_hex
-from eth_utils import to_canonical_address, to_normalized_address
+from eth_utils import encode_hex, to_canonical_address, to_normalized_address
 from raiden.accounts import AccountManager
 from raiden.constants import (
     RAIDEN_DB_VERSION,

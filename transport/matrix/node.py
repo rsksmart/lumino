@@ -1237,9 +1237,9 @@ class MatrixLightClientNode(MatrixNode):
             )
             return
         self.log.debug(
-            "Send raw", recipient=pex(recipient), room=room, payload=payload.replace("\n", "\\n")
+            "Send LC raw", recipient=pex(recipient), room=room, payload=payload.replace("\n", "\\n")
         )
-        print("---- Matrix Send Message " + payload)
+        print("---->> Matrix LC Send Message" + payload)
 
         room.send_text(payload)
 
