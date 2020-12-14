@@ -594,7 +594,7 @@ class MatrixNode(TransportNode):
             if not isinstance(message, (SignedRetrieableMessage, SignedMessage)):
                 self.log.warning("Received invalid message", message=message)
             self.log.info(f"<<<----------------- Receiving Message "
-                          f"from {to_checksum_address(message.sender)} to {to_checksum_address(self.get_address())}")
+                          f"from {to_checksum_address(message.sender)} to {to_checksum_address(self.address)}")
             self.log.info(f"<<<----------------- Message Content {str(message)}")
             if isinstance(message, Delivered):
                 self._receive_delivered(message)
@@ -605,9 +605,6 @@ class MatrixNode(TransportNode):
                 self._receive_message(message)
 
         return True
-
-    def get_address(self):
-        return self.address
 
     def _receive_delivered(self, delivered: Delivered):
         self.log.info(
@@ -1483,7 +1480,7 @@ class MatrixLightClientNode(MatrixNode):
             if not isinstance(message, (SignedRetrieableMessage, SignedMessage)):
                 self.log.warning("Received invalid message", message=message)
             self.log.info(f"<<<----------------- Receiving Message "
-                          f"from {to_checksum_address(message.sender)} to {to_checksum_address(self.get_address())}")
+                          f"from {to_checksum_address(message.sender)} to {to_checksum_address(self.address)}")
             self.log.info(f"<<<----------------- Message Content {str(message)}")
             if isinstance(message, Delivered):
                 self._receive_delivered_to_lc(message)
@@ -1501,7 +1498,7 @@ class MatrixLightClientNode(MatrixNode):
         )
 
         assert self._raiden_service is not None
-        self._raiden_service.on_message(delivered, self.get_address(), True)
+        self._raiden_service.on_message(delivered, self.address, True)
 
     def _receive_message_to_lc(self, message: Union[SignedRetrieableMessage, Processed]):
         assert self._raiden_service is not None
@@ -1515,7 +1512,7 @@ class MatrixLightClientNode(MatrixNode):
         try:
             # Just manage the message, the Delivered response will be initiated by the LightClient invoking
             # send_for_light_client_with_retry
-            self._raiden_service.on_message(message, self.get_address(), True)
+            self._raiden_service.on_message(message, self.address, True)
 
         except (InvalidAddress, UnknownAddress, UnknownTokenAddress):
             self.log.warning("Exception while processing message", exc_info=True)
