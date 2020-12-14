@@ -4,8 +4,9 @@ from unittest.mock import MagicMock
 
 import gevent
 import pytest
-import raiden
 from gevent import Timeout
+
+import raiden
 from raiden.constants import (
     MONITORING_BROADCASTING_ROOM,
     PATH_FINDING_BROADCASTING_ROOM,
@@ -25,7 +26,6 @@ from transport.matrix.client import Room
 from transport.matrix.node import MatrixNode as MatrixTransportNode
 from transport.matrix.utils import AddressReachability, make_room_alias
 from transport.message import Message as TransportMessage
-from transport.utils import MessageQueue
 
 USERID0 = "@Arthur:RestaurantAtTheEndOfTheUniverse"
 USERID1 = "@Alice:Wonderland"
@@ -39,7 +39,7 @@ class MessageHandler:
     def __init__(self, bag: set):
         self.bag = bag
 
-    def on_message(self, _, message):
+    def on_message(self, _, message, __, ___):
         self.bag.add(message)
 
 
@@ -51,6 +51,7 @@ def mock_matrix(
     local_matrix_servers,
     private_rooms,
     global_rooms,
+    private_keys
 ):
     from transport.matrix.client import User
 
@@ -88,8 +89,10 @@ def mock_matrix(
     transport = MatrixTransportNode(raiden_service.address, config)
     transport._raiden_service = raiden_service
     transport.stop_event.clear()
+
     transport._address_mgr.add_userid_for_address(factories.HOP1, USERID1)
     transport._client.user_id = USERID0
+
 
     monkeypatch.setattr(MatrixTransportNode, "_get_user", mock_get_user)
     monkeypatch.setattr(
@@ -396,7 +399,7 @@ def test_matrix_tx_error_handling(  # pylint: disable=unused-argument
 
 
 def test_matrix_message_retry(
-    local_matrix_servers, retry_interval, retries_before_backoff, global_rooms
+    local_matrix_servers, retry_interval, retries_before_backoff, global_rooms, private_keys
 ):
     """ Test the retry mechanism implemented into the matrix client.
     The test creates a transport and sends a message. Given that the
@@ -480,7 +483,7 @@ def test_matrix_message_retry(
 
 
 def test_join_invalid_discovery(
-    local_matrix_servers, private_rooms, retry_interval, retries_before_backoff, global_rooms
+    local_matrix_servers, private_rooms, retry_interval, retries_before_backoff, global_rooms, private_keys
 ):
     """join_global_room tries to join on all servers on available_servers config
     If any of the servers isn't reachable by synapse, it'll return a 500 response, which needs
@@ -553,7 +556,7 @@ def test_matrix_cross_server_with_load_balance(matrix_transports):
 
 
 def test_matrix_discovery_room_offline_server(
-    local_matrix_servers, retries_before_backoff, retry_interval, private_rooms, global_rooms
+    local_matrix_servers, retries_before_backoff, retry_interval, private_rooms, global_rooms, private_keys
 ):
     raiden_service = MockRaidenService(None)
     transport = MatrixTransportNode(
@@ -579,7 +582,7 @@ def test_matrix_discovery_room_offline_server(
 
 
 def test_matrix_send_global(
-    local_matrix_servers, retries_before_backoff, retry_interval, private_rooms, global_rooms
+    local_matrix_servers, retries_before_backoff, retry_interval, private_rooms, global_rooms, private_keys
 ):
     raiden_service = MockRaidenService(None)
     transport = MatrixTransportNode(
@@ -864,9 +867,6 @@ def test_matrix_invite_private_room_unhappy_case_2(
     transport0.start_health_check(raiden_service1.address)
     transport1.start_health_check(raiden_service0.address)
 
-    assert is_reachable(transport1, raiden_service0.address)
-    assert is_reachable(transport0, raiden_service1.address)
-
     transport1.stop()
 
     room_id = transport0._get_room_for_address(raiden_service1.address).room_id
@@ -919,8 +919,6 @@ def test_matrix_invite_private_room_unhappy_case_3(matrix_transports, expected_j
     transport0.start_health_check(raiden_service1.address)
     transport1.start_health_check(raiden_service0.address)
 
-    assert is_reachable(transport1, raiden_service0.address)
-    assert is_reachable(transport0, raiden_service1.address)
     transport1.stop()
 
     room_id = transport0._get_room_for_address(raiden_service1.address).room_id
@@ -975,8 +973,6 @@ def test_matrix_user_roaming(matrix_transports):
 
     transport0._address = raiden_service0.address
     transport0.start(raiden_service0, message_handler0, "")
-
-    assert is_reachable(transport1, raiden_service0.address)
 
     assert ping_pong_message_success(transport0, transport1)
 

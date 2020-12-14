@@ -44,7 +44,6 @@ class MatrixNode(TransportNode):
 
     def __init__(self, address: Address, config: dict):
         TransportNode.__init__(self, address)
-
         self._config = config
         self._raiden_service: Optional[RaidenService] = None
 
@@ -97,7 +96,6 @@ class MatrixNode(TransportNode):
         self._account_data_lock = Semaphore()
 
         self._message_handler: Optional[MessageHandler] = None
-
     def enqueue_global_messages(self):
         if self._prioritize_global_messages:
             self._global_send_queue.join()
@@ -314,7 +312,9 @@ class MatrixNode(TransportNode):
             recipient=pex(recipient),
             message=raiden_message,
             queue_identifier=queue_identifier,
+
         )
+        self.log.info(f"----------------->>> Message Content {str(message)}")
 
         self._send_with_retry(queue_identifier, raiden_message)
 
@@ -412,8 +412,7 @@ class MatrixNode(TransportNode):
         """ Join rooms invited by whitelisted partners """
         if self.stop_event.ready():
             return
-
-        self.log.debug("Got invite", room_id=room_id)
+        self.log.info("Got invite", room_id=room_id)
         invite_events = [
             event
             for event in state["events"]
@@ -450,11 +449,6 @@ class MatrixNode(TransportNode):
             )
             return
 
-        if not self._address_mgr.is_address_known(peer_address):
-            self.log.debug(
-                "Got invited by a non-whitelisted user - ignoring", room_id=room_id, user=user
-            )
-            return
 
         join_rules_events = [
             event for event in state["events"] if event["type"] == "m.room.join_rules"
@@ -599,6 +593,9 @@ class MatrixNode(TransportNode):
         for message in messages:
             if not isinstance(message, (SignedRetrieableMessage, SignedMessage)):
                 self.log.warning("Received invalid message", message=message)
+            self.log.info(f"<<<----------------- Receiving Message "
+                          f"from {to_checksum_address(message.sender)} to {to_checksum_address(self.get_address())}")
+            self.log.info(f"<<<----------------- Message Content {str(message)}")
             if isinstance(message, Delivered):
                 self._receive_delivered(message)
             elif isinstance(message, Processed):
@@ -609,13 +606,16 @@ class MatrixNode(TransportNode):
 
         return True
 
+    def get_address(self):
+        return self.address
+
     def _receive_delivered(self, delivered: Delivered):
         self.log.info(
             "Delivered message received", sender=pex(delivered.sender), message=delivered
         )
 
         assert self._raiden_service is not None
-        self._raiden_service.on_message(delivered)
+        self._raiden_service.on_message(delivered, self.address)
 
     def _receive_message(self, message: Union[SignedRetrieableMessage, Processed]):
         print("---- Matrix Received Message HUB Transport" + str(message))
@@ -641,6 +641,7 @@ class MatrixNode(TransportNode):
             )
             self.enqueue_message(*TransportMessage.wrap(queue_identifier, delivered_message))
             self._raiden_service.on_message(message)
+
 
         except (InvalidAddress, UnknownAddress, UnknownTokenAddress):
             self.log.warning("Exception while processing message", exc_info=True)
@@ -669,7 +670,8 @@ class MatrixNode(TransportNode):
 
     def send_message(self, payload: str, recipient: Address):
         with self._getroom_lock:
-            room = self._get_room_for_address(recipient)
+        room = self._get_room_for_address(recipient)
+
         if not room:
             self.log.error(
                 "No room for recipient", recipient=to_normalized_address(recipient)
@@ -705,6 +707,7 @@ class MatrixNode(TransportNode):
         address_pair = sorted(
             [to_normalized_address(address) for address in [address, self._raiden_service.address]]
         )
+        print("making room alias")
         room_name = make_room_alias(self.network_id, *address_pair)
 
         # no room with expected name => create one and invite peer
@@ -729,7 +732,7 @@ class MatrixNode(TransportNode):
         if room_is_empty:
             last_ex: Optional[Exception] = None
             retry_interval = 0.1
-            self.log.debug("Waiting for peer to join from invite", peer_address=address_hex)
+            self.log.info("Waiting for peer to join from invite", peer_address=address_hex)
             for _ in range(JOIN_RETRIES):
                 try:
                     member_ids = {member.user_id for member in room.get_joined_members()}
@@ -786,13 +789,13 @@ class MatrixNode(TransportNode):
                 room = self._client.join_room(room_name_full)
             except MatrixRequestError as error:
                 if error.code == 404:
-                    self.log.debug(
+                    self.log.info(
                         f"No room for peer, trying to create",
                         room_name=room_name_full,
                         error=error,
                     )
                 else:
-                    self.log.debug(
+                    self.log.info(
                         f"Error joining room",
                         room_name=room_name,
                         error=error.content,
@@ -802,10 +805,10 @@ class MatrixNode(TransportNode):
                 # Invite users to existing room
                 member_ids = {user.user_id for user in room.get_joined_members(force_resync=True)}
                 users_to_invite = set(invitees_uids) - member_ids
-                self.log.debug("Inviting users", room=room, invitee_ids=users_to_invite)
+                self.log.info("Inviting users", room=room, invitee_ids=users_to_invite)
                 for invitee_id in users_to_invite:
                     room.invite_user(invitee_id)
-                self.log.debug("Room joined successfully", room=room)
+                self.log.info("Room joined successfully", room=room)
                 break
 
             # if can't, try creating it
@@ -820,11 +823,11 @@ class MatrixNode(TransportNode):
                 else:
                     msg = "Error creating room, retrying."
 
-                self.log.debug(
+                self.log.info(
                     msg, room_name=room_name, error=error.content, error_code=error.code
                 )
             else:
-                self.log.debug("Room created successfully", room=room, invitees=invitees)
+                self.log.info("Room created successfully", room=room, invitees=invitees)
                 break
         else:
             # if can't join nor create, create an unnamed one
@@ -874,7 +877,7 @@ class MatrixNode(TransportNode):
         if not room._members:
             room.get_joined_members(force_resync=True)
         if user.user_id not in room._members:
-            self.log.debug("Inviting", user=user, room=room)
+            self.log.info("Inviting", user=user, room=room)
             try:
                 room.invite_user(user.user_id)
             except (json.JSONDecodeError, MatrixRequestError):
@@ -1140,6 +1143,7 @@ class MatrixLightClientNode(MatrixNode):
         self._encrypted_light_client_display_name_signature = auth_params["light_client_display_name"]
         self._encrypted_light_client_seed_for_retry_signature = auth_params["light_client_seed_retry"]
 
+
     def start(  # type: ignore
         self,
         raiden_service: RaidenService,
@@ -1242,6 +1246,7 @@ class MatrixLightClientNode(MatrixNode):
 
         room.send_text(payload)
 
+
     def _get_room_for_address(self, address: Address, allow_missing_peers=False) -> Optional[Room]:
         if self.stop_event.ready():
             return None
@@ -1285,19 +1290,18 @@ class MatrixLightClientNode(MatrixNode):
         else:
             room = self._get_public_room(room_name, invitees=peers)
 
-        peer_ids = self._address_mgr.get_userids_for_address(address)
         member_ids = {member.user_id for member in room.get_joined_members(force_resync=True)}
-        room_is_empty = not bool(peer_ids & member_ids)
+        room_is_empty = not bool(member_ids)
         if room_is_empty:
             last_ex: Optional[Exception] = None
             retry_interval = 0.1
-            self.log.debug("Waiting for peer to join from invite", peer_address=address_hex)
+            self.log.info("Waiting for peer to join from invite", peer_address=address_hex)
             for _ in range(JOIN_RETRIES):
                 try:
                     member_ids = {member.user_id for member in room.get_joined_members()}
                 except MatrixRequestError as e:
                     last_ex = e
-                room_is_empty = not bool(peer_ids & member_ids)
+                    room_is_empty = not bool(member_ids)
                 if room_is_empty or last_ex:
                     if self.stop_event.wait(retry_interval):
                         break
@@ -1335,13 +1339,13 @@ class MatrixLightClientNode(MatrixNode):
                 room = self._client.join_room(room_name_full)
             except MatrixRequestError as error:
                 if error.code == 404:
-                    self.log.debug(
+                    self.log.info(
                         f"No room for peer, trying to create",
                         room_name=room_name_full,
                         error=error,
                     )
                 else:
-                    self.log.debug(
+                    self.log.info(
                         f"Error joining room",
                         room_name=room_name,
                         error=error.content,
@@ -1351,10 +1355,10 @@ class MatrixLightClientNode(MatrixNode):
                 # Invite users to existing room
                 member_ids = {user.user_id for user in room.get_joined_members(force_resync=True)}
                 users_to_invite = set(invitees_uids) - member_ids
-                self.log.debug("Inviting users", room=room, invitee_ids=users_to_invite)
+                self.log.info("Inviting users", room=room, invitee_ids=users_to_invite)
                 for invitee_id in users_to_invite:
                     room.invite_user(invitee_id)
-                self.log.debug("Room joined successfully", room=room)
+                self.log.info("Room joined successfully", room=room)
                 break
 
             # if can't, try creating it
@@ -1369,11 +1373,11 @@ class MatrixLightClientNode(MatrixNode):
                 else:
                     msg = "Error creating room, retrying."
 
-                self.log.debug(
+                self.log.info(
                     msg, room_name=room_name, error=error.content, error_code=error.code
                 )
             else:
-                self.log.debug("Room created successfully", room=room, invitees=invitees)
+                self.log.info("Room created successfully", room=room, invitees=invitees)
                 break
         else:
             # if can't join nor create, create an unnamed one
@@ -1433,7 +1437,7 @@ class MatrixLightClientNode(MatrixNode):
                 reason = "required private room, but received message in a public"
             else:
                 reason = "unknown room for user"
-            self.log.debug(
+            self.log.info(
                 "Ignoring invalid message",
                 peer_user=user.user_id,
                 peer_address=pex(peer_address),
@@ -1449,7 +1453,7 @@ class MatrixLightClientNode(MatrixNode):
             if self._is_room_global(room):
                 # This must not happen. Nodes must not listen on global rooms.
                 raise RuntimeError(f"Received message in global room {room.aliases}.")
-            self.log.debug(
+            self.log.info(
                 "Received message triggered new comms room for peer",
                 peer_user=user.user_id,
                 peer_address=pex(peer_address),
@@ -1482,6 +1486,9 @@ class MatrixLightClientNode(MatrixNode):
         for message in messages:
             if not isinstance(message, (SignedRetrieableMessage, SignedMessage)):
                 self.log.warning("Received invalid message", message=message)
+            self.log.info(f"<<<----------------- Receiving Message "
+                          f"from {to_checksum_address(message.sender)} to {to_checksum_address(self.get_address())}")
+            self.log.info(f"<<<----------------- Message Content {str(message)}")
             if isinstance(message, Delivered):
                 self._receive_delivered_to_lc(message)
             elif isinstance(message, Processed):
@@ -1498,10 +1505,9 @@ class MatrixLightClientNode(MatrixNode):
         )
 
         assert self._raiden_service is not None
-        self._raiden_service.on_message(delivered, True)
+        self._raiden_service.on_message(delivered, self.get_address(), True)
 
     def _receive_message_to_lc(self, message: Union[SignedRetrieableMessage, Processed]):
-        print("<<---- Matrix Received Message LC transport" + str(message))
         assert self._raiden_service is not None
         self.log.debug(
             "Message received",
@@ -1513,7 +1519,7 @@ class MatrixLightClientNode(MatrixNode):
         try:
             # Just manage the message, the Delivered response will be initiated by the LightClient invoking
             # send_for_light_client_with_retry
-            self._raiden_service.on_message(message, True)
+            self._raiden_service.on_message(message, self.get_address(), True)
 
         except (InvalidAddress, UnknownAddress, UnknownTokenAddress):
             self.log.warning("Exception while processing message", exc_info=True)

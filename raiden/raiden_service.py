@@ -10,6 +10,8 @@ import structlog
 from eth_utils import is_binary_address, to_canonical_address, to_checksum_address
 from gevent import Greenlet
 from gevent.event import AsyncResult, Event
+from raiden_contracts.contract_manager import ContractManager
+
 from raiden import constants, routing
 from raiden.blockchain.events import BlockchainEvents
 from raiden.blockchain_events_handler import on_blockchain_event
@@ -29,8 +31,10 @@ from raiden.exceptions import (
     PaymentConflict,
     RaidenRecoverableError,
     RaidenUnrecoverableError,
-    InvalidPaymentIdentifier)
+    InvalidPaymentIdentifier,
+    InsufficientFunds)
 from raiden.lightclient.handlers.light_client_message_handler import LightClientMessageHandler
+from raiden.lightclient.handlers.light_client_service import LightClientService
 from raiden.lightclient.models.light_client_protocol_message import LightClientProtocolMessageType
 from raiden.messages import (
     LockedTransfer,
@@ -46,6 +50,7 @@ from raiden.storage import serialize, sqlite, wal
 from raiden.tasks import AlarmTask
 from raiden.transfer import node, views
 from raiden.transfer.architecture import Event as RaidenEvent, StateChange
+from raiden.transfer.channel import get_distributable
 from raiden.transfer.identifiers import CanonicalIdentifier
 from raiden.transfer.identifiers import QueueIdentifier
 from raiden.transfer.mediated_transfer.events import SendLockedTransfer, SendLockedTransferLight, \
@@ -94,7 +99,6 @@ from raiden.utils.typing import (
     TokenNetworkID,
     PaymentHashInvoice, ChannelID)
 from raiden.utils.upgrades import UpgradeManager
-from raiden_contracts.contract_manager import ContractManager
 from transport.layer import Layer as TransportLayer
 from transport.message import Message as TransportMessage
 
@@ -154,6 +158,10 @@ def initiator_init_light(
         channel_identifier=channel_identifier)
     current_channel = views.get_channelstate_by_canonical_identifier_and_address(chain_state, canonical_identifier,
                                                                                  creator_address)
+
+    # checking the balance before initiating the payment
+    if transfer_amount > get_distributable(current_channel.our_state, current_channel.partner_state):
+        raise InsufficientFunds("Insufficient funds to initiate payment")
 
     return ActionInitInitiatorLight(transfer_state, current_channel, signed_locked_transfer,
                                     transfer_prev_secrethash is not None)
@@ -656,8 +664,8 @@ class RaidenService(Runnable):
         assert self.wal, f"WAL object not yet initialized. node:{self!r}"
         return views.block_number(self.wal.state_manager.current_state)
 
-    def on_message(self, message: Message, is_light_client: bool = False):
-        self.message_handler.on_message(self, message, is_light_client)
+    def on_message(self, message: Message, message_receiver_address: Address, is_light_client: bool = False):
+        self.message_handler.on_message(self, message, message_receiver_address, is_light_client)
 
     def handle_and_track_state_change(self, state_change: StateChange):
         """ Dispatch the state change and does not handle the exceptions.
@@ -873,29 +881,30 @@ class RaidenService(Runnable):
         """
 
         with self.payment_identifier_lock:
-            for task in chain_state.payment_mapping.secrethashes_to_task.values():
-                if not isinstance(task, InitiatorTask):
-                    continue
+            for payment_state in chain_state.get_payment_states():
+                for task in payment_state.secrethashes_to_task.values():
+                    if not isinstance(task, InitiatorTask):
+                        continue
 
-                # Every transfer in the transfers_list must have the same target
-                # and payment_identifier, so using the first transfer is
-                # sufficient.
-                initiator = next(iter(task.manager_state.initiator_transfers.values()))
-                transfer = initiator.transfer
-                transfer_description = initiator.transfer_description
-                target = transfer.target
-                identifier = transfer.payment_identifier
-                balance_proof = transfer.balance_proof
-                payment_hash_invoice = transfer.payment_hash_invoice
-                self.targets_to_identifiers_to_statuses[target][identifier] = PaymentStatus(
-                    payment_identifier=identifier,
-                    payment_hash_invoice=payment_hash_invoice,
-                    amount=transfer_description.amount,
-                    token_network_identifier=TokenNetworkID(
-                        balance_proof.token_network_identifier
-                    ),
-                    payment_done=AsyncResult(),
-                )
+                    # Every transfer in the transfers_list must have the same target
+                    # and payment_identifier, so using the first transfer is
+                    # sufficient.
+                    initiator = next(iter(task.manager_state.initiator_transfers.values()))
+                    transfer = initiator.transfer
+                    transfer_description = initiator.transfer_description
+                    target = transfer.target
+                    identifier = transfer.payment_identifier
+                    balance_proof = transfer.balance_proof
+                    payment_hash_invoice = transfer.payment_hash_invoice
+                    self.targets_to_identifiers_to_statuses[target][identifier] = PaymentStatus(
+                        payment_identifier=identifier,
+                        payment_hash_invoice=payment_hash_invoice,
+                        amount=transfer_description.amount,
+                        token_network_identifier=TokenNetworkID(
+                            balance_proof.token_network_identifier
+                        ),
+                        payment_done=AsyncResult(),
+                    )
 
     def _initialize_messages_queues(self, chain_state: ChainState):
         """Initialize all the message queues with the transport.
@@ -1051,7 +1060,7 @@ class RaidenService(Runnable):
         self, token_network_identifier: TokenNetworkID
     ) -> ConnectionManager:
         if not is_binary_address(token_network_identifier):
-            raise InvalidAddress("token address is not valid.")
+            raise InvalidAddress("token address is not valid."
 
         known_token_networks = views.get_token_network_identifiers(
             views.state_from_raiden(self), self.default_registry.address
@@ -1313,42 +1322,62 @@ class RaidenService(Runnable):
     def initiate_send_delivered_light(self, sender_address: Address, receiver_address: Address,
                                       delivered: Delivered, msg_order: int, payment_id: int,
                                       message_type: LightClientProtocolMessageType):
-        lc_transport = self.get_light_client_transport(to_checksum_address(sender_address))
-        if lc_transport:
-            LightClientMessageHandler.store_light_client_protocol_message(
-                delivered.delivered_message_identifier,
-                delivered,
-                True,
-                sender_address,
-                msg_order,
-                message_type,
-                self.wal,
-                payment_id
+        # check if receiver is a handled light client too
+        is_handled_lc = LightClientService.is_handled_lc(
+            client_address=to_checksum_address(sender_address),
+            wal=self.wal
+        )
+        if is_handled_lc:
+            lc_transport_instance = self.get_light_client_transport(to_checksum_address(sender_address))
+            exists = LightClientMessageHandler.get_message_for_order_and_address(
+                message_id=delivered.delivered_message_identifier,
+                payment_id=payment_id,
+                order=msg_order,
+                light_client_address=sender_address,
+                wal=self.wal
             )
-            queue_identifier = QueueIdentifier(
-                recipient=receiver_address, channel_identifier=CHANNEL_IDENTIFIER_GLOBAL_QUEUE
-            )
-            lc_transport.enqueue_message(*TransportMessage.wrap(queue_identifier, delivered))
+
+            if not exists:
+                LightClientMessageHandler.store_light_client_protocol_message(
+                    identifier=delivered.delivered_message_identifier,
+                    message=delivered,
+                    signed=True,
+                    light_client_address=sender_address,
+                    order=msg_order,
+                    message_type=message_type,
+                    wal=self.wal,
+                    payment_id=payment_id
+                )
+                queue_identifier = QueueIdentifier(
+                    recipient=receiver_address, channel_identifier=CHANNEL_IDENTIFIER_GLOBAL_QUEUE
+                )
+                lc_transport_instance.enqueue_message(*TransportMessage.wrap(queue_identifier, delivered))
+
 
     def initiate_send_processed_light(self, sender_address: Address, receiver_address: Address,
                                       processed: Processed, msg_order: int, payment_id: int,
                                       message_type: LightClientProtocolMessageType):
-        lc_transport = self.get_light_client_transport(to_checksum_address(sender_address))
-        if lc_transport:
+        is_handled_lc = LightClientService.is_handled_lc(
+            client_address=to_checksum_address(sender_address),
+            wal=self.wal
+        )
+        if is_handled_lc:
+            lc_transport_instance = self.get_light_client_transport(to_checksum_address(sender_address))
             LightClientMessageHandler.store_light_client_protocol_message(
-                processed.message_identifier,
-                processed,
-                True,
-                sender_address,
-                msg_order,
-                message_type,
-                self.wal,
-                payment_id
+                identifier=processed.message_identifier,
+                message=processed,
+                signed=True,
+                light_client_address=sender_address,
+                order=msg_order,
+                message_type=message_type,
+                wal=self.wal,
+                payment_id=payment_id
             )
             queue_identifier = QueueIdentifier(
                 recipient=receiver_address, channel_identifier=CHANNEL_IDENTIFIER_GLOBAL_QUEUE
             )
-            lc_transport.enqueue_message(*TransportMessage.wrap(queue_identifier, processed))
+            lc_transport_instance.enqueue_message(*TransportMessage.wrap(queue_identifier, processed))
+
 
     def initiate_send_secret_reveal_light(
         self,
