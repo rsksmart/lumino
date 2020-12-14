@@ -139,17 +139,28 @@ class ChannelValidator:
         if token_address not in valid_tokens:
             raise UnknownTokenAddress("Token address is not known in channel settle.")
 
-        channels = views.get_channelstate_settling(
-            chain_state=chain_state,
-            payment_network_id=registry_address,
-            token_address=token_address,
-            creator_address=creator_address
-        )
-
         channels_to_settle: List[NettingChannelState] = []
 
-        for channel in channels:
-            if channel.partner_state.address == partner_address:
-                channels_to_settle.append(channel)
+        # we look for the waiting_for_settle channels that we have created with our partner
+        channels = filter(lambda channel: channel.partner_state.address == partner_address,
+                          views.get_channelstate_settling(
+                              chain_state=chain_state,
+                              payment_network_id=registry_address,
+                              token_address=token_address,
+                              creator_address=creator_address
+                          ))
+
+        channels_to_settle.extend(channels)
+
+        # we look for the waiting_for_settle channels that our partner has created with us
+        channels = filter(lambda channel: channel.partner_state.address == partner_address,
+                          views.get_channelstate_settling(
+                              chain_state=chain_state,
+                              payment_network_id=registry_address,
+                              token_address=token_address,
+                              creator_address=partner_address
+                          ))
+
+        channels_to_settle.extend(channels)
 
         return channels_to_settle

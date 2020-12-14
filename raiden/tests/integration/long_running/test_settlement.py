@@ -220,7 +220,7 @@ def run_test_lock_expiry(raiden_network, token_addresses, deposit):
     assert transfer_1_secrethash in bob_channel_state.partner_state.secrethashes_to_lockedlocks
 
     alice_chain_state = views.state_from_raiden(alice_app.raiden)
-    assert transfer_1_secrethash in alice_chain_state.payment_mapping.secrethashes_to_task
+    assert alice_chain_state.get_payment_task(alice_app.raiden.address, transfer_1_secrethash) is not None
 
     remove_expired_lock_received.wait()
 
@@ -232,7 +232,7 @@ def run_test_lock_expiry(raiden_network, token_addresses, deposit):
     assert transfer_1_secrethash not in bob_channel_state.partner_state.secrethashes_to_lockedlocks
 
     alice_chain_state = views.state_from_raiden(alice_app.raiden)
-    assert transfer_1_secrethash not in alice_chain_state.payment_mapping.secrethashes_to_task
+    assert alice_chain_state.get_payment_task(alice_app.raiden.address, transfer_1_secrethash) is None
 
     # Make another transfer
     alice_to_bob_amount = 10
@@ -253,7 +253,7 @@ def run_test_lock_expiry(raiden_network, token_addresses, deposit):
 
     # Make sure the other transfer still exists
     alice_chain_state = views.state_from_raiden(alice_app.raiden)
-    assert transfer_2_secrethash in alice_chain_state.payment_mapping.secrethashes_to_task
+    assert alice_chain_state.get_payment_task(alice_app.raiden.address, transfer_2_secrethash) is not None
 
     bob_channel_state = get_channelstate(bob_app, alice_app, token_network_identifier)
     assert transfer_2_secrethash in bob_channel_state.partner_state.secrethashes_to_lockedlocks
@@ -494,6 +494,7 @@ def run_test_settled_lock(token_addresses, raiden_network, deposit):
     )
 
     netting_channel = app1.raiden.chain.payment_channel(
+        creator_address=channelstate_0_1.our_state.address,
         canonical_identifier=channelstate_0_1.canonical_identifier
     )
 
@@ -565,12 +566,12 @@ def run_test_automatic_secret_registration(raiden_chain, token_addresses):
 
     reveal_secret = RevealSecret(message_identifier=random.randint(0, UINT64_MAX), secret=secret)
     app0.raiden.sign(reveal_secret)
-    message_handler.on_message(app1.raiden, reveal_secret)
+    message_handler.on_message(app1.raiden, reveal_secret, app1.raiden.address)
 
     chain_state = views.state_from_app(app1)
 
     secrethash = sha3(secret)
-    target_task = chain_state.payment_mapping.secrethashes_to_task[secrethash]
+    target_task = chain_state.get_payment_task(app1.raiden.address, secrethash)
     lock_expiration = target_task.target_state.transfer.lock.expiration
     app1.raiden.chain.wait_until_block(target_block_number=lock_expiration)
 

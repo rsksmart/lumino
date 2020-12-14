@@ -9,13 +9,13 @@ from raiden.billing.invoices.handlers.invoice_handler import handle_receive_even
 from raiden.constants import EMPTY_BALANCE_HASH, EMPTY_HASH, EMPTY_MESSAGE_HASH, EMPTY_SIGNATURE
 from raiden.exceptions import ChannelOutdatedError, RaidenUnrecoverableError
 from raiden.lightclient.handlers.light_client_message_handler import LightClientMessageHandler
-from raiden.lightclient.models.light_client_protocol_message import LightClientProtocolMessageType
+from raiden.lightclient.models.light_client_protocol_message import LightClientProtocolMessageType, \
+    LightClientProtocolMessage
 from raiden.message_event_convertor import message_from_sendevent
 from raiden.messages import RequestRegisterSecret, UnlockLightRequest, SettlementRequiredLightMessage
 from raiden.network.proxies.payment_channel import PaymentChannel
 from raiden.network.proxies.token_network import TokenNetwork
 from raiden.network.resolver.client import reveal_secret_with_resolver
-from raiden.storage.restore import channel_state_until_state_change
 from raiden.transfer import views
 from raiden.transfer.architecture import Event
 from raiden.transfer.balance_proof import pack_balance_proof_update
@@ -62,8 +62,6 @@ from raiden.transfer.unlock import get_channel_state, should_search_events, shou
 from raiden.transfer.utils import (
     get_event_with_balance_proof_by_balance_hash,
     get_state_change_with_balance_proof_by_balance_hash,
-    get_state_change_with_balance_proof_by_locksroot,
-    get_event_with_balance_proof_by_locksroot,
 )
 from raiden.transfer.views import get_channelstate_by_token_network_and_partner
 from raiden.utils import pex
@@ -122,10 +120,10 @@ def unlock_light(raiden: "RaidenService",
         sender=partner,
         merkle_tree_leaves=leaves_packed
     )
-    if not LightClientMessageHandler.is_message_already_stored(
+    if not LightClientMessageHandler.get_message_by_content(
         light_client_address=channel_unlock_event.client,
         message_type=LightClientProtocolMessageType.UnlockLightRequest,
-        unsigned_message=message,
+        message=message,
         wal=raiden.wal
     ):
         LightClientMessageHandler.store_light_client_protocol_message(
@@ -238,33 +236,58 @@ class RaidenEventHandler(EventHandler):
 
     @staticmethod
     def handle_store_message(raiden: "RaidenService", store_message_event: StoreMessageEvent):
-        existing_message = LightClientMessageHandler.is_light_client_protocol_message_already_stored(
-            store_message_event.payment_id,
-            store_message_event.message_order,
-            store_message_event.message_type,
-            store_message_event.message.to_dict()["type"],
-            raiden.wal)
-        if not existing_message:
-            LightClientMessageHandler.store_light_client_protocol_message(store_message_event.message_id,
-                                                                          store_message_event.message,
-                                                                          store_message_event.is_signed,
-                                                                          store_message_event.light_client_address,
-                                                                          store_message_event.message_order,
-                                                                          store_message_event.message_type,
-                                                                          raiden.wal,
-                                                                          store_message_event.payment_id)
-        else:
-            stored_but_unsigned = existing_message.signed_message is None
-            if stored_but_unsigned and store_message_event.is_signed:
+        existing_message = RaidenEventHandler.get_existing_lc_message_from_store_event(
+            raiden=raiden,
+            store_message_event=store_message_event
+        )
+        if existing_message:
+            if not existing_message.is_signed and store_message_event.is_signed:
                 # Update messages that were created by the hub and now are received signed by the light client
-                LightClientMessageHandler \
-                    .update_offchain_light_client_protocol_message_set_signed_message(store_message_event.message,
-                                                                                      store_message_event.payment_id,
-                                                                                      store_message_event.message_order,
-                                                                                      store_message_event.message_type,
-                                                                                      raiden.wal)
+                LightClientMessageHandler.update_offchain_light_client_protocol_message_set_signed_message(
+                    message=store_message_event.message,
+                    payment_id=store_message_event.payment_id,
+                    order=store_message_event.message_order,
+                    message_type=store_message_event.message_type,
+                    light_client_address=store_message_event.light_client_address,
+                    wal=raiden.wal
+                )
             else:
                 log.info("Message for lc already received, ignoring db storage")
+        else:
+            LightClientMessageHandler.store_light_client_protocol_message(
+                identifier=store_message_event.message_id,
+                message=store_message_event.message,
+                signed=store_message_event.is_signed,
+                light_client_address=store_message_event.light_client_address,
+                order=store_message_event.message_order,
+                message_type=store_message_event.message_type,
+                wal=raiden.wal,
+                payment_id=store_message_event.payment_id
+            )
+
+    @staticmethod
+    def get_existing_lc_message_from_store_event(raiden: "RaidenService",
+                                                 store_message_event: StoreMessageEvent) -> LightClientProtocolMessage:
+        existing_message: LightClientProtocolMessage
+        if store_message_event.payment_id:
+            # payment related message
+            existing_message = LightClientMessageHandler.get_message_for_payment(
+                message_id=store_message_event.message_id,
+                light_client_address=store_message_event.light_client_address,
+                payment_id=store_message_event.payment_id,
+                order=store_message_event.message_order,
+                message_type=store_message_event.message_type,
+                message_protocol_type=store_message_event.message.to_dict()["type"],
+                wal=raiden.wal
+            )
+        else:
+            existing_message = LightClientMessageHandler.get_message_by_content(
+                light_client_address=store_message_event.light_client_address,
+                message_type=store_message_event.message_type,
+                message=store_message_event.message,
+                wal=raiden.wal
+            )
+        return existing_message
 
     @staticmethod
     def handle_send_lockexpired(raiden: "RaidenService", send_lock_expired: SendLockExpired):
@@ -442,12 +465,15 @@ class RaidenEventHandler(EventHandler):
         raiden: "RaidenService", channel_reveal_secret_event: ContractSendSecretRevealLight
     ):
         message = RequestRegisterSecret(raiden.default_secret_registry.address)
-        existing_message = LightClientMessageHandler.is_light_client_protocol_message_already_stored(
+        existing_message = LightClientMessageHandler.get_message_for_payment(
+            message_id=channel_reveal_secret_event.message_id,
+            light_client_address=channel_reveal_secret_event.light_client_address,
             payment_id=channel_reveal_secret_event.payment_identifier,
             order=0,
             message_type=LightClientProtocolMessageType.RequestRegisterSecret,
             message_protocol_type=message.to_dict()["type"],
-            wal=raiden.wal)
+            wal=raiden.wal
+        )
         # Do not store the RegisterSecretRequest twice for same payment
         if not existing_message:
             LightClientMessageHandler.store_light_client_protocol_message(
@@ -482,6 +508,7 @@ class RaidenEventHandler(EventHandler):
             message_hash = EMPTY_MESSAGE_HASH
 
         channel_proxy = raiden.chain.payment_channel(
+            creator_address=channel_close_event.our_address,
             canonical_identifier=CanonicalIdentifier(
                 chain_identifier=chain_state.chain_id,
                 token_network_address=channel_close_event.token_network_identifier,
@@ -512,7 +539,10 @@ class RaidenEventHandler(EventHandler):
 
         if balance_proof:
             canonical_identifier = balance_proof.canonical_identifier
-            channel = raiden.chain.payment_channel(canonical_identifier=canonical_identifier)
+            channel = raiden.chain.payment_channel(
+                creator_address=channel_update_event.our_address,
+                canonical_identifier=canonical_identifier
+            )
 
             non_closing_data = pack_balance_proof_update(
                 nonce=balance_proof.nonce,
@@ -540,19 +570,15 @@ class RaidenEventHandler(EventHandler):
 
         # checking that this balance proof exists on the database
         db_balance_proof = raiden.wal.storage.get_latest_light_client_non_closing_balance_proof(
-            channel_id=balance_proof.channel_identifier
+            channel_id=balance_proof.channel_identifier,
+            non_closing_participant=channel_update_event.lc_address
         )
 
         if db_balance_proof:
             canonical_identifier = balance_proof.canonical_identifier
-            channel = raiden.chain.payment_channel(canonical_identifier=canonical_identifier)
-            if channel_update_event.lc_address == channel.participant2:
-                partner_address = channel.participant1
-            else:
-                partner_address = channel.participant2
+            channel = raiden.chain.payment_channel(creator_address=channel_update_event.lc_address,
+                                                   canonical_identifier=canonical_identifier)
             channel.update_transfer_light(
-                lc_address=channel_update_event.lc_address,
-                partner_address=partner_address,
                 nonce=balance_proof.nonce,
                 balance_hash=balance_proof.balance_hash,
                 additional_hash=balance_proof.message_hash,
@@ -572,10 +598,10 @@ class RaidenEventHandler(EventHandler):
 
         canonical_identifier = channel_unlock_event.canonical_identifier
         token_network_identifier = canonical_identifier.token_network_address
-        channel_identifier = canonical_identifier.channel_identifier
         participant = channel_unlock_event.participant
 
         payment_channel: PaymentChannel = raiden.chain.payment_channel(
+            creator_address=participant,
             canonical_identifier=canonical_identifier
         )
 
@@ -617,85 +643,23 @@ class RaidenEventHandler(EventHandler):
             return
 
         if search_state_changes:
-            state_change_record = get_state_change_with_balance_proof_by_locksroot(
-                storage=raiden.wal.storage,
-                canonical_identifier=canonical_identifier,
-                locksroot=partner_locksroot,
-                sender=partner_address,
-            )
-            state_change_identifier = state_change_record.state_change_identifier
-
-            if not state_change_identifier:
-                raise RaidenUnrecoverableError(
-                    f"Failed to find state that matches the current channel locksroots. "
-                    f"chain_id:{raiden.chain.network_id} "
-                    f"token_network:{to_checksum_address(token_network_identifier)} "
-                    f"channel:{channel_identifier} "
-                    f"participant:{to_checksum_address(participant)} "
-                    f"our_locksroot:{to_hex(our_locksroot)} "
-                    f"partner_locksroot:{to_hex(partner_locksroot)} "
-                )
-
-            restored_channel_state = channel_state_until_state_change(
-                raiden=raiden,
-                canonical_identifier=canonical_identifier,
-                state_change_identifier=state_change_identifier,
-            )
-            assert restored_channel_state is not None
-
-            gain = get_batch_unlock_gain(restored_channel_state)
-
-            skip_unlock = (
-                restored_channel_state.partner_state.address == participant
-                and gain.from_partner_locks == 0
-            )
-            if not skip_unlock:
+            gain = get_batch_unlock_gain(channel_state)
+            if gain.from_partner_locks > 0:
                 unlock(
                     raiden=raiden,
                     payment_channel=payment_channel,
-                    end_state=restored_channel_state.partner_state,
+                    end_state=channel_state.partner_state,
                     participant=our_address,
                     partner=partner_address,
                 )
 
         if search_events:
-            event_record = get_event_with_balance_proof_by_locksroot(
-                storage=raiden.wal.storage,
-                canonical_identifier=canonical_identifier,
-                locksroot=our_locksroot,
-                recipient=partner_address,
-            )
-            state_change_identifier = event_record.state_change_identifier
-
-            if not state_change_identifier:
-                raise RaidenUnrecoverableError(
-                    f"Failed to find event that match current channel locksroots. "
-                    f"chain_id:{raiden.chain.network_id} "
-                    f"token_network:{to_checksum_address(token_network_identifier)} "
-                    f"channel:{channel_identifier} "
-                    f"participant:{to_checksum_address(participant)} "
-                    f"our_locksroot:{to_hex(our_locksroot)} "
-                    f"partner_locksroot:{to_hex(partner_locksroot)} "
-                )
-
-            restored_channel_state = channel_state_until_state_change(
-                raiden=raiden,
-                canonical_identifier=canonical_identifier,
-                state_change_identifier=state_change_identifier,
-            )
-            assert restored_channel_state is not None
-
-            gain = get_batch_unlock_gain(restored_channel_state)
-
-            skip_unlock = (
-                restored_channel_state.our_state.address == participant
-                and gain.from_our_locks == 0
-            )
-            if not skip_unlock:
+            gain = get_batch_unlock_gain(channel_state)
+            if gain.from_our_locks > 0:
                 unlock(
                     raiden=raiden,
                     payment_channel=payment_channel,
-                    end_state=restored_channel_state.our_state,
+                    end_state=channel_state.our_state,
                     participant=partner_address,
                     partner=our_address,
                 )
@@ -712,24 +676,28 @@ class RaidenEventHandler(EventHandler):
             canonical_identifier=channel_unlock_event.canonical_identifier,
             participant=channel_unlock_event.participant,
             our_address=channel_unlock_event.client)
-        if should_search_events(channel_state):
-            unlock_light(
-                raiden=raiden,
-                chain_state=chain_state,
-                channel_unlock_event=channel_unlock_event,
-                participant=channel_state.partner_state.address,
-                partner=channel_state.our_state.address,
-                end_state=channel_state.our_state
-            )
         if should_search_state_changes(channel_state):
-            unlock_light(
-                raiden=raiden,
-                chain_state=chain_state,
-                channel_unlock_event=channel_unlock_event,
-                participant=channel_state.our_state.address,
-                partner=channel_state.partner_state.address,
-                end_state=channel_state.partner_state
-            )
+            gain = get_batch_unlock_gain(channel_state)
+            if gain.from_partner_locks > 0:
+                unlock_light(
+                    raiden=raiden,
+                    chain_state=chain_state,
+                    channel_unlock_event=channel_unlock_event,
+                    participant=channel_state.our_state.address,
+                    partner=channel_state.partner_state.address,
+                    end_state=channel_state.partner_state
+                )
+        if should_search_events(channel_state):
+            gain = get_batch_unlock_gain(channel_state)
+            if gain.from_our_locks > 0:
+                unlock_light(
+                    raiden=raiden,
+                    chain_state=chain_state,
+                    channel_unlock_event=channel_unlock_event,
+                    participant=channel_state.partner_state.address,
+                    partner=channel_state.our_state.address,
+                    end_state=channel_state.our_state
+                )
 
     @staticmethod
     def handle_contract_send_channelsettle(
@@ -737,8 +705,10 @@ class RaidenEventHandler(EventHandler):
     ):
         """ Handles settlement for normal node. """
 
+        our_address = channel_settle_event.channel_state.our_state.address
         settlement_parameters = RaidenEventHandler.process_data_and_get_settlement_parameters(
             raiden,
+            our_address,
             channel_settle_event.token_network_identifier,
             channel_settle_event.channel_identifier,
             channel_settle_event.triggered_by_block_hash
@@ -751,6 +721,7 @@ class RaidenEventHandler(EventHandler):
         )
 
         payment_channel: PaymentChannel = raiden.chain.payment_channel(
+            creator_address=our_address,
             canonical_identifier=canonical_identifier
         )
 
@@ -771,8 +742,10 @@ class RaidenEventHandler(EventHandler):
 
         log.debug("Handling channel settle light")
 
+        our_address = channel_settle_light_event.channel_state.our_state.address
         settlement_parameters = RaidenEventHandler.process_data_and_get_settlement_parameters(
             raiden,
+            our_address,
             channel_settle_light_event.token_network_identifier,
             channel_settle_light_event.channel_identifier,
             channel_settle_light_event.triggered_by_block_hash
@@ -785,6 +758,7 @@ class RaidenEventHandler(EventHandler):
         )
 
         payment_channel: PaymentChannel = raiden.chain.payment_channel(
+            creator_address=our_address,
             canonical_identifier=canonical_identifier
         )
 
@@ -825,10 +799,10 @@ class RaidenEventHandler(EventHandler):
 
         log.debug("Storing light client message to require settle")
 
-        message_already_stored = LightClientMessageHandler.is_message_already_stored(
+        message_already_stored = LightClientMessageHandler.get_message_by_content(
             light_client_address=payment_channel.participant1,
             message_type=LightClientProtocolMessageType.SettlementRequired,
-            unsigned_message=message,
+            message=message,
             wal=raiden.wal)
 
         if message_already_stored:
@@ -850,6 +824,7 @@ class RaidenEventHandler(EventHandler):
 
     @staticmethod
     def process_data_and_get_settlement_parameters(raiden: "RaidenService",
+                                                   our_address: Address,
                                                    token_network_identifier: TokenNetworkID,
                                                    channel_identifier: ChannelID,
                                                    triggered_by_block_hash: BlockHash) -> SettlementParameters:
@@ -863,6 +838,7 @@ class RaidenEventHandler(EventHandler):
             channel_identifier=channel_identifier,
         )
         payment_channel: PaymentChannel = raiden.chain.payment_channel(
+            creator_address=our_address,
             canonical_identifier=canonical_identifier
         )
         token_network_proxy: TokenNetwork = payment_channel.token_network

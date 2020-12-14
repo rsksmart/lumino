@@ -382,16 +382,17 @@ def test_insufficient_funds(raiden_network, token_addresses, deposit):
 
 
 def run_test_insufficient_funds(raiden_network, token_addresses, deposit):
-    app0, app1 = raiden_network
+    initiator, target = raiden_network
     token_address = token_addresses[0]
 
-    result = RaidenAPI(app0.raiden).transfer(
-        registry_address=app0.raiden.default_registry.address,
+    result = RaidenAPI(initiator.raiden).transfer_and_wait(
+        registry_address=initiator.raiden.default_registry.address,
         token_address=token_address,
         amount=deposit + 1,
-        target=app1.raiden.address,
+        target=target.raiden.address,
         payment_hash_invoice=EMPTY_PAYMENT_HASH_INVOICE,
     )
+
     assert not result.payment_done.get()
 
 

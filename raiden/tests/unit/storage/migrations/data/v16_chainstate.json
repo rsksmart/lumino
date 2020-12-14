@@ -926,7 +926,7 @@
     "0xB2C94bBaf307C6DfBf70Cc2537385553385a345b": "reachable"
   },
   "our_address": "0x4d6FA60E64C7E520899A9aeDD40cB1E6992027F0",
-  "payment_mapping": {
+  "payment_states_by_address": {
     "secrethashes_to_task": {
       "0x59d8dd1e6b553e3923e51c2f1c3efb1f9c832cffcc98a5b4710da7343babc6c4": {
         "token_network_identifier": "0xa5C9ECf54790334B73E5DfA1ff5668eB425dC474",
