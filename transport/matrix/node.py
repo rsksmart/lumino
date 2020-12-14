@@ -615,7 +615,7 @@ class MatrixNode(TransportNode):
         self._raiden_service.on_message(delivered, self.address)
 
     def _receive_message(self, message: Union[SignedRetrieableMessage, Processed]):
-        print("---- Matrix Received Message HUB Transport" + str(message))
+        self.log.info("Matrix Received Message HUB Transport", message=str(message))
         assert self._raiden_service is not None
         self.log.info(
             "Message received",
@@ -675,7 +675,6 @@ class MatrixNode(TransportNode):
         self.log.debug(
             "Send raw", recipient=pex(recipient), room=room, payload=payload.replace("\n", "\\n")
         )
-        print("---->> Matrix Send Message " + payload)
 
         room.send_text(payload)
 
@@ -702,7 +701,6 @@ class MatrixNode(TransportNode):
         address_pair = sorted(
             [to_normalized_address(address) for address in [address, self._raiden_service.address]]
         )
-        print("making room alias")
         room_name = make_room_alias(self.network_id, *address_pair)
 
         # no room with expected name => create one and invite peer
@@ -1236,7 +1234,6 @@ class MatrixLightClientNode(MatrixNode):
         self.log.debug(
             "Send LC raw", recipient=pex(recipient), room=room, payload=payload.replace("\n", "\\n")
         )
-        print("---->> Matrix LC Send Message" + payload)
 
         room.send_text(payload)
 
