@@ -148,7 +148,9 @@ class TokenNetwork:
         # Serializes concurent deposits on this token network. This must be an
         # exclusive lock, since we need to coordinate the approve and
         # setTotalDeposit calls.
-        self.deposit_lock = Semaphore()
+        # has to be in a map also by channel id because at the end it's the same as the other lock
+        # we have to lock it by channel, if not the result will be the same, only sequential executions
+        self.deposit_lock: Dict[ChannelID, Semaphore] = defaultdict(Semaphore)
 
     def _call_and_check_result(
         self, block_identifier: BlockSpecification, function_name: str, *args, **kwargs
@@ -820,7 +822,7 @@ class TokenNetwork:
                 log.info("setTotalDeposit light successful", **log_details)
 
         self.lock_and_execute_channel_operation(channel_identifier=channel_identifier,
-                                                semaphore=self.deposit_lock,
+                                                semaphore=self.deposit_lock[channel_identifier],
                                                 code_to_block=make_deposit)
 
     def set_total_deposit(
@@ -966,7 +968,7 @@ class TokenNetwork:
 
             log.info("setTotalDeposit successful", **log_details)
         self.lock_and_execute_channel_operation(channel_identifier=channel_identifier,
-                                                semaphore=self.deposit_lock,
+                                                semaphore=self.deposit_lock[channel_identifier],
                                                 code_to_block=make_deposit)
 
     def _check_why_deposit_failed(
