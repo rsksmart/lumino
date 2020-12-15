@@ -2214,26 +2214,24 @@ class TokenNetwork:
             pass
 
         def make_settlement():
-            tx_error = None
-            tx_error_prefix = "Call to settle will fail"
             tx_gas_limit = self.proxy.estimate_gas(
                 checking_block, "settleChannel", channel_identifier=channel_identifier, **kwargs
             )
-
             if tx_gas_limit:
-                tx_error_prefix = "settle call failed"
                 tx_gas_limit = safe_gas_limit(tx_gas_limit, GAS_REQUIRED_FOR_SETTLE_CHANNEL)
-
                 transaction_hash = self.proxy.transact(
                     "settleChannel", tx_gas_limit, channel_identifier=channel_identifier, **kwargs
                 )
                 self.client.poll(transaction_hash)
                 tx_error = check_transaction_threw(self.client, transaction_hash)
-
-            if not tx_gas_limit or tx_error:
+                if tx_error:
+                    raise ProxyTransactionError(tx_gas_limit=tx_gas_limit,
+                                                tx_error=tx_error,
+                                                tx_error_prefix="settle call failed")
+            else:
                 raise ProxyTransactionError(tx_gas_limit=tx_gas_limit,
-                                            tx_error=tx_error,
-                                            tx_error_prefix=tx_error_prefix)
+                                            tx_error=None,
+                                            tx_error_prefix="Call to settle will fail")
 
         try:
             self.lock_and_execute_channel_operation(channel_identifier=channel_identifier,
