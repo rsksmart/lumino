@@ -118,7 +118,7 @@ class Node(TransportNode):
                 return
 
             # once acknowledged, pass message to raiden service for business logic
-            self._raiden_service.on_message(message)
+            self._raiden_service.on_message(message, self.address)
 
         else:
             self.log.warning(
@@ -305,7 +305,7 @@ class LightClientNode(Node):
                 sender=pex(message.sender),
             )
             # Pass message to raiden service for business logic. The message will be stored on the HUB database.
-            self._raiden_service.on_message(message, True)
+            self._raiden_service.on_message(message, self.address, True)
         else:
             self.log.warning(
                 "unexpected type of message received",

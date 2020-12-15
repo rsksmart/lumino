@@ -283,30 +283,18 @@ def get_channelstate_for(
     )
 
     channel_state = None
-    address_to_get_channel_state = creator_address
-
-    # Dos casos el primer cuando un ligth client crea un canal con un nodo normal a traves del hub
-    # Cuando un light client crea una canal con un hub directamente
-
-    channel = None
-    if token_network and creator_address in token_network.channelidentifiers_to_channels or \
-        token_network and partner_address in token_network.channelidentifiers_to_channels:
-        channels = []
-        for channel_id in token_network.partneraddresses_to_channelidentifiers[partner_address]:
-
-            if creator_address in token_network.channelidentifiers_to_channels:
-                channel = token_network.channelidentifiers_to_channels[creator_address].get(channel_id)
-
-            if channel is None and partner_address in token_network.channelidentifiers_to_channels:
-                # Check if partner address had a open channel, can be a hub node.
-                channel = token_network.channelidentifiers_to_channels[partner_address].get(channel_id)
-                address_to_get_channel_state = partner_address
-
-            if channel is not None:
-                if channel.close_transaction is None or channel.close_transaction.result != 'success':
-                    channels.append(token_network.channelidentifiers_to_channels[address_to_get_channel_state][channel_id])
-            channel = None
-
+    if token_network:
+        channel_ids = list(filter(
+            lambda channel_id:
+            creator_address in token_network.channelidentifiers_to_channels
+            and channel_id in token_network.channelidentifiers_to_channels[creator_address],
+            token_network.partneraddresses_to_channelidentifiers[partner_address]
+        ))
+        channels = list(map(
+            lambda channel_id:
+            token_network.channelidentifiers_to_channels[creator_address].get(channel_id),
+            channel_ids
+        ))
         states = filter_channels_by_status(channels, [CHANNEL_STATE_UNUSABLE])
         # If multiple channel states are found, return the last one.
         if states:
@@ -531,30 +519,22 @@ def secret_from_transfer_task(
     return transfer_state.transfer_description.secret
 
 
-def get_transfer_role(chain_state: ChainState, secrethash: SecretHash) -> Optional[str]:
+def get_transfer_role(chain_state: ChainState,
+                      message_receiver_address: AddressHex,
+                      secrethash: SecretHash) -> Optional[str]:
     """
     Returns 'initiator', 'mediator' or 'target' to signify the role the node has
     in a transfer. If a transfer task is not found for the secrethash then the
     function returns None
     """
-    task = chain_state.payment_mapping.secrethashes_to_task.get(secrethash)
+    task = chain_state.get_payment_task(message_receiver_address, secrethash)
     if not task:
         return None
     return role_from_transfer_task(task)
 
 
-def get_transfer_secret(chain_state: ChainState, secrethash: SecretHash) -> Optional[Secret]:
-    return secret_from_transfer_task(
-        chain_state.payment_mapping.secrethashes_to_task.get(secrethash), secrethash
-    )
-
-
-def get_transfer_task(chain_state: ChainState, secrethash: SecretHash) -> Optional[TransferTask]:
-    return chain_state.payment_mapping.secrethashes_to_task.get(secrethash)
-
-
-def get_all_transfer_tasks(chain_state: ChainState) -> Dict[SecretHash, TransferTask]:
-    return chain_state.payment_mapping.secrethashes_to_task
+def get_transfer_secret(chain_state: ChainState, node_address: AddressHex, secrethash: SecretHash) -> Optional[Secret]:
+    return secret_from_transfer_task(chain_state.get_payment_task(node_address, secrethash), secrethash)
 
 
 def list_channelstate_for_tokennetwork(
@@ -654,7 +634,7 @@ def filter_channels_by_status(
 
     states = []
     for channel_state in channel_states:
-        if channel.get_status(channel_state) not in exclude_states:
+        if channel_state and channel.get_status(channel_state) not in exclude_states:
             states.append(channel_state)
 
     return states

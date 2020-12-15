@@ -610,7 +610,7 @@ def run_test_mediated_transfer_with_node_consuming_more_than_allocated_fee(
     secret_request_received.wait()
 
     app0_chain_state = views.state_from_app(app0)
-    initiator_task = app0_chain_state.payment_mapping.secrethashes_to_task[secrethash]
+    initiator_task = app0_chain_state.get_payment_task(app0.raiden.address, secrethash)
 
     msg = "App0 should have never revealed the secret"
     assert initiator_task.manager_state.initiator_transfers[secrethash].revealsecret is None

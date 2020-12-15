@@ -9,7 +9,7 @@ import psutil
 
 # FIXME: this should be a dependency within the project
 # path to the RIF Comms Node repo
-RIF_COMMS_PATH = Path(__file__).parents[7].joinpath('rif-communications-pubsub-node')
+RIF_COMMS_PATH = Path(__file__).parents[7].joinpath('rif-communications-pubsub-bootnode')
 
 
 class Process:

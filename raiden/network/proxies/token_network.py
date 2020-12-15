@@ -20,6 +20,7 @@ from raiden.constants import (
     GENESIS_BLOCK_NUMBER,
     UINT256_MAX,
     UNLOCK_TX_GAS_LIMIT,
+    ErrorCode
 )
 from raiden.exceptions import (
     ChannelOutdatedError,
@@ -1429,8 +1430,8 @@ class TokenNetwork:
     def update_transfer_light(
         self,
         channel_identifier: ChannelID,
-        lc_address: Address,
-        partner: Address,
+        our_address: Address,
+        partner_address: Address,
         balance_hash: BalanceHash,
         nonce: Nonce,
         additional_hash: AdditionalHash,
@@ -1442,7 +1443,7 @@ class TokenNetwork:
         log_details = {
             "token_network": pex(self.address),
             "node": pex(self.node_address),
-            "partner": pex(partner),
+            "partner": pex(partner_address),
             "nonce": nonce,
             "balance_hash": encode_hex(balance_hash),
             "additional_hash": encode_hex(additional_hash),
@@ -1495,10 +1496,10 @@ class TokenNetwork:
         except Exception:  # pylint: disable=broad-except
             raise RaidenUnrecoverableError("Couldn't verify the balance proof signature")
         else:
-            if our_recovered_address != lc_address:
+            if our_recovered_address != our_address:
                 raise RaidenUnrecoverableError("Invalid balance proof signature. Recovered address isnt light client address")
 
-            if partner_recovered_address != partner:
+            if partner_recovered_address != partner_address:
                 raise RaidenUnrecoverableError("Invalid update transfer signature")
 
         # Check the preconditions for calling updateNonClosingBalanceProof at
@@ -1506,16 +1507,16 @@ class TokenNetwork:
         try:
             #FIXME participant 1 and 2 values
             channel_onchain_detail = self._detail_channel(
-                participant1=lc_address,
-                participant2=partner,
+                participant1=our_address,
+                participant2=partner_address,
                 block_identifier=given_block_identifier,
                 channel_identifier=channel_identifier,
             )
             #FIXME participant and partner values?
             closer_details = self._detail_participant(
                 channel_identifier=channel_identifier,
-                participant=partner,
-                partner=lc_address,
+                participant=partner_address,
+                partner=our_address,
                 block_identifier=given_block_identifier,
             )
             given_block_number = self.client.get_block(given_block_identifier)["number"]
@@ -1558,8 +1559,8 @@ class TokenNetwork:
             checking_block,
             "updateNonClosingBalanceProof",
             channel_identifier=channel_identifier,
-            closing_participant=partner,
-            non_closing_participant=lc_address,
+            closing_participant=partner_address,
+            non_closing_participant=our_address,
             balance_hash=balance_hash,
             nonce=nonce,
             additional_hash=additional_hash,
@@ -1574,8 +1575,8 @@ class TokenNetwork:
                     "updateNonClosingBalanceProof",
                     safe_gas_limit(gas_limit, GAS_REQUIRED_FOR_UPDATE_BALANCE_PROOF),
                     channel_identifier=channel_identifier,
-                    closing_participant=partner,
-                    non_closing_participant=lc_address,
+                    closing_participant=partner_address,
+                    non_closing_participant=our_address,
                     balance_hash=balance_hash,
                     nonce=nonce,
                     additional_hash=additional_hash,
@@ -1608,8 +1609,8 @@ class TokenNetwork:
                         raise RaidenRecoverableError(msg)
 
                     channel_data = self._detail_channel(
-                        participant1=lc_address,
-                        participant2=partner,
+                        participant1=our_address,
+                        participant2=partner_address,
                         block_identifier=mining_block,
                         channel_identifier=channel_identifier,
                     )
@@ -1653,8 +1654,8 @@ class TokenNetwork:
 
                     partner_details = self._detail_participant(
                         channel_identifier=channel_identifier,
-                        participant=partner,
-                        partner=lc_address,
+                        participant=partner_address,
+                        partner=our_address,
                         block_identifier=mining_block,
                     )
                     if partner_details.nonce != nonce:
@@ -1696,7 +1697,7 @@ class TokenNetwork:
 
                 detail = self._detail_channel(
                     participant1=self.node_address,
-                    participant2=partner,
+                    participant2=partner_address,
                     block_identifier=failed_at_blockhash,
                     channel_identifier=channel_identifier,
                 )
@@ -1724,7 +1725,7 @@ class TokenNetwork:
                 # `failed_at_blockhash`
                 partner_details = self._detail_participant(
                     channel_identifier=channel_identifier,
-                    participant=partner,
+                    participant=partner_address,
                     partner=self.node_address,
                     block_identifier=failed_at_blockhash,
                 )
@@ -2416,9 +2417,9 @@ class TokenNetwork:
             channel_identifier=channel_identifier,
         )
         if channel_data.state == ChannelState.SETTLED:
-            raise RaidenRecoverableError("Channel is already settled")
+            raise RaidenRecoverableError(ErrorCode.Settlement.CHANNEL_ALREADY_SETTLED)
         elif channel_data.state == ChannelState.REMOVED:
-            raise RaidenRecoverableError("Channel is already unlocked. It cannot be settled")
+            raise RaidenRecoverableError(ErrorCode.Settlement.CHANNEL_UNLOCKED)
         elif channel_data.state == ChannelState.OPENED:
             raise RaidenUnrecoverableError("Channel is still open. It cannot be settled")
         elif channel_data.state == ChannelState.CLOSED:

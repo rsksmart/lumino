@@ -1,6 +1,6 @@
 import structlog
 
-from eth_utils import to_checksum_address
+from eth_utils import to_checksum_address, to_canonical_address
 
 from raiden.constants import EMPTY_SECRET
 from raiden.lightclient.handlers.light_client_message_handler import LightClientMessageHandler
@@ -31,27 +31,31 @@ from raiden.transfer.mediated_transfer.state_change import (
 from raiden.transfer.state import balanceproof_from_envelope
 from raiden.transfer.state_change import ReceiveDelivered, ReceiveProcessed, ReceiveUnlock, ReceiveUnlockLight
 from raiden.utils import pex, random_secret
-from raiden.utils.typing import MYPY_ANNOTATION
+from raiden.utils.typing import MYPY_ANNOTATION, Address
 
 log = structlog.get_logger(__name__)  # pylint: disable=invalid-name
 
 
 class MessageHandler:
-    def on_message(self, raiden: RaidenService, message: Message, is_light_client: bool = False) -> None:
+    def on_message(self,
+                   raiden: RaidenService,
+                   message: Message,
+                   message_receiver_address: Address,
+                   is_light_client: bool = False) -> None:
         # pylint: disable=unidiomatic-typecheck
-        print("On received message " + str(type(message)))
-
+        log.info(f"Handling received message {str(type(message))}")
+        message_receiver_address = to_canonical_address(message_receiver_address)
         if type(message) == SecretRequest:
             assert isinstance(message, SecretRequest), MYPY_ANNOTATION
-            self.handle_message_secretrequest(raiden, message, is_light_client)
+            self.handle_message_secretrequest(raiden, message, message_receiver_address, is_light_client)
 
         elif type(message) == RevealSecret:
             assert isinstance(message, RevealSecret), MYPY_ANNOTATION
-            self.handle_message_revealsecret(raiden, message, is_light_client)
+            self.handle_message_revealsecret(raiden, message, message_receiver_address, is_light_client)
 
         elif type(message) == Unlock:
             assert isinstance(message, Unlock), MYPY_ANNOTATION
-            self.handle_message_unlock(raiden, message, is_light_client)
+            self.handle_message_unlock(raiden, message, message_receiver_address, is_light_client)
 
         elif type(message) == LockExpired:
             assert isinstance(message, LockExpired), MYPY_ANNOTATION
@@ -67,16 +71,18 @@ class MessageHandler:
 
         elif type(message) == Delivered:
             assert isinstance(message, Delivered), MYPY_ANNOTATION
-            self.handle_message_delivered(raiden, message, is_light_client)
+            self.handle_message_delivered(raiden, message, message_receiver_address, is_light_client)
 
         elif type(message) == Processed:
             assert isinstance(message, Processed), MYPY_ANNOTATION
-            self.handle_message_processed(raiden, message, is_light_client)
+            self.handle_message_processed(raiden, message, message_receiver_address, is_light_client)
         else:
             log.error("Unknown message cmdid {}".format(message.cmdid))
 
     @staticmethod
-    def handle_message_secretrequest(raiden: RaidenService, message: SecretRequest,
+    def handle_message_secretrequest(raiden: RaidenService,
+                                     message: SecretRequest,
+                                     message_receiver_address: Address,
                                      is_light_client: bool = False) -> None:
 
         if is_light_client:
@@ -86,6 +92,7 @@ class MessageHandler:
                 message.expiration,
                 message.secrethash,
                 message.sender,
+                message_receiver_address,
                 message
             )
             raiden.handle_and_track_state_change(secret_request_light)
@@ -100,23 +107,30 @@ class MessageHandler:
             raiden.handle_and_track_state_change(secret_request)
 
     @staticmethod
-    def handle_message_revealsecret(raiden: RaidenService, message: RevealSecret, is_light_client=False) -> None:
+    def handle_message_revealsecret(raiden: RaidenService,
+                                    message: RevealSecret,
+                                    message_receiver_address: Address,
+                                    is_light_client=False) -> None:
         if is_light_client:
-            state_change = ReceiveSecretRevealLight(message.secret, message.sender, message)
+            state_change = ReceiveSecretRevealLight(message.secret, message.sender, message_receiver_address, message)
             raiden.handle_and_track_state_change(state_change)
         else:
             state_change = ReceiveSecretReveal(message.secret, message.sender)
             raiden.handle_and_track_state_change(state_change)
 
     @staticmethod
-    def handle_message_unlock(raiden: RaidenService, message: Unlock, is_light_client=False) -> None:
+    def handle_message_unlock(raiden: RaidenService,
+                              message: Unlock,
+                              message_receiver_address: Address,
+                              is_light_client=False) -> None:
         balance_proof = balanceproof_from_envelope(message)
         if is_light_client:
             state_change = ReceiveUnlockLight(
                 message_identifier=message.message_identifier,
                 secret=message.secret,
                 balance_proof=balance_proof,
-                signed_unlock=message
+                signed_unlock=message,
+                recipient=message_receiver_address
             )
             raiden.handle_and_track_state_change(state_change)
         else:
@@ -128,14 +142,16 @@ class MessageHandler:
             raiden.handle_and_track_state_change(state_change)
 
     @staticmethod
-    def handle_message_lockexpired(raiden: RaidenService, message: LockExpired, is_light_client=False) -> None:
+    def handle_message_lockexpired(raiden: RaidenService,
+                                   message: LockExpired,
+                                   is_light_client=False) -> None:
         balance_proof = balanceproof_from_envelope(message)
         if is_light_client:
             state_change = ReceiveLockExpiredLight(
                 balance_proof=balance_proof,
                 secrethash=message.secrethash,
                 message_identifier=message.message_identifier,
-                lock_expired=message
+                lock_expired=message,
             )
             raiden.handle_and_track_state_change(state_change)
         else:
@@ -152,7 +168,7 @@ class MessageHandler:
         from_transfer = lockedtransfersigned_from_message(message)
 
         role = views.get_transfer_role(
-            chain_state=chain_state, secrethash=from_transfer.lock.secrethash
+            chain_state=chain_state, message_receiver_address=message.recipient, secrethash=from_transfer.lock.secrethash
         )
         state_change: StateChange
         if role == "initiator":
@@ -172,7 +188,7 @@ class MessageHandler:
                 # the case of an atomic swap, we will not try to re-route the
                 # transfer. In all other cases we can try to find another route
                 # (and generate a new secret)
-                old_secret = views.get_transfer_secret(chain_state, from_transfer.lock.secrethash)
+                old_secret = views.get_transfer_secret(chain_state, message.recipient, from_transfer.lock.secrethash)
                 is_secret_known = old_secret is not None and old_secret != EMPTY_SECRET
 
                 if is_secret_known:
@@ -223,15 +239,15 @@ class MessageHandler:
             raiden.mediate_mediated_transfer(message)
 
     @classmethod
-    def handle_message_processed(cls, raiden: RaidenService, message: Processed, is_light_client: bool = False) -> None:
+    def handle_message_processed(cls, raiden: RaidenService, message: Processed, address: Address, is_light_client: bool = False) -> None:
         processed = ReceiveProcessed(message.sender, message.message_identifier)
         raiden.handle_and_track_state_change(processed)
         if is_light_client:
-            LightClientMessageHandler.store_lc_processed(message, raiden.wal)
+            LightClientMessageHandler.store_lc_processed(message, address, raiden.wal)
 
     @classmethod
-    def handle_message_delivered(cls, raiden: RaidenService, message: Delivered, is_light_client: bool = False) -> None:
+    def handle_message_delivered(cls, raiden: RaidenService, message: Delivered, address: Address, is_light_client: bool = False) -> None:
         delivered = ReceiveDelivered(message.sender, message.delivered_message_identifier)
         raiden.handle_and_track_state_change(delivered)
         if is_light_client:
-            LightClientMessageHandler.store_lc_delivered(message, raiden.wal)
+            LightClientMessageHandler.store_lc_delivered(message, address, raiden.wal)
