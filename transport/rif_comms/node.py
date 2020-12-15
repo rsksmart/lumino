@@ -154,7 +154,6 @@ class Node(TransportNode):
             self._receive_messages()
             self.log.info("RIF Comms Node _run. Listening for messages.")
         except GreenletExit:  # killed without exception
-            print("GreenletExit comms")
             self.stop_event.set()
             killall([self.greenlet])  # kill comms listener thread
             raise  # re-raise to keep killed status
