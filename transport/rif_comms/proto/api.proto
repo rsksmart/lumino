@@ -26,7 +26,10 @@ service CommunicationsApi {
 
     //Query if a subscriber exists in a participating channel
     rpc HasSubscriber(Subscriber) returns (BooleanResponse);
-    
+
+    //Query if a subscriber exists in a participating channel
+    rpc IsSubscribedToRskAddress(RskAddress) returns (BooleanResponse);
+
     //Send a direct message to a peer
     rpc SendMessage(Msg) returns (Void);
 
@@ -40,10 +43,13 @@ service CommunicationsApi {
     rpc CreateTopicWithRskAddress(RskAddress) returns (stream Notification);
 
     //Close Topic for a specific topicID
-    rpc CloseTopic (Channel) returns (Void);
+    rpc CloseTopicWithRskAddress (RskAddress) returns (Void);
 
     //Send Message to Specified Topic
     rpc SendMessageToTopic(PublishPayload) returns (Void);
+
+    // Send message to topic binded to an specific RSK address
+    rpc SendMessageToRskAddress(RskAddressPublish) returns (Void);
 
     //Update RSK Address after invitation
     rpc UpdateAddress(RskAddress) returns (Void);
@@ -59,6 +65,7 @@ message RskAddress {
     string address = 1;
     bool exclusive= 2;
 }
+
 message PeerId {
     string address = 1;
     bool exclusive= 2;
@@ -79,6 +86,10 @@ message PublishPayload {
     Msg message = 2;
 }
 
+message RskAddressPublish {
+    RskAddress receiver = 1;
+    Msg message = 2;
+}
 
 // Set of peerIDs subscribed to a specific channel
 message Subscribers {
@@ -107,15 +118,16 @@ message Notification {
         ChannelPeerLeft channelPeerLeft = 5;
         ChannelPeerJoined channelPeerJoined = 6;
         ServerNotification serverNotification = 7;
+        SubscribeError subscribeError = 8;
     }
 }
 
 //A new direct message from a peer has been received
 message PeerNewMsg {
     Msg message = 1;    // The payload, when using communications-pubsub, it will include:
-                        //from:  PeerId sending the message
-                        //to: PeeId of the intended recipient
-                        //data: actual payload of the message
+    //from:  PeerId sending the message
+    //to: PeeId of the intended recipient
+    //data: actual payload of the message
     optional string peerId=2;   //peerId of the sender (it already comes in the payload if pubsub-node is used)
     optional bytes signature =3;    //signature of info above (payload | peerId) (e.g, with RSK account key)
 }
@@ -168,4 +180,11 @@ message ChannelPeerJoined {
 message ServerNotification {
     bytes notification = 1;
     bytes payload = 2;
+}
+
+
+//A subscribe has failled
+message SubscribeError {
+    Channel channel = 1;
+    string reason = 2;
 }
