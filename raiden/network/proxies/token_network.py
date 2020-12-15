@@ -145,12 +145,12 @@ class TokenNetwork:
         # Forbids concurrent operations on the same channel on the same participant
         self.channel_blocking_operations: Dict[ChannelID, RLock] = defaultdict(RLock)
 
-        # Serializes concurent deposits on this token network. This must be an
+        # Serializes concurrent deposits on this token network. This must be an
         # exclusive lock, since we need to coordinate the approve and
         # setTotalDeposit calls.
-        # has to be in a map also by channel id because at the end it's the same as the other lock
-        # we have to lock it by channel, if not the result will be the same, only sequential executions
-        self.channel_deposit_blocking_operations: Dict[ChannelID, Semaphore] = defaultdict(Semaphore)
+        # we use the initiator address as the key because we want to block deposits by initiator address
+        # since for LC's we can have different initiators and we don't want to block different clients.
+        self.channel_deposit_blocking_operations: Dict[Address, Semaphore] = defaultdict(Semaphore)
 
     def _call_and_check_result(
         self, block_identifier: BlockSpecification, function_name: str, *args, **kwargs
@@ -732,7 +732,7 @@ class TokenNetwork:
         checking_block = self.client.get_checking_block()
 
         def make_deposit():
-            with self.channel_deposit_blocking_operations[channel_identifier]:
+            with self.channel_deposit_blocking_operations[creator]:
                 previous_total_deposit = self._detail_participant(
                     channel_identifier=channel_identifier,
                     participant=creator,
@@ -868,7 +868,7 @@ class TokenNetwork:
         checking_block = self.client.get_checking_block()
 
         def make_deposit():
-            with self.channel_deposit_blocking_operations[channel_identifier]:
+            with self.channel_deposit_blocking_operations[self.node_address]:
                 previous_total_deposit = self._detail_participant(
                     channel_identifier=channel_identifier,
                     participant=self.node_address,
