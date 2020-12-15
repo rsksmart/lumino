@@ -305,3 +305,16 @@ class RawTransactionFailed(RaidenError):
 class UnhandledLightClient(RaidenRecoverableError):
     """Raised if someone tries to create a channel using this node as a hub and the light clients are not registered."""
 
+
+class ProxyTransactionError(RaidenError):
+    """ Raised when an operation is sent out to the blockchain and it returns an error and we need to handle it """
+
+    def __init__(self,
+                 tx_error_prefix: Optional[str],
+                 tx_error: Optional[Any],
+                 tx_gas_limit: Optional[int]):
+        super().__init__()
+        self.tx_error_prefix = tx_error_prefix
+        self.tx_error = tx_error
+        self.tx_gas_limit = tx_gas_limit
+

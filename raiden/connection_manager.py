@@ -210,60 +210,60 @@ class ConnectionManager:
         token_network_proxy = self.raiden.chain.token_network(self.token_network_identifier)
 
         def join_network_channel():
-            channel_state = views.get_channelstate_for(
-                chain_state=views.state_from_raiden(self.raiden),
-                payment_network_id=self.token_network_identifier,
-                token_address=self.token_address,
-                partner_address=partner_address
-            )
-
-            if not channel_state:
-                return
-
-            joining_funds = min(
-                partner_deposit, self._funds_remaining, self._initial_funding_per_partner
-            )
-            if joining_funds <= 0 or self._leaving_state:
-                return
-
-            if joining_funds <= channel_state.our_state.contract_balance:
-                return
-
-            try:
-                # TODO: creator address cant be None we should specify a value here #jonaf2103
-                self.api.set_total_channel_deposit(
-                    registry_address=self.registry_address,
+            with self.lock:
+                channel_state = views.get_channelstate_for(
+                    chain_state=views.state_from_raiden(self.raiden),
+                    payment_network_id=self.token_network_identifier,
                     token_address=self.token_address,
-                    creator_address=None,
-                    partner_address=partner_address,
-                    total_deposit=joining_funds
+                    partner_address=partner_address
                 )
-            except RaidenRecoverableError:
-                log.info("Channel not in opened state", node=pex(self.raiden.address))
-            except InvalidDBData:
-                raise
-            except RaidenUnrecoverableError as e:
-                should_crash = (
-                    self.raiden.config["environment_type"] != Environment.PRODUCTION
-                    or self.raiden.config["unrecoverable_error_should_crash"]
-                )
-                if should_crash:
-                    raise
 
-                log.critical(str(e), node=pex(self.raiden.address))
-            else:
-                log.info(
-                    "Joined a channel",
-                    node=pex(self.raiden.address),
-                    partner=pex(partner_address),
-                    funds=joining_funds,
+                if not channel_state:
+                    return
+
+                joining_funds = min(
+                    partner_deposit, self._funds_remaining, self._initial_funding_per_partner
                 )
+                if joining_funds <= 0 or self._leaving_state:
+                    return
+
+                if joining_funds <= channel_state.our_state.contract_balance:
+                    return
+
+                try:
+                    # TODO: creator address cant be None we should specify a value here #jonaf2103
+                    self.api.set_total_channel_deposit(
+                        registry_address=self.registry_address,
+                        token_address=self.token_address,
+                        creator_address=None,
+                        partner_address=partner_address,
+                        total_deposit=joining_funds
+                    )
+                except RaidenRecoverableError:
+                    log.info("Channel not in opened state", node=pex(self.raiden.address))
+                except InvalidDBData:
+                    raise
+                except RaidenUnrecoverableError as e:
+                    should_crash = (
+                        self.raiden.config["environment_type"] != Environment.PRODUCTION
+                        or self.raiden.config["unrecoverable_error_should_crash"]
+                    )
+                    if should_crash:
+                        raise
+
+                    log.critical(str(e), node=pex(self.raiden.address))
+                else:
+                    log.info(
+                        "Joined a channel",
+                        node=pex(self.raiden.address),
+                        partner=pex(partner_address),
+                        funds=joining_funds,
+                    )
 
         # Wait for any pending operation in the channel to complete, before
         # deciding on the deposit
         token_network_proxy.lock_and_execute_channel_operation(channel_identifier=channel_identifier,
-                                                               semaphore=self.lock,
-                                                               code_to_block=join_network_channel)
+                                                               blocking_operation=join_network_channel)
 
 
     def retry_connect(self):
