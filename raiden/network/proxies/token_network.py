@@ -150,7 +150,7 @@ class TokenNetwork:
         # setTotalDeposit calls.
         # has to be in a map also by channel id because at the end it's the same as the other lock
         # we have to lock it by channel, if not the result will be the same, only sequential executions
-        self.deposit_lock: Dict[ChannelID, Semaphore] = defaultdict(Semaphore)
+        self.channel_deposit_blocking_operations: Dict[ChannelID, Semaphore] = defaultdict(Semaphore)
 
     def _call_and_check_result(
         self, block_identifier: BlockSpecification, function_name: str, *args, **kwargs
@@ -733,7 +733,7 @@ class TokenNetwork:
         checking_block = self.client.get_checking_block()
 
         def make_deposit():
-            with self.deposit_lock[channel_identifier]:
+            with self.channel_deposit_blocking_operations[channel_identifier]:
                 previous_total_deposit = self._detail_participant(
                     channel_identifier=channel_identifier,
                     participant=creator,
@@ -869,7 +869,7 @@ class TokenNetwork:
         checking_block = self.client.get_checking_block()
 
         def make_deposit():
-            with self.deposit_lock[channel_identifier]:
+            with self.channel_deposit_blocking_operations[channel_identifier]:
                 previous_total_deposit = self._detail_participant(
                     channel_identifier=channel_identifier,
                     participant=self.node_address,
