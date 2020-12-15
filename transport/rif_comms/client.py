@@ -4,12 +4,10 @@ from grpc import insecure_channel
 from raiden.utils import Address
 from transport.rif_comms.proto.api_pb2 import (
     Notification,
-    PublishPayload,
-    Channel,
     Msg,
     RskAddress,
     Void,
-    Subscriber
+    RskAddressPublish
 )
 from transport.rif_comms.proto.api_pb2_grpc import CommunicationsApiStub
 
@@ -48,6 +46,7 @@ class Client:
         """
         topic_id = None
         # TODO: catch already subscribed and any error
+        # TODO: add timeout
         topic = self.stub.CreateTopicWithRskAddress(RskAddress(address=to_checksum_address(rsk_address)))
         for response in topic:
             topic_id = response.channelPeerJoined.peerId
@@ -62,13 +61,7 @@ class Client:
         :param rsk_address: RSK address which corresponds to the topic which is being checked for subscription
         :return: boolean value indicating whether the client is subscribed or not
         """
-        topic_id = self._get_peer_id(rsk_address)
-        return self.stub.HasSubscriber(
-            Subscriber(
-                peerId=topic_id,
-                channel=Channel(channelId=topic_id)
-            )
-        ).value
+        return self.stub.IsSubscribedToRskAddress(RskAddress(address=to_checksum_address(rsk_address)))
 
     def send_message(self, payload: str, rsk_address: Address):
         """
@@ -77,11 +70,10 @@ class Client:
         :param payload: the message data to be sent
         :param rsk_address: the destination for the message to be sent to
         """
-        topic_id = self._get_peer_id(to_checksum_address(rsk_address))
         # TODO: message encoding
-        self.stub.SendMessageToTopic(
-            PublishPayload(
-                topic=Channel(channelId=topic_id),
+        self.stub.SendMessageToRskAddress(
+            RskAddressPublish(
+                receiver=RskAddress(address=rsk_address),
                 message=Msg(payload=str.encode(payload))
             )
         )
@@ -92,8 +84,7 @@ class Client:
         Invokes the CloseTopic GRPC API endpoint.
         :param rsk_address: RSK address which corresponds to the topic which the client is unsubscribing from.
         """
-        topic_id = self._get_peer_id(to_checksum_address(rsk_address))
-        self.stub.CloseTopic(Channel(channelId=topic_id))
+        self.stub.CloseTopicWithRskAddress(RskAddress(address=to_checksum_address(rsk_address)))
 
     def disconnect(self):
         """
@@ -102,16 +93,3 @@ class Client:
         """
         self.stub.EndCommunication(Void())
         self.grpc_channel.unsubscribe(lambda: self.grpc_channel.close())
-
-    def _get_peer_id(self, rsk_address: Address) -> str:
-        """
-        Gets the peer ID associated with a node RSK address.
-        :param rsk_address: the RSK address which corresponds to the node to locate
-        :return: a string that represents the peer ID that matches the given address
-        :raises:
-            - No peers from routing table:
-                exception: _InactiveRpcError
-                status = StatusCode.UNKNOWN
-                details = "Failed to lookup key! No peers from routing table!"
-        """
-        return self.stub.LocatePeerId(RskAddress(address=to_checksum_address(rsk_address))).address

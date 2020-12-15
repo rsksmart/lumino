@@ -1,7 +1,6 @@
 import pytest
 
 from raiden.tests.integration.network.transport.rif_comms.node import Node as CommsNode, Config as CommsConfig
-from raiden.tests.integration.network.transport.utils import generate_address
 from transport.rif_comms.utils import notification_to_payload
 
 
@@ -20,23 +19,6 @@ def comms_nodes(amount_of_nodes) -> {int, CommsNode}:
     # teardown
     for node in nodes.values():
         node.stop()
-
-
-@pytest.mark.parametrize("amount_of_nodes", [1])
-def test_locate_own_peer_id(comms_nodes):
-    comms_node = comms_nodes[1]
-
-    # attempt to locate self
-    assert comms_node.client._get_peer_id(comms_node.address) is not ""
-
-
-# FIXME: causes ERR_NO_PEERS_IN_ROUTING_TABLE in comms node although it passes
-@pytest.mark.parametrize("amount_of_nodes", [1])
-def test_locate_unregistered_peer_id(comms_nodes):
-    comms_node = comms_nodes[1]
-
-    # attempt to locate an unregistered peer
-    assert comms_node.client._get_peer_id(generate_address()) is ""
 
 
 # FIXME: comms node prints strange ServerUnaryCall message
