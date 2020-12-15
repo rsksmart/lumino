@@ -310,11 +310,9 @@ class ProxyTransactionError(RaidenError):
     """ Raised when an operation is sent out to the blockchain and it returns an error and we need to handle it """
 
     def __init__(self,
-                 tx_error_prefix: Optional[str],
-                 tx_error: Optional[Any],
-                 tx_gas_limit: Optional[int]):
-        super().__init__()
+                 tx_error_prefix: str,
+                 tx_error: Optional[Any]):
+        super(RaidenError, self).__init__(f"A proxy transaction error has occurred: {tx_error_prefix}")
         self.tx_error_prefix = tx_error_prefix
         self.tx_error = tx_error
-        self.tx_gas_limit = tx_gas_limit
 

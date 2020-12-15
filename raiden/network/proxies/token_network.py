@@ -2225,13 +2225,11 @@ class TokenNetwork:
                 self.client.poll(transaction_hash)
                 tx_error = check_transaction_threw(self.client, transaction_hash)
                 if tx_error:
-                    raise ProxyTransactionError(tx_gas_limit=tx_gas_limit,
-                                                tx_error=tx_error,
-                                                tx_error_prefix="settle call failed")
+                    raise ProxyTransactionError(tx_error_prefix="settle call failed",
+                                                tx_error=tx_error)
             else:
-                raise ProxyTransactionError(tx_gas_limit=tx_gas_limit,
-                                            tx_error=None,
-                                            tx_error_prefix="Call to settle will fail")
+                raise ProxyTransactionError(tx_error_prefix="Call to settle will fail",
+                                            tx_error=None)
 
         try:
             self.lock_and_execute_channel_operation(channel_identifier=channel_identifier,
@@ -2280,7 +2278,7 @@ class TokenNetwork:
             self.client.poll(transaction_hash)
             tx_error = check_transaction_threw(self.client, transaction_hash)
             if tx_error:
-                raise ProxyTransactionError(tx_error=tx_error)
+                raise ProxyTransactionError(tx_error_prefix="settle call failed", tx_error=tx_error)
 
         try:
             self.lock_and_execute_channel_operation(channel_identifier=channel_identifier,
@@ -2288,7 +2286,7 @@ class TokenNetwork:
         except ProxyTransactionError as e:
             self.handle_transaction_error_for_settlement(channel_identifier=channel_identifier,
                                                          checking_block=checking_block,
-                                                         error_prefix="settle call failed",
+                                                         error_prefix=e.tx_error_prefix,
                                                          log_details=log_details,
                                                          partner=partner,
                                                          transaction_error=e.tx_error)
