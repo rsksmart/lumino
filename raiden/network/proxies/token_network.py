@@ -166,7 +166,6 @@ class TokenNetwork:
     def lock_and_execute_channel_operation(self,
                                            channel_identifier: ChannelID,
                                            blocking_operation: Callable) -> Optional[Any]:
-
         with self.channel_blocking_operations[channel_identifier]:
             return blocking_operation()
 
