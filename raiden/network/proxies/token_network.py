@@ -1112,20 +1112,20 @@ class TokenNetwork:
         else:
             onchain_channel_identifier = channel_onchain_detail.channel_identifier
             if onchain_channel_identifier != channel_identifier:
-                raise RaidenUnrecoverableError((
+                raise RaidenUnrecoverableError(
                     f"The provided channel identifier does not match the value "
                     f"on-chain at the provided block ({given_block_identifier}). "
                     f"This call should never have been attempted. "
                     f"provided_channel_identifier={channel_identifier}, "
                     f"onchain_channel_identifier={channel_onchain_detail.channel_identifier}"
-                ))
+                )
 
             if channel_onchain_detail.state != ChannelState.OPENED:
-                raise RaidenUnrecoverableError((
+                raise RaidenUnrecoverableError(
                     f"The channel was not open at the provided block "
                     f"({given_block_identifier}). This call should never have "
                     f"been attempted."
-                ))
+                )
 
         def close_light_channel():
             checking_block = self.client.get_checking_block()
@@ -1163,12 +1163,12 @@ class TokenNetwork:
                     mining_block = int(receipt_or_none["blockNumber"])
 
                     if receipt_or_none["cumulativeGasUsed"] == gas_limit:
-                        raise RaidenUnrecoverableError((
+                        raise RaidenUnrecoverableError(
                             "update transfer failed and all gas was used. Estimate gas "
                             "may have underestimated update transfer, or succeeded even "
                             "though an assert is triggered, or the smart contract code "
                             "has an conditional assert."
-                        ))
+                        )
 
                     partner_details = self._detail_participant(
                         channel_identifier=channel_identifier,
@@ -1207,16 +1207,16 @@ class TokenNetwork:
                 )
 
                 if detail.state < ChannelState.OPENED:
-                    raise RaidenUnrecoverableError((
+                    raise RaidenUnrecoverableError(
                         f"cannot call close channel has not been opened yet. "
                         f"current_state={detail.state}"
-                    ))
+                    )
 
                 if detail.state >= ChannelState.CLOSED:
-                    raise RaidenRecoverableError((
+                    raise RaidenRecoverableError(
                         f"cannot call close on a channel that has been closed already. "
                         f"current_state={detail.state}"
-                    ))
+                    )
 
                 raise RaidenUnrecoverableError("close channel failed for an unknown reason")
 
@@ -1304,20 +1304,20 @@ class TokenNetwork:
         else:
             onchain_channel_identifier = channel_onchain_detail.channel_identifier
             if onchain_channel_identifier != channel_identifier:
-                raise RaidenUnrecoverableError((
+                raise RaidenUnrecoverableError(
                     f"The provided channel identifier does not match the value "
                     f"on-chain at the provided block ({given_block_identifier}). "
                     f"This call should never have been attempted. "
                     f"provided_channel_identifier={channel_identifier}, "
                     f"onchain_channel_identifier={channel_onchain_detail.channel_identifier}"
-                ))
+                )
 
             if channel_onchain_detail.state != ChannelState.OPENED:
-                raise RaidenUnrecoverableError((
+                raise RaidenUnrecoverableError(
                     f"The channel was not open at the provided block "
                     f"({given_block_identifier}). This call should never have "
                     f"been attempted."
-                ))
+                )
 
         def close_channel():
             checking_block = self.client.get_checking_block()
@@ -1364,12 +1364,12 @@ class TokenNetwork:
                     mining_block = int(receipt_or_none["blockNumber"])
 
                     if receipt_or_none["cumulativeGasUsed"] == gas_limit:
-                        raise RaidenUnrecoverableError((
+                        raise RaidenUnrecoverableError(
                             "update transfer failed and all gas was used. Estimate gas "
                             "may have underestimated update transfer, or succeeded even "
                             "though an assert is triggered, or the smart contract code "
                             "has an conditional assert."
-                        ))
+                        )
 
                     partner_details = self._detail_participant(
                         channel_identifier=channel_identifier,
@@ -1408,16 +1408,16 @@ class TokenNetwork:
                 )
 
                 if detail.state < ChannelState.OPENED:
-                    raise RaidenUnrecoverableError((
+                    raise RaidenUnrecoverableError(
                         f"cannot call close channel has not been opened yet. "
                         f"current_state={detail.state}"
-                    ))
+                    )
 
                 if detail.state >= ChannelState.CLOSED:
-                    raise RaidenRecoverableError((
+                    raise RaidenRecoverableError(
                         f"cannot call close on a channel that has been closed already. "
                         f"current_state={detail.state}"
-                    ))
+                    )
 
                 raise RaidenUnrecoverableError("close channel failed for an unknown reason")
 
