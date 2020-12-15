@@ -637,7 +637,7 @@ class MatrixNode(TransportNode):
                 recipient=message.sender, channel_identifier=CHANNEL_IDENTIFIER_GLOBAL_QUEUE
             )
             self.enqueue_message(*TransportMessage.wrap(queue_identifier, delivered_message))
-            self._raiden_service.on_message(message)
+            self._raiden_service.on_message(message, self.address)
 
         except (InvalidAddress, UnknownAddress, UnknownTokenAddress):
             self.log.warning("Exception while processing message", exc_info=True)
