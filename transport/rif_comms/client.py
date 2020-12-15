@@ -98,9 +98,7 @@ class Client:
     def disconnect(self):
         """
         Disconnects from RIF Communications Node.
-        Invokes the EndCommunication GRPC API endpoint.
         """
-        self.stub.EndCommunication(Void())
         self.grpc_channel.unsubscribe(lambda: self.grpc_channel.close())
 
     def _get_peer_id(self, rsk_address: Address) -> str:
@@ -115,3 +113,9 @@ class Client:
                 details = "Failed to lookup key! No peers from routing table!"
         """
         return self.stub.LocatePeerId(RskAddress(address=to_checksum_address(rsk_address))).address
+
+    def end_communications(self):
+        """
+        Invokes the EndCommunication GRPC API endpoint.
+        """
+        self.stub.EndCommunication(Void())

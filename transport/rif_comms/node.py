@@ -1,3 +1,4 @@
+import sys
 from typing import Any, Dict
 
 import structlog
@@ -153,6 +154,7 @@ class Node(TransportNode):
             self._receive_messages()
             self.log.info("RIF Comms Node _run. Listening for messages.")
         except GreenletExit:  # killed without exception
+            print("GreenletExit comms")
             self.stop_event.set()
             killall([self.greenlet])  # kill comms listener thread
             raise  # re-raise to keep killed status
@@ -176,14 +178,8 @@ class Node(TransportNode):
             if message_queue.greenlet:
                 message_queue.notify()  # if we need to send something, this is the time
 
-        if self.greenlet:
-            self.greenlet.kill()
-            self.greenlet.get()
-
-        # wait for our own greenlets, no need to get on them, exceptions should be raised in _run()
-        wait([self.greenlet] + [r.greenlet for r in self._address_to_message_queue.values()])
-
-        self._comms_client.disconnect()
+        # wait for message queues, self.greenlet just dispatch the handle message, so there is no point of wait for it.
+        wait([r.greenlet for r in self._address_to_message_queue.values()])
 
         self.log.debug("RIF Comms Node stop", config=self._config)
         try:
@@ -191,8 +187,12 @@ class Node(TransportNode):
         except AttributeError:
             # During shutdown the log attribute may have already been collected
             pass
-        # parent may want to call get() after stop(), to ensure _run errors are re-raised
-        # we don't call it here to avoid deadlock when self crashes and calls stop() on finally
+
+        # end grpc communication
+        self._comms_client.disconnect()
+        # stop lumino if transport layer stopped
+        self.log.warning("RIF Comms transport node stopped, shutting down Lumino")
+        sys.exit(1)
 
     def enqueue_message(self, message: TransportMessage, recipient: Address):
         """
