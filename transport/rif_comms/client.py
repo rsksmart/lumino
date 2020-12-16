@@ -95,14 +95,6 @@ class Client:
         topic_id = self._get_peer_id(to_checksum_address(rsk_address))
         self.stub.CloseTopic(Channel(channelId=topic_id))
 
-    def disconnect(self):
-        """
-        Disconnects from RIF Communications Node.
-        Invokes the EndCommunication GRPC API endpoint.
-        """
-        self.stub.EndCommunication(Void())
-        self.grpc_channel.unsubscribe(lambda: self.grpc_channel.close())
-
     def _get_peer_id(self, rsk_address: Address) -> str:
         """
         Gets the peer ID associated with a node RSK address.
@@ -115,3 +107,13 @@ class Client:
                 details = "Failed to lookup key! No peers from routing table!"
         """
         return self.stub.LocatePeerId(RskAddress(address=to_checksum_address(rsk_address))).address
+
+    def disconnect(self):
+        """
+         Invokes the EndCommunication GRPC API endpoint.
+         Disconnects from RIF Communications Node. Closes grpc connection
+        """
+        self.stub.EndCommunication(Void())
+        self.grpc_channel.unsubscribe(lambda: self.grpc_channel.close())
+
+
