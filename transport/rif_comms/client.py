@@ -95,10 +95,6 @@ class Client:
         topic_id = self._get_peer_id(to_checksum_address(rsk_address))
         self.stub.CloseTopic(Channel(channelId=topic_id))
 
-    def terminate(self):
-        """
-        """
-
     def _get_peer_id(self, rsk_address: Address) -> str:
         """
         Gets the peer ID associated with a node RSK address.
