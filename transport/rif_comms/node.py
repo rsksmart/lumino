@@ -1,11 +1,8 @@
-import sys
 from typing import Any, Dict
 
 import structlog
 from eth_utils import is_binary_address
-from gevent import killall, wait
-from greenlet import GreenletExit
-
+from gevent import wait
 from raiden.exceptions import InvalidAddress, UnknownAddress, UnknownTokenAddress, InvalidProtocolMessage
 from raiden.message_handler import MessageHandler
 from raiden.messages import (
@@ -185,7 +182,6 @@ class Node(TransportNode):
 
         self._comms_client.disconnect()
 
-
     def enqueue_message(self, message: TransportMessage, recipient: Address):
         """
         Queue the message for sending to recipient.
@@ -233,7 +229,8 @@ class Node(TransportNode):
         Send text message through the RIF Comms client.
         """
         self.log.info(
-            "sending message", message_payload=payload.replace("\n", "\\n"), transport="rif_comms", recipient=pex(recipient)
+            "sending message", message_payload=payload.replace("\n", "\\n"), transport="rif_comms",
+            recipient=pex(recipient)
         )
         if not self._comms_client.is_subscribed_to(recipient):
             self.log.info(
