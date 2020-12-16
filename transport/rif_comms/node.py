@@ -183,11 +183,7 @@ class Node(TransportNode):
             # During shutdown the log attribute may have already been collected
             pass
 
-        # end grpc communication
-        self._comms_client.terminate()
-        # stop lumino if transport layer stopped
-
-        self.log.warning("RIF Comms transport node stopped, shutting down Lumino")
+        self._comms_client.disconnect()
 
 
     def enqueue_message(self, message: TransportMessage, recipient: Address):

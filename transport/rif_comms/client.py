@@ -97,9 +97,7 @@ class Client:
 
     def terminate(self):
         """
-        Disconnects from RIF Communications Node. Closes grpc connection
         """
-        self.grpc_channel.unsubscribe(lambda: self.grpc_channel.close())
 
     def _get_peer_id(self, rsk_address: Address) -> str:
         """
@@ -117,6 +115,9 @@ class Client:
     def disconnect(self):
         """
          Invokes the EndCommunication GRPC API endpoint.
+         Disconnects from RIF Communications Node. Closes grpc connection
         """
         self.stub.EndCommunication(Void())
+        self.grpc_channel.unsubscribe(lambda: self.grpc_channel.close())
+
 
