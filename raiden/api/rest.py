@@ -17,6 +17,7 @@ from gevent.pywsgi import WSGIServer
 from hexbytes import HexBytes
 
 from raiden.api.validations.light_client_authorization import requires_api_key
+from raiden.api.validations.light_client_balance import requires_lc_balance
 from raiden.lightclient.handlers.light_client_message_handler import LightClientMessageHandler
 from raiden_webui import RAIDEN_WEBUI_PATH
 
@@ -715,6 +716,7 @@ class RestAPI:
             status_code=HTTPStatus.CREATED,
         )
 
+    @requires_lc_balance
     def open_light(
         self,
         registry_address: typing.PaymentNetworkID,
@@ -1749,6 +1751,7 @@ class RestAPI:
         except Exception as e:
             return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.BAD_REQUEST, log=log)
 
+    @requires_lc_balance
     def _deposit_light(
         self,
         registry_address: typing.PaymentNetworkID,
@@ -1845,6 +1848,7 @@ class RestAPI:
         result = self.channel_schema.dump(updated_channel_state)
         return api_response(result=result.data)
 
+    @requires_lc_balance
     def _close_light(
         self,
         registry_address: typing.PaymentNetworkID,
