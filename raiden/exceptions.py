@@ -312,7 +312,7 @@ class ProxyTransactionError(RaidenError):
     def __init__(self,
                  tx_error_prefix: str,
                  tx_error: Optional[Any]):
-        super(RaidenError, self).__init__(f"A proxy transaction error has occurred: {tx_error_prefix}")
+        super(ProxyTransactionError, self).__init__(f"A proxy transaction error has occurred: {tx_error_prefix}")
         self.tx_error_prefix = tx_error_prefix
         self.tx_error = tx_error
 
