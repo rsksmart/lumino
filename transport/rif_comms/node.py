@@ -153,10 +153,6 @@ class Node(TransportNode):
             # children crashes should throw an exception here
             self._receive_messages()
             self.log.info("RIF Comms Node _run. Listening for messages.")
-        except GreenletExit:  # killed without exception
-            self.stop_event.set()
-            killall([self.greenlet])  # kill comms listener thread
-            raise  # re-raise to keep killed status
         except Exception:
             self.stop()  # ensure cleanup and wait on subtasks
             raise
@@ -190,8 +186,9 @@ class Node(TransportNode):
         # end grpc communication
         self._comms_client.terminate()
         # stop lumino if transport layer stopped
+
         self.log.warning("RIF Comms transport node stopped, shutting down Lumino")
-        sys.exit(1)
+
 
     def enqueue_message(self, message: TransportMessage, recipient: Address):
         """
