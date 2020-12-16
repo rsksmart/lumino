@@ -47,7 +47,9 @@ class Client:
         topic_id = None
         # TODO: catch already subscribed and any error
         # TODO: add timeout
-        topic = self.stub.CreateTopicWithRskAddress(RskAddress(address=to_checksum_address(rsk_address)))
+        topic = self.stub.CreateTopicWithRskAddress(
+            RskAddress(address=to_checksum_address(rsk_address))
+        )
         for response in topic:
             topic_id = response.channelPeerJoined.peerId
             break
@@ -61,7 +63,9 @@ class Client:
         :param rsk_address: RSK address which corresponds to the topic which is being checked for subscription
         :return: boolean value indicating whether the client is subscribed or not
         """
-        return self.stub.IsSubscribedToRskAddress(RskAddress(address=to_checksum_address(rsk_address)))
+        return self.stub.IsSubscribedToRskAddress(
+            RskAddress(address=to_checksum_address(rsk_address))
+        ).value
 
     def send_message(self, payload: str, rsk_address: Address):
         """
@@ -70,10 +74,9 @@ class Client:
         :param payload: the message data to be sent
         :param rsk_address: the destination for the message to be sent to
         """
-        # TODO: message encoding
         self.stub.SendMessageToRskAddress(
             RskAddressPublish(
-                receiver=RskAddress(address=rsk_address),
+                receiver=RskAddress(address=to_checksum_address(rsk_address)),
                 message=Msg(payload=str.encode(payload))
             )
         )
@@ -84,7 +87,9 @@ class Client:
         Invokes the CloseTopic GRPC API endpoint.
         :param rsk_address: RSK address which corresponds to the topic which the client is unsubscribing from.
         """
-        self.stub.CloseTopicWithRskAddress(RskAddress(address=to_checksum_address(rsk_address)))
+        self.stub.CloseTopicWithRskAddress(
+            RskAddress(address=to_checksum_address(rsk_address))
+        )
 
     def disconnect(self):
         """
