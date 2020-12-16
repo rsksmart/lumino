@@ -32,11 +32,9 @@ from raiden.transfer.state import (
     CHANNEL_STATE_CLOSED,
     CHANNEL_STATE_OPENED,
     NODE_NETWORK_REACHABLE,
-    NODE_NETWORK_UNREACHABLE,
     NettingChannelState,
     RouteState,
-    message_identifier_from_prng,
-    NODE_NETWORK_UNKNOWN
+    message_identifier_from_prng
 )
 from raiden.transfer.state_change import (
     ActionChangeNodeNetworkState,
@@ -180,24 +178,6 @@ def has_secret_registration_started(
         pair.payer_state == "payer_waiting_secret_reveal" for pair in transfers_pair
     )
     return is_secret_registered_onchain or has_pending_transaction
-
-
-def filter_reachable_routes(
-    routes: List[RouteState], nodeaddresses_to_networkstates: NodeNetworkStateMap
-) -> List[RouteState]:
-    """This function makes sure we use reachable routes only."""
-    reachable_routes = []
-
-    for route in routes:
-        node_network_state = nodeaddresses_to_networkstates.get(
-            route.node_address, NODE_NETWORK_UNREACHABLE
-        )
-        # TODO: jonaf2103 NODE_NETWORK_UNKNOWN should be
-        #  removed from this comparison after fixing the reachability issues
-        if node_network_state == NODE_NETWORK_REACHABLE or node_network_state == NODE_NETWORK_UNKNOWN:
-            reachable_routes.append(route)
-
-    return reachable_routes
 
 
 def filter_used_routes(
@@ -1029,7 +1009,6 @@ def mediate_transfer(
     possible_routes: List["RouteState"],
     payer_channel: NettingChannelState,
     channelidentifiers_to_channels: ChannelMap,
-    nodeaddresses_to_networkstates: NodeNetworkStateMap,
     pseudo_random_generator: random.Random,
     payer_transfer: LockedTransferSignedState,
     block_number: BlockNumber,
@@ -1042,8 +1021,8 @@ def mediate_transfer(
     send a refund back to the payer, allowing the payer to try a different
     route.
     """
-    reachable_routes = filter_reachable_routes(possible_routes, nodeaddresses_to_networkstates)
-    available_routes = filter_used_routes(state.transfers_pair, reachable_routes)
+
+    available_routes = filter_used_routes(state.transfers_pair, possible_routes)
 
     assert payer_channel.partner_state.address == payer_transfer.balance_proof.sender
 
@@ -1117,7 +1096,6 @@ def handle_init(
         routes,
         payer_channel,
         channelidentifiers_to_channels,
-        nodeaddresses_to_networkstates,
         pseudo_random_generator,
         from_transfer,
         block_number,
@@ -1217,7 +1195,6 @@ def handle_refundtransfer(
             mediator_state.routes,
             payer_channel,
             channelidentifiers_to_channels,
-            nodeaddresses_to_networkstates,
             pseudo_random_generator,
             payer_transfer,
             block_number,
@@ -1445,7 +1422,6 @@ def handle_node_change_network_state(
         possible_routes=[route],
         payer_channel=payer_channel,
         channelidentifiers_to_channels=channelidentifiers_to_channels,
-        nodeaddresses_to_networkstates={state_change.node_address: state_change.network_state},
         pseudo_random_generator=pseudo_random_generator,
         payer_transfer=mediator_state.waiting_transfer.transfer,
         block_number=block_number,

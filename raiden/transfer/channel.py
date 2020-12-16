@@ -1357,7 +1357,8 @@ def events_for_close(
             canonical_identifier=channel_state.canonical_identifier,
             balance_proof=balance_proof,
             triggered_by_block_hash=block_hash,
-            signed_close_tx=signed_close_tx
+            signed_close_tx=signed_close_tx,
+            our_address=channel_state.our_state.address
         )
 
         events.append(close_event)
@@ -1432,6 +1433,8 @@ def events_for_expired_lock(
     msg = "caller must make sure the channel is open"
     assert get_status(channel_state) == CHANNEL_STATE_OPENED, msg
 
+    recipient = channel_state.partner_state.address
+
     send_lock_expired, merkletree = create_sendexpiredlock(
         sender_end_state=channel_state.our_state,
         locked_lock=locked_lock,
@@ -1439,7 +1442,7 @@ def events_for_expired_lock(
         chain_id=channel_state.chain_id,
         token_network_identifier=TokenNetworkID(channel_state.token_network_identifier),
         channel_identifier=channel_state.identifier,
-        recipient=channel_state.partner_state.address,
+        recipient=recipient,
         payment_identifier=payment_identifier,
         is_light_channel=channel_state.is_light_channel
     )
@@ -1454,13 +1457,13 @@ def events_for_expired_lock(
 
         if channel_state.is_light_channel:
             # Store the send lock expired light message
-            store_lock_expired = StoreMessageEvent(send_lock_expired.message_identifier,
-                                                   send_lock_expired.payment_identifier,
-                                                   1,
-                                                   LockExpired.from_event(send_lock_expired),
-                                                   False,
-                                                   LightClientProtocolMessageType.PaymentExpired,
-                                                   send_lock_expired.sender)
+            store_lock_expired = StoreMessageEvent(message_id=send_lock_expired.message_identifier,
+                                                   payment_id=send_lock_expired.payment_identifier,
+                                                   message_order=1,
+                                                   message=LockExpired.from_event(send_lock_expired),
+                                                   is_signed=False,
+                                                   message_type=LightClientProtocolMessageType.PaymentExpired,
+                                                   light_client_address=send_lock_expired.sender)
             events.append(store_lock_expired)
         events.append(send_lock_expired)
 
@@ -1558,11 +1561,12 @@ def handle_action_close(
 ) -> TransitionResult[NettingChannelState]:
     msg = "caller must make sure the ids match"
     assert channel_state.identifier == close.channel_identifier, msg
-
-    events = events_for_close(
-        channel_state=channel_state, block_number=block_number, block_hash=block_hash,
-        signed_close_tx=close.signed_close_tx
-    )
+    events = []
+    if close.participant1 == channel_state.our_state.address:
+        events = events_for_close(
+            channel_state=channel_state, block_number=block_number, block_hash=block_hash,
+            signed_close_tx=close.signed_close_tx
+        )
     return TransitionResult(channel_state, events)
 
 
@@ -1660,7 +1664,7 @@ def handle_receive_lock_expired_light(
         block_number=block_number,
     )
 
-    events: List[Event] = list()
+    events: List[Event]
     if is_valid:
         assert merkletree, "is_valid_lock_expired should return merkletree if valid"
         channel_state.partner_state.balance_proof = state_change.balance_proof
@@ -1669,13 +1673,13 @@ def handle_receive_lock_expired_light(
         _del_unclaimed_lock(channel_state.partner_state, state_change.secrethash)
 
         store_lock_expired = StoreMessageEvent(
-            state_change.lock_expired.message_identifier,
-            payment_id,
-            1,
-            state_change.lock_expired,
-            True,
-            LightClientProtocolMessageType.PaymentExpired,
-            state_change.lock_expired.recipient
+            message_id=state_change.lock_expired.message_identifier,
+            payment_id=payment_id,
+            message_order=1,
+            message=state_change.lock_expired,
+            is_signed=True,
+            message_type=LightClientProtocolMessageType.PaymentExpired,
+            light_client_address=state_change.lock_expired.recipient
         )
         events = [store_lock_expired]
     else:
@@ -1741,7 +1745,6 @@ def handle_receive_lockedtransfer_light(
     is_valid, msg, merkletree, handle_invoice_result = is_valid_lockedtransfer(
         mediated_transfer, channel_state, channel_state.partner_state, channel_state.our_state, storage
     )
-
     if is_valid:
         assert merkletree, "is_valid_lock_expired should return merkletree if valid"
         channel_state.partner_state.balance_proof = mediated_transfer.balance_proof
@@ -1879,6 +1882,7 @@ def handle_channel_closed(
                 expiration=expiration,
                 balance_proof=balance_proof,
                 triggered_by_block_hash=state_change.block_hash,
+                our_address=channel_state.our_state.address
             )
             channel_state.update_transaction = TransactionExecutionStatus(
                 started_block_number=state_change.block_number,
@@ -1919,7 +1923,7 @@ def handle_channel_closed_light(
             # The channel was closed by our partner, if there is a balance
             # proof available update this node half of the state
             update = ContractSendChannelUpdateTransferLight(
-                lc_address=state_change.light_client_address,
+                lc_address=state_change.non_closing_participant,
                 expiration=expiration,
                 balance_proof=balance_proof,
                 triggered_by_block_hash=state_change.block_hash,
@@ -1970,7 +1974,7 @@ def handle_channel_settled(
 
         channel_state.our_state.onchain_locksroot = our_locksroot
         channel_state.partner_state.onchain_locksroot = partner_locksroot
-        
+
         onchain_unlock = ContractSendChannelBatchUnlock(
             canonical_identifier=channel_state.canonical_identifier,
             participant=channel_state.partner_state.address,
@@ -1989,8 +1993,7 @@ def handle_channel_settled_light(
     if state_change.channel_identifier == channel_state.identifier:
         set_settled(channel_state, state_change.block_number)
 
-        our_locksroot = state_change.our_onchain_locksroot
-        partner_locksroot = state_change.partner_onchain_locksroot
+        our_locksroot, partner_locksroot = get_locksroot_from_state_change(channel_state.our_state.address, state_change)
 
         should_clear_channel = (
             our_locksroot == EMPTY_MERKLE_ROOT and partner_locksroot == EMPTY_MERKLE_ROOT
@@ -2011,6 +2014,14 @@ def handle_channel_settled_light(
         )
         events.append(onchain_unlock)
     return TransitionResult(channel_state, events)
+
+
+def get_locksroot_from_state_change(our_address: Address, state_change: ContractReceiveChannelSettledLight):
+    if our_address == state_change.participant1:
+        return state_change.our_onchain_locksroot, state_change.partner_onchain_locksroot
+    else:
+        return state_change.partner_onchain_locksroot, state_change.our_onchain_locksroot
+
 
 def handle_channel_newbalance(
     channel_state: NettingChannelState,

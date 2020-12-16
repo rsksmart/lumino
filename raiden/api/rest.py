@@ -10,23 +10,19 @@ import gevent
 import gevent.pool
 import structlog
 from dateutil.relativedelta import relativedelta
-from eth_utils import encode_hex, decode_hex, to_checksum_address
-from eth_utils import (
-    to_canonical_address
-)
+from eth_utils import encode_hex, decode_hex, to_checksum_address, to_canonical_address
 from flask import Flask, make_response, send_from_directory, url_for, request
 from flask_cors import CORS
 from flask_restful import Api, abort
 from gevent.pywsgi import WSGIServer
 from hexbytes import HexBytes
-from raiden_webui import RAIDEN_WEBUI_PATH
-from web3 import Web3
-from webargs.flaskparser import parser
-
-from raiden.api.objects import AddressList, PartnersPerTokenList
-from raiden.api.objects import DashboardGeneralItem
-from raiden.api.objects import DashboardGraphItem
-from raiden.api.objects import DashboardTableItem
+from raiden.api.objects import (
+    AddressList,
+    PartnersPerTokenList,
+    DashboardGeneralItem,
+    DashboardGraphItem,
+    DashboardTableItem
+)
 from raiden.api.v1.encoding import (
     AddressListSchema,
     ChannelStateSchema,
@@ -88,7 +84,13 @@ from raiden.billing.invoices.constants.invoice_status import InvoiceStatus
 from raiden.billing.invoices.constants.invoice_type import InvoiceType
 from raiden.billing.invoices.decoder.invoice_decoder import get_tags_dict, get_unknown_tags_dict
 from raiden.billing.invoices.util.time_util import is_invoice_expired, UTC_FORMAT
-from raiden.constants import GENESIS_BLOCK_NUMBER, UINT256_MAX, Environment, EMPTY_PAYMENT_HASH_INVOICE
+from raiden.constants import (
+    GENESIS_BLOCK_NUMBER,
+    UINT256_MAX,
+    Environment,
+    EMPTY_PAYMENT_HASH_INVOICE,
+    ErrorCode
+)
 from raiden.exceptions import (
     AddressWithoutCode,
     AlreadyRegisteredTokenAddress,
@@ -141,6 +143,9 @@ from raiden.utils import (
     typing)
 from raiden.utils.rns import is_rns_address
 from raiden.utils.runnable import Runnable
+from raiden_webui import RAIDEN_WEBUI_PATH
+from web3 import Web3
+from webargs.flaskparser import parser
 
 log = structlog.get_logger(__name__)
 
@@ -877,7 +882,7 @@ class RestAPI:
     @requires_api_key
     def register_secret_light(self, internal_msg_identifier: int, signed_tx: typing.SignedTransaction):
         try:
-            message = LightClientMessageHandler.get_light_client_protocol_message_by_internal_identifier(
+            message = LightClientMessageHandler.get_message_by_internal_identifier(
                 internal_msg_identifier=internal_msg_identifier,
                 wal=self.raiden_api.raiden.wal
             )
@@ -1650,7 +1655,7 @@ class RestAPI:
         return None
 
     def settlement_light(self,
-                         registry_address: typing.PaymentNetworkID,
+                         registry_address: typing.Address,
                          internal_msg_identifier: int,
                          token_address: typing.TokenAddress,
                          creator_address: typing.Address,
@@ -1682,7 +1687,7 @@ class RestAPI:
             )
             return result
 
-        message = LightClientMessageHandler.get_light_client_protocol_message_by_internal_identifier(
+        message = LightClientMessageHandler.get_message_by_internal_identifier(
             internal_msg_identifier=internal_msg_identifier,
             wal=self.raiden_api.raiden.wal
         )
@@ -1697,7 +1702,7 @@ class RestAPI:
 
         if message.is_signed:
             return ApiErrorBuilder.build_and_log_error(
-                errors="Message already signed",
+                errors=ErrorCode.MESSAGE_ALREADY_SIGNED,
                 status_code=HTTPStatus.CONFLICT,
                 log=log
             )
@@ -1718,10 +1723,11 @@ class RestAPI:
                 signed_settle_tx=signed_settle_tx
             )
             return self.update_channel_state(registry_address, channel_state)
-        except ChannelNotFound as e:
-            return api_error(
-                errors="Channel is already unlocked.",
-                status_code=HTTPStatus.NOT_FOUND
+        except ChannelNotFound:
+            return ApiErrorBuilder.build_and_log_error(
+                errors=ErrorCode.Settlement.CHANNEL_ALREADY_SETTLED,
+                status_code=HTTPStatus.NOT_FOUND,
+                log=log
             )
         except Exception as e:
             return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.BAD_REQUEST, log=log)
@@ -2243,7 +2249,7 @@ class RestAPI:
     def post_unlock_payment_light(self, internal_msg_identifier: int, signed_tx: typing.SignedTransaction,
                                   token_address: typing.TokenAddress):
         try:
-            message = LightClientMessageHandler.get_light_client_protocol_message_by_internal_identifier(
+            message = LightClientMessageHandler.get_message_by_internal_identifier(
                 internal_msg_identifier=internal_msg_identifier,
                 wal=self.raiden_api.raiden.wal
             )
@@ -2305,5 +2311,7 @@ class RestAPI:
             return api_response(hub_message.to_dict())
         except ChannelNotFound as e:
             return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.NOT_FOUND, log=log)
+        except InsufficientFunds as e:
+            return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.PAYMENT_REQUIRED, log=log)
         except UnhandledLightClient as e:
             return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.FORBIDDEN, log=log)

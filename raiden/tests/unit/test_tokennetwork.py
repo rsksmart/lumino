@@ -379,7 +379,7 @@ def test_mediator_clear_pairs_after_batch_unlock(
 
     # Make sure that mediator task was cleared during the next block processing
     # since the channel was removed
-    mediator_task = chain_state.payment_mapping.secrethashes_to_task.get(lock_secrethash)
+    mediator_task = chain_state.get_payment_task(our_address, lock_secrethash)
     assert not mediator_task
 
 
