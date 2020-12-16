@@ -95,9 +95,9 @@ class Client:
         topic_id = self._get_peer_id(to_checksum_address(rsk_address))
         self.stub.CloseTopic(Channel(channelId=topic_id))
 
-    def disconnect(self):
+    def terminate(self):
         """
-        Disconnects from RIF Communications Node.
+        Disconnects from RIF Communications Node. Closes grpc connection
         """
         self.grpc_channel.unsubscribe(lambda: self.grpc_channel.close())
 
@@ -114,8 +114,9 @@ class Client:
         """
         return self.stub.LocatePeerId(RskAddress(address=to_checksum_address(rsk_address))).address
 
-    def end_communications(self):
+    def disconnect(self):
         """
-        Invokes the EndCommunication GRPC API endpoint.
+         Invokes the EndCommunication GRPC API endpoint.
         """
         self.stub.EndCommunication(Void())
+

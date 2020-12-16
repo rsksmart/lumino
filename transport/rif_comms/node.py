@@ -188,7 +188,7 @@ class Node(TransportNode):
             pass
 
         # end grpc communication
-        self._comms_client.disconnect()
+        self._comms_client.terminate()
         # stop lumino if transport layer stopped
         self.log.warning("RIF Comms transport node stopped, shutting down Lumino")
         sys.exit(1)

@@ -63,5 +63,6 @@ class Node:
         try:
             # FIXME: deleting entries in the connections dictionary is causing non-crashing thread exceptions
             self.client.disconnect()
+            self.client.terminate()
         finally:
             CommsProcess.stop(process=self._process)
