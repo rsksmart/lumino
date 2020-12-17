@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
 import structlog
-from eth_utils import to_checksum_address, to_hex, encode_hex
+from eth_utils import to_checksum_address, to_hex, encode_hex, to_canonical_address
 from raiden.api.objects import SettlementParameters
 from raiden.billing.invoices.handlers.invoice_handler import handle_receive_events_with_payments
 from raiden.constants import EMPTY_BALANCE_HASH, EMPTY_HASH, EMPTY_MESSAGE_HASH, EMPTY_SIGNATURE
@@ -300,7 +300,7 @@ class RaidenEventHandler(EventHandler):
     @staticmethod
     def handle_send_lockexpired_light(raiden: "RaidenService", send_lock_expired: SendLockExpiredLight):
         signed_lock_expired = send_lock_expired.signed_lock_expired
-        lc_transport = raiden.get_light_client_transport(to_checksum_address(signed_lock_expired.sender))
+        lc_transport = raiden.transport.get_light_client_transport(signed_lock_expired.sender)
         if lc_transport:
             lc_transport.enqueue_message(
                 *TransportMessage.wrap(send_lock_expired.queue_identifier, signed_lock_expired)
@@ -321,12 +321,11 @@ class RaidenEventHandler(EventHandler):
         raiden: "RaidenService", send_locked_transfer_light: SendLockedTransferLight
     ):
         mediated_transfer_message = send_locked_transfer_light.signed_locked_transfer
-        light_client_address = to_checksum_address(send_locked_transfer_light.signed_locked_transfer.initiator)
-        for light_client_transport in raiden.transport.light_clients:
-            if light_client_address == light_client_transport.address:
-                light_client_transport.enqueue_message(
-                    *TransportMessage.wrap(send_locked_transfer_light.queue_identifier, mediated_transfer_message)
-                )
+        light_client_address = send_locked_transfer_light.signed_locked_transfer.initiator
+        light_client_transport = raiden.transport.get_light_client_transport(light_client_address)
+        light_client_transport.enqueue_message(
+            *TransportMessage.wrap(send_locked_transfer_light.queue_identifier, mediated_transfer_message)
+        )
 
     @staticmethod
     def handle_send_secretreveal(raiden: "RaidenService", reveal_secret_event: SendSecretReveal):
@@ -339,7 +338,7 @@ class RaidenEventHandler(EventHandler):
     @staticmethod
     def handle_send_secretreveal_light(raiden: "RaidenService", reveal_secret_event: SendSecretRevealLight):
         signed_secret_reveal = reveal_secret_event.signed_secret_reveal
-        lc_transport = raiden.get_light_client_transport(to_checksum_address(reveal_secret_event.sender))
+        lc_transport = raiden.transport.get_light_client_transport(reveal_secret_event.sender)
         if lc_transport:
             lc_transport.enqueue_message(
                 *TransportMessage.wrap(reveal_secret_event.queue_identifier, signed_secret_reveal)
@@ -356,7 +355,7 @@ class RaidenEventHandler(EventHandler):
     @staticmethod
     def handle_send_balanceproof_light(raiden: "RaidenService", balance_proof_event: SendBalanceProofLight):
         unlock_message = message_from_sendevent(balance_proof_event)
-        lc_transport = raiden.get_light_client_transport(to_checksum_address(balance_proof_event.sender))
+        lc_transport = raiden.transport.get_light_client_transport(balance_proof_event.sender)
         if lc_transport:
             lc_transport.enqueue_message(
                 *TransportMessage.wrap(balance_proof_event.queue_identifier, unlock_message)
@@ -380,7 +379,7 @@ class RaidenEventHandler(EventHandler):
         raiden: "RaidenService", secret_request_event: SendSecretRequestLight
     ):
         secret_request_message = message_from_sendevent(secret_request_event)
-        lc_transport = raiden.get_light_client_transport(to_checksum_address(secret_request_event.sender))
+        lc_transport = raiden.transport.get_light_client_transport(secret_request_event.sender)
         if lc_transport:
             lc_transport.enqueue_message(
                 *TransportMessage.wrap(secret_request_event.queue_identifier, secret_request_message)

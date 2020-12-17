@@ -63,3 +63,9 @@ class Layer(ABC, Generic[TN]):
          This function must return a list of objects that are subtype of TransportNode and correspond to light client
          transport nodes
         """
+
+    @abstractmethod
+    def get_light_client_transport(self, address) -> TransportNode:
+        """
+        Finds the light client transport node by address
+        """

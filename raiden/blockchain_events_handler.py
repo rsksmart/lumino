@@ -485,7 +485,7 @@ def get_our_address_by_canonical_identifier(
     )
     for address, channels in token_network.channelidentifiers_to_channels.items():
         if canonical_identifier.channel_identifier in channels \
-                and (raiden.address == address or raiden.get_light_client_transport(to_checksum_address(address))):
+                and (raiden.address == address or raiden.transport.get_light_client_transport(address)):
             return address
     return None
 
