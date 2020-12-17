@@ -21,7 +21,6 @@ def comms_nodes(amount_of_nodes) -> {int, CommsNode}:
         node.stop()
 
 
-# FIXME: comms node prints strange ServerUnaryCall message
 @pytest.mark.parametrize("amount_of_nodes", [1])
 def test_has_subscriber_self(comms_nodes):
     comms_node = comms_nodes[1]
@@ -39,18 +38,14 @@ def test_has_subscriber(comms_nodes):
     client_1, address_1 = comms_node_1.client, comms_node_1.address
     client_2, address_2 = comms_node_2.client, comms_node_2.address
 
-    # FIXME: nodes shouldn't have to subscribe to themselves for this to work
-    client_1.subscribe_to(address_1)
-    client_2.subscribe_to(address_2)
-
     # subscribe from node 1 to 2
     client_1.subscribe_to(address_2)
 
     # check subscriptions
-    assert client_1.is_subscribed_to(address_1) is True
+    assert client_1.is_subscribed_to(address_1) is False
     assert client_1.is_subscribed_to(address_2) is True
     assert client_2.is_subscribed_to(address_1) is False
-    assert client_2.is_subscribed_to(address_2) is True
+    assert client_2.is_subscribed_to(address_2) is False
 
 
 @pytest.mark.parametrize("amount_of_nodes", [2])
@@ -59,19 +54,15 @@ def test_two_clients_cross_subscription(comms_nodes):
     client_1, address_1 = comms_node_1.client, comms_node_1.address
     client_2, address_2 = comms_node_2.client, comms_node_2.address
 
-    # FIXME: nodes shouldn't have to subscribe to themselves for this to work
-    client_1.subscribe_to(address_1)
-    client_2.subscribe_to(address_2)
-
     # subscribe both nodes to each other
     client_1.subscribe_to(address_2)
     client_2.subscribe_to(address_1)
 
     # check subscriptions
-    assert client_1.is_subscribed_to(address_1) is True
+    assert client_1.is_subscribed_to(address_1) is False
     assert client_1.is_subscribed_to(address_2) is True
     assert client_2.is_subscribed_to(address_1) is True
-    assert client_2.is_subscribed_to(address_2) is True
+    assert client_2.is_subscribed_to(address_2) is False
 
 
 @pytest.mark.parametrize("amount_of_nodes", [2])
@@ -79,10 +70,6 @@ def test_two_clients_cross_messaging_same_topic(comms_nodes):
     comms_node_1, comms_node_2 = comms_nodes[1], comms_nodes[2]
     client_1, address_1 = comms_node_1.client, comms_node_1.address
     client_2, address_2 = comms_node_2.client, comms_node_2.address
-
-    # FIXME: nodes shouldn't have to subscribe to themselves for this to work
-    client_1.subscribe_to(address_1)
-    client_2.subscribe_to(address_2)
 
     # subscribe both nodes to each other
     _, sub_1_to_2 = client_1.subscribe_to(address_2)
