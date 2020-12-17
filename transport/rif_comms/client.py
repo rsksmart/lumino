@@ -93,8 +93,8 @@ class Client:
 
     def disconnect(self):
         """
-        Disconnects from RIF Communications Node.
-        Invokes the EndCommunication GRPC API endpoint.
+         Invokes the EndCommunication GRPC API endpoint.
+         Disconnects from RIF Communications Node. Closes grpc connection
         """
         self.stub.EndCommunication(Void())
         self.grpc_channel.unsubscribe(lambda: self.grpc_channel.close())

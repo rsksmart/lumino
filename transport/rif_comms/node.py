@@ -2,9 +2,7 @@ from typing import Any, Dict
 
 import structlog
 from eth_utils import is_binary_address
-from gevent import killall, wait
-from greenlet import GreenletExit
-
+from gevent import wait
 from raiden.exceptions import InvalidAddress, UnknownAddress, UnknownTokenAddress, InvalidProtocolMessage
 from raiden.message_handler import MessageHandler
 from raiden.messages import (
@@ -152,10 +150,6 @@ class Node(TransportNode):
             # children crashes should throw an exception here
             self._receive_messages()
             self.log.info("RIF Comms Node _run. Listening for messages.")
-        except GreenletExit:  # killed without exception
-            self.stop_event.set()
-            killall([self.greenlet])  # kill comms listener thread
-            raise  # re-raise to keep killed status
         except Exception:
             self.stop()  # ensure cleanup and wait on subtasks
             raise
@@ -176,14 +170,8 @@ class Node(TransportNode):
             if message_queue.greenlet:
                 message_queue.notify()  # if we need to send something, this is the time
 
-        if self.greenlet:
-            self.greenlet.kill()
-            self.greenlet.get()
-
-        # wait for our own greenlets, no need to get on them, exceptions should be raised in _run()
-        wait([self.greenlet] + [r.greenlet for r in self._address_to_message_queue.values()])
-
-        self._comms_client.disconnect()
+        # wait for message queues, self.greenlet just dispatch the handle message, so there is no point of wait for it.
+        wait([r.greenlet for r in self._address_to_message_queue.values()])
 
         self.log.debug("RIF Comms Node stop", config=self._config)
         try:
@@ -191,8 +179,8 @@ class Node(TransportNode):
         except AttributeError:
             # During shutdown the log attribute may have already been collected
             pass
-        # parent may want to call get() after stop(), to ensure _run errors are re-raised
-        # we don't call it here to avoid deadlock when self crashes and calls stop() on finally
+
+        self._comms_client.disconnect()
 
     def enqueue_message(self, message: TransportMessage, recipient: Address):
         """
@@ -241,7 +229,8 @@ class Node(TransportNode):
         Send text message through the RIF Comms client.
         """
         self.log.info(
-            "sending message", message_payload=payload.replace("\n", "\\n"), transport="rif_comms", recipient=pex(recipient)
+            "sending message", message_payload=payload.replace("\n", "\\n"), transport="rif_comms",
+            recipient=pex(recipient)
         )
         if not self._comms_client.is_subscribed_to(recipient):
             self.log.info(
