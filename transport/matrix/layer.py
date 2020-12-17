@@ -21,7 +21,7 @@ from transport.layer import Layer as TransportLayer
 from transport.matrix.node import MatrixNode as MatrixTransportNode, \
     MatrixLightClientNode as MatrixLightClientTransportNode
 from transport.matrix.utils import get_available_servers_from_config, server_is_available, make_client
-from transport.node import Node as TransportNode,
+from transport.node import Node as TransportNode
 
 log = structlog.get_logger(__name__)
 
@@ -192,7 +192,7 @@ class MatrixLayer(TransportLayer[MatrixTransportNode]):
         # using to_checksum_address -> str
         matrix_address = to_checksum_address(address)
         light_client_transport_result = None
-        for light_client_transport in self.transport.light_clients:
+        for light_client_transport in self.light_clients:
             if matrix_address == light_client_transport.address:
                 light_client_transport_result = light_client_transport
                 break

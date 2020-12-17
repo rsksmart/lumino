@@ -77,7 +77,7 @@ class Layer(TransportLayer[RIFCommsTransportNode]):
         # using to_canonical_address -> bytes
         rif_comms_address = to_canonical_address(address)
         light_client_transport_result = None
-        for light_client_transport in self.transport.light_clients:
+        for light_client_transport in self.light_clients:
             if rif_comms_address == light_client_transport.address:
                 light_client_transport_result = light_client_transport
                 break
