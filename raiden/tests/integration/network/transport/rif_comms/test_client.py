@@ -22,7 +22,7 @@ def comms_nodes(amount_of_nodes) -> {int, CommsNode}:
 
 
 @pytest.mark.parametrize("amount_of_nodes", [1])
-def test_subscribe_self(comms_nodes):
+def test_is_subscribed_to_self(comms_nodes):
     comms_node = comms_nodes[1]
     client, address = comms_node.client, comms_node.address
 
@@ -36,7 +36,7 @@ def test_subscribe_self(comms_nodes):
 
 
 @pytest.mark.parametrize("amount_of_nodes", [2])
-def test_subscribe_peers(comms_nodes):
+def test_is_subscribed_to_peers(comms_nodes):
     comms_node_1, comms_node_2 = comms_nodes[1], comms_nodes[2]
     client_1, address_1 = comms_node_1.client, comms_node_1.address
     client_2, address_2 = comms_node_2.client, comms_node_2.address
