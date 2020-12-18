@@ -113,7 +113,7 @@ def test_send_message_invalid_address(comms_nodes):
 
 
 @pytest.mark.parametrize("amount_of_nodes", [2])
-def test_send_message_unsubscribed(comms_nodes):
+def test_send_message_with_subscription(comms_nodes):
     comms_node_1, comms_node_2 = comms_nodes[1], comms_nodes[2]
     client_1, address_1 = comms_node_1.client, comms_node_1.address
     client_2, address_2 = comms_node_2.client, comms_node_2.address
@@ -122,8 +122,18 @@ def test_send_message_unsubscribed(comms_nodes):
     _, sub = client_2.subscribe_to(address_2)
 
     with pytest.raises(_InactiveRpcError) as e:
-        client_1.send_message("unsubbed message", address_2)
+        client_1.send_message("marco", address_2)
         assert "Not subscribed to" in e.details()
+
+    # subscribe from node 1 to 2
+    client_1.subscribe_to(address_2)
+
+    # message should be successfully sent now
+    client_1.send_message("polo", address_2)
+    for resp in sub:
+        received_message = notification_to_payload(resp)
+        assert received_message == "polo"
+        break  # only 1 message is expected
 
 
 @pytest.mark.parametrize("amount_of_nodes", [2])
