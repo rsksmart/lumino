@@ -76,7 +76,7 @@ class Client:
         """
         self.stub.SendMessageToRskAddress(
             RskAddressPublish(
-                sender=RskAddress(address=self.rsk_address),
+                sender=self.rsk_address,
                 receiver=RskAddress(address=to_checksum_address(rsk_address)),
                 message=Msg(payload=str.encode(payload)),
             )

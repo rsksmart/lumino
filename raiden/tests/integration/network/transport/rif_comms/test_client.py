@@ -66,7 +66,7 @@ def test_is_subscribed_to_peers(comms_nodes):
 
 
 @pytest.mark.parametrize("amount_of_nodes", [2])
-def test_cross_messaging(comms_nodes):
+def test_send_message_peer(comms_nodes):
     comms_node_1, comms_node_2 = comms_nodes[1], comms_nodes[2]
     client_1, address_1 = comms_node_1.client, comms_node_1.address
     client_2, address_2 = comms_node_2.client, comms_node_2.address
