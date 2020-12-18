@@ -1,6 +1,7 @@
 import pytest
 
 from raiden.tests.integration.network.transport.rif_comms.node import Node as CommsNode, Config as CommsConfig
+from raiden.tests.integration.network.transport.utils import generate_address
 from transport.rif_comms.utils import notification_to_payload
 
 
@@ -19,6 +20,41 @@ def comms_nodes(amount_of_nodes) -> {int, CommsNode}:
     # teardown
     for node in nodes.values():
         node.stop()
+
+
+@pytest.mark.parametrize("amount_of_nodes", [1])
+def test_subscribe_to_invalid(comms_nodes):
+    client = comms_nodes[1].client
+
+    invalid_addr = generate_address()
+    topic_id, _ = client.subscribe_to(invalid_addr)
+
+    # FIXME: this should probably throw an exception rather than an empty result
+    assert topic_id is ""
+
+
+@pytest.mark.parametrize("amount_of_nodes", [1])
+def test_subscribe_to_self(comms_nodes):
+    client, address = comms_nodes[1].client, comms_nodes[1].address
+
+    topic_id, _ = client.subscribe_to(address)
+
+    assert topic_id
+
+
+@pytest.mark.parametrize("amount_of_nodes", [2])
+def test_subscribe_to_peers(comms_nodes):
+    comms_node_1, comms_node_2 = comms_nodes[1], comms_nodes[2]
+    client_1, address_1 = comms_node_1.client, comms_node_1.address
+    client_2, address_2 = comms_node_2.client, comms_node_2.address
+
+    topic_id_1, _ = client_1.subscribe_to(address_2)
+
+    assert topic_id_1
+
+    topic_id_2, _ = client_2.subscribe_to(address_1)
+
+    assert topic_id_2
 
 
 @pytest.mark.parametrize("amount_of_nodes", [1])
