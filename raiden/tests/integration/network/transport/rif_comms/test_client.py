@@ -121,18 +121,34 @@ def test_send_message_with_subscription(comms_nodes):
     # node 2 must listen to its own topic
     _, sub = client_2.subscribe_to(address_2)
 
+    payload = "marco"
     with pytest.raises(_InactiveRpcError) as e:
-        client_1.send_message("marco", address_2)
+        client_1.send_message(payload, address_2)
         assert "Not subscribed to" in e.details()
 
     # subscribe from node 1 to 2
     client_1.subscribe_to(address_2)
 
     # message should be successfully sent now
-    client_1.send_message("polo", address_2)
+    payload = "polo"
+    client_1.send_message(payload, address_2)
     for resp in sub:
         received_message = notification_to_payload(resp)
-        assert received_message == "polo"
+        assert received_message == payload
+        break  # only 1 message is expected
+
+
+@pytest.mark.parametrize("amount_of_nodes", [1])
+def test_send_message_self(comms_nodes):
+    client, address = comms_nodes[1].client, comms_nodes[1].address
+
+    # subscribe to self, send and listen
+    _, sub = client.subscribe_to(address)
+    payload = "echo"
+    client.send_message(payload, address)
+    for resp in sub:
+        received_message = notification_to_payload(resp)
+        assert received_message == payload
         break  # only 1 message is expected
 
 
