@@ -88,7 +88,8 @@ message PublishPayload {
 
 message RskAddressPublish {
     RskAddress receiver = 1;
-    Msg message = 2;
+    RskAddress sender = 2;
+    Msg message = 3;
 }
 
 // Set of peerIDs subscribed to a specific channel
@@ -158,10 +159,11 @@ message PeerSignatureResponse {
 
 //You've received new data from a subscribed channel
 message ChannelNewData {
-    optional string from = 1; // PeerID of the publisher
-    bytes data = 2; // The actual information published
-    bytes nonce = 3; // Sequence number of the publisher's publications in the channel/s
-    repeated Channel channel = 4; //List of topics where the data was published
+    optional PeerId peer = 1; // PeerID of the publisher
+    optional RskAddress sender = 2; // RskAddress of the sender
+    bytes data = 3; // The actual information published
+    bytes nonce = 4; // Sequence number of the publisher's publications in the channel/s
+    repeated Channel channel = 5; //List of topics where the data was published
 }
 
 //A peer left from one of your subscribed channels
