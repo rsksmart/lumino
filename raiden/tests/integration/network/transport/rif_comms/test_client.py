@@ -1,4 +1,5 @@
 import pytest
+from grpc._channel import _InactiveRpcError
 
 from raiden.tests.integration.network.transport.rif_comms.node import Node as CommsNode, Config as CommsConfig
 from raiden.tests.integration.network.transport.utils import generate_address
@@ -101,8 +102,32 @@ def test_is_subscribed_to_peers(comms_nodes):
     assert client_2.is_subscribed_to(address_2) is False
 
 
+@pytest.mark.parametrize("amount_of_nodes", [1])
+@pytest.mark.skip(reason="hangs, incomplete")
+def test_send_message_invalid_address(comms_nodes):
+    client, address = comms_nodes[1].client, comms_nodes[1].address
+
+    # send message to unregistered peer
+    # FIXME: hangs
+    client.send_message("echo", generate_address())
+
+
 @pytest.mark.parametrize("amount_of_nodes", [2])
-def test_send_message_peer(comms_nodes):
+def test_send_message_unsubscribed(comms_nodes):
+    comms_node_1, comms_node_2 = comms_nodes[1], comms_nodes[2]
+    client_1, address_1 = comms_node_1.client, comms_node_1.address
+    client_2, address_2 = comms_node_2.client, comms_node_2.address
+
+    # node 2 must listen to its own topic
+    _, sub = client_2.subscribe_to(address_2)
+
+    with pytest.raises(_InactiveRpcError) as e:
+        client_1.send_message("unsubbed message", address_2)
+        assert "Not subscribed to" in e.details()
+
+
+@pytest.mark.parametrize("amount_of_nodes", [2])
+def test_send_message_peers(comms_nodes):
     comms_node_1, comms_node_2 = comms_nodes[1], comms_nodes[2]
     client_1, address_1 = comms_node_1.client, comms_node_1.address
     client_2, address_2 = comms_node_2.client, comms_node_2.address
