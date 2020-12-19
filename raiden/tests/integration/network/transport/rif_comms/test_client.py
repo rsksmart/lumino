@@ -205,7 +205,7 @@ def test_unsubscribe_peers(comms_nodes):
     client_1, address_1 = comms_node_1.client, comms_node_1.address
     client_2, address_2 = comms_node_2.client, comms_node_2.address
 
-    # subscribe then unsubscribe both nodes to each other
+    # subscribe then unsubscribe both nodes to and from each other
     client_1.subscribe_to(address_2)
     client_2.subscribe_to(address_1)
 
