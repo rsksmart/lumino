@@ -245,7 +245,7 @@ def test_unsubscribe_from_peers(comms_nodes):
     # unsubscribe both nodes from each other
     client_1.unsubscribe_from(address_2)
     assert client_1.is_subscribed_to(address_2) is False
-    assert client_2.is_subscribed_to(address_2) is True  # check operations are independent
+    assert client_2.is_subscribed_to(address_1) is True  # check operations are independent
     client_2.unsubscribe_from(address_1)
     assert client_2.is_subscribed_to(address_1) is False
     assert client_1.is_subscribed_to(address_2) is False  # check operations are independent
