@@ -43,9 +43,7 @@ class Process:
         Kill a RIF Comms node process with the given process ID (PID),
         """
         # FIXME: find a better way to stop the comms node process
-        # FIXME: without this sleep, exceptions will be raised by stopping multiple Process instances subsequently
         # terminate children and process group
-        time.sleep(5)
         pid = process.pid
         for child in psutil.Process(pid).children(recursive=True):
             child.kill()
