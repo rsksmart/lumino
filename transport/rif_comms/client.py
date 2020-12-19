@@ -34,6 +34,7 @@ class Client:
         Adds the client RSK address under the RIF Communications node peer ID.
         :return: notification stream
         """
+        # FIXME: communications should not need variable assignment
         return self.stub.ConnectToCommunicationsNode(self.rsk_address)
 
     def subscribe_to(self, rsk_address: Address) -> (str, Notification):
@@ -45,7 +46,7 @@ class Client:
         :return: peer id and notification stream for receiving messages
         """
         topic_id = None
-        # TODO: catch already subscribed and any error
+        # TODO: catch exceptions
         # TODO: add timeout
         topic = self.stub.CreateTopicWithRskAddress(
             RskAddress(address=to_checksum_address(rsk_address))

@@ -57,6 +57,18 @@ def test_subscribe_to_peers(comms_nodes):
     assert topic_id_2
 
 
+@pytest.mark.parametrize("amount_of_nodes", [2])
+def test_subscribe_to_repeated(comms_nodes):
+    comms_node_1, comms_node_2 = comms_nodes[1], comms_nodes[2]
+    client_1, address_1 = comms_node_1.client, comms_node_1.address
+    client_2, address_2 = comms_node_2.client, comms_node_2.address
+
+    topic_id_1, _ = client_1.subscribe_to(address_2)
+    topic_id_2, _ = client_1.subscribe_to(address_2)
+
+    assert topic_id_1 == topic_id_2
+
+
 @pytest.mark.parametrize("amount_of_nodes", [1])
 def test_is_subscribed_to_invalid(comms_nodes):
     client, address = comms_nodes[1].client, comms_nodes[1].address
@@ -230,11 +242,10 @@ def test_unsubscribe_from_peers(comms_nodes):
     client_1.subscribe_to(address_2)
     client_2.subscribe_to(address_1)
 
-    # check operations are independent
+    # unsubscribe both nodes from each other
     client_1.unsubscribe_from(address_2)
     assert client_1.is_subscribed_to(address_2) is False
-    assert client_2.is_subscribed_to(address_2) is True
-
+    assert client_2.is_subscribed_to(address_2) is True  # check operations are independent
     client_2.unsubscribe_from(address_1)
     assert client_2.is_subscribed_to(address_1) is False
-    assert client_1.is_subscribed_to(address_2) is False
+    assert client_1.is_subscribed_to(address_2) is False  # check operations are independent
