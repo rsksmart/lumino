@@ -231,6 +231,8 @@ def test_unsubscribe_from_self(comms_nodes):
     _, sub = client.subscribe_to(address)
     client.unsubscribe_from(address)
 
+    assert client.is_subscribed_to(address) is False
+
 
 @pytest.mark.parametrize("amount_of_nodes", [2])
 def test_unsubscribe_from_peers(comms_nodes):
