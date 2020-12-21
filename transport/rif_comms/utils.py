@@ -33,5 +33,5 @@ def notification_to_payload(notification_data: ChannelNewData) -> str:
 
 
 def get_sender_from_notification(notification_data: ChannelNewData) -> Address:
-    return to_canonical_address(notification_data.sender.address)
+    return to_canonical_address(notification_data.channelNewData.sender.address)
 
