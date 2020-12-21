@@ -590,7 +590,6 @@ def test_matrix_send_global(
     local_matrix_servers, retries_before_backoff, retry_interval, private_rooms, global_rooms, private_keys
 ):
     address = to_checksum_address(privatekey_to_address(private_keys[0]))
-    address = to_checksum_address(privatekey_to_address(private_keys[0]))
     transport = MatrixTransportNode(
         address=address,
         config={
