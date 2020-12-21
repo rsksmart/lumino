@@ -90,7 +90,6 @@ def mock_matrix(
     address = to_checksum_address(privatekey_to_address(private_keys[0]))
 
     transport = MatrixTransportNode(address, config)
-
     transport._raiden_service = MockRaidenService()
     transport.stop_event.clear()
     transport._address_mgr.add_userid_for_address(factories.HOP1, USERID1)
@@ -415,6 +414,7 @@ def test_matrix_message_retry(
     raiden_service = MockRaidenService(None)
 
     address = to_checksum_address(privatekey_to_address(private_keys[0]))
+
     transport = MatrixTransportNode(
         address=address,
         config={
@@ -495,40 +495,33 @@ def test_join_invalid_discovery(
     """
 
     address = to_checksum_address(privatekey_to_address(private_keys[0]))
+    transport = MatrixTransportNode(
+        address=address,
+        config={
+            "global_rooms": global_rooms,
+            "retries_before_backoff": retries_before_backoff,
+            "retry_interval": retry_interval,
+            "server": local_matrix_servers[0],
+            "server_name": local_matrix_servers[0].netloc,
+            "available_servers": ["http://invalid.server"],
+            "private_rooms": private_rooms,
+        }
+    )
+    transport._client.api.retry_timeout = 0
+    transport.send_message = MagicMock()
+    raiden_service = MockRaidenService(None)
 
-<< << << < HEAD
-transport = MatrixTransportNode(
-            == == == =
-transport = MatrixTransport(
-            >> >> >> > 666e4
-e309530c3d962402fe7cc5e784aa50ab679
-address = address,
-          config = {
-    "global_rooms": global_rooms,
-    "retries_before_backoff": retries_before_backoff,
-    "retry_interval": retry_interval,
-    "server": local_matrix_servers[0],
-    "server_name": local_matrix_servers[0].netloc,
-    "available_servers": ["http://invalid.server"],
-    "private_rooms": private_rooms,
-}
-)
-transport._client.api.retry_timeout = 0
-transport.send_message = MagicMock()
-raiden_service = MockRaidenService(None)
+    transport.start(raiden_service, raiden_service.message_handler, None)
+    transport._log = MagicMock()
+    discovery_room_name = make_room_alias(transport.network_id, "discovery")
+    assert isinstance(transport._global_rooms.get(discovery_room_name), Room)
 
-transport.start(raiden_service, raiden_service.message_handler, None)
-transport._log = MagicMock()
-discovery_room_name = make_room_alias(transport.network_id, "discovery")
-assert isinstance(transport._global_rooms.get(discovery_room_name), Room)
-
-transport.stop()
-transport.get() \
- \
-@ pytest.mark.parametrize("matrix_server_count", [2])
-@ pytest.mark.parametrize("number_of_transports", [3])
+    transport.stop()
+    transport.get()
 
 
+@pytest.mark.parametrize("matrix_server_count", [2])
+@pytest.mark.parametrize("number_of_transports", [3])
 def test_matrix_cross_server_with_load_balance(matrix_transports):
     transport0, transport1, transport2 = matrix_transports
     received_messages0 = set()
@@ -571,92 +564,73 @@ def test_matrix_discovery_room_offline_server(
     local_matrix_servers, retries_before_backoff, retry_interval, private_rooms, global_rooms, private_keys
 ):
     address = to_checksum_address(privatekey_to_address(private_keys[0]))
+    transport = MatrixTransportNode(
+        address=address,
+        config={
+            "global_rooms": global_rooms,
+            "retries_before_backoff": retries_before_backoff,
+            "retry_interval": retry_interval,
+            "server": local_matrix_servers[0],
+            "server_name": local_matrix_servers[0].netloc,
+            "available_servers": [local_matrix_servers[0], "https://localhost:1"],
+            "private_rooms": private_rooms,
+        }
+    )
+    transport.start(MockRaidenService(None), MessageHandler(set()), "")
+    gevent.sleep(0.2)
 
-<< << << < HEAD
-transport = MatrixTransportNode(
-            == == == =
-address = to_checksum_address(privatekey_to_address(private_keys[0]))
+    discovery_room_name = make_room_alias(transport.network_id, "discovery")
+    assert isinstance(transport._global_rooms.get(discovery_room_name), Room)
 
-transport = MatrixTransport(
-            >> >> >> > 666e4
-e309530c3d962402fe7cc5e784aa50ab679
-address = address,
-          config = {
-    "global_rooms": global_rooms,
-    "retries_before_backoff": retries_before_backoff,
-    "retry_interval": retry_interval,
-    "server": local_matrix_servers[0],
-    "server_name": local_matrix_servers[0].netloc,
-    "available_servers": [local_matrix_servers[0], "https://localhost:1"],
-    "private_rooms": private_rooms,
-}
-)
-transport.start(MockRaidenService(None), MessageHandler(set()), "")
-gevent.sleep(0.2)
-
-discovery_room_name = make_room_alias(transport.network_id, "discovery")
-assert isinstance(transport._global_rooms.get(discovery_room_name), Room)
-
-transport.stop()
-transport.get()
+    transport.stop()
+    transport.get()
 
 
 def test_matrix_send_global(
     local_matrix_servers, retries_before_backoff, retry_interval, private_rooms, global_rooms, private_keys
 ):
-    << << << < HEAD
+    address = to_checksum_address(privatekey_to_address(private_keys[0]))
+    address = to_checksum_address(privatekey_to_address(private_keys[0]))
+    transport = MatrixTransportNode(
+        address=address,
+        config={
+            "global_rooms": global_rooms + [MONITORING_BROADCASTING_ROOM],
+            "retries_before_backoff": retries_before_backoff,
+            "retry_interval": retry_interval,
+            "server": local_matrix_servers[0],
+            "server_name": local_matrix_servers[0].netloc,
+            "available_servers": [local_matrix_servers[0]],
+            "private_rooms": private_rooms,
+        }
+    )
+    transport.start(MockRaidenService(None), MessageHandler(set()), "")
+    gevent.idle()
+
+    ms_room_name = make_room_alias(transport.network_id, MONITORING_BROADCASTING_ROOM)
+    ms_room = transport._global_rooms.get(ms_room_name)
+    assert isinstance(ms_room, Room)
+
+    ms_room.send_text = MagicMock(spec=ms_room.send_text)
+
+    for i in range(5):
+        message = Processed(message_identifier=i)
+        transport._raiden_service.sign(message)
+        transport.send_global(MONITORING_BROADCASTING_ROOM, message)
+    transport._spawn(transport._global_send_worker)
+
+    gevent.idle()
+
+    assert ms_room.send_text.call_count >= 1
+    # messages could have been bundled
+    call_args_str = " ".join(str(arg) for arg in ms_room.send_text.call_args_list)
+    for i in range(5):
+        assert f'"message_identifier": {i}' in call_args_str
+
+    transport.stop()
+    transport.get()
 
 
-address = to_checksum_address(privatekey_to_address(private_keys[0]))
-
-transport = MatrixTransportNode(
-            == == == =
-
-address = to_checksum_address(privatekey_to_address(private_keys[0]))
-
-transport = MatrixTransport(
-            >> >> >> > 666e4
-e309530c3d962402fe7cc5e784aa50ab679
-address = address,
-          config = {
-    "global_rooms": global_rooms + [MONITORING_BROADCASTING_ROOM],
-    "retries_before_backoff": retries_before_backoff,
-    "retry_interval": retry_interval,
-    "server": local_matrix_servers[0],
-    "server_name": local_matrix_servers[0].netloc,
-    "available_servers": [local_matrix_servers[0]],
-    "private_rooms": private_rooms,
-}
-)
-transport.start(MockRaidenService(None), MessageHandler(set()), "")
-gevent.idle()
-
-ms_room_name = make_room_alias(transport.network_id, MONITORING_BROADCASTING_ROOM)
-ms_room = transport._global_rooms.get(ms_room_name)
-assert isinstance(ms_room, Room)
-
-ms_room.send_text = MagicMock(spec=ms_room.send_text)
-
-for i in range(5):
-    message = Processed(message_identifier=i)
-transport._raiden_service.sign(message)
-transport.send_global(MONITORING_BROADCASTING_ROOM, message)
-transport._spawn(transport._global_send_worker)
-
-gevent.idle()
-
-assert ms_room.send_text.call_count >= 1
-# messages could have been bundled
-call_args_str = " ".join(str(arg) for arg in ms_room.send_text.call_args_list)
-for i in range(5):
-    assert f'"message_identifier": {i}' in call_args_str
-
-transport.stop()
-transport.get() \
- \
-@ pytest.mark.skip
-
-
+@pytest.mark.skip
 def test_monitoring_global_messages(
     local_matrix_servers,
     private_rooms,
