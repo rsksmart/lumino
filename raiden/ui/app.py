@@ -7,8 +7,12 @@ from urllib.parse import urlparse
 import click
 import filelock
 import structlog
-from definitions import ROOT_DIR
 from eth_utils import encode_hex, to_canonical_address, to_normalized_address
+from raiden_contracts.constants import ID_TO_NETWORKNAME
+from raiden_contracts.contract_manager import ContractManager
+from web3 import HTTPProvider, Web3
+
+from definitions import ROOT_DIR
 from raiden.accounts import AccountManager
 from raiden.constants import (
     RAIDEN_DB_VERSION,
@@ -43,10 +47,7 @@ from raiden.ui.startup import (
 )
 from raiden.utils import BlockNumber, pex, split_endpoint
 from raiden.utils.typing import Address, Optional, PrivateKey, Tuple
-from raiden_contracts.constants import ID_TO_NETWORKNAME
-from raiden_contracts.contract_manager import ContractManager
 from transport.factory import Factory
-from web3 import HTTPProvider, Web3
 
 log = structlog.get_logger(__name__)
 

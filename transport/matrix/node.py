@@ -11,6 +11,7 @@ from gevent.event import Event
 from gevent.queue import JoinableQueue
 from matrix_client.errors import MatrixRequestError
 from matrix_client.user import User
+
 from raiden.constants import DISCOVERY_DEFAULT_ROOM
 from raiden.exceptions import InvalidAddress, UnknownAddress, UnknownTokenAddress
 from raiden.message_handler import MessageHandler
@@ -44,7 +45,6 @@ class MatrixNode(TransportNode):
 
     def __init__(self, address: Address, config: dict):
         TransportNode.__init__(self, address)
-
         self._config = config
         self._raiden_service: Optional[RaidenService] = None
 
@@ -606,6 +606,9 @@ class MatrixNode(TransportNode):
 
         return True
 
+    def get_address(self):
+        return self.address
+
     def _receive_delivered(self, delivered: Delivered):
         self.log.info(
             "Delivered message received", sender=pex(delivered.sender), message=delivered
@@ -632,7 +635,6 @@ class MatrixNode(TransportNode):
             #       See: https://matrix.org/docs/spec/client_server/r0.3.0.html#id57
             delivered_message = Delivered(delivered_message_identifier=message.message_identifier)
             self._raiden_service.sign(delivered_message)
-
             queue_identifier = QueueIdentifier(
                 recipient=message.sender, channel_identifier=CHANNEL_IDENTIFIER_GLOBAL_QUEUE
             )
@@ -672,10 +674,9 @@ class MatrixNode(TransportNode):
                 "No room for recipient", recipient=to_normalized_address(recipient)
             )
             return
-        self.log.debug(
+        self.log.info(
             "Send raw", recipient=pex(recipient), room=room, payload=payload.replace("\n", "\\n")
         )
-
         room.send_text(payload)
 
     def _get_room_for_address(self, address: Address, allow_missing_peers=False) -> Optional[Room]:
@@ -701,6 +702,7 @@ class MatrixNode(TransportNode):
         address_pair = sorted(
             [to_normalized_address(address) for address in [address, self._raiden_service.address]]
         )
+        print("making room alias")
         room_name = make_room_alias(self.network_id, *address_pair)
 
         # no room with expected name => create one and invite peer
@@ -1231,10 +1233,9 @@ class MatrixLightClientNode(MatrixNode):
                 "No room for recipient", recipient=to_normalized_address(recipient)
             )
             return
-        self.log.debug(
+        self.log.info(
             "Send LC raw", recipient=pex(recipient), room=room, payload=payload.replace("\n", "\\n")
         )
-
         room.send_text(payload)
 
     def _get_room_for_address(self, address: Address, allow_missing_peers=False) -> Optional[Room]:
@@ -1478,6 +1479,7 @@ class MatrixLightClientNode(MatrixNode):
                 self.log.warning("Received invalid message", message=message)
             self.log.info(f"<<<----------------- Receiving Message "
                           f"from {to_checksum_address(message.sender)} to {to_checksum_address(self.address)}")
+
             self.log.info(f"<<<----------------- Message Content {str(message)}")
             if isinstance(message, Delivered):
                 self._receive_delivered_to_lc(message)
@@ -1486,7 +1488,6 @@ class MatrixLightClientNode(MatrixNode):
             else:
                 assert isinstance(message, SignedRetrieableMessage)
                 self._receive_message_to_lc(message)
-
         return True
 
     def _receive_delivered_to_lc(self, delivered: Delivered):
@@ -1510,7 +1511,6 @@ class MatrixLightClientNode(MatrixNode):
             # Just manage the message, the Delivered response will be initiated by the LightClient invoking
             # send_for_light_client_with_retry
             self._raiden_service.on_message(message, self.address, True)
-
         except (InvalidAddress, UnknownAddress, UnknownTokenAddress):
             self.log.warning("Exception while processing message", exc_info=True)
             return

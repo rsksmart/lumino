@@ -1,16 +1,17 @@
 import hashlib
 import random
+import string
 from datetime import datetime, date
 from http import HTTPStatus
 
 import dateutil.parser
 import gevent
-import raiden.blockchain.events as blockchain_events
-import string
 import structlog
 from dateutil.relativedelta import relativedelta
 from eth_utils import is_binary_address, to_checksum_address, to_canonical_address, to_normalized_address, encode_hex
 from gevent import Greenlet
+
+import raiden.blockchain.events as blockchain_events
 from raiden import waiting, routing
 from raiden.api.validations.api_error_builder import ApiErrorBuilder
 from raiden.api.validations.channel_validator import ChannelValidator
