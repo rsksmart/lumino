@@ -21,9 +21,7 @@ DEFAULT_MATRIX_KNOWN_SERVERS = {
         "https://raw.githubusercontent.com/raiden-network/raiden-transport"
         "/master/known_servers.main.yaml"
     ),
-    Environment.DEVELOPMENT: (
-        "https://raw.githubusercontent.com/marcosmartinez7/matrix-known-servers/master/known_servers.test.yaml"
-    ),
+    Environment.DEVELOPMENT: ["http://64.225.11.151"],
 }
 
 DEFAULT_REVEAL_TIMEOUT = 50
