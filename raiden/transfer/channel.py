@@ -565,8 +565,6 @@ def valid_lockedtransfer_check(
         channel_state=channel_state,
         sender_state=sender_state,
     )
-    print("is balance proof usable")
-    print(invalid_balance_proof_msg)
 
     result: MerkletreeOrError = (False, None, None, None)
 

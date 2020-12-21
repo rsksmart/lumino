@@ -606,9 +606,6 @@ class MatrixNode(TransportNode):
 
         return True
 
-    def get_address(self):
-        return self.address
-
     def _receive_delivered(self, delivered: Delivered):
         self.log.info(
             "Delivered message received", sender=pex(delivered.sender), message=delivered
@@ -702,7 +699,6 @@ class MatrixNode(TransportNode):
         address_pair = sorted(
             [to_normalized_address(address) for address in [address, self._raiden_service.address]]
         )
-        print("making room alias")
         room_name = make_room_alias(self.network_id, *address_pair)
 
         # no room with expected name => create one and invite peer
