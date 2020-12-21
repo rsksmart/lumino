@@ -21,3 +21,4 @@ bump2version==0.5.8
 # Test support
 matrix-synapse==1.5.1
 json5
+pytest-repeat

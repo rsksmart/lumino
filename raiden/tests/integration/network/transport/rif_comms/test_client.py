@@ -1,4 +1,5 @@
 import pytest
+from grpc._channel import _InactiveRpcError
 
 from raiden.tests.integration.network.transport.rif_comms.node import Node as CommsNode, Config as CommsConfig
 from raiden.tests.integration.network.transport.utils import generate_address
@@ -23,27 +24,69 @@ def comms_nodes(amount_of_nodes) -> {int, CommsNode}:
 
 
 @pytest.mark.parametrize("amount_of_nodes", [1])
-def test_locate_own_peer_id(comms_nodes):
-    comms_node = comms_nodes[1]
+def test_subscribe_to_invalid(comms_nodes):
+    client = comms_nodes[1].client
+    # subscribe to unregistered address
+    topic_id, _ = client.subscribe_to(generate_address())
 
-    # attempt to locate self
-    assert comms_node.client._get_peer_id(comms_node.address) is not ""
+    # FIXME: this should probably throw an exception rather than an empty result
+    assert topic_id is ""
 
 
-# FIXME: causes ERR_NO_PEERS_IN_ROUTING_TABLE in comms node although it passes
 @pytest.mark.parametrize("amount_of_nodes", [1])
-def test_locate_unregistered_peer_id(comms_nodes):
-    comms_node = comms_nodes[1]
+def test_subscribe_to_self(comms_nodes):
+    client, address = comms_nodes[1].client, comms_nodes[1].address
 
-    # attempt to locate an unregistered peer
-    assert comms_node.client._get_peer_id(generate_address()) is ""
+    topic_id, _ = client.subscribe_to(address)
+
+    assert topic_id
 
 
-# FIXME: comms node prints strange ServerUnaryCall message
+@pytest.mark.parametrize("amount_of_nodes", [2])
+def test_subscribe_to_peers(comms_nodes):
+    comms_node_1, comms_node_2 = comms_nodes[1], comms_nodes[2]
+    client_1, address_1 = comms_node_1.client, comms_node_1.address
+    client_2, address_2 = comms_node_2.client, comms_node_2.address
+
+    topic_id_1, _ = client_1.subscribe_to(address_2)
+
+    assert topic_id_1
+
+    topic_id_2, _ = client_2.subscribe_to(address_1)
+
+    assert topic_id_2
+
+
+@pytest.mark.parametrize("amount_of_nodes", [2])
+def test_subscribe_to_repeated(comms_nodes):
+    comms_node_1, comms_node_2 = comms_nodes[1], comms_nodes[2]
+    client_1, address_1 = comms_node_1.client, comms_node_1.address
+    client_2, address_2 = comms_node_2.client, comms_node_2.address
+
+    topic_id_1, _ = client_1.subscribe_to(address_2)
+    topic_id_2, _ = client_1.subscribe_to(address_2)
+
+    assert topic_id_1 == topic_id_2
+
+
 @pytest.mark.parametrize("amount_of_nodes", [1])
-def test_has_subscriber_self(comms_nodes):
+def test_is_subscribed_to_invalid(comms_nodes):
+    client, address = comms_nodes[1].client, comms_nodes[1].address
+
+    # check subscription to non-subscribed address
+    assert client.is_subscribed_to(address) is False
+
+    # check subscription to unregistered address
+    assert client.is_subscribed_to(generate_address()) is False
+
+
+@pytest.mark.parametrize("amount_of_nodes", [1])
+def test_is_subscribed_to_self(comms_nodes):
     comms_node = comms_nodes[1]
     client, address = comms_node.client, comms_node.address
+
+    # no subscription should be present
+    assert client.is_subscribed_to(address) is False
 
     client.subscribe_to(address)
 
@@ -52,55 +95,93 @@ def test_has_subscriber_self(comms_nodes):
 
 
 @pytest.mark.parametrize("amount_of_nodes", [2])
-def test_has_subscriber(comms_nodes):
+def test_is_subscribed_to_peers(comms_nodes):
     comms_node_1, comms_node_2 = comms_nodes[1], comms_nodes[2]
     client_1, address_1 = comms_node_1.client, comms_node_1.address
     client_2, address_2 = comms_node_2.client, comms_node_2.address
 
-    # FIXME: nodes shouldn't have to subscribe to themselves for this to work
-    client_1.subscribe_to(address_1)
-    client_2.subscribe_to(address_2)
+    # no subscriptions should be present
+    assert client_1.is_subscribed_to(address_1) is False
+    assert client_1.is_subscribed_to(address_2) is False
+    assert client_2.is_subscribed_to(address_1) is False
+    assert client_2.is_subscribed_to(address_2) is False
 
     # subscribe from node 1 to 2
     client_1.subscribe_to(address_2)
 
     # check subscriptions
-    assert client_1.is_subscribed_to(address_1) is True
+    assert client_1.is_subscribed_to(address_1) is False
     assert client_1.is_subscribed_to(address_2) is True
     assert client_2.is_subscribed_to(address_1) is False
-    assert client_2.is_subscribed_to(address_2) is True
+    assert client_2.is_subscribed_to(address_2) is False
 
-
-@pytest.mark.parametrize("amount_of_nodes", [2])
-def test_two_clients_cross_subscription(comms_nodes):
-    comms_node_1, comms_node_2 = comms_nodes[1], comms_nodes[2]
-    client_1, address_1 = comms_node_1.client, comms_node_1.address
-    client_2, address_2 = comms_node_2.client, comms_node_2.address
-
-    # FIXME: nodes shouldn't have to subscribe to themselves for this to work
-    client_1.subscribe_to(address_1)
-    client_2.subscribe_to(address_2)
-
-    # subscribe both nodes to each other
-    client_1.subscribe_to(address_2)
+    # now from node 2 to 1 and check again
     client_2.subscribe_to(address_1)
 
-    # check subscriptions
-    assert client_1.is_subscribed_to(address_1) is True
+    assert client_1.is_subscribed_to(address_1) is False
     assert client_1.is_subscribed_to(address_2) is True
     assert client_2.is_subscribed_to(address_1) is True
-    assert client_2.is_subscribed_to(address_2) is True
+    assert client_2.is_subscribed_to(address_2) is False
+
+
+@pytest.mark.parametrize("amount_of_nodes", [1])
+@pytest.mark.skip(reason="hangs, incomplete")
+def test_send_message_invalid(comms_nodes):
+    client, address = comms_nodes[1].client, comms_nodes[1].address
+
+    # send message to unregistered peer
+    # FIXME: hangs
+    client.send_message("echo", generate_address())
 
 
 @pytest.mark.parametrize("amount_of_nodes", [2])
-def test_two_clients_cross_messaging_same_topic(comms_nodes):
+def test_send_message_subscription(comms_nodes):
     comms_node_1, comms_node_2 = comms_nodes[1], comms_nodes[2]
     client_1, address_1 = comms_node_1.client, comms_node_1.address
     client_2, address_2 = comms_node_2.client, comms_node_2.address
 
-    # FIXME: nodes shouldn't have to subscribe to themselves for this to work
-    client_1.subscribe_to(address_1)
-    client_2.subscribe_to(address_2)
+    # node 2 must listen to its own topic
+    _, sub = client_2.subscribe_to(address_2)
+
+    # send message without subscription
+    payload = "marco"
+    with pytest.raises(_InactiveRpcError) as e:
+        client_1.send_message(payload, address_2)
+
+    assert "not subscribed to" in str.lower(e.value.details())
+
+    # now subscribe from node 1 to 2
+    client_1.subscribe_to(address_2)
+
+    # message should be successfully sent now
+    payload = "polo"
+    client_1.send_message(payload, address_2)
+    for resp in sub:
+        received_message = notification_to_payload(resp)
+        assert received_message == payload
+        break  # only 1 message is expected
+
+
+@pytest.mark.parametrize("amount_of_nodes", [1])
+def test_send_message_self(comms_nodes):
+    client, address = comms_nodes[1].client, comms_nodes[1].address
+
+    # subscribe to self, send and listen
+    _, sub = client.subscribe_to(address)
+
+    payload = "echo"
+    client.send_message(payload, address)
+    for resp in sub:
+        received_message = notification_to_payload(resp)
+        assert received_message == payload
+        break  # only 1 message is expected
+
+
+@pytest.mark.parametrize("amount_of_nodes", [2])
+def test_send_message_peers(comms_nodes):
+    comms_node_1, comms_node_2 = comms_nodes[1], comms_nodes[2]
+    client_1, address_1 = comms_node_1.client, comms_node_1.address
+    client_2, address_2 = comms_node_2.client, comms_node_2.address
 
     # subscribe both nodes to each other
     _, sub_1_to_2 = client_1.subscribe_to(address_2)
@@ -109,6 +190,7 @@ def test_two_clients_cross_messaging_same_topic(comms_nodes):
     payload_1 = "hello from 1"
     payload_2 = "hello from 2"
 
+    # send messages and listen
     client_1.send_message(payload_1, address_2)
     client_2.send_message(payload_2, address_1)
 
@@ -121,3 +203,51 @@ def test_two_clients_cross_messaging_same_topic(comms_nodes):
         received_message = notification_to_payload(resp)
         assert received_message == payload_2
         break  # only 1 message is expected
+
+
+@pytest.mark.parametrize("amount_of_nodes", [1])
+@pytest.mark.xfail(reason="incorrect exception from comms")
+def test_unsubscribe_from_invalid(comms_nodes):
+    client, address = comms_nodes[1].client, comms_nodes[1].address
+
+    # unsubscribe from non-subscribed address
+    with pytest.raises(_InactiveRpcError) as e:
+        client.unsubscribe_from(address)
+
+    assert "not subscribed to" in str.lower(e.value.details())
+
+    # unsubscribe from unregistered address
+    with pytest.raises(_InactiveRpcError) as e:
+        client.unsubscribe_from(generate_address())
+
+    assert "not subscribed to" in str.lower(e.value.details())
+
+
+@pytest.mark.parametrize("amount_of_nodes", [1])
+def test_unsubscribe_from_self(comms_nodes):
+    client, address = comms_nodes[1].client, comms_nodes[1].address
+
+    # subscribe to self, then unsubscribe from self
+    client.subscribe_to(address)
+    client.unsubscribe_from(address)
+
+    assert client.is_subscribed_to(address) is False
+
+
+@pytest.mark.parametrize("amount_of_nodes", [2])
+def test_unsubscribe_from_peers(comms_nodes):
+    comms_node_1, comms_node_2 = comms_nodes[1], comms_nodes[2]
+    client_1, address_1 = comms_node_1.client, comms_node_1.address
+    client_2, address_2 = comms_node_2.client, comms_node_2.address
+
+    # subscribe both nodes to each other
+    client_1.subscribe_to(address_2)
+    client_2.subscribe_to(address_1)
+
+    # unsubscribe both nodes from each other
+    client_1.unsubscribe_from(address_2)
+    assert client_1.is_subscribed_to(address_2) is False
+    assert client_2.is_subscribed_to(address_1) is True  # check operations are independent
+    client_2.unsubscribe_from(address_1)
+    assert client_2.is_subscribed_to(address_1) is False
+    assert client_1.is_subscribed_to(address_2) is False  # check operations are independent
