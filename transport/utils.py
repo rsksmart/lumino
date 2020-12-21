@@ -270,6 +270,13 @@ def validate_and_parse_messages(data, peer_address) -> List[Message]:
                     peer_address=pex(peer_address),
                 )
                 continue
-            # TODO message must be signed by sender
+            if message.sender != peer_address:
+                log.warning(
+                    "ToDevice Message not signed by sender!",
+                    message=message,
+                    signer=message.sender,
+                    peer_address=pex(peer_address),
+                )
+                continue
             messages.append(message)
     return messages
