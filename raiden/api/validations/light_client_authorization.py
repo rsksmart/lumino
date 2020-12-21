@@ -5,7 +5,6 @@ from flask import request
 
 from raiden.api.validations.api_error_builder import ApiErrorBuilder
 from raiden.lightclient.handlers.light_client_service import LightClientService
-from raiden.storage.wal import WriteAheadLog
 
 log = structlog.get_logger(__name__)
 
@@ -18,24 +17,18 @@ def requires_api_key(func):
     """
 
     def inner(*args, **kwargs):
-        key_error = get_key_error(args[0].raiden_api.raiden.wal)
-        if key_error:
-            return key_error
+        api_key = request.headers.get("x-api-key")
+        if not api_key:
+            return ApiErrorBuilder.build_and_log_error(
+                errors="Missing api_key auth header", status_code=HTTPStatus.BAD_REQUEST, log=log
+            )
+        light_client = LightClientService.get_by_api_key(api_key=api_key, wal=args[0].raiden_api.raiden.wal)
+        if not light_client:
+            return ApiErrorBuilder.build_and_log_error(
+                errors="There is no light client associated with the api key provided",
+                status_code=HTTPStatus.FORBIDDEN,
+                log=log
+            )
         return func(*args, **kwargs)
 
     return inner
-
-
-def get_key_error(wal: WriteAheadLog):
-    api_key = request.headers.get("x-api-key")
-    if not api_key:
-        return ApiErrorBuilder.build_and_log_error(
-            errors="Missing api_key auth header", status_code=HTTPStatus.BAD_REQUEST, log=log
-        )
-    light_client = LightClientService.get_by_api_key(api_key=api_key, wal=wal)
-    if not light_client:
-        return ApiErrorBuilder.build_and_log_error(
-            errors="There is no light client associated with the api key provided",
-            status_code=HTTPStatus.FORBIDDEN,
-            log=log
-        )
