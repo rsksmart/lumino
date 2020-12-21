@@ -228,7 +228,7 @@ def test_unsubscribe_from_self(comms_nodes):
     client, address = comms_nodes[1].client, comms_nodes[1].address
 
     # subscribe to self, then unsubscribe from self
-    _, sub = client.subscribe_to(address)
+    client.subscribe_to(address)
     client.unsubscribe_from(address)
 
     assert client.is_subscribed_to(address) is False
