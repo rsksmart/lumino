@@ -88,8 +88,7 @@ class Token:
                 address=self.node_address,
                 transaction_name="approve",
                 transaction_executed=transaction_executed,
-                required_gas=GAS_REQUIRED_FOR_APPROVE,
-                block_identifier=block,
+                required_gas=GAS_REQUIRED_FOR_APPROVE
             )
 
             msg = self._check_why_approved_failed(allowance, block)

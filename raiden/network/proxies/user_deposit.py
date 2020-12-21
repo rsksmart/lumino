@@ -118,8 +118,7 @@ class UserDeposit:
                     transaction_name="deposit",
                     address=self.node_address,
                     transaction_executed=transaction_executed,
-                    required_gas=GAS_REQUIRED_FOR_UDC_DEPOSIT,
-                    block_identifier=block,
+                    required_gas=GAS_REQUIRED_FOR_UDC_DEPOSIT
                 )
 
                 msg = self._check_why_deposit_failed(

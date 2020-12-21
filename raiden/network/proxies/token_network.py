@@ -209,8 +209,7 @@ class TokenNetwork:
             transaction_name="openChannel",
             address=creator,
             transaction_executed=False,
-            required_gas=GAS_REQUIRED_FOR_OPEN_CHANNEL,
-            block_identifier=self.client.get_checking_block(),
+            required_gas=GAS_REQUIRED_FOR_OPEN_CHANNEL
         )
 
     def _new_channel_postconditions(self, creator: Address, partner: Address, block: BlockSpecification):
@@ -246,8 +245,7 @@ class TokenNetwork:
                     transaction_name="openChannel",
                     address=creator,
                     transaction_executed=False,
-                    required_gas=GAS_REQUIRED_FOR_OPEN_CHANNEL,
-                    block_identifier=self.client.get_checking_block(),
+                    required_gas=GAS_REQUIRED_FOR_OPEN_CHANNEL
                 )
                 log.warning("new_netting_channel failed: transaction malformed", ex=e, **log_details)
                 new_open_channel_transaction.set_exception(e)
@@ -303,8 +301,7 @@ class TokenNetwork:
                 transaction_name="openChannel",
                 address=self.node_address,
                 transaction_executed=False,
-                required_gas=GAS_REQUIRED_FOR_OPEN_CHANNEL,
-                block_identifier=checking_block,
+                required_gas=GAS_REQUIRED_FOR_OPEN_CHANNEL
             )
             self._new_channel_postconditions(creator=self.node_address, partner=partner, block=checking_block)
 
@@ -693,8 +690,7 @@ class TokenNetwork:
             transaction_name="setTotalDeposit",
             address=creator,
             transaction_executed=False,
-            required_gas=GAS_REQUIRED_FOR_SET_TOTAL_DEPOSIT,
-            block_identifier=block_identifier,
+            required_gas=GAS_REQUIRED_FOR_SET_TOTAL_DEPOSIT
         )
 
     def _check_deposit_failure_reasons(
@@ -713,8 +709,7 @@ class TokenNetwork:
             transaction_name="setTotalDeposit",
             address=creator,
             transaction_executed=transaction_executed,
-            required_gas=GAS_REQUIRED_FOR_SET_TOTAL_DEPOSIT,
-            block_identifier=block_identifier,
+            required_gas=GAS_REQUIRED_FOR_SET_TOTAL_DEPOSIT
         )
         error_type, msg = self._check_why_deposit_failed(
             channel_identifier=channel_identifier,
@@ -1158,8 +1153,7 @@ class TokenNetwork:
                 transaction_name="closeChannel",
                 address=closing_participant,
                 transaction_executed=False,
-                required_gas=GAS_REQUIRED_FOR_CLOSE_CHANNEL,
-                block_identifier=checking_block,
+                required_gas=GAS_REQUIRED_FOR_CLOSE_CHANNEL
             )
 
             gas_limit = self.proxy.estimate_gas(
@@ -1228,8 +1222,7 @@ class TokenNetwork:
                     transaction_name="closeChannel",
                     address=self.node_address,
                     transaction_executed=True,
-                    required_gas=GAS_REQUIRED_FOR_CLOSE_CHANNEL,
-                    block_identifier=failed_at_blocknumber,
+                    required_gas=GAS_REQUIRED_FOR_CLOSE_CHANNEL
                 )
 
                 detail = self._detail_channel(
@@ -1429,8 +1422,7 @@ class TokenNetwork:
                     transaction_name="closeChannel",
                     address=self.node_address,
                     transaction_executed=True,
-                    required_gas=GAS_REQUIRED_FOR_CLOSE_CHANNEL,
-                    block_identifier=failed_at_blocknumber,
+                    required_gas=GAS_REQUIRED_FOR_CLOSE_CHANNEL
                 )
 
                 detail = self._detail_channel(
@@ -1723,8 +1715,7 @@ class TokenNetwork:
                     transaction_name="updateNonClosingBalanceProof",
                     address=self.node_address,
                     transaction_executed=False,
-                    required_gas=GAS_REQUIRED_FOR_UPDATE_BALANCE_PROOF,
-                    block_identifier=failed_at_blocknumber,
+                    required_gas=GAS_REQUIRED_FOR_UPDATE_BALANCE_PROOF
                 )
 
                 detail = self._detail_channel(
@@ -2038,8 +2029,7 @@ class TokenNetwork:
                 transaction_name="updateNonClosingBalanceProof",
                 address=self.node_address,
                 transaction_executed=False,
-                required_gas=GAS_REQUIRED_FOR_UPDATE_BALANCE_PROOF,
-                block_identifier=failed_at_blocknumber,
+                required_gas=GAS_REQUIRED_FOR_UPDATE_BALANCE_PROOF
             )
 
             detail = self._detail_channel(
@@ -2145,8 +2135,7 @@ class TokenNetwork:
                 transaction_name="unlock",
                 address=self.node_address,
                 transaction_executed=transaction_executed,
-                required_gas=UNLOCK_TX_GAS_LIMIT,
-                block_identifier=block,
+                required_gas=UNLOCK_TX_GAS_LIMIT
             )
             channel_settled = self.channel_is_settled(
                 participant1=participant,
@@ -2182,8 +2171,7 @@ class TokenNetwork:
             transaction_name="settleChannel",
             address=creator,
             transaction_executed=False,
-            required_gas=GAS_REQUIRED_FOR_SETTLE_CHANNEL,
-            block_identifier=block_identifier,
+            required_gas=GAS_REQUIRED_FOR_SETTLE_CHANNEL
         )
 
     def settle(
@@ -2357,8 +2345,7 @@ class TokenNetwork:
             transaction_name="settleChannel",
             address=creator,
             transaction_executed=transaction_error and transaction_error["blockNumber"] is not None,
-            required_gas=GAS_REQUIRED_FOR_SETTLE_CHANNEL,
-            block_identifier=block,
+            required_gas=GAS_REQUIRED_FOR_SETTLE_CHANNEL
         )
         msg = self._check_channel_state_after_settle(
             participant1=creator,

@@ -18,6 +18,7 @@ from hexbytes import HexBytes
 
 from raiden.api.validations.light_client_authorization import requires_api_key
 from raiden.api.validations.light_client_balance import requires_lc_balance
+from raiden.api.validations.light_client_safe_operation import lc_safe_operation
 from raiden.lightclient.handlers.light_client_message_handler import LightClientMessageHandler
 from raiden_webui import RAIDEN_WEBUI_PATH
 
@@ -717,6 +718,7 @@ class RestAPI:
         )
 
     @requires_lc_balance
+    @lc_safe_operation
     def open_light(
         self,
         registry_address: typing.PaymentNetworkID,
@@ -1673,6 +1675,8 @@ class RestAPI:
             return api_error(errors=str(e), status_code=HTTPStatus.PAYMENT_REQUIRED)
         return None
 
+    @requires_lc_balance
+    @lc_safe_operation
     def settlement_light(self,
                          registry_address: typing.Address,
                          internal_msg_identifier: int,
@@ -1752,6 +1756,7 @@ class RestAPI:
             return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.BAD_REQUEST, log=log)
 
     @requires_lc_balance
+    @lc_safe_operation
     def _deposit_light(
         self,
         registry_address: typing.PaymentNetworkID,
@@ -1849,6 +1854,7 @@ class RestAPI:
         return api_response(result=result.data)
 
     @requires_lc_balance
+    @lc_safe_operation
     def _close_light(
         self,
         registry_address: typing.PaymentNetworkID,
