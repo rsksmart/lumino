@@ -23,7 +23,7 @@ def requires_lc_balance(func):
         web3 = raiden_api.raiden.default_registry.client.web3
         current_lc_balance = web3.eth.getBalance(light_client.address)
         if current_lc_balance > 0:
-            return func(*args, **kwargs)
+            return func(rest_api, *args, **kwargs)
         return ApiErrorBuilder.build_and_log_error(
             errors="Insufficient Funds",
             status_code=HTTPStatus.PAYMENT_REQUIRED,

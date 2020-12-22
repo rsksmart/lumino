@@ -30,6 +30,6 @@ def requires_api_key(func):
                 status_code=HTTPStatus.FORBIDDEN,
                 log=log
             )
-        return func(*args, **kwargs)
+        return func(rest_api, *args, **kwargs)
 
     return inner
