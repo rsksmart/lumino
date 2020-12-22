@@ -1,8 +1,8 @@
 import json
 
+from eth_typing import Address
 from eth_utils import to_canonical_address
 
-from raiden.utils import Address
 from transport.rif_comms.proto.api_pb2 import ChannelNewData
 
 
@@ -33,5 +33,14 @@ def notification_to_payload(notification_data: ChannelNewData) -> str:
 
 
 def get_sender_from_notification(notification_data: ChannelNewData) -> Address:
-    return to_canonical_address(notification_data.channelNewData.sender.address)
+    """
+    Returns the sender from a notification received through a RIF Comms node. The sender represents the Lumino node
+    that sends the message.
+    @param notification_data notification data received from the subscription stream
+    @returns the sender address
+    """
+    try:
+        return to_canonical_address(notification_data.channelNewData.sender.address)
+    except AttributeError:
+        return Address(b"")
 
