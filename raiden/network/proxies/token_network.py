@@ -1216,7 +1216,6 @@ class TokenNetwork:
                 # therefore every call using this block has to handle pruned data.
                 failed_at = self.proxy.jsonrpc_client.get_block("latest")
                 failed_at_blockhash = encode_hex(failed_at["hash"])
-                failed_at_blocknumber = failed_at["number"]
 
                 self.proxy.jsonrpc_client.check_for_insufficient_eth(
                     transaction_name="closeChannel",
@@ -1416,7 +1415,6 @@ class TokenNetwork:
                 # therefore every call using this block has to handle pruned data.
                 failed_at = self.proxy.jsonrpc_client.get_block("latest")
                 failed_at_blockhash = encode_hex(failed_at["hash"])
-                failed_at_blocknumber = failed_at["number"]
 
                 self.proxy.jsonrpc_client.check_for_insufficient_eth(
                     transaction_name="closeChannel",
