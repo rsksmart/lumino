@@ -4,6 +4,7 @@ import random
 
 from eth_utils import encode_hex
 
+from raiden.billing.invoices.handlers.invoice_handler import handle_received_invoice
 from raiden.constants import (
     EMPTY_HASH_KECCAK,
     EMPTY_MERKLE_ROOT,
@@ -116,8 +117,6 @@ from raiden.utils.typing import (
     Tuple,
     Union,
     cast)
-
-from raiden.billing.invoices.handlers.invoice_handler import handle_received_invoice
 
 # This should be changed to `Union[str, MerkleTreeState]`
 MerkletreeOrError = Tuple[bool, Optional[str], Optional[MerkleTreeState]]
@@ -1653,7 +1652,8 @@ def handle_receive_lock_expired(
 
 
 def handle_receive_lock_expired_light(
-    channel_state: NettingChannelState, state_change: ReceiveLockExpiredLight, block_number: BlockNumber, payment_id: PaymentID
+    channel_state: NettingChannelState, state_change: ReceiveLockExpiredLight, block_number: BlockNumber,
+    payment_id: PaymentID
 ) -> TransitionResult[NettingChannelState]:
     """Remove expired locks from channel states."""
     is_valid, msg, merkletree = is_valid_lock_expired(
@@ -1993,7 +1993,8 @@ def handle_channel_settled_light(
     if state_change.channel_identifier == channel_state.identifier:
         set_settled(channel_state, state_change.block_number)
 
-        our_locksroot, partner_locksroot = get_locksroot_from_state_change(channel_state.our_state.address, state_change)
+        our_locksroot, partner_locksroot = get_locksroot_from_state_change(channel_state.our_state.address,
+                                                                           state_change)
 
         should_clear_channel = (
             our_locksroot == EMPTY_MERKLE_ROOT and partner_locksroot == EMPTY_MERKLE_ROOT
@@ -2005,7 +2006,7 @@ def handle_channel_settled_light(
         channel_state.our_state.onchain_locksroot = our_locksroot
         channel_state.partner_state.onchain_locksroot = partner_locksroot
 
-        #TODO mmartinez7 unlock for light clients
+        # TODO mmartinez7 unlock for light clients
         onchain_unlock = ContractSendChannelBatchUnlockLight(
             canonical_identifier=channel_state.canonical_identifier,
             client=channel_state.our_state.address,
