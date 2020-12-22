@@ -8,7 +8,7 @@ import structlog
 from eth_utils import to_normalized_address, decode_hex, remove_0x_prefix
 
 from raiden.api.python import RaidenAPI
-from raiden.constants import PATH_FINDING_BROADCASTING_ROOM, MONITORING_BROADCASTING_ROOM
+from raiden.constants import PATH_FINDING_BROADCASTING_ROOM, MONITORING_BROADCASTING_ROOM, Environment
 from raiden.exceptions import RaidenError
 from raiden.lightclient.handlers.light_client_service import LightClientService
 from raiden.settings import DEFAULT_MATRIX_KNOWN_SERVERS
@@ -112,7 +112,9 @@ class MatrixLayer(TransportLayer[MatrixTransportNode]):
     def light_client_onboarding_data(self, address: typing.Address) -> dict:
         # fetch list of known servers from raiden-network/raiden-tranport repo
         available_servers_url = DEFAULT_MATRIX_KNOWN_SERVERS[self.environment_type]
-        available_servers = get_matrix_servers(available_servers_url)
+        available_servers = available_servers_url \
+            if self.environment_type == Environment.DEVELOPMENT \
+            else get_matrix_servers(available_servers_url)
 
         client = make_client(available_servers)
         server_url = client.api.base_url
