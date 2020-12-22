@@ -241,6 +241,7 @@ class TokenNetwork:
                     log.critical("new_netting_channel_light failed", **log_details)
                     raise RaidenRecoverableError("creating new channel failed")
             except HTTPError as e:
+                new_open_channel_transaction.set_exception(e)
                 self.proxy.jsonrpc_client.check_for_insufficient_eth(
                     transaction_name="openChannel",
                     address=creator,
@@ -248,7 +249,6 @@ class TokenNetwork:
                     required_gas=GAS_REQUIRED_FOR_OPEN_CHANNEL
                 )
                 log.warning("new_netting_channel failed: transaction malformed", ex=e, **log_details)
-                new_open_channel_transaction.set_exception(e)
                 raise RawTransactionFailed("Light Client raw transaction malformed")
             except Exception as e:
                 log.warning("new_netting_channel failed", ex=e, **log_details)

@@ -3,6 +3,7 @@ from http import HTTPStatus
 import structlog
 from flask import request
 
+from raiden.api.rest import RestAPI
 from raiden.api.validations.api_error_builder import ApiErrorBuilder
 from raiden.lightclient.handlers.light_client_service import LightClientService
 
@@ -16,13 +17,13 @@ def requires_api_key(func):
         of type raiden.api.python.RaidenAPI.
     """
 
-    def inner(*args, **kwargs):
+    def inner(rest_api: RestAPI, *args, **kwargs):
         api_key = request.headers.get("x-api-key")
         if not api_key:
             return ApiErrorBuilder.build_and_log_error(
                 errors="Missing api_key auth header", status_code=HTTPStatus.BAD_REQUEST, log=log
             )
-        light_client = LightClientService.get_by_api_key(api_key=api_key, wal=args[0].raiden_api.raiden.wal)
+        light_client = LightClientService.get_by_api_key(api_key=api_key, wal=rest_api.raiden_api.raiden.wal)
         if not light_client:
             return ApiErrorBuilder.build_and_log_error(
                 errors="There is no light client associated with the api key provided",
