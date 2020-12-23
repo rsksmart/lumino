@@ -23,7 +23,7 @@ from transport.message import Message as TransportMessage
 from transport.node import Node as TransportNode
 from transport.rif_comms.client import Client as RIFCommsClient
 from transport.rif_comms.proto.api_pb2 import Notification
-from transport.rif_comms.utils import notification_to_payload
+from transport.rif_comms.utils import notification_to_payload, get_sender_from_notification
 from transport.utils import MessageQueue
 from transport.utils import validate_and_parse_messages
 
@@ -81,9 +81,10 @@ class Node(TransportNode):
         Iterate over the Notification stream and block thread to receive messages.
         """
         for notification in self._our_topic_stream:
+            sender = get_sender_from_notification(notification)
             payload = notification_to_payload(notification)
             try:
-                for raiden_message in validate_and_parse_messages(payload, None):
+                for raiden_message in validate_and_parse_messages(payload, sender):
                     self.log.info("incoming message", message=raiden_message)
                     self._handle_message(raiden_message)
             except InvalidProtocolMessage:
