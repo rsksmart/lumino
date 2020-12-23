@@ -151,6 +151,31 @@ def test_send_message_peers(comms_nodes):
 
 
 @pytest.mark.parametrize("amount_of_nodes", [2])
+def test_send_message_sender(comms_nodes):
+    comms_node_1, comms_node_2 = comms_nodes[1], comms_nodes[2]
+    client_1, address_1 = comms_node_1.client, comms_node_1.address
+    client_2, address_2 = comms_node_2.client, comms_node_2.address
+
+    # listen on both nodes
+    _, sub_1 = client_1.subscribe_to(address_1)
+    _, sub_2 = client_2.subscribe_to(address_2)
+
+    # send and receive messages
+    client_1.send_message("ping", address_2)
+    client_2.send_message("pong", address_1)
+
+    for resp in sub_1:
+        sender = get_sender_from_notification(resp)
+        assert sender == address_2
+        break  # only 1 message is expected
+
+    for resp in sub_2:
+        sender = get_sender_from_notification(resp)
+        assert sender == address_1
+        break  # only 1 message is expected
+
+
+@pytest.mark.parametrize("amount_of_nodes", [2])
 def test_send_message_subscription(comms_nodes):
     comms_node_1, comms_node_2 = comms_nodes[1], comms_nodes[2]
     client_1, address_1 = comms_node_1.client, comms_node_1.address
@@ -225,28 +250,3 @@ def test_unsubscribe_from_peers(comms_nodes):
     client_2.unsubscribe_from(address_1)
     assert client_2._is_subscribed_to(address_1) is False
     assert client_1._is_subscribed_to(address_2) is False  # check operations are independent
-
-
-@pytest.mark.parametrize("amount_of_nodes", [2])
-def test_send_message_sender(comms_nodes):
-    comms_node_1, comms_node_2 = comms_nodes[1], comms_nodes[2]
-    client_1, address_1 = comms_node_1.client, comms_node_1.address
-    client_2, address_2 = comms_node_2.client, comms_node_2.address
-
-    # subscribe both nodes to each other
-    _, sub_1_to_2 = client_1.subscribe_to(address_2)
-    _, sub_2_to_1 = client_2.subscribe_to(address_1)
-
-    # send messages and listen
-    client_1.send_message("ping", address_2)
-    client_2.send_message("pong", address_1)
-
-    for resp in sub_1_to_2:
-        sender = get_sender_from_notification(resp)
-        assert sender == address_1
-        break  # only 1 message is expected
-
-    for resp in sub_2_to_1:
-        sender = get_sender_from_notification(resp)
-        assert sender == address_2
-        break  # only 1 message is expected
