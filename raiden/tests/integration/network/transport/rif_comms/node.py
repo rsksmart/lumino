@@ -37,7 +37,6 @@ class Node:
     """
     Class for RIF Comms node program.
     """
-    connections = {}  # hack to get around the fact that each connect() call needs to be assigned
 
     def __init__(self, config: Config):
         self.address = config.address
@@ -52,8 +51,8 @@ class Node:
         Start a RIF Comms node process and connect to it.
         """
         process = CommsProcess.start(env_name=self._env_name)
-        # FIXME: client.connect() calls should not need assignment
-        self.connections[self.address] = self.client.connect()
+        # FIXME: failing sometimes
+        self.client.connect()
         return process
 
     def stop(self):
@@ -61,7 +60,6 @@ class Node:
         Disconnect from RIF Comms node program, and stop its process.
         """
         try:
-            # FIXME: deleting entries in the connections dictionary is causing non-crashing thread exceptions
             self.client.disconnect()
         finally:
             CommsProcess.stop(process=self._process)

@@ -63,8 +63,8 @@ class Node(TransportNode):
         self.stop_event.clear()
 
         # connect to rif comms node
-        # TODO: this shouldn't need to be assigned, it is only done because otherwise the code hangs
-        self._rif_comms_connect_stream = self._comms_client.connect()
+        # FIXME: failing sometimes
+        self._comms_client.connect()
         # start pre-loaded message queues
         for message_queue in self._address_to_message_queue.values():
             if not message_queue.greenlet:
