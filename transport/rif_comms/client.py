@@ -57,7 +57,7 @@ class Client:
             break
         return topic_id, topic
 
-    def is_subscribed_to(self, rsk_address: Address) -> bool:
+    def _is_subscribed_to(self, rsk_address: Address) -> bool:
         """
         Returns whether or not the client's underlying RIF Communications node is subscribed to the topic
         which corresponds to the given RSK address.

@@ -231,11 +231,6 @@ class Node(TransportNode):
             "sending message", message_payload=payload.replace("\n", "\\n"), transport="rif_comms",
             recipient=pex(recipient)
         )
-        if not self._comms_client.is_subscribed_to(recipient):
-            self.log.info(
-                "subscribing to recipient", transport="rif_comms", recipient=pex(recipient)
-            )
-            self._comms_client.subscribe_to(recipient)
         # send the message
         self._comms_client.send_message(payload, recipient)  # TODO: exception handling for RIF Comms client
         self.log.info(

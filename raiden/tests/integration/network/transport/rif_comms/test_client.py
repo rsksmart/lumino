@@ -74,10 +74,10 @@ def test_is_subscribed_to_invalid(comms_nodes):
     client, address = comms_nodes[1].client, comms_nodes[1].address
 
     # check subscription to non-subscribed address
-    assert client.is_subscribed_to(address) is False
+    assert client._is_subscribed_to(address) is False
 
     # check subscription to unregistered address
-    assert client.is_subscribed_to(generate_address()) is False
+    assert client._is_subscribed_to(generate_address()) is False
 
 
 @pytest.mark.parametrize("amount_of_nodes", [1])
@@ -86,12 +86,12 @@ def test_is_subscribed_to_self(comms_nodes):
     client, address = comms_node.client, comms_node.address
 
     # no subscription should be present
-    assert client.is_subscribed_to(address) is False
+    assert client._is_subscribed_to(address) is False
 
     client.subscribe_to(address)
 
     # subscribe to self and check subscription
-    assert client.is_subscribed_to(address) is True
+    assert client._is_subscribed_to(address) is True
 
 
 @pytest.mark.parametrize("amount_of_nodes", [2])
@@ -101,27 +101,27 @@ def test_is_subscribed_to_peers(comms_nodes):
     client_2, address_2 = comms_node_2.client, comms_node_2.address
 
     # no subscriptions should be present
-    assert client_1.is_subscribed_to(address_1) is False
-    assert client_1.is_subscribed_to(address_2) is False
-    assert client_2.is_subscribed_to(address_1) is False
-    assert client_2.is_subscribed_to(address_2) is False
+    assert client_1._is_subscribed_to(address_1) is False
+    assert client_1._is_subscribed_to(address_2) is False
+    assert client_2._is_subscribed_to(address_1) is False
+    assert client_2._is_subscribed_to(address_2) is False
 
     # subscribe from node 1 to 2
     client_1.subscribe_to(address_2)
 
     # check subscriptions
-    assert client_1.is_subscribed_to(address_1) is False
-    assert client_1.is_subscribed_to(address_2) is True
-    assert client_2.is_subscribed_to(address_1) is False
-    assert client_2.is_subscribed_to(address_2) is False
+    assert client_1._is_subscribed_to(address_1) is False
+    assert client_1._is_subscribed_to(address_2) is True
+    assert client_2._is_subscribed_to(address_1) is False
+    assert client_2._is_subscribed_to(address_2) is False
 
     # now from node 2 to 1 and check again
     client_2.subscribe_to(address_1)
 
-    assert client_1.is_subscribed_to(address_1) is False
-    assert client_1.is_subscribed_to(address_2) is True
-    assert client_2.is_subscribed_to(address_1) is True
-    assert client_2.is_subscribed_to(address_2) is False
+    assert client_1._is_subscribed_to(address_1) is False
+    assert client_1._is_subscribed_to(address_2) is True
+    assert client_2._is_subscribed_to(address_1) is True
+    assert client_2._is_subscribed_to(address_2) is False
 
 
 @pytest.mark.parametrize("amount_of_nodes", [1])
@@ -234,7 +234,7 @@ def test_unsubscribe_from_self(comms_nodes):
     client.subscribe_to(address)
     client.unsubscribe_from(address)
 
-    assert client.is_subscribed_to(address) is False
+    assert client._is_subscribed_to(address) is False
 
 
 @pytest.mark.parametrize("amount_of_nodes", [2])
@@ -249,8 +249,8 @@ def test_unsubscribe_from_peers(comms_nodes):
 
     # unsubscribe both nodes from each other
     client_1.unsubscribe_from(address_2)
-    assert client_1.is_subscribed_to(address_2) is False
-    assert client_2.is_subscribed_to(address_1) is True  # check operations are independent
+    assert client_1._is_subscribed_to(address_2) is False
+    assert client_2._is_subscribed_to(address_1) is True  # check operations are independent
     client_2.unsubscribe_from(address_1)
-    assert client_2.is_subscribed_to(address_1) is False
-    assert client_1.is_subscribed_to(address_2) is False  # check operations are independent
+    assert client_2._is_subscribed_to(address_1) is False
+    assert client_1._is_subscribed_to(address_2) is False  # check operations are independent
