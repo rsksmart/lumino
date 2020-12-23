@@ -7,7 +7,7 @@ service CommunicationsApi {
     //The client can be notified of events in their subscriptions
 
     //Open a data stream with the server, it can only receive messages
-    rpc ConnectToCommunicationsNode(RskAddress) returns (stream Notification);
+    rpc ConnectToCommunicationsNode(RskAddress) returns (Notification);
 
     //Close the data stream
     rpc EndCommunication(Void) returns (Void);
@@ -40,10 +40,10 @@ service CommunicationsApi {
 
     //Creates topic for specific peerID/Rsk Address
     rpc CreateTopicWithPeerId(PeerId) returns (stream Notification);
-    rpc CreateTopicWithRskAddress(RskAddress) returns (stream Notification);
+    rpc CreateTopicWithRskAddress(RskSubscription) returns (stream Notification);
 
     //Close Topic for a specific topicID
-    rpc CloseTopicWithRskAddress (RskAddress) returns (Void);
+    rpc CloseTopicWithRskAddress (RskSubscription) returns (Void);
 
     //Send Message to Specified Topic
     rpc SendMessageToTopic(PublishPayload) returns (Void);
@@ -66,9 +66,19 @@ message RskAddress {
     bool exclusive= 2;
 }
 
+message RskSubscription {
+    RskAddress subscriber = 1;
+    RskAddress topic =  2;
+}
+
 message PeerId {
     string address = 1;
     bool exclusive= 2;
+}
+
+message PeerSubscription {
+    PeerId subscriber = 1;
+    PeerId topic =  2;
 }
 
 /*RPC needs a message, so when there are no params to send, this empty message is used*/
@@ -120,6 +130,9 @@ message Notification {
         ChannelPeerJoined channelPeerJoined = 6;
         ServerNotification serverNotification = 7;
         SubscribeError subscribeError = 8;
+        ConnectCommsError connectCommsError = 9;
+        EndCommsError endCommsError = 10;
+        
     }
 }
 
@@ -185,8 +198,18 @@ message ServerNotification {
 }
 
 
-//A subscribe has failled
+//A subscribe has failed
 message SubscribeError {
     Channel channel = 1;
     string reason = 2;
+}
+
+//Comms could not be terminated
+message EndCommsError {
+    string reason = 1;
+}
+
+//Comms could not be initialized
+message ConnectCommsError {
+    string reason = 1;
 }

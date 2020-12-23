@@ -16,7 +16,7 @@ class CommunicationsApiStub(object):
         Args:
             channel: A grpc.Channel.
         """
-        self.ConnectToCommunicationsNode = channel.unary_stream(
+        self.ConnectToCommunicationsNode = channel.unary_unary(
                 '/communicationsapi.CommunicationsApi/ConnectToCommunicationsNode',
                 request_serializer=api__pb2.RskAddress.SerializeToString,
                 response_deserializer=api__pb2.Notification.FromString,
@@ -73,12 +73,12 @@ class CommunicationsApiStub(object):
                 )
         self.CreateTopicWithRskAddress = channel.unary_stream(
                 '/communicationsapi.CommunicationsApi/CreateTopicWithRskAddress',
-                request_serializer=api__pb2.RskAddress.SerializeToString,
+                request_serializer=api__pb2.RskSubscription.SerializeToString,
                 response_deserializer=api__pb2.Notification.FromString,
                 )
         self.CloseTopicWithRskAddress = channel.unary_unary(
                 '/communicationsapi.CommunicationsApi/CloseTopicWithRskAddress',
-                request_serializer=api__pb2.RskAddress.SerializeToString,
+                request_serializer=api__pb2.RskSubscription.SerializeToString,
                 response_deserializer=api__pb2.Void.FromString,
                 )
         self.SendMessageToTopic = channel.unary_unary(
@@ -219,7 +219,7 @@ class CommunicationsApiServicer(object):
 
 def add_CommunicationsApiServicer_to_server(servicer, server):
     rpc_method_handlers = {
-            'ConnectToCommunicationsNode': grpc.unary_stream_rpc_method_handler(
+            'ConnectToCommunicationsNode': grpc.unary_unary_rpc_method_handler(
                     servicer.ConnectToCommunicationsNode,
                     request_deserializer=api__pb2.RskAddress.FromString,
                     response_serializer=api__pb2.Notification.SerializeToString,
@@ -276,12 +276,12 @@ def add_CommunicationsApiServicer_to_server(servicer, server):
             ),
             'CreateTopicWithRskAddress': grpc.unary_stream_rpc_method_handler(
                     servicer.CreateTopicWithRskAddress,
-                    request_deserializer=api__pb2.RskAddress.FromString,
+                    request_deserializer=api__pb2.RskSubscription.FromString,
                     response_serializer=api__pb2.Notification.SerializeToString,
             ),
             'CloseTopicWithRskAddress': grpc.unary_unary_rpc_method_handler(
                     servicer.CloseTopicWithRskAddress,
-                    request_deserializer=api__pb2.RskAddress.FromString,
+                    request_deserializer=api__pb2.RskSubscription.FromString,
                     response_serializer=api__pb2.Void.SerializeToString,
             ),
             'SendMessageToTopic': grpc.unary_unary_rpc_method_handler(
@@ -322,7 +322,7 @@ class CommunicationsApi(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.unary_stream(request, target, '/communicationsapi.CommunicationsApi/ConnectToCommunicationsNode',
+        return grpc.experimental.unary_unary(request, target, '/communicationsapi.CommunicationsApi/ConnectToCommunicationsNode',
             api__pb2.RskAddress.SerializeToString,
             api__pb2.Notification.FromString,
             options, channel_credentials,
@@ -510,7 +510,7 @@ class CommunicationsApi(object):
             timeout=None,
             metadata=None):
         return grpc.experimental.unary_stream(request, target, '/communicationsapi.CommunicationsApi/CreateTopicWithRskAddress',
-            api__pb2.RskAddress.SerializeToString,
+            api__pb2.RskSubscription.SerializeToString,
             api__pb2.Notification.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
@@ -527,7 +527,7 @@ class CommunicationsApi(object):
             timeout=None,
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/communicationsapi.CommunicationsApi/CloseTopicWithRskAddress',
-            api__pb2.RskAddress.SerializeToString,
+            api__pb2.RskSubscription.SerializeToString,
             api__pb2.Void.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
