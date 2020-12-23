@@ -26,76 +26,35 @@ def comms_nodes(amount_of_nodes) -> {int, CommsNode}:
 @pytest.mark.parametrize("amount_of_nodes", [1])
 def test_subscribe_to_invalid(comms_nodes):
     client = comms_nodes[1].client
-    # subscribe to unregistered address
-    topic_id, _ = client.subscribe_to(generate_address())
+    unregistered_address = generate_address()
 
+    # no subscriptions should be present
+    assert client._is_subscribed_to(unregistered_address) is False
+
+    # subscribe to unregistered address
+    topic_id, _ = client.subscribe_to(unregistered_address)
+
+    # check subscription again
     # FIXME: this should probably throw an exception rather than an empty result
     assert topic_id is ""
+    assert client._is_subscribed_to(unregistered_address) is False
 
 
 @pytest.mark.parametrize("amount_of_nodes", [1])
 def test_subscribe_to_self(comms_nodes):
     client, address = comms_nodes[1].client, comms_nodes[1].address
 
-    topic_id, _ = client.subscribe_to(address)
-
-    assert topic_id
-
-
-@pytest.mark.parametrize("amount_of_nodes", [2])
-def test_subscribe_to_peers(comms_nodes):
-    comms_node_1, comms_node_2 = comms_nodes[1], comms_nodes[2]
-    client_1, address_1 = comms_node_1.client, comms_node_1.address
-    client_2, address_2 = comms_node_2.client, comms_node_2.address
-
-    topic_id_1, _ = client_1.subscribe_to(address_2)
-
-    assert topic_id_1
-
-    topic_id_2, _ = client_2.subscribe_to(address_1)
-
-    assert topic_id_2
-
-
-@pytest.mark.parametrize("amount_of_nodes", [2])
-def test_subscribe_to_repeated(comms_nodes):
-    comms_node_1, comms_node_2 = comms_nodes[1], comms_nodes[2]
-    client_1, address_1 = comms_node_1.client, comms_node_1.address
-    client_2, address_2 = comms_node_2.client, comms_node_2.address
-
-    topic_id_1, _ = client_1.subscribe_to(address_2)
-    topic_id_2, _ = client_1.subscribe_to(address_2)
-
-    assert topic_id_1 == topic_id_2
-
-
-@pytest.mark.parametrize("amount_of_nodes", [1])
-def test_is_subscribed_to_invalid(comms_nodes):
-    client, address = comms_nodes[1].client, comms_nodes[1].address
-
-    # check subscription to non-subscribed address
-    assert client._is_subscribed_to(address) is False
-
-    # check subscription to unregistered address
-    assert client._is_subscribed_to(generate_address()) is False
-
-
-@pytest.mark.parametrize("amount_of_nodes", [1])
-def test_is_subscribed_to_self(comms_nodes):
-    comms_node = comms_nodes[1]
-    client, address = comms_node.client, comms_node.address
-
     # no subscription should be present
     assert client._is_subscribed_to(address) is False
 
-    client.subscribe_to(address)
-
     # subscribe to self and check subscription
+    topic_id, _ = client.subscribe_to(address)
+    assert topic_id
     assert client._is_subscribed_to(address) is True
 
 
 @pytest.mark.parametrize("amount_of_nodes", [2])
-def test_is_subscribed_to_peers(comms_nodes):
+def test_subscribe_to_peers(comms_nodes):
     comms_node_1, comms_node_2 = comms_nodes[1], comms_nodes[2]
     client_1, address_1 = comms_node_1.client, comms_node_1.address
     client_2, address_2 = comms_node_2.client, comms_node_2.address
@@ -106,22 +65,42 @@ def test_is_subscribed_to_peers(comms_nodes):
     assert client_2._is_subscribed_to(address_1) is False
     assert client_2._is_subscribed_to(address_2) is False
 
-    # subscribe from node 1 to 2
-    client_1.subscribe_to(address_2)
-
-    # check subscriptions
+    # subscribe from node 1 to 2 and check subscriptions
+    topic_id_1, _ = client_1.subscribe_to(address_2)
+    assert topic_id_1
     assert client_1._is_subscribed_to(address_1) is False
     assert client_1._is_subscribed_to(address_2) is True
     assert client_2._is_subscribed_to(address_1) is False
     assert client_2._is_subscribed_to(address_2) is False
 
-    # now from node 2 to 1 and check again
-    client_2.subscribe_to(address_1)
-
+    # subscribe from node 2 to 1 and check subscriptions
+    topic_id_2, _ = client_2.subscribe_to(address_1)
+    assert topic_id_2
     assert client_1._is_subscribed_to(address_1) is False
     assert client_1._is_subscribed_to(address_2) is True
     assert client_2._is_subscribed_to(address_1) is True
     assert client_2._is_subscribed_to(address_2) is False
+
+
+@pytest.mark.parametrize("amount_of_nodes", [2])
+def test_subscribe_to_repeated(comms_nodes):
+    comms_node_1, comms_node_2 = comms_nodes[1], comms_nodes[2]
+    client_1, address_1 = comms_node_1.client, comms_node_1.address
+    client_2, address_2 = comms_node_2.client, comms_node_2.address
+
+    # no subscriptions should be present
+    assert client_1._is_subscribed_to(address_2) is False
+
+    # subscribe from node 1 to 2 and check subscription
+    topic_id_1, _ = client_1.subscribe_to(address_2)
+    assert topic_id_1
+    assert client_1._is_subscribed_to(address_2) is True
+
+    # subscribe again and check subscription
+    topic_id_2, _ = client_1.subscribe_to(address_2)
+    assert topic_id_2
+    assert topic_id_1 == topic_id_2
+    assert client_1._is_subscribed_to(address_2) is True
 
 
 @pytest.mark.parametrize("amount_of_nodes", [1])
