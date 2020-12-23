@@ -33,7 +33,6 @@ class Client:
         Invokes ConnectToCommunicationsNode GRPC API endpoint.
         Adds the client RSK address under the RIF Communications node peer ID.
         """
-        # FIXME: failing sometimes
         self.stub.ConnectToCommunicationsNode(self.rsk_address)
 
     def subscribe_to(self, rsk_address: Address) -> (str, Notification):

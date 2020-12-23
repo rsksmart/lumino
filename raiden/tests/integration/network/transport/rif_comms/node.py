@@ -51,7 +51,6 @@ class Node:
         Start a RIF Comms node process and connect to it.
         """
         process = CommsProcess.start(env_name=self._env_name)
-        # FIXME: failing sometimes
         self.client.connect()
         return process
 

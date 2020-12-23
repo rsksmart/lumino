@@ -145,15 +145,18 @@ def test_send_message_subscription(comms_nodes):
 
     # send message without subscription
     payload = "marco"
-    with pytest.raises(_InactiveRpcError) as e:
-        client_1.send_message(payload, address_2)
+    client_1.send_message(payload, address_2)
 
-    assert "not subscribed to" in str.lower(e.value.details())
+    # receive message
+    for resp in sub:
+        received_message = notification_to_payload(resp)
+        assert received_message == payload
+        break  # only 1 message is expected
 
     # now subscribe from node 1 to 2
     client_1.subscribe_to(address_2)
 
-    # message should be successfully sent now
+    # message should be successfully sent again
     payload = "polo"
     client_1.send_message(payload, address_2)
     for resp in sub:

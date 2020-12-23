@@ -63,7 +63,6 @@ class Node(TransportNode):
         self.stop_event.clear()
 
         # connect to rif comms node
-        # FIXME: failing sometimes
         self._comms_client.connect()
         # start pre-loaded message queues
         for message_queue in self._address_to_message_queue.values():
