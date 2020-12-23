@@ -205,7 +205,7 @@ def test_send_message_subscription(comms_nodes):
 
 
 @pytest.mark.parametrize("amount_of_nodes", [1])
-@pytest.mark.xfail(reason="unexpected behavior from comms")
+@pytest.mark.xfail(reason="exceptions are not raised from comms node")
 def test_unsubscribe_from_invalid(comms_nodes):
     client, address = comms_nodes[1].client, comms_nodes[1].address
 
