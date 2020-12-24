@@ -265,6 +265,31 @@ def test_send_message_subscription(comms_nodes):
         break  # only 1 message is expected
 
 
+def test_send_message_shutdown():
+    try:
+        # the comms_nodes fixture is not used in order to shut down nodes manually
+        node_1 = CommsNode(CommsConfig(node_number=1, auto_connect=False))
+        client_1, address_1 = node_1.client, node_1.address
+
+        node_2 = CommsNode(CommsConfig(node_number=2, auto_connect=False))
+        client_2, address_2 = node_2.client, node_2.address
+
+        # connect clients
+        client_1.connect()
+        client_2.connect()
+
+        # shut down node 2
+        node_2.stop()
+
+        # send message
+        client_1.send_message("into the void", address_2)  # no exception should be raised
+    finally:
+        if node_1:
+            node_1.stop()
+        if not node_2._process.poll():  # node 2 is still running
+            node_2.stop()
+
+
 @pytest.mark.parametrize("amount_of_nodes", [1])
 @pytest.mark.xfail(reason="exceptions are not raised from comms node")
 def test_unsubscribe_from_invalid(comms_nodes):
