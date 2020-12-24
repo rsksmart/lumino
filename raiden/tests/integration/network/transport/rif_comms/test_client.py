@@ -1,12 +1,15 @@
+from typing import List, Dict
+
 import pytest
 
 from raiden.tests.integration.network.transport.rif_comms.node import Node as CommsNode, Config as CommsConfig
 from raiden.tests.integration.network.transport.utils import generate_address
+from transport.rif_comms.client import Client
 
 
 @pytest.fixture()
 @pytest.mark.parametrize("cluster")
-def comms_clients(cluster: dict) -> {int, CommsNode}:
+def comms_clients(cluster: dict) -> Dict[int, Client]:
     """
     The cluster dict has the following structure:
 
@@ -49,9 +52,26 @@ def comms_clients(cluster: dict) -> {int, CommsNode}:
 
 @pytest.mark.parametrize("cluster", [{1: 1}, {1: 2}, {1: 2, 2: 2}])
 def test_subscribe_to_invalid(comms_clients):
-    client = comms_clients[1]
-    # subscribe to unregistered address
-    topic_id, _ = client.subscribe_to(generate_address())
+    for client in comms_clients.values():
+        # subscribe to unregistered address
+        topic_id, _ = client.subscribe_to(generate_address())
+        # FIXME: this should probably throw an exception rather than an empty result
+        assert topic_id is ""
 
-    # FIXME: this should probably throw an exception rather than an empty result
-    assert topic_id is ""
+
+@pytest.mark.parametrize("cluster", [{1: 1}, {1: 2}, {1: 2, 2: 2}])
+def test_subscribe_to_self(comms_clients):
+    for client in comms_clients.values():
+        topic_id, _ = client.subscribe_to(client.rsk_address.address)
+        assert topic_id
+
+
+@pytest.mark.parametrize("cluster", [{1: 1, 2: 1}, {1: 2}])
+def test_subscribe_to_peers(comms_clients):
+    client_1 = comms_clients[1]
+    client_2 = comms_clients[2]
+
+    topic_id_1, _ = client_1.subscribe_to(client_2.rsk_address.address)
+    assert topic_id_1
+    topic_id_2, _ = client_2.subscribe_to(client_1.rsk_address.address)
+    assert topic_id_2
