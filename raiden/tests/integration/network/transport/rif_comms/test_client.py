@@ -23,6 +23,67 @@ def comms_nodes(amount_of_nodes) -> {int, CommsNode}:
         node.stop()
 
 
+@pytest.mark.xfail(reason="wrong exception message from comms node")
+def test_connect():
+    # the comms_nodes fixture is not used to prevent automatic connect
+    try:
+        node = CommsNode(CommsConfig(node_number=1, auto_connect=False))
+        client, address = node.client, node.address
+
+        # no peer ID should be registered under this address yet
+        # unsubscribe from unregistered address
+        with pytest.raises(_InactiveRpcError) as e:
+            client._get_peer_id(address)
+
+        assert "not found" in str.lower(e.value.details())
+
+        # connect and check again
+        client.connect()
+        assert client._get_peer_id(address)
+    finally:
+        if node:
+            node.stop()
+
+
+def test_connect_repeated():
+    # the comms_nodes fixture is not used to prevent automatic connect
+    try:
+        node = CommsNode(CommsConfig(node_number=1, auto_connect=False))
+        client, address = node.client, node.address
+
+        client.connect()
+        peer_id_1 = client._get_peer_id(address)
+
+        # repeat connection and check peer id
+        client.connect()
+        peer_id_2 = client._get_peer_id(address)
+        assert peer_id_2 == peer_id_1
+    finally:
+        if node:
+            node.stop()
+
+
+def test_connect_peers():
+    # the comms_nodes fixture is not used to prevent automatic connect
+    try:
+        node_1 = CommsNode(CommsConfig(node_number=1, auto_connect=False))
+        client_1, address_1 = node_1.client, node_1.address
+
+        node_2 = CommsNode(CommsConfig(node_number=2, auto_connect=False))
+        client_2, address_2 = node_2.client, node_2.address
+
+        # connect clients
+        client_1.connect()
+        client_2.connect()
+
+        # check connections from peers
+        assert client_1._get_peer_id(address_2)
+        assert client_2._get_peer_id(address_1)
+    finally:
+        for node in [node_1, node_2]:
+            node.stop()
+
+
 @pytest.mark.parametrize("amount_of_nodes", [1])
 def test_subscribe_to_invalid(comms_nodes):
     client = comms_nodes[1].client
