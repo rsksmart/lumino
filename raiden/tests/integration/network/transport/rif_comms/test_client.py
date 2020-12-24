@@ -82,7 +82,7 @@ def test_connect_peers():
         client_1.connect()
         client_2.connect()
 
-        # check connections from peers
+        # check from peers that connections were successfully made
         assert client_1._get_peer_id(address_2)
         assert client_2._get_peer_id(address_1)
     finally:
