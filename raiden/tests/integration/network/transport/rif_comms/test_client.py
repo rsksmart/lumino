@@ -75,3 +75,78 @@ def test_subscribe_to_peers(comms_clients):
     assert topic_id_1
     topic_id_2, _ = client_2.subscribe_to(client_1.rsk_address.address)
     assert topic_id_2
+
+
+@pytest.mark.parametrize("cluster", [{1: 1, 2: 1}, {1: 2}])
+def test_subscribe_to_repeated(comms_clients):
+    client_1 = comms_clients[1]
+    client_2 = comms_clients[2]
+
+    topic_id_1, _ = client_1.subscribe_to(client_2.rsk_address.address)
+    topic_id_2, _ = client_1.subscribe_to(client_2.rsk_address.address)
+
+    assert topic_id_1 == topic_id_2
+
+
+@pytest.mark.parametrize("cluster", [{1: 1, 2: 1}, {1: 2}])
+def test_is_subscribed_to_invalid(comms_clients):
+    client_1 = comms_clients[1]
+    client_2 = comms_clients[2]
+    # check subscription to non-subscribed address
+    assert client_1._is_subscribed_to(client_1.rsk_address.address) is False
+    assert client_2._is_subscribed_to(client_2.rsk_address.address) is False
+    # check subscription to unregistered address
+    assert client_1._is_subscribed_to(generate_address()) is False
+    assert client_2._is_subscribed_to(generate_address()) is False
+
+
+@pytest.mark.xfail(reason="fails, last assertion fails, multi addr issue")
+@pytest.mark.parametrize("cluster", [{1: 1, 2: 1}, {1: 2}])
+def test_is_subscribed_to_self(comms_clients):
+    client_1 = comms_clients[1]
+    client_2 = comms_clients[2]
+
+    # no subscription should be present
+    assert client_1._is_subscribed_to(client_1.rsk_address.address) is False
+    assert client_2._is_subscribed_to(client_2.rsk_address.address) is False
+
+    # subscribe to self and check subscription
+    client_1.subscribe_to(client_1.rsk_address.address)
+    client_2.subscribe_to(client_2.rsk_address.address)
+
+    assert client_1._is_subscribed_to(client_1.rsk_address.address) is True
+    assert client_2._is_subscribed_to(client_2.rsk_address.address) is True
+
+    # should not be subscribed to each other, even if they share comms node
+    assert client_2._is_subscribed_to(client_1.rsk_address.address) is False
+    assert client_1._is_subscribed_to(client_2.rsk_address.address) is False  # FIXME this fails
+
+
+@pytest.mark.xfail(reason="fails, last assertion fails, multi addr issue")
+@pytest.mark.parametrize("cluster", [{1: 1, 2: 1}, {1: 2}])
+def test_is_subscribed_to_peers(comms_clients):
+    client_1 = comms_clients[1]
+    client_2 = comms_clients[2]
+
+    # no subscriptions should be present
+    assert client_1._is_subscribed_to(client_1.rsk_address.address) is False
+    assert client_1._is_subscribed_to(client_2.rsk_address.address) is False
+    assert client_2._is_subscribed_to(client_1.rsk_address.address) is False
+    assert client_2._is_subscribed_to(client_2.rsk_address.address) is False
+
+    # subscribe from node 1 to 2
+    client_1.subscribe_to(client_2.rsk_address.address)
+
+    # check subscriptions
+    assert client_1._is_subscribed_to(client_1.rsk_address.address) is False
+    assert client_1._is_subscribed_to(client_2.rsk_address.address) is True
+    assert client_2._is_subscribed_to(client_1.rsk_address.address) is False
+    assert client_2._is_subscribed_to(client_2.rsk_address.address) is False # FIXME this fails
+
+    # now from node 2 to 1 and check again
+    client_2.subscribe_to(client_1.rsk_address.address)
+
+    assert client_1._is_subscribed_to(client_1.rsk_address.address) is False
+    assert client_1._is_subscribed_to(client_2.rsk_address.address) is True
+    assert client_2._is_subscribed_to(client_1.rsk_address.address) is True
+    assert client_2._is_subscribed_to(client_2.rsk_address.address) is False
