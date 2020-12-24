@@ -26,8 +26,10 @@ def comms_nodes(amount_of_nodes) -> {int, CommsNode}:
 @pytest.mark.xfail(reason="wrong exception message from comms node")
 def test_connect():
     # the comms_nodes fixture is not used to prevent automatic connect
+    nodes = []
     try:
         node = CommsNode(CommsConfig(node_number=1, auto_connect=False))
+        nodes.append(node)
         client, address = node.client, node.address
 
         # no peer ID should be registered under this address yet
@@ -41,14 +43,16 @@ def test_connect():
         client.connect()
         assert client._get_peer_id(address)
     finally:
-        if node:
+        for node in nodes:
             node.stop()
 
 
 def test_connect_repeated():
     # the comms_nodes fixture is not used to prevent automatic connect
+    nodes = []
     try:
         node = CommsNode(CommsConfig(node_number=1, auto_connect=False))
+        nodes.append(node)
         client, address = node.client, node.address
 
         client.connect()
@@ -59,17 +63,20 @@ def test_connect_repeated():
         peer_id_2 = client._get_peer_id(address)
         assert peer_id_2 == peer_id_1
     finally:
-        if node:
+        for node in nodes:
             node.stop()
 
 
 def test_connect_peers():
     # the comms_nodes fixture is not used to prevent automatic connect
+    nodes = []
     try:
         node_1 = CommsNode(CommsConfig(node_number=1, auto_connect=False))
+        nodes.append(node_1)
         client_1, address_1 = node_1.client, node_1.address
 
         node_2 = CommsNode(CommsConfig(node_number=2, auto_connect=False))
+        nodes.append(node_2)
         client_2, address_2 = node_2.client, node_2.address
 
         # connect clients
@@ -80,7 +87,7 @@ def test_connect_peers():
         assert client_1._get_peer_id(address_2)
         assert client_2._get_peer_id(address_1)
     finally:
-        for node in [node_1, node_2]:
+        for node in nodes:
             node.stop()
 
 
@@ -266,12 +273,15 @@ def test_send_message_subscription(comms_nodes):
 
 
 def test_send_message_shutdown():
+    # the comms_nodes fixture is not used in order to shut down nodes manually
+    nodes = []
     try:
-        # the comms_nodes fixture is not used in order to shut down nodes manually
         node_1 = CommsNode(CommsConfig(node_number=1, auto_connect=False))
+        nodes.append(node_1)
         client_1, address_1 = node_1.client, node_1.address
 
         node_2 = CommsNode(CommsConfig(node_number=2, auto_connect=False))
+        nodes.append(node_2)
         client_2, address_2 = node_2.client, node_2.address
 
         # connect clients
@@ -284,10 +294,10 @@ def test_send_message_shutdown():
         # send message
         client_1.send_message("into the void", address_2)  # no exception should be raised
     finally:
-        if node_1:
-            node_1.stop()
-        if not node_2._process.poll():  # node 2 is still running
-            node_2.stop()
+        for node in nodes:
+            # because node 2 can be already stopped, we cannot call stop() indiscriminately
+            if not node._process.poll():  # if True, node is still running
+                node.stop()
 
 
 @pytest.mark.parametrize("amount_of_nodes", [1])
