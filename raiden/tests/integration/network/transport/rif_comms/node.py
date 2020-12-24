@@ -15,7 +15,7 @@ class Config:
     api_endpoint_prefix = "localhost"
     env_file_prefix = "testing_"
 
-    def __init__(self, node_number: int):
+    def __init__(self, node_number: int, amount_of_clients: int = 1):
         """
         Load and set a configuration attributes for a RIF Comms node.
         A valid configuration file must exist at RIF_COMMS_PATH/config/testing_<node_number>.json5
@@ -29,8 +29,8 @@ class Config:
             config = json5.loads(reader.read())
             self._listening_port = config['grpcPort']
 
-        self.address = generate_address()
         self.api_endpoint = self.api_endpoint_prefix + ":" + str(self._listening_port)
+        self.amount_of_clients = amount_of_clients
 
 
 class Node:
@@ -39,11 +39,11 @@ class Node:
     """
 
     def __init__(self, config: Config):
-        self.address = config.address
+        self.clients = list()
         self._api_endpoint = config.api_endpoint
         self._env_name = config.env_name
-
-        self.client = RIFCommsClient(rsk_address=self.address, grpc_api_endpoint=self._api_endpoint)
+        for i in range(config.amount_of_clients):
+            self.clients.append(RIFCommsClient(rsk_address=generate_address(), grpc_api_endpoint=self._api_endpoint))
         self._process = self.start()
 
     def start(self) -> Popen:
@@ -51,7 +51,8 @@ class Node:
         Start a RIF Comms node process and connect to it.
         """
         process = CommsProcess.start(env_name=self._env_name)
-        self.client.connect()
+        for client in self.clients:
+            client.connect()
         return process
 
     def stop(self):
@@ -59,6 +60,8 @@ class Node:
         Disconnect from RIF Comms node program, and stop its process.
         """
         try:
-            self.client.disconnect()
+            for client in self.clients:
+                client.disconnect()
+
         finally:
             CommsProcess.stop(process=self._process)
