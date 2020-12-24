@@ -33,7 +33,6 @@ def test_connect():
         client, address = node.client, node.address
 
         # no peer ID should be registered under this address yet
-        # unsubscribe from unregistered address
         with pytest.raises(_InactiveRpcError) as e:
             client._get_peer_id(address)
 
