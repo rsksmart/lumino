@@ -40,7 +40,7 @@ class Node:
     """
 
     def __init__(self, config: Config):
-        self.clients = list()
+        self.clients = []
         self._api_endpoint = config.api_endpoint
         self._env_name = config.env_name
         for i in range(config.amount_of_clients):
