@@ -43,7 +43,7 @@ class Node:
         self.clients = []
         self._api_endpoint = config.api_endpoint
         self._env_name = config.env_name
-        for i in range(config.amount_of_clients):
+        for _ in range(config.amount_of_clients):
             self.clients.append(RIFCommsClient(rsk_address=generate_address(), grpc_api_endpoint=self._api_endpoint))
         self._auto_connect = config.auto_connect
         self._process = self.start()
