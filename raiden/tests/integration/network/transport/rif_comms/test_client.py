@@ -53,31 +53,149 @@ def comms_clients(cluster: dict) -> Dict[int, Client]:
         node.stop()
 
 
+@pytest.mark.xfail(reason="wrong exception message from comms node")
+def test_connect():
+    # the comms_nodes fixture is not used to prevent automatic connect
+    nodes = []
+    try:
+        node = CommsNode(CommsConfig(node_number=1, amount_of_clients=1, auto_connect=False))
+        nodes.append(node)
+        client, address = node.clients[0], node.clients[0].rsk_address.address
+
+        # no peer ID should be registered under this address yet
+        with pytest.raises(_InactiveRpcError) as e:
+            client._get_peer_id(address)
+
+        assert "not found" in str.lower(e.value.details())
+
+        # connect and check again
+        client.connect()
+        assert client._get_peer_id(address)
+    finally:
+        for node in nodes:
+            node.stop()
+
+
+def test_connect_repeated():
+    # the comms_nodes fixture is not used to prevent automatic connect
+    nodes = []
+    try:
+        node = CommsNode(CommsConfig(node_number=1, amount_of_clients=1, auto_connect=False))
+        nodes.append(node)
+        client, address = node.clients[0], node.clients[0].rsk_address.address
+
+        client.connect()
+        peer_id_1 = client._get_peer_id(address)
+
+        # repeat connection and check peer id
+        client.connect()
+        peer_id_2 = client._get_peer_id(address)
+        assert peer_id_2 == peer_id_1
+    finally:
+        for node in nodes:
+            node.stop()
+
+
+def test_connect_peers():
+    # the comms_nodes fixture is not used to prevent automatic connect
+    nodes = []
+    try:
+        node_1 = CommsNode(CommsConfig(node_number=1, amount_of_clients=1, auto_connect=False))
+        nodes.append(node_1)
+        client_1, address_1 = node_1.clients[0], node_1.clients[0].rsk_address.address
+
+        node_2 = CommsNode(CommsConfig(node_number=2, amount_of_clients=1, auto_connect=False))
+        nodes.append(node_2)
+        client_2, address_2 = node_2.clients[0], node_2.clients[0].rsk_address.address
+
+        # connect clients
+        client_1.connect()
+        client_2.connect()
+
+        # check from peers that connections were successfully made
+        assert client_1._get_peer_id(address_2)
+        assert client_2._get_peer_id(address_1)
+    finally:
+        for node in nodes:
+            node.stop()
+
+
+def test_send_message_shutdown():
+    # the comms_nodes fixture is not used in order to shut down nodes manually
+    nodes = []
+    try:
+        node_1 = CommsNode(CommsConfig(node_number=1, amount_of_clients=1, auto_connect=False))
+        nodes.append(node_1)
+        client_1, address_1 = node_1.clients[0], node_1.clients[0].rsk_address.address
+
+        node_2 = CommsNode(CommsConfig(node_number=2, amount_of_clients=1, auto_connect=False))
+        nodes.append(node_2)
+        client_2, address_2 = node_2.clients[0], node_2.clients[0].rsk_address.address
+
+        # connect clients
+        client_1.connect()
+        client_2.connect()
+
+        # shut down node 2
+        node_2.stop()
+
+        # send message
+        client_1.send_message("into the void", address_2)  # no exception should be raised
+    finally:
+        for node in nodes:
+            # because node 2 can be already stopped, we cannot call stop() indiscriminately
+            if not node._process.poll():  # if True, node is still running
+                node.stop()
+
+
 @pytest.mark.parametrize("cluster", [{1: 1}, {1: 2}, {1: 2, 2: 2}])
 def test_subscribe_to_invalid(comms_clients):
     for client in comms_clients.values():
+        unregistered_address = generate_address()
+        # no subscriptions should be present
+        assert client._is_subscribed_to(unregistered_address) is False
         # subscribe to unregistered address
-        topic_id, _ = client.subscribe_to(generate_address())
+        topic_id, _ = client.subscribe_to(unregistered_address)
         # FIXME: this should probably throw an exception rather than an empty result
         assert topic_id is ""
+        assert client._is_subscribed_to(unregistered_address) is False
 
 
 @pytest.mark.parametrize("cluster", [{1: 1}, {1: 2}, {1: 2, 2: 2}])
 def test_subscribe_to_self(comms_clients):
     for client in comms_clients.values():
+        # no subscription should be present
+        assert client._is_subscribed_to(client.rsk_address.address) is False
+        # subscribe to self and check subscription
         topic_id, _ = client.subscribe_to(client.rsk_address.address)
         assert topic_id
+        assert client._is_subscribed_to(client.rsk_address.address) is True
 
 
+@pytest.mark.xfail(reason="fails, multi addr issue")
 @pytest.mark.parametrize("cluster", [{1: 1, 2: 1}, {1: 2}])
 def test_subscribe_to_peers(comms_clients):
     client_1 = comms_clients[1]
     client_2 = comms_clients[2]
 
+    # no subscriptions should be present
+    assert client_1._is_subscribed_to(client_2.rsk_address.address) is False
+    assert client_2._is_subscribed_to(client_1.rsk_address.address) is False
+
+    # subscribe from node 1 to 2 and check subscriptions
     topic_id_1, _ = client_1.subscribe_to(client_2.rsk_address.address)
     assert topic_id_1
+    assert client_1._is_subscribed_to(client_1.rsk_address.address) is False
+    assert client_1._is_subscribed_to(client_2.rsk_address.address) is True
+    assert client_2._is_subscribed_to(client_1.rsk_address.address) is False
+    assert client_2._is_subscribed_to(client_2.rsk_address.address) is False # FIXME this fails
+
     topic_id_2, _ = client_2.subscribe_to(client_1.rsk_address.address)
     assert topic_id_2
+    assert client_1._is_subscribed_to(client_1.rsk_address.address) is False
+    assert client_1._is_subscribed_to(client_2.rsk_address.address) is True
+    assert client_2._is_subscribed_to(client_1.rsk_address.address) is True
+    assert client_2._is_subscribed_to(client_2.rsk_address.address) is False
 
 
 @pytest.mark.parametrize("cluster", [{1: 1, 2: 1}, {1: 2}])
@@ -85,14 +203,19 @@ def test_subscribe_to_repeated(comms_clients):
     client_1 = comms_clients[1]
     client_2 = comms_clients[2]
 
+    # subscribe from node 1 to 2 and check subscription
     topic_id_1, _ = client_1.subscribe_to(client_2.rsk_address.address)
+    assert topic_id_1
+    assert client_1._is_subscribed_to(client_2.rsk_address.address) is True
+
+    # subscribe again and check subscription
     topic_id_2, _ = client_1.subscribe_to(client_2.rsk_address.address)
-
     assert topic_id_1 == topic_id_2
+    assert client_1._is_subscribed_to(client_2.rsk_address.address) is True
 
 
-@pytest.mark.parametrize("cluster", [{1: 1, 2: 1}, {1: 2}])
-def test_is_subscribed_to_invalid(comms_clients):
+@pytest.mark.parametrize("cluster", [{1: 2}])
+def test_multiple_subscriptions_same_node(comms_clients):
     client_1 = comms_clients[1]
     client_2 = comms_clients[2]
     # check subscription to non-subscribed address
@@ -126,8 +249,8 @@ def test_is_subscribed_to_self(comms_clients):
 
 
 @pytest.mark.xfail(reason="fails, last assertion fails, multi addr issue")
-@pytest.mark.parametrize("cluster", [{1: 1, 2: 1}, {1: 2}])
-def test_is_subscribed_to_peers(comms_clients):
+@pytest.mark.parametrize("cluster", [{1: 2}])
+def test_subscribe_to_peers_multi_address(comms_clients):
     client_1 = comms_clients[1]
     client_2 = comms_clients[2]
 

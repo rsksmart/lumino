@@ -15,7 +15,7 @@ class Config:
     api_endpoint_prefix = "localhost"
     env_file_prefix = "testing_"
 
-    def __init__(self, node_number: int, amount_of_clients: int = 1):
+    def __init__(self, node_number: int, amount_of_clients: int = 1, auto_connect = True):
         """
         Load and set a configuration attributes for a RIF Comms node.
         A valid configuration file must exist at RIF_COMMS_PATH/config/testing_<node_number>.json5
@@ -31,6 +31,7 @@ class Config:
 
         self.api_endpoint = self.api_endpoint_prefix + ":" + str(self._listening_port)
         self.amount_of_clients = amount_of_clients
+        self.auto_connect = auto_connect
 
 
 class Node:
@@ -44,6 +45,7 @@ class Node:
         self._env_name = config.env_name
         for i in range(config.amount_of_clients):
             self.clients.append(RIFCommsClient(rsk_address=generate_address(), grpc_api_endpoint=self._api_endpoint))
+        self._auto_connect = config.auto_connect
         self._process = self.start()
 
     def start(self) -> Popen:
@@ -52,7 +54,8 @@ class Node:
         """
         process = CommsProcess.start(env_name=self._env_name)
         for client in self.clients:
-            client.connect()
+            if self._auto_connect:
+                client.connect()
         return process
 
     def stop(self):
