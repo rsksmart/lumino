@@ -195,21 +195,9 @@ def test_subscribe_to_repeated(comms_clients):
     assert client_1._is_subscribed_to(client_2.rsk_address.address) is True
 
 
-@pytest.mark.parametrize("nodes_to_clients", [{1: 2}])
-def test_multiple_subscriptions_same_node(comms_clients):
-    client_1 = comms_clients[1]
-    client_2 = comms_clients[2]
-    # check subscription to non-subscribed address
-    assert client_1._is_subscribed_to(client_1.rsk_address.address) is False
-    assert client_2._is_subscribed_to(client_2.rsk_address.address) is False
-    # check subscription to unregistered address
-    assert client_1._is_subscribed_to(generate_address()) is False
-    assert client_2._is_subscribed_to(generate_address()) is False
-
-
 @pytest.mark.xfail(reason="fails, last assertion fails, multi addr issue")
 @pytest.mark.parametrize("nodes_to_clients", [{1: 1, 2: 1}, {1: 2}])
-def test_is_subscribed_to_self(comms_clients):
+def test_is_subscribed_to_self_mutli_address(comms_clients):
     client_1 = comms_clients[1]
     client_2 = comms_clients[2]
 
@@ -227,36 +215,6 @@ def test_is_subscribed_to_self(comms_clients):
     # should not be subscribed to each other, even if they share comms node
     assert client_2._is_subscribed_to(client_1.rsk_address.address) is False
     assert client_1._is_subscribed_to(client_2.rsk_address.address) is False  # FIXME this fails
-
-
-@pytest.mark.xfail(reason="fails, last assertion fails, multi addr issue")
-@pytest.mark.parametrize("nodes_to_clients", [{1: 2}])
-def test_subscribe_to_peers_multi_address(comms_clients):
-    client_1 = comms_clients[1]
-    client_2 = comms_clients[2]
-
-    # no subscriptions should be present
-    assert client_1._is_subscribed_to(client_1.rsk_address.address) is False
-    assert client_1._is_subscribed_to(client_2.rsk_address.address) is False
-    assert client_2._is_subscribed_to(client_1.rsk_address.address) is False
-    assert client_2._is_subscribed_to(client_2.rsk_address.address) is False
-
-    # subscribe from node 1 to 2
-    client_1.subscribe_to(client_2.rsk_address.address)
-
-    # check subscriptions
-    assert client_1._is_subscribed_to(client_1.rsk_address.address) is False
-    assert client_1._is_subscribed_to(client_2.rsk_address.address) is True
-    assert client_2._is_subscribed_to(client_1.rsk_address.address) is False
-    assert client_2._is_subscribed_to(client_2.rsk_address.address) is False  # FIXME this fails
-
-    # now from node 2 to 1 and check again
-    client_2.subscribe_to(client_1.rsk_address.address)
-
-    assert client_1._is_subscribed_to(client_1.rsk_address.address) is False
-    assert client_1._is_subscribed_to(client_2.rsk_address.address) is True
-    assert client_2._is_subscribed_to(client_1.rsk_address.address) is True
-    assert client_2._is_subscribed_to(client_2.rsk_address.address) is False
 
 
 @pytest.mark.parametrize("nodes_to_clients", [{1: 1}])
@@ -294,7 +252,7 @@ def test_send_message_subscription(comms_clients):
         break  # only 1 message is expected
 
 
-@pytest.mark.parametrize("nodes_to_clients", [{1: 1}, {1: 2}])
+@pytest.mark.parametrize("nodes_to_clients", [{1: 1}])
 def test_send_message_self(comms_clients):
     client = comms_clients[1]
 
