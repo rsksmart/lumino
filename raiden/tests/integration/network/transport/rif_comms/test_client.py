@@ -7,12 +7,13 @@ from grpc._channel import _InactiveRpcError
 from raiden.tests.integration.network.transport.rif_comms.node import Node as CommsNode, Config as CommsConfig
 from raiden.tests.integration.network.transport.utils import generate_address
 from transport.rif_comms.client import Client
+from transport.rif_comms.cluster import Cluster
 from transport.rif_comms.utils import notification_to_payload, get_sender_from_notification
 
 
 @pytest.fixture()
-@pytest.mark.parametrize("cluster")
-def comms_clients(cluster: dict) -> Dict[int, Client]:
+@pytest.mark.parametrize("nodes_to_clients")
+def comms_clients(nodes_to_clients: dict) -> Dict[int, Client]:
     """
     The cluster dict has the following structure:
 
@@ -26,31 +27,11 @@ def comms_clients(cluster: dict) -> Dict[int, Client]:
     Values are the amount of clients connected to that node.
     """
 
-    def get_all_clients_from_cluster_nodes(comms_nodes: list) -> dict:
-        """
-        Aux function to flatten comms clients.
-        @param comms_nodes a list of CommsNode object
-        @returns a dict of clients. Each key is the client number to access
-        on each test. The value is a RIFCommsClient instance.
-        """
-        cluster_clients = {}
-        for comms_node in comms_nodes:
-            for client in comms_node.clients:
-                cluster_clients[len(cluster_clients.keys()) + 1] = client
-        return cluster_clients
-
-    nodes = list()
-    # setup
-    for cluster_key in cluster:
-        amount_of_clients = cluster[cluster_key]
-        node = CommsNode(CommsConfig(cluster_key, amount_of_clients))
-        nodes.append(node)
-    all_clients = get_all_clients_from_cluster_nodes(nodes)
-    yield all_clients
+    cluster = Cluster(nodes_to_clients)
+    yield cluster.get_clients()
 
     # teardown
-    for node in nodes:
-        node.stop()
+    cluster.shutdown()
 
 
 @pytest.mark.xfail(reason="wrong exception message from comms node")
@@ -148,10 +129,10 @@ def test_send_message_shutdown():
                 node.stop()
 
 
-@pytest.mark.parametrize("cluster", [{1: 1}, {1: 2}, {1: 2, 2: 2}])
+@pytest.mark.parametrize("nodes_to_clients", [{1: 1}, {1: 2}])
 def test_subscribe_to_invalid(comms_clients):
+    unregistered_address = generate_address()
     for client in comms_clients.values():
-        unregistered_address = generate_address()
         # no subscriptions should be present
         assert client._is_subscribed_to(unregistered_address) is False
         # subscribe to unregistered address
@@ -161,7 +142,7 @@ def test_subscribe_to_invalid(comms_clients):
         assert client._is_subscribed_to(unregistered_address) is False
 
 
-@pytest.mark.parametrize("cluster", [{1: 1}, {1: 2}, {1: 2, 2: 2}])
+@pytest.mark.parametrize("nodes_to_clients", [{1: 1}, {1: 2}, {1: 2, 2: 2}])
 def test_subscribe_to_self(comms_clients):
     for client in comms_clients.values():
         # no subscription should be present
@@ -173,7 +154,7 @@ def test_subscribe_to_self(comms_clients):
 
 
 @pytest.mark.xfail(reason="fails, multi addr issue")
-@pytest.mark.parametrize("cluster", [{1: 1, 2: 1}, {1: 2}])
+@pytest.mark.parametrize("nodes_to_clients", [{1: 1, 2: 1}, {1: 2}])
 def test_subscribe_to_peers(comms_clients):
     client_1 = comms_clients[1]
     client_2 = comms_clients[2]
@@ -198,7 +179,7 @@ def test_subscribe_to_peers(comms_clients):
     assert client_2._is_subscribed_to(client_2.rsk_address.address) is False
 
 
-@pytest.mark.parametrize("cluster", [{1: 1, 2: 1}, {1: 2}])
+@pytest.mark.parametrize("nodes_to_clients", [{1: 1, 2: 1}, {1: 2}])
 def test_subscribe_to_repeated(comms_clients):
     client_1 = comms_clients[1]
     client_2 = comms_clients[2]
@@ -214,7 +195,7 @@ def test_subscribe_to_repeated(comms_clients):
     assert client_1._is_subscribed_to(client_2.rsk_address.address) is True
 
 
-@pytest.mark.parametrize("cluster", [{1: 2}])
+@pytest.mark.parametrize("nodes_to_clients", [{1: 2}])
 def test_multiple_subscriptions_same_node(comms_clients):
     client_1 = comms_clients[1]
     client_2 = comms_clients[2]
@@ -227,7 +208,7 @@ def test_multiple_subscriptions_same_node(comms_clients):
 
 
 @pytest.mark.xfail(reason="fails, last assertion fails, multi addr issue")
-@pytest.mark.parametrize("cluster", [{1: 1, 2: 1}, {1: 2}])
+@pytest.mark.parametrize("nodes_to_clients", [{1: 1, 2: 1}, {1: 2}])
 def test_is_subscribed_to_self(comms_clients):
     client_1 = comms_clients[1]
     client_2 = comms_clients[2]
@@ -249,7 +230,7 @@ def test_is_subscribed_to_self(comms_clients):
 
 
 @pytest.mark.xfail(reason="fails, last assertion fails, multi addr issue")
-@pytest.mark.parametrize("cluster", [{1: 2}])
+@pytest.mark.parametrize("nodes_to_clients", [{1: 2}])
 def test_subscribe_to_peers_multi_address(comms_clients):
     client_1 = comms_clients[1]
     client_2 = comms_clients[2]
@@ -278,7 +259,7 @@ def test_subscribe_to_peers_multi_address(comms_clients):
     assert client_2._is_subscribed_to(client_2.rsk_address.address) is False
 
 
-@pytest.mark.parametrize("cluster", [{1: 1}])
+@pytest.mark.parametrize("nodes_to_clients", [{1: 1}])
 @pytest.mark.skip(reason="hangs, incomplete")
 def test_send_message_invalid(comms_clients):
     client = comms_clients[1]
@@ -287,7 +268,7 @@ def test_send_message_invalid(comms_clients):
     client.send_message("echo", generate_address())
 
 
-@pytest.mark.parametrize("cluster", [{1: 1, 2: 1}, {1: 2}])
+@pytest.mark.parametrize("nodes_to_clients", [{1: 1, 2: 1}, {1: 2}])
 def test_send_message_subscription(comms_clients):
     client_1 = comms_clients[1]
     client_2 = comms_clients[2]
@@ -313,7 +294,7 @@ def test_send_message_subscription(comms_clients):
         break  # only 1 message is expected
 
 
-@pytest.mark.parametrize("cluster", [{1: 1}, {1: 2}])
+@pytest.mark.parametrize("nodes_to_clients", [{1: 1}, {1: 2}])
 def test_send_message_self(comms_clients):
     client = comms_clients[1]
 
@@ -328,7 +309,7 @@ def test_send_message_self(comms_clients):
         break  # only 1 message is expected
 
 
-@pytest.mark.parametrize("cluster", [{1: 1, 2: 1}, {1: 2}])
+@pytest.mark.parametrize("nodes_to_clients", [{1: 1, 2: 1}, {1: 2}])
 def test_send_message_peers(comms_clients):
     client_1 = comms_clients[1]
     client_2 = comms_clients[2]
@@ -355,7 +336,7 @@ def test_send_message_peers(comms_clients):
         break  # only 1 message is expected
 
 
-@pytest.mark.parametrize("cluster", [{1: 1}])
+@pytest.mark.parametrize("nodes_to_clients", [{1: 1}])
 @pytest.mark.xfail(reason="exceptions are not raised from comms node")
 def test_unsubscribe_from_invalid(comms_clients):
     client = comms_clients[1]
@@ -373,7 +354,7 @@ def test_unsubscribe_from_invalid(comms_clients):
     assert "not subscribed to" in str.lower(e.value.details())
 
 
-@pytest.mark.parametrize("cluster", [{1: 1, 2: 1}, {1: 2}])
+@pytest.mark.parametrize("nodes_to_clients", [{1: 1, 2: 1}, {1: 2}])
 @pytest.mark.xfail(reason="wrong rif comms subscription behaviour cluster 2")
 def test_unsubscribe_from_self(comms_clients):
     client_1 = comms_clients[1]
@@ -396,7 +377,7 @@ def test_unsubscribe_from_self(comms_clients):
     assert client_2._is_subscribed_to(client_2.rsk_address.address) is False
 
 
-@pytest.mark.parametrize("cluster", [{1: 1, 2: 1}, {1: 2}])
+@pytest.mark.parametrize("nodes_to_clients", [{1: 1, 2: 1}, {1: 2}])
 def test_unsubscribe_from_peers(comms_clients):
     client_1 = comms_clients[1]
     client_2 = comms_clients[2]
@@ -414,7 +395,7 @@ def test_unsubscribe_from_peers(comms_clients):
     assert client_1._is_subscribed_to(client_2.rsk_address.address) is False  # check operations are independent
 
 
-@pytest.mark.parametrize("cluster", [{1: 1, 2: 1}, {1: 2}])
+@pytest.mark.parametrize("nodes_to_clients", [{1: 1, 2: 1}, {1: 2}])
 def test_send_message_sender(comms_clients):
     client_1 = comms_clients[1]
     client_2 = comms_clients[2]
