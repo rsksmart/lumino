@@ -35,6 +35,16 @@ class Client:
         """
         self.stub.ConnectToCommunicationsNode(self.rsk_address)
 
+    def _get_peer_id(self, rsk_address: Address) -> str:
+        """
+        Gets the peer ID associated with a node RSK address.
+        :param rsk_address: the RSK address which corresponds to the node to locate
+        :return: a string that represents the peer ID that matches the given address
+        """
+        return self.stub.LocatePeerId(
+            RskAddress(address=to_checksum_address(rsk_address))
+        ).address
+
     def subscribe_to(self, rsk_address: Address) -> (str, Notification):
         """
         Subscribes to a pub-sub topic in order to send messages to or receive messages from an address.
