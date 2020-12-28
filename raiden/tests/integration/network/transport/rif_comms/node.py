@@ -56,6 +56,7 @@ class Node:
         for client in self.clients:
             if self._auto_connect:
                 client.connect()
+
         return process
 
     def stop(self):
