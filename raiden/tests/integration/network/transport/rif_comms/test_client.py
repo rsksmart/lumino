@@ -153,7 +153,6 @@ def test_subscribe_to_self(comms_clients):
         assert client._is_subscribed_to(client.rsk_address.address) is True
 
 
-@pytest.mark.xfail(reason="fails, multi addr issue")
 @pytest.mark.parametrize("nodes_to_clients", [{1: 1, 2: 1}, {1: 2}])
 def test_subscribe_to_peers(comms_clients):
     client_1 = comms_clients[1]
@@ -195,7 +194,6 @@ def test_subscribe_to_repeated(comms_clients):
     assert client_1._is_subscribed_to(client_2.rsk_address.address) is True
 
 
-@pytest.mark.xfail(reason="fails, last assertion fails, multi addr issue")
 @pytest.mark.parametrize("nodes_to_clients", [{1: 1, 2: 1}, {1: 2}])
 def test_is_subscribed_to_self_mutli_address(comms_clients):
     client_1 = comms_clients[1]
@@ -295,7 +293,6 @@ def test_send_message_peers(comms_clients):
 
 
 @pytest.mark.parametrize("nodes_to_clients", [{1: 1}])
-@pytest.mark.xfail(reason="exceptions are not raised from comms node")
 def test_unsubscribe_from_invalid(comms_clients):
     client = comms_clients[1]
 
@@ -313,7 +310,6 @@ def test_unsubscribe_from_invalid(comms_clients):
 
 
 @pytest.mark.parametrize("nodes_to_clients", [{1: 1, 2: 1}, {1: 2}])
-@pytest.mark.xfail(reason="wrong rif comms subscription behaviour cluster 2")
 def test_unsubscribe_from_self(comms_clients):
     client_1 = comms_clients[1]
     client_2 = comms_clients[2]
