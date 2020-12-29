@@ -15,12 +15,12 @@ class Config:
     api_endpoint_prefix = "localhost"
     env_file_prefix = "testing_"
 
-    def __init__(self, node_number: int, amount_of_clients: int = 1, auto_connect = True):
+    def __init__(self, node_id: str, amount_of_clients: int, auto_connect=True):
         """
         Load and set a configuration attributes for a RIF Comms node.
         A valid configuration file must exist at RIF_COMMS_PATH/config/testing_<node_number>.json5
         """
-        self.env_name = self.env_file_prefix + str(node_number)
+        self.env_name = self.env_file_prefix + node_id
         # TODO: generate these files if needed
         self._env_file = RIF_COMMS_PATH.joinpath('config/' + self.env_name + '.json5')
 
@@ -53,8 +53,8 @@ class Node:
         Start a RIF Comms node process and connect to it.
         """
         process = CommsProcess.start(env_name=self._env_name)
-        for client in self.clients:
-            if self._auto_connect:
+        if self._auto_connect:
+            for client in self.clients:
                 client.connect()
 
         return process
