@@ -76,7 +76,10 @@ class Client:
         :return: boolean value indicating whether the client is subscribed or not
         """
         return self.stub.IsSubscribedToRskAddress(
-            RskAddress(address=to_checksum_address(rsk_address))
+            RskSubscription(
+                topic=RskAddress(address=to_checksum_address(rsk_address)),
+                subscriber=self.rsk_address
+            )
         ).value
 
     def send_message(self, payload: str, rsk_address: Address):

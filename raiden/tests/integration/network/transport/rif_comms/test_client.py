@@ -21,7 +21,6 @@ def comms_clients(nodes_to_clients: dict) -> Dict[int, Client]:
     cluster.stop()
 
 
-@pytest.mark.xfail(reason="wrong exception message from comms node")
 def test_connect():
     # the comms_nodes fixture is not used to prevent automatic connect
     nodes = []
@@ -101,7 +100,6 @@ def test_subscribe_to_invalid(comms_clients):
         assert client._is_subscribed_to(unregistered_address) is False
 
 
-@pytest.mark.xfail(reason="rif comms error")
 @pytest.mark.parametrize("nodes_to_clients", [{"A": 1, "B": 1}, {"B": 2}, {"A": 2, "B": 2}])
 def test_subscribe_to_self(comms_clients):
     client_1 = comms_clients[1]
@@ -123,7 +121,6 @@ def test_subscribe_to_self(comms_clients):
     assert client_1._is_subscribed_to(client_2.rsk_address.address) is False  # FIXME this fails
 
 
-@pytest.mark.xfail(reason="fails, multi addr issue")
 @pytest.mark.parametrize("nodes_to_clients", [{"A": 1, "B": 1}, {"A": 2}])
 def test_subscribe_to_peers(comms_clients):
     client_1 = comms_clients[1]
@@ -243,7 +240,6 @@ def test_send_message_peers(comms_clients):
 
 
 @pytest.mark.parametrize("nodes_to_clients", [{"A": 1}])
-@pytest.mark.xfail(reason="exceptions are not raised from comms node")
 def test_unsubscribe_from_invalid(comms_clients):
     client = comms_clients[1]
 
@@ -261,7 +257,6 @@ def test_unsubscribe_from_invalid(comms_clients):
 
 
 @pytest.mark.parametrize("nodes_to_clients", [{"A": 1, "B": 1}, {"A": 2}])
-@pytest.mark.xfail(reason="wrong rif comms subscription behaviour cluster 2")
 def test_unsubscribe_from_self(comms_clients):
     client_1 = comms_clients[1]
     client_2 = comms_clients[2]
