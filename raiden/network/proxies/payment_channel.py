@@ -223,6 +223,7 @@ class PaymentChannel:
         """ Closes the channel using the provided balance proof. """
         self.token_network.close_light(
             channel_identifier=self.channel_identifier,
+            closing_participant=self.participant1,
             partner=self.participant2,
             balance_hash=balance_hash,
             nonce=nonce,

@@ -173,8 +173,7 @@ class TokenNetworkRegistry:
                 transaction_name="createERC20TokenNetwork",
                 address=self.node_address,
                 transaction_executed=transaction_executed,
-                required_gas=required_gas,
-                block_identifier=block,
+                required_gas=required_gas
             )
 
             if self.get_token_network(token_address, block):
