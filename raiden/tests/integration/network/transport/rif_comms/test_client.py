@@ -21,7 +21,6 @@ def comms_clients(nodes_to_clients: dict) -> Dict[int, Client]:
     cluster.stop()
 
 
-@pytest.mark.xfail(reason="wrong exception message from comms node")
 def test_connect():
     # the comms_nodes fixture is not used to prevent automatic connect
     nodes = []
@@ -101,7 +100,6 @@ def test_subscribe_to_invalid(comms_clients):
         assert client._is_subscribed_to(unregistered_address) is False
 
 
-@pytest.mark.xfail(reason="rif comms error")
 @pytest.mark.parametrize("nodes_to_clients", [{"A": 1, "B": 1}, {"B": 2}, {"A": 2, "B": 2}])
 def test_subscribe_to_self(comms_clients):
     client_1 = comms_clients[1]
