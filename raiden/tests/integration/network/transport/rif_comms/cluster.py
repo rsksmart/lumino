@@ -44,5 +44,3 @@ class Cluster:
     def stop(self):
         for node in self.nodes:
             node.stop()
-
-

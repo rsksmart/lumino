@@ -1,4 +1,4 @@
-from typing import List, Dict
+from typing import Dict
 
 import pytest
 from eth_utils import to_canonical_address
@@ -14,7 +14,6 @@ from transport.rif_comms.utils import notification_to_payload, get_sender_from_n
 @pytest.fixture()
 @pytest.mark.parametrize("nodes_to_clients")
 def comms_clients(nodes_to_clients: dict) -> Dict[int, Client]:
-
     cluster = Cluster(nodes_to_clients)
     yield cluster.get_clients()
 
@@ -88,6 +87,7 @@ def test_connect_peers():
         for node in nodes:
             node.stop()
 
+
 @pytest.mark.parametrize("nodes_to_clients", [{"A": 1}, {"A": 2}])
 def test_subscribe_to_invalid(comms_clients):
     unregistered_address = generate_address()
@@ -139,7 +139,7 @@ def test_subscribe_to_peers(comms_clients):
     assert client_1._is_subscribed_to(client_1.rsk_address.address) is False
     assert client_1._is_subscribed_to(client_2.rsk_address.address) is True
     assert client_2._is_subscribed_to(client_1.rsk_address.address) is False
-    assert client_2._is_subscribed_to(client_2.rsk_address.address) is False # FIXME this fails
+    assert client_2._is_subscribed_to(client_2.rsk_address.address) is False  # FIXME this fails
 
     topic_id_2, _ = client_2.subscribe_to(client_1.rsk_address.address)
     assert topic_id_2
