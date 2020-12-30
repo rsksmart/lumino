@@ -28,7 +28,7 @@ service CommunicationsApi {
     rpc HasSubscriber(Subscriber) returns (BooleanResponse);
 
     //Query if a subscriber exists in a participating channel
-    rpc IsSubscribedToRskAddress(RskAddress) returns (BooleanResponse);
+    rpc IsSubscribedToRskAddress(RskSubscription) returns (BooleanResponse);
 
     //Send a direct message to a peer
     rpc SendMessage(Msg) returns (Void);
