@@ -100,7 +100,7 @@ def test_subscribe_to_invalid(comms_clients):
         assert client._is_subscribed_to(unregistered_address) is False
 
 
-@pytest.mark.parametrize("nodes_to_clients", [{"A": 1, "B": 2}])
+@pytest.mark.parametrize("nodes_to_clients", [{"A": 1, "B": 1}, {"A": 2}])
 def test_subscribe_to_self(comms_clients):
     client_1 = comms_clients[1]
     client_2 = comms_clients[2]
@@ -138,6 +138,7 @@ def test_subscribe_to_peers(comms_clients):
     assert client_2._is_subscribed_to(client_1.rsk_address.address) is False
     assert client_2._is_subscribed_to(client_2.rsk_address.address) is False
 
+    # subscribe from node 2 to 1 and check subscriptions
     topic_id_2, _ = client_2.subscribe_to(client_1.rsk_address.address)
     assert topic_id_2
     assert client_1._is_subscribed_to(client_1.rsk_address.address) is False
