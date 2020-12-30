@@ -38,7 +38,7 @@ class Cluster:
         cluster_clients = {}
         for comms_node in self.nodes:
             for client in comms_node.clients:
-                cluster_clients[len(cluster_clients.keys()) + 1] = client
+                cluster_clients[len(cluster_clients.keys()) + 1] = client  # start from key "1"
         return cluster_clients
 
     def stop(self):
