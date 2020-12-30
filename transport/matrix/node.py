@@ -699,6 +699,7 @@ class MatrixNode(TransportNode):
         address_pair = sorted(
             [to_normalized_address(address) for address in [address, self._raiden_service.address]]
         )
+        print("making room alias")
         room_name = make_room_alias(self.network_id, *address_pair)
 
         # no room with expected name => create one and invite peer

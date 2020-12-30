@@ -47,7 +47,8 @@ from raiden.transfer.mediated_transfer.state import (
 from raiden.transfer.mediated_transfer.state_change import (
     ReceiveLockExpired,
     ReceiveTransferRefund,
-    ReceiveLockExpiredLight)
+    ReceiveLockExpiredLight
+)
 from raiden.transfer.merkle_tree import LEAVES, compute_layers, merkleroot
 from raiden.transfer.state import (
     CHANNEL_STATE_CLOSED,
@@ -69,7 +70,8 @@ from raiden.transfer.state import (
     UnlockPartialProofState,
     make_empty_merkle_tree,
     message_identifier_from_prng,
-    balanceproof_from_envelope)
+    balanceproof_from_envelope
+)
 from raiden.transfer.state_change import (
     ActionChannelClose,
     ActionChannelSetFee,
@@ -80,7 +82,9 @@ from raiden.transfer.state_change import (
     ContractReceiveChannelSettled,
     ContractReceiveUpdateTransfer,
     ReceiveUnlock,
-    ContractReceiveChannelClosedLight, ContractReceiveChannelSettledLight)
+    ContractReceiveChannelClosedLight,
+    ContractReceiveChannelSettledLight
+)
 from raiden.transfer.utils import hash_balance_data
 from raiden.utils import pex
 from raiden.utils.signer import recover
@@ -116,7 +120,8 @@ from raiden.utils.typing import (
     TokenNetworkID,
     Tuple,
     Union,
-    cast)
+    cast
+)
 
 # This should be changed to `Union[str, MerkleTreeState]`
 MerkletreeOrError = Tuple[bool, Optional[str], Optional[MerkleTreeState]]
@@ -565,6 +570,8 @@ def valid_lockedtransfer_check(
         channel_state=channel_state,
         sender_state=sender_state,
     )
+    print("is balance proof usable")
+    print(invalid_balance_proof_msg)
 
     result: MerkletreeOrError = (False, None, None, None)
 

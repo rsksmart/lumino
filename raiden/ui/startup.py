@@ -49,9 +49,7 @@ def environment_type_to_contracts_version(environment_type: Environment) -> str:
 def setup_environment(config: Dict[str, Any], environment_type: Environment) -> None:
     """Sets the config depending on the environment type"""
     # interpret the provided string argument
-    if environment_type == Environment.PRODUCTION:
-        # Safe configuration: restrictions for mainnet apply and matrix rooms have to be private
-        config["transport"]["matrix"]["private_rooms"] = True
+    config["transport"]["matrix"]["private_rooms"] = True
 
     config["environment_type"] = environment_type
 
