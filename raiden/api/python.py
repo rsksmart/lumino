@@ -73,8 +73,7 @@ from raiden.transfer.state import (
     PaymentMappingState
 )
 from raiden.transfer.state_change import ActionChannelClose
-from raiden.utils import pex, typing
-from raiden.utils import random_secret, sha3
+from raiden.utils import pex, typing, random_secret, sha3
 from raiden.utils.gas_reserve import has_enough_gas_reserve
 from raiden.utils.rns import is_rns_address
 from raiden.utils.typing import (
@@ -100,7 +99,8 @@ from raiden.utils.typing import (
     TokenNetworkID,
     Tuple,
     SignedTransaction,
-    InitiatorAddress)
+    InitiatorAddress
+)
 
 log = structlog.get_logger(__name__)  # pylint: disable=invalid-name
 

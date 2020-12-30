@@ -33,7 +33,7 @@ class Process:
         )
 
         # FIXME: we need some sort of ping call, this might sometimes not be enough
-        time.sleep(5)  # hack to get around calling the comms node before it is ready
+        time.sleep(7)  # hack to get around calling the comms node before it is ready
 
         return process
 
