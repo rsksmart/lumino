@@ -18,7 +18,7 @@ class Config:
     def __init__(self, node_id: str, amount_of_clients: int, auto_connect=True):
         """
         Load and set a configuration attributes for a RIF Comms node.
-        A valid configuration file must exist at RIF_COMMS_PATH/config/testing_<node_number>.json5
+        A valid configuration file must exist at RIF_COMMS_PATH/config/testing_<node_id>.json5
         """
         self.env_name = self.env_file_prefix + node_id
         # TODO: generate these files if needed
