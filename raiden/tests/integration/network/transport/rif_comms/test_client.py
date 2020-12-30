@@ -118,7 +118,7 @@ def test_subscribe_to_self(comms_clients):
 
     # should not be subscribed to each other, even if they share comms node
     assert client_2._is_subscribed_to(client_1.rsk_address.address) is False
-    assert client_1._is_subscribed_to(client_2.rsk_address.address) is False  # FIXME this fails
+    assert client_1._is_subscribed_to(client_2.rsk_address.address) is False
 
 
 @pytest.mark.parametrize("nodes_to_clients", [{"A": 1, "B": 1}, {"A": 2}])
@@ -136,7 +136,7 @@ def test_subscribe_to_peers(comms_clients):
     assert client_1._is_subscribed_to(client_1.rsk_address.address) is False
     assert client_1._is_subscribed_to(client_2.rsk_address.address) is True
     assert client_2._is_subscribed_to(client_1.rsk_address.address) is False
-    assert client_2._is_subscribed_to(client_2.rsk_address.address) is False  # FIXME this fails
+    assert client_2._is_subscribed_to(client_2.rsk_address.address) is False
 
     topic_id_2, _ = client_2.subscribe_to(client_1.rsk_address.address)
     assert topic_id_2
@@ -167,7 +167,7 @@ def test_subscribe_to_repeated(comms_clients):
 def test_send_message_invalid(comms_clients):
     client = comms_clients[1]
     # send message to unregistered peer
-    # FIXME: hangs
+    # FIXME: raises no peers on routing table
     client.send_message("echo", generate_address())
 
 
@@ -320,7 +320,7 @@ def test_unsubscribe_from_self(comms_clients):
 
     client_2.subscribe_to(client_2.rsk_address.address)
     assert client_2._is_subscribed_to(client_2.rsk_address.address) is True
-    assert client_2._is_subscribed_to(client_1.rsk_address.address) is False  # FIXME this fails scenario cluster 2
+    assert client_2._is_subscribed_to(client_1.rsk_address.address) is False
 
     client_1.unsubscribe_from(client_1.rsk_address.address)
     assert client_1._is_subscribed_to(client_1.rsk_address.address) is False
