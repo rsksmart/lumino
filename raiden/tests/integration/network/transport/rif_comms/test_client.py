@@ -291,7 +291,7 @@ def test_send_message_shutdown():
                 node.stop()
 
 
-@pytest.mark.parametrize("nodes_to_clients", [{"A": 1}])
+@pytest.mark.parametrize("nodes_to_clients", [{"A": 1}, {"A": 2}])
 def test_unsubscribe_from_invalid(comms_clients):
     client = comms_clients[1]
 
