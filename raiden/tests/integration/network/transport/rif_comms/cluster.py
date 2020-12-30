@@ -14,13 +14,13 @@ class Cluster:
         """
         The nodes_to_clients dict must respect the following structure:
         {
-            "A": 3 // a node with 3 clients connected
-            "B": 1 // a node with a client
-            "C": 2 // another node with 2 clients connected
+            "A": 3, // a node with 3 clients connected
+            "B": 1, // a node with a client
+            "C": 2, // another node with 2 clients connected
         }
 
-        Keys must be letters of the alphabet.
-        Values are the amount of clients connected to that node.
+        Keys must be letters of the alphabet, which represent node names.
+        Values correspond the amount of clients connected to that node.
         """
         self.nodes_to_clients = nodes_to_clients
         self.nodes = []
