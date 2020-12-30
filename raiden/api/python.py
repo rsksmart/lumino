@@ -1,16 +1,17 @@
 import hashlib
 import random
+import string
 from datetime import datetime, date
 from http import HTTPStatus
 
 import dateutil.parser
 import gevent
-import raiden.blockchain.events as blockchain_events
-import string
 import structlog
 from dateutil.relativedelta import relativedelta
 from eth_utils import is_binary_address, to_checksum_address, to_canonical_address, to_normalized_address, encode_hex
 from gevent import Greenlet
+
+import raiden.blockchain.events as blockchain_events
 from raiden import waiting, routing
 from raiden.api.validations.api_error_builder import ApiErrorBuilder
 from raiden.api.validations.channel_validator import ChannelValidator
@@ -72,8 +73,7 @@ from raiden.transfer.state import (
     PaymentMappingState
 )
 from raiden.transfer.state_change import ActionChannelClose
-from raiden.utils import pex, typing
-from raiden.utils import random_secret, sha3
+from raiden.utils import pex, typing, random_secret, sha3
 from raiden.utils.gas_reserve import has_enough_gas_reserve
 from raiden.utils.rns import is_rns_address
 from raiden.utils.typing import (
@@ -99,7 +99,8 @@ from raiden.utils.typing import (
     TokenNetworkID,
     Tuple,
     SignedTransaction,
-    InitiatorAddress)
+    InitiatorAddress
+)
 
 log = structlog.get_logger(__name__)  # pylint: disable=invalid-name
 

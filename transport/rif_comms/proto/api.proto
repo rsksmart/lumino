@@ -7,7 +7,7 @@ service CommunicationsApi {
     //The client can be notified of events in their subscriptions
 
     //Open a data stream with the server, it can only receive messages
-    rpc ConnectToCommunicationsNode(RskAddress) returns (stream Notification);
+    rpc ConnectToCommunicationsNode(RskAddress) returns (Notification);
 
     //Close the data stream
     rpc EndCommunication(Void) returns (Void);
@@ -28,7 +28,7 @@ service CommunicationsApi {
     rpc HasSubscriber(Subscriber) returns (BooleanResponse);
 
     //Query if a subscriber exists in a participating channel
-    rpc IsSubscribedToRskAddress(RskAddress) returns (BooleanResponse);
+    rpc IsSubscribedToRskAddress(RskSubscription) returns (BooleanResponse);
 
     //Send a direct message to a peer
     rpc SendMessage(Msg) returns (Void);
@@ -40,10 +40,10 @@ service CommunicationsApi {
 
     //Creates topic for specific peerID/Rsk Address
     rpc CreateTopicWithPeerId(PeerId) returns (stream Notification);
-    rpc CreateTopicWithRskAddress(RskAddress) returns (stream Notification);
+    rpc CreateTopicWithRskAddress(RskSubscription) returns (stream Notification);
 
     //Close Topic for a specific topicID
-    rpc CloseTopicWithRskAddress (RskAddress) returns (Void);
+    rpc CloseTopicWithRskAddress (RskSubscription) returns (Void);
 
     //Send Message to Specified Topic
     rpc SendMessageToTopic(PublishPayload) returns (Void);
@@ -66,9 +66,19 @@ message RskAddress {
     bool exclusive= 2;
 }
 
+message RskSubscription {
+    RskAddress subscriber = 1;
+    RskAddress topic =  2;
+}
+
 message PeerId {
     string address = 1;
     bool exclusive= 2;
+}
+
+message PeerSubscription {
+    PeerId subscriber = 1;
+    PeerId topic =  2;
 }
 
 /*RPC needs a message, so when there are no params to send, this empty message is used*/
@@ -88,7 +98,8 @@ message PublishPayload {
 
 message RskAddressPublish {
     RskAddress receiver = 1;
-    Msg message = 2;
+    RskAddress sender = 2;
+    Msg message = 3;
 }
 
 // Set of peerIDs subscribed to a specific channel
@@ -119,6 +130,9 @@ message Notification {
         ChannelPeerJoined channelPeerJoined = 6;
         ServerNotification serverNotification = 7;
         SubscribeError subscribeError = 8;
+        ConnectCommsError connectCommsError = 9;
+        EndCommsError endCommsError = 10;
+        
     }
 }
 
@@ -158,10 +172,11 @@ message PeerSignatureResponse {
 
 //You've received new data from a subscribed channel
 message ChannelNewData {
-    optional string from = 1; // PeerID of the publisher
-    bytes data = 2; // The actual information published
-    bytes nonce = 3; // Sequence number of the publisher's publications in the channel/s
-    repeated Channel channel = 4; //List of topics where the data was published
+    optional PeerId peer = 1; // PeerID of the publisher
+    optional RskAddress sender = 2; // RskAddress of the sender
+    bytes data = 3; // The actual information published
+    bytes nonce = 4; // Sequence number of the publisher's publications in the channel/s
+    repeated Channel channel = 5; //List of topics where the data was published
 }
 
 //A peer left from one of your subscribed channels
@@ -183,8 +198,18 @@ message ServerNotification {
 }
 
 
-//A subscribe has failled
+//A subscribe has failed
 message SubscribeError {
     Channel channel = 1;
     string reason = 2;
+}
+
+//Comms could not be terminated
+message EndCommsError {
+    string reason = 1;
+}
+
+//Comms could not be initialized
+message ConnectCommsError {
+    string reason = 1;
 }

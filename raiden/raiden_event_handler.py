@@ -3,7 +3,8 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
 import structlog
-from eth_utils import to_checksum_address, to_hex, encode_hex, to_canonical_address
+from eth_utils import to_checksum_address, to_hex, encode_hex
+
 from raiden.api.objects import SettlementParameters
 from raiden.billing.invoices.handlers.invoice_handler import handle_receive_events_with_payments
 from raiden.constants import EMPTY_BALANCE_HASH, EMPTY_HASH, EMPTY_MESSAGE_HASH, EMPTY_SIGNATURE

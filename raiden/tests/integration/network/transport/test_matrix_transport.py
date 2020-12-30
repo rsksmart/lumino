@@ -4,9 +4,10 @@ from unittest.mock import MagicMock
 
 import gevent
 import pytest
-import raiden
 from eth_utils import to_checksum_address
 from gevent import Timeout
+
+import raiden
 from raiden.constants import (
     MONITORING_BROADCASTING_ROOM,
     PATH_FINDING_BROADCASTING_ROOM,
@@ -494,7 +495,6 @@ def test_join_invalid_discovery(
     """
 
     address = to_checksum_address(privatekey_to_address(private_keys[0]))
-
     transport = MatrixTransportNode(
         address=address,
         config={
@@ -564,7 +564,6 @@ def test_matrix_discovery_room_offline_server(
     local_matrix_servers, retries_before_backoff, retry_interval, private_rooms, global_rooms, private_keys
 ):
     address = to_checksum_address(privatekey_to_address(private_keys[0]))
-
     transport = MatrixTransportNode(
         address=address,
         config={
@@ -591,7 +590,6 @@ def test_matrix_send_global(
     local_matrix_servers, retries_before_backoff, retry_interval, private_rooms, global_rooms, private_keys
 ):
     address = to_checksum_address(privatekey_to_address(private_keys[0]))
-
     transport = MatrixTransportNode(
         address=address,
         config={

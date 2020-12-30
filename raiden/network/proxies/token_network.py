@@ -1,5 +1,5 @@
 from collections import defaultdict
-from typing import Any, Dict, List, NamedTuple, Optional, Tuple
+from typing import Any, Dict, List, NamedTuple, Optional, Tuple, Callable
 from dataclasses import dataclass
 
 import structlog
@@ -32,7 +32,7 @@ from raiden.exceptions import (
     RaidenRecoverableError,
     RaidenUnrecoverableError,
     SamePeerAddress,
-    RawTransactionFailed)
+    RawTransactionFailed, ProxyTransactionError)
 from raiden.network.proxies.token import Token
 from raiden.network.proxies.utils import compare_contract_versions
 from raiden.network.rpc.client import StatelessFilter, check_address_has_code
@@ -142,14 +142,15 @@ class TokenNetwork:
         self.node_address = self.client.address
         self.open_channel_transactions: Dict[OpenChannelTrKey, AsyncResult] = dict()
 
-        # Forbids concurrent operations on the same channel
+        # Forbids concurrent operations on the same channel on the same participant
+        self.channel_blocking_operations: Dict[ChannelID, RLock] = defaultdict(RLock)
 
-        self.channel_operations_lock: Dict[Address, RLock] = defaultdict(RLock)
-
-        # Serializes concurent deposits on this token network. This must be an
+        # Serializes concurrent deposits on this token network. This must be an
         # exclusive lock, since we need to coordinate the approve and
         # setTotalDeposit calls.
-        self.deposit_lock = Semaphore()
+        # we use the initiator address as the key because we want to block deposits by initiator address
+        # since for LC's we can have different initiators and we don't want to block different clients.
+        self.channel_deposit_blocking_operations: Dict[Address, Semaphore] = defaultdict(Semaphore)
 
     def _call_and_check_result(
         self, block_identifier: BlockSpecification, function_name: str, *args, **kwargs
@@ -161,6 +162,12 @@ class TokenNetwork:
             raise RuntimeError(f"Call to '{function_name}' returned nothing")
 
         return call_result
+
+    def lock_and_execute_channel_operation(self,
+                                           channel_identifier: ChannelID,
+                                           blocking_operation: Callable) -> Optional[Any]:
+        with self.channel_blocking_operations[channel_identifier]:
+            return blocking_operation()
 
     def token_address(self) -> Address:
         """ Return the token of this manager. """
@@ -723,90 +730,95 @@ class TokenNetwork:
             contract_manager=self.contract_manager,
         )
         checking_block = self.client.get_checking_block()
-        with self.channel_operations_lock[partner], self.deposit_lock:
-            previous_total_deposit = self._detail_participant(
-                channel_identifier=channel_identifier,
-                participant=creator,
-                partner=partner,
-                block_identifier=given_block_identifier,
-            ).deposit
-            amount_to_deposit = TokenAmount(total_deposit - previous_total_deposit)
-            log_details = {
-                "token_network": pex(self.address),
-                "channel_identifier": channel_identifier,
-                "node": pex(creator),
-                "partner": pex(partner),
-                "new_total_deposit": total_deposit,
-                "previous_total_deposit": previous_total_deposit,
-            }
-            try:
-                self._deposit_preconditions(
-                    channel_identifier=channel_identifier,
-                    total_deposit=total_deposit,
-                    creator=creator,
-                    partner=partner,
-                    token=token,
-                    previous_total_deposit=previous_total_deposit,
-                    log_details=log_details,
-                    block_identifier=given_block_identifier,
-                )
-            except NoStateForBlockIdentifier:
-                # If preconditions end up being on pruned state skip them. Estimate
-                # gas will stop us from sending a transaction that will fail
-                pass
-            # See comments of set_total_deposit of why approval is always executed.
-            try:
-                approval_hash = self.proxy.broadcast_signed_transaction(signed_approval_tx)
-            except HTTPError as e:
-                log.warning("approval failed: transaction malformed", ex=e, **log_details)
-                raise RawTransactionFailed("Approval for Light Client raw transaction malformed")
-            self.client.poll(approval_hash)
-            approval_receipt_or_none = check_transaction_threw(self.client, approval_hash)
-            if approval_receipt_or_none:
-                log.warning("approval failed: receipt status failed", **log_details)
-                raise RawTransactionFailed("Approval for Light Client raw transaction receipt status failed")
-            else:
-                log.info("approve light successful", **log_details)
-                deposit_hash = None
-                gas_limit = self.proxy.estimate_gas(
-                    checking_block,
-                    "setTotalDeposit",
+
+        def make_deposit():
+            with self.channel_deposit_blocking_operations[creator]:
+                previous_total_deposit = self._detail_participant(
                     channel_identifier=channel_identifier,
                     participant=creator,
-                    total_deposit=total_deposit,
                     partner=partner,
-                )
-                if gas_limit:
-                    gas_limit = safe_gas_limit(gas_limit, GAS_REQUIRED_FOR_SET_TOTAL_DEPOSIT)
-                    try:
-                        log.info("setTotalDeposit light called", **log_details)
-                        deposit_hash = self.proxy.broadcast_signed_transaction(signed_deposit_tx)
-                    except HTTPError as e:
-                        log.warning("setTotalDeposit failed: transaction malformed", ex=e, **log_details)
-                        raise RawTransactionFailed("Light Client raw transaction malformed")
-                    self.client.poll(deposit_hash)
-
-                deposit_receipt_or_none = check_transaction_threw(self.client, deposit_hash)
-                deposit_executed = gas_limit is not None
-                if deposit_receipt_or_none or not deposit_executed:
-                    log.warning("setTotalDeposit for Light Client raw transaction receipt status failed",
-                                **log_details)
-                    if deposit_executed:
-                        block = deposit_receipt_or_none["blockNumber"]
-                    else:
-                        block = checking_block
-                    self._check_deposit_failure_reasons(
+                    block_identifier=given_block_identifier,
+                ).deposit
+                amount_to_deposit = TokenAmount(total_deposit - previous_total_deposit)
+                log_details = {
+                    "token_network": pex(self.address),
+                    "channel_identifier": channel_identifier,
+                    "node": pex(creator),
+                    "partner": pex(partner),
+                    "new_total_deposit": total_deposit,
+                    "previous_total_deposit": previous_total_deposit,
+                }
+                try:
+                    self._deposit_preconditions(
                         channel_identifier=channel_identifier,
+                        total_deposit=total_deposit,
                         creator=creator,
                         partner=partner,
                         token=token,
-                        amount_to_deposit=amount_to_deposit,
-                        total_deposit=total_deposit,
-                        transaction_executed=deposit_executed,
-                        block_identifier=block,
-                        log_details=log_details
+                        previous_total_deposit=previous_total_deposit,
+                        log_details=log_details,
+                        block_identifier=given_block_identifier,
                     )
-                log.info("setTotalDeposit light successful", **log_details)
+                except NoStateForBlockIdentifier:
+                    # If preconditions end up being on pruned state skip them. Estimate
+                    # gas will stop us from sending a transaction that will fail
+                    pass
+                # See comments of set_total_deposit of why approval is always executed.
+                try:
+                    approval_hash = self.proxy.broadcast_signed_transaction(signed_approval_tx)
+                except HTTPError as e:
+                    log.warning("approval failed: transaction malformed", ex=e, **log_details)
+                    raise RawTransactionFailed("Approval for Light Client raw transaction malformed")
+                self.client.poll(approval_hash)
+                approval_receipt_or_none = check_transaction_threw(self.client, approval_hash)
+                if approval_receipt_or_none:
+                    log.warning("approval failed: receipt status failed", **log_details)
+                    raise RawTransactionFailed("Approval for Light Client raw transaction receipt status failed")
+                else:
+                    log.info("approve light successful", **log_details)
+                    deposit_hash = None
+                    gas_limit = self.proxy.estimate_gas(
+                        checking_block,
+                        "setTotalDeposit",
+                        channel_identifier=channel_identifier,
+                        participant=creator,
+                        total_deposit=total_deposit,
+                        partner=partner,
+                    )
+                    if gas_limit:
+                        gas_limit = safe_gas_limit(gas_limit, GAS_REQUIRED_FOR_SET_TOTAL_DEPOSIT)
+                        try:
+                            log.info("setTotalDeposit light called", **log_details)
+                            deposit_hash = self.proxy.broadcast_signed_transaction(signed_deposit_tx)
+                        except HTTPError as e:
+                            log.warning("setTotalDeposit failed: transaction malformed", ex=e, **log_details)
+                            raise RawTransactionFailed("Light Client raw transaction malformed")
+                        self.client.poll(deposit_hash)
+
+                    deposit_receipt_or_none = check_transaction_threw(self.client, deposit_hash)
+                    deposit_executed = gas_limit is not None
+                    if deposit_receipt_or_none or not deposit_executed:
+                        log.warning("setTotalDeposit for Light Client raw transaction receipt status failed",
+                                    **log_details)
+                        if deposit_executed:
+                            block = deposit_receipt_or_none["blockNumber"]
+                        else:
+                            block = checking_block
+                        self._check_deposit_failure_reasons(
+                            channel_identifier=channel_identifier,
+                            creator=creator,
+                            partner=partner,
+                            token=token,
+                            amount_to_deposit=amount_to_deposit,
+                            total_deposit=total_deposit,
+                            transaction_executed=deposit_executed,
+                            block_identifier=block,
+                            log_details=log_details
+                        )
+                    log.info("setTotalDeposit light successful", **log_details)
+
+        self.lock_and_execute_channel_operation(channel_identifier=channel_identifier,
+                                                blocking_operation=make_deposit)
 
     def set_total_deposit(
         self,
@@ -854,101 +866,106 @@ class TokenNetwork:
             contract_manager=self.contract_manager,
         )
         checking_block = self.client.get_checking_block()
-        with self.channel_operations_lock[partner], self.deposit_lock:
-            previous_total_deposit = self._detail_participant(
-                channel_identifier=channel_identifier,
-                participant=self.node_address,
-                partner=partner,
-                block_identifier=given_block_identifier,
-            ).deposit
-            amount_to_deposit = TokenAmount(total_deposit - previous_total_deposit)
-            log_details = {
-                "token_network": pex(self.address),
-                "channel_identifier": channel_identifier,
-                "node": pex(self.node_address),
-                "partner": pex(partner),
-                "new_total_deposit": total_deposit,
-                "previous_total_deposit": previous_total_deposit,
-            }
-            try:
-                self._deposit_preconditions(
+
+        def make_deposit():
+            with self.channel_deposit_blocking_operations[self.node_address]:
+                previous_total_deposit = self._detail_participant(
                     channel_identifier=channel_identifier,
-                    total_deposit=total_deposit,
-                    creator=self.node_address,
+                    participant=self.node_address,
                     partner=partner,
-                    token=token,
-                    previous_total_deposit=previous_total_deposit,
-                    log_details=log_details,
                     block_identifier=given_block_identifier,
-                )
-            except NoStateForBlockIdentifier:
-                # If preconditions end up being on pruned state skip them. Estimate
-                # gas will stop us from sending a transaction that will fail
-                pass
+                ).deposit
+                amount_to_deposit = TokenAmount(total_deposit - previous_total_deposit)
+                log_details = {
+                    "token_network": pex(self.address),
+                    "channel_identifier": channel_identifier,
+                    "node": pex(self.node_address),
+                    "partner": pex(partner),
+                    "new_total_deposit": total_deposit,
+                    "previous_total_deposit": previous_total_deposit,
+                }
+                try:
+                    self._deposit_preconditions(
+                        channel_identifier=channel_identifier,
+                        total_deposit=total_deposit,
+                        creator=self.node_address,
+                        partner=partner,
+                        token=token,
+                        previous_total_deposit=previous_total_deposit,
+                        log_details=log_details,
+                        block_identifier=given_block_identifier,
+                    )
+                except NoStateForBlockIdentifier:
+                    # If preconditions end up being on pruned state skip them. Estimate
+                    # gas will stop us from sending a transaction that will fail
+                    pass
 
-            # If there are channels being set up concurrenlty either the
-            # allowance must be accumulated *or* the calls to `approve` and
-            # `setTotalDeposit` must be serialized. This is necessary otherwise
-            # the deposit will fail.
-            #
-            # Calls to approve and setTotalDeposit are serialized with the
-            # deposit_lock to avoid transaction failure, because with two
-            # concurrent deposits, we may have the transactions executed in the
-            # following order
-            #
-            # - approve
-            # - approve
-            # - setTotalDeposit
-            # - setTotalDeposit
-            #
-            # in which case  the second `approve` will overwrite the first,
-            # and the first `setTotalDeposit` will consume the allowance,
-            #  making the second deposit fail.
-            token.approve(allowed_address=Address(self.address), allowance=amount_to_deposit)
+                # If there are channels being set up concurrenlty either the
+                # allowance must be accumulated *or* the calls to `approve` and
+                # `setTotalDeposit` must be serialized. This is necessary otherwise
+                # the deposit will fail.
+                #
+                # Calls to approve and setTotalDeposit are serialized with the
+                # deposit_lock to avoid transaction failure, because with two
+                # concurrent deposits, we may have the transactions executed in the
+                # following order
+                #
+                # - approve
+                # - approve
+                # - setTotalDeposit
+                # - setTotalDeposit
+                #
+                # in which case  the second `approve` will overwrite the first,
+                # and the first `setTotalDeposit` will consume the allowance,
+                #  making the second deposit fail.
+                token.approve(allowed_address=Address(self.address), allowance=amount_to_deposit)
 
-            gas_limit = self.proxy.estimate_gas(
-                checking_block,
-                "setTotalDeposit",
-                channel_identifier=channel_identifier,
-                participant=self.node_address,
-                total_deposit=total_deposit,
-                partner=partner,
-            )
-
-            if gas_limit:
-                gas_limit = safe_gas_limit(gas_limit, GAS_REQUIRED_FOR_SET_TOTAL_DEPOSIT)
-                log.info("setTotalDeposit called", **log_details)
-                transaction_hash = self.proxy.transact(
+                gas_limit = self.proxy.estimate_gas(
+                    checking_block,
                     "setTotalDeposit",
-                    gas_limit,
                     channel_identifier=channel_identifier,
                     participant=self.node_address,
                     total_deposit=total_deposit,
                     partner=partner,
                 )
-                self.client.poll(transaction_hash)
-                receipt_or_none = check_transaction_threw(self.client, transaction_hash)
 
-            transaction_executed = gas_limit is not None
-            if not transaction_executed or receipt_or_none:
-                if transaction_executed:
-                    block = receipt_or_none["blockNumber"]
-                else:
-                    block = checking_block
+                if gas_limit:
+                    gas_limit = safe_gas_limit(gas_limit, GAS_REQUIRED_FOR_SET_TOTAL_DEPOSIT)
+                    log.info("setTotalDeposit called", **log_details)
+                    transaction_hash = self.proxy.transact(
+                        "setTotalDeposit",
+                        gas_limit,
+                        channel_identifier=channel_identifier,
+                        participant=self.node_address,
+                        total_deposit=total_deposit,
+                        partner=partner,
+                    )
+                    self.client.poll(transaction_hash)
+                    receipt_or_none = check_transaction_threw(self.client, transaction_hash)
 
-                self._check_deposit_failure_reasons(
-                    channel_identifier=channel_identifier,
-                    creator=self.node_address,
-                    partner=partner,
-                    token=token,
-                    amount_to_deposit=amount_to_deposit,
-                    total_deposit=total_deposit,
-                    transaction_executed=transaction_executed,
-                    block_identifier=block,
-                    log_details=log_details
-                )
+                transaction_executed = gas_limit is not None
+                if not transaction_executed or receipt_or_none:
+                    if transaction_executed:
+                        block = receipt_or_none["blockNumber"]
+                    else:
+                        block = checking_block
 
-            log.info("setTotalDeposit successful", **log_details)
+                    self._check_deposit_failure_reasons(
+                        channel_identifier=channel_identifier,
+                        creator=self.node_address,
+                        partner=partner,
+                        token=token,
+                        amount_to_deposit=amount_to_deposit,
+                        total_deposit=total_deposit,
+                        transaction_executed=transaction_executed,
+                        block_identifier=block,
+                        log_details=log_details
+                    )
+
+                log.info("setTotalDeposit successful", **log_details)
+
+        self.lock_and_execute_channel_operation(channel_identifier=channel_identifier,
+                                                blocking_operation=make_deposit)
 
     def _check_why_deposit_failed(
         self,
@@ -1095,24 +1112,22 @@ class TokenNetwork:
         else:
             onchain_channel_identifier = channel_onchain_detail.channel_identifier
             if onchain_channel_identifier != channel_identifier:
-                msg = (
+                raise RaidenUnrecoverableError(
                     f"The provided channel identifier does not match the value "
                     f"on-chain at the provided block ({given_block_identifier}). "
                     f"This call should never have been attempted. "
                     f"provided_channel_identifier={channel_identifier}, "
                     f"onchain_channel_identifier={channel_onchain_detail.channel_identifier}"
                 )
-                raise RaidenUnrecoverableError(msg)
 
             if channel_onchain_detail.state != ChannelState.OPENED:
-                msg = (
+                raise RaidenUnrecoverableError(
                     f"The channel was not open at the provided block "
                     f"({given_block_identifier}). This call should never have "
                     f"been attempted."
                 )
-                raise RaidenUnrecoverableError(msg)
 
-        with self.channel_operations_lock[partner]:
+        def close_light_channel():
             checking_block = self.client.get_checking_block()
             gas_limit = self.proxy.estimate_gas(
                 checking_block,
@@ -1126,18 +1141,6 @@ class TokenNetwork:
             )
 
             if gas_limit:
-                # transaction_hash = self.proxy.transact(
-                #     "closeChannel",
-                #     safe_gas_limit(gas_limit, GAS_REQUIRED_FOR_CLOSE_CHANNEL),
-                #     channel_identifier=channel_identifier,
-                #     partner=partner,
-                #     balance_hash=balance_hash,
-                #     nonce=nonce,
-                #     additional_hash=additional_hash,
-                #     signature=signature,
-                # )
-
-                print("Sending signed_close_tx")
                 transaction_hash = self.proxy.broadcast_signed_transaction(signed_close_tx)
 
                 self.client.poll(transaction_hash)
@@ -1160,13 +1163,12 @@ class TokenNetwork:
                     mining_block = int(receipt_or_none["blockNumber"])
 
                     if receipt_or_none["cumulativeGasUsed"] == gas_limit:
-                        msg = (
+                        raise RaidenUnrecoverableError(
                             "update transfer failed and all gas was used. Estimate gas "
                             "may have underestimated update transfer, or succeeded even "
                             "though an assert is triggered, or the smart contract code "
                             "has an conditional assert."
                         )
-                        raise RaidenUnrecoverableError(msg)
 
                     partner_details = self._detail_participant(
                         channel_identifier=channel_identifier,
@@ -1176,8 +1178,7 @@ class TokenNetwork:
                     )
 
                     if partner_details.is_closer:
-                        msg = "Channel was already closed by channel partner first."
-                        raise RaidenRecoverableError(msg)
+                        raise RaidenRecoverableError("Channel was already closed by channel partner first.")
 
                     raise RaidenUnrecoverableError("closeChannel call failed")
 
@@ -1206,20 +1207,21 @@ class TokenNetwork:
                 )
 
                 if detail.state < ChannelState.OPENED:
-                    msg = (
+                    raise RaidenUnrecoverableError(
                         f"cannot call close channel has not been opened yet. "
                         f"current_state={detail.state}"
                     )
-                    raise RaidenUnrecoverableError(msg)
 
                 if detail.state >= ChannelState.CLOSED:
-                    msg = (
+                    raise RaidenRecoverableError(
                         f"cannot call close on a channel that has been closed already. "
                         f"current_state={detail.state}"
                     )
-                    raise RaidenRecoverableError(msg)
 
                 raise RaidenUnrecoverableError("close channel failed for an unknown reason")
+
+        self.lock_and_execute_channel_operation(channel_identifier=channel_identifier,
+                                                blocking_operation=close_light_channel)
 
         log.info("closeChannel successful", **log_details)
 
@@ -1302,24 +1304,22 @@ class TokenNetwork:
         else:
             onchain_channel_identifier = channel_onchain_detail.channel_identifier
             if onchain_channel_identifier != channel_identifier:
-                msg = (
+                raise RaidenUnrecoverableError(
                     f"The provided channel identifier does not match the value "
                     f"on-chain at the provided block ({given_block_identifier}). "
                     f"This call should never have been attempted. "
                     f"provided_channel_identifier={channel_identifier}, "
                     f"onchain_channel_identifier={channel_onchain_detail.channel_identifier}"
                 )
-                raise RaidenUnrecoverableError(msg)
 
             if channel_onchain_detail.state != ChannelState.OPENED:
-                msg = (
+                raise RaidenUnrecoverableError(
                     f"The channel was not open at the provided block "
                     f"({given_block_identifier}). This call should never have "
                     f"been attempted."
                 )
-                raise RaidenUnrecoverableError(msg)
 
-        with self.channel_operations_lock[partner]:
+        def close_channel():
             checking_block = self.client.get_checking_block()
             gas_limit = self.proxy.estimate_gas(
                 checking_block,
@@ -1364,13 +1364,12 @@ class TokenNetwork:
                     mining_block = int(receipt_or_none["blockNumber"])
 
                     if receipt_or_none["cumulativeGasUsed"] == gas_limit:
-                        msg = (
+                        raise RaidenUnrecoverableError(
                             "update transfer failed and all gas was used. Estimate gas "
                             "may have underestimated update transfer, or succeeded even "
                             "though an assert is triggered, or the smart contract code "
                             "has an conditional assert."
                         )
-                        raise RaidenUnrecoverableError(msg)
 
                     partner_details = self._detail_participant(
                         channel_identifier=channel_identifier,
@@ -1380,8 +1379,7 @@ class TokenNetwork:
                     )
 
                     if partner_details.is_closer:
-                        msg = "Channel was already closed by channel partner first."
-                        raise RaidenRecoverableError(msg)
+                        raise RaidenRecoverableError("Channel was already closed by channel partner first.")
 
                     raise RaidenUnrecoverableError("closeChannel call failed")
 
@@ -1410,20 +1408,21 @@ class TokenNetwork:
                 )
 
                 if detail.state < ChannelState.OPENED:
-                    msg = (
+                    raise RaidenUnrecoverableError(
                         f"cannot call close channel has not been opened yet. "
                         f"current_state={detail.state}"
                     )
-                    raise RaidenUnrecoverableError(msg)
 
                 if detail.state >= ChannelState.CLOSED:
-                    msg = (
+                    raise RaidenRecoverableError(
                         f"cannot call close on a channel that has been closed already. "
                         f"current_state={detail.state}"
                     )
-                    raise RaidenRecoverableError(msg)
 
                 raise RaidenUnrecoverableError("close channel failed for an unknown reason")
+
+        self.lock_and_execute_channel_operation(channel_identifier=channel_identifier,
+                                                blocking_operation=close_channel)
 
         log.info("closeChannel successful", **log_details)
 
@@ -2214,31 +2213,34 @@ class TokenNetwork:
             # gas will stop us from sending a transaction that will fail
             pass
 
-        transaction_error = None
-
-        with self.channel_operations_lock[partner]:
-            error_prefix = "Call to settle will fail"
-            gas_limit = self.proxy.estimate_gas(
+        def make_settlement():
+            tx_gas_limit = self.proxy.estimate_gas(
                 checking_block, "settleChannel", channel_identifier=channel_identifier, **kwargs
             )
-
-            if gas_limit:
-                error_prefix = "settle call failed"
-                gas_limit = safe_gas_limit(gas_limit, GAS_REQUIRED_FOR_SETTLE_CHANNEL)
-
+            if tx_gas_limit:
+                tx_gas_limit = safe_gas_limit(tx_gas_limit, GAS_REQUIRED_FOR_SETTLE_CHANNEL)
                 transaction_hash = self.proxy.transact(
-                    "settleChannel", gas_limit, channel_identifier=channel_identifier, **kwargs
+                    "settleChannel", tx_gas_limit, channel_identifier=channel_identifier, **kwargs
                 )
                 self.client.poll(transaction_hash)
-                transaction_error = check_transaction_threw(self.client, transaction_hash)
+                tx_error = check_transaction_threw(self.client, transaction_hash)
+                if tx_error:
+                    raise ProxyTransactionError(tx_error_prefix="settle call failed",
+                                                tx_error=tx_error)
+            else:
+                raise ProxyTransactionError(tx_error_prefix="Call to settle will fail",
+                                            tx_error=None)
 
-        if not gas_limit or transaction_error:
+        try:
+            self.lock_and_execute_channel_operation(channel_identifier=channel_identifier,
+                                                    blocking_operation=make_settlement)
+        except ProxyTransactionError as e:
             self.handle_transaction_error_for_settlement(channel_identifier=channel_identifier,
                                                          checking_block=checking_block,
-                                                         error_prefix=error_prefix,
+                                                         error_prefix=e.tx_error_prefix,
                                                          log_details=log_details,
                                                          partner=partner,
-                                                         transaction_error=transaction_error)
+                                                         transaction_error=e.tx_error)
 
         log.info("settle successful", **log_details)
 
@@ -2271,18 +2273,23 @@ class TokenNetwork:
             # gas will stop us from sending a transaction that will fail
             pass
 
-        with self.channel_operations_lock[partner]:
+        def make_light_settlement():
             transaction_hash = self.proxy.broadcast_signed_transaction(signed_settle_tx)
             self.client.poll(transaction_hash)
-            transaction_error = check_transaction_threw(self.client, transaction_hash)
+            tx_error = check_transaction_threw(self.client, transaction_hash)
+            if tx_error:
+                raise ProxyTransactionError(tx_error_prefix="settle call failed", tx_error=tx_error)
 
-        if transaction_error:
+        try:
+            self.lock_and_execute_channel_operation(channel_identifier=channel_identifier,
+                                                    blocking_operation=make_light_settlement)
+        except ProxyTransactionError as e:
             self.handle_transaction_error_for_settlement(channel_identifier=channel_identifier,
                                                          checking_block=checking_block,
-                                                         error_prefix="settle call failed",
+                                                         error_prefix=e.tx_error_prefix,
                                                          log_details=log_details,
                                                          partner=partner,
-                                                         transaction_error=transaction_error)
+                                                         transaction_error=e.tx_error)
 
         log.info("settle light successful", **log_details)
 

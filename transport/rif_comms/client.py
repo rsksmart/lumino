@@ -6,8 +6,8 @@ from transport.rif_comms.proto.api_pb2 import (
     Notification,
     Msg,
     RskAddress,
-    Void,
-    RskAddressPublish
+    RskAddressPublish,
+    RskSubscription
 )
 from transport.rif_comms.proto.api_pb2_grpc import CommunicationsApiStub
 
@@ -27,14 +27,23 @@ class Client:
         self.grpc_channel = insecure_channel(grpc_api_endpoint)  # TODO: how to make this secure?
         self.stub = CommunicationsApiStub(self.grpc_channel)
 
-    def connect(self) -> Notification:
+    def connect(self):
         """
         Connects to RIF Communications Node.
         Invokes ConnectToCommunicationsNode GRPC API endpoint.
         Adds the client RSK address under the RIF Communications node peer ID.
-        :return: notification stream
         """
-        return self.stub.ConnectToCommunicationsNode(self.rsk_address)
+        self.stub.ConnectToCommunicationsNode(self.rsk_address)
+
+    def _get_peer_id(self, rsk_address: Address) -> str:
+        """
+        Gets the peer ID associated with a node RSK address.
+        :param rsk_address: the RSK address which corresponds to the node to locate
+        :return: a string that represents the peer ID that matches the given address
+        """
+        return self.stub.LocatePeerId(
+            RskAddress(address=to_checksum_address(rsk_address))
+        ).address
 
     def subscribe_to(self, rsk_address: Address) -> (str, Notification):
         """
@@ -45,17 +54,20 @@ class Client:
         :return: peer id and notification stream for receiving messages
         """
         topic_id = None
-        # TODO: catch already subscribed and any error
+        # TODO: catch exceptions
         # TODO: add timeout
         topic = self.stub.CreateTopicWithRskAddress(
-            RskAddress(address=to_checksum_address(rsk_address))
+            RskSubscription(
+                topic=RskAddress(address=to_checksum_address(rsk_address)),
+                subscriber=self.rsk_address
+            )
         )
         for response in topic:
             topic_id = response.channelPeerJoined.peerId
             break
         return topic_id, topic
 
-    def is_subscribed_to(self, rsk_address: Address) -> bool:
+    def _is_subscribed_to(self, rsk_address: Address) -> bool:
         """
         Returns whether or not the client's underlying RIF Communications node is subscribed to the topic
         which corresponds to the given RSK address.
@@ -64,7 +76,10 @@ class Client:
         :return: boolean value indicating whether the client is subscribed or not
         """
         return self.stub.IsSubscribedToRskAddress(
-            RskAddress(address=to_checksum_address(rsk_address))
+            RskSubscription(
+                topic=RskAddress(address=to_checksum_address(rsk_address)),
+                subscriber=self.rsk_address
+            )
         ).value
 
     def send_message(self, payload: str, rsk_address: Address):
@@ -76,8 +91,9 @@ class Client:
         """
         self.stub.SendMessageToRskAddress(
             RskAddressPublish(
+                sender=self.rsk_address,
                 receiver=RskAddress(address=to_checksum_address(rsk_address)),
-                message=Msg(payload=str.encode(payload))
+                message=Msg(payload=str.encode(payload)),
             )
         )
 
@@ -88,7 +104,10 @@ class Client:
         :param rsk_address: RSK address which corresponds to the topic which the client is unsubscribing from.
         """
         self.stub.CloseTopicWithRskAddress(
-            RskAddress(address=to_checksum_address(rsk_address))
+            RskSubscription(
+                topic=RskAddress(address=to_checksum_address(rsk_address)),
+                subscriber=self.rsk_address,
+            )
         )
 
     def disconnect(self):
@@ -96,5 +115,6 @@ class Client:
          Invokes the EndCommunication GRPC API endpoint.
          Disconnects from RIF Communications Node. Closes grpc connection
         """
-        self.stub.EndCommunication(Void())
+        # FIXME: EndCommunication pending implementation
+        # self.stub.EndCommunication(Void())
         self.grpc_channel.unsubscribe(lambda: self.grpc_channel.close())

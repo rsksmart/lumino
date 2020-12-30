@@ -23,7 +23,7 @@ from transport.message import Message as TransportMessage
 from transport.node import Node as TransportNode
 from transport.rif_comms.client import Client as RIFCommsClient
 from transport.rif_comms.proto.api_pb2 import Notification
-from transport.rif_comms.utils import notification_to_payload
+from transport.rif_comms.utils import notification_to_payload, get_sender_from_notification
 from transport.utils import MessageQueue
 from transport.utils import validate_and_parse_messages
 
@@ -63,8 +63,7 @@ class Node(TransportNode):
         self.stop_event.clear()
 
         # connect to rif comms node
-        # TODO: this shouldn't need to be assigned, it is only done because otherwise the code hangs
-        self._rif_comms_connect_stream = self._comms_client.connect()
+        self._comms_client.connect()
         # start pre-loaded message queues
         for message_queue in self._address_to_message_queue.values():
             if not message_queue.greenlet:
@@ -81,9 +80,10 @@ class Node(TransportNode):
         Iterate over the Notification stream and block thread to receive messages.
         """
         for notification in self._our_topic_stream:
+            sender = get_sender_from_notification(notification)
             payload = notification_to_payload(notification)
             try:
-                for raiden_message in validate_and_parse_messages(payload, None):
+                for raiden_message in validate_and_parse_messages(payload, sender):
                     self.log.info("incoming message", message=raiden_message)
                     self._handle_message(raiden_message)
             except InvalidProtocolMessage:
@@ -232,11 +232,6 @@ class Node(TransportNode):
             "sending message", message_payload=payload.replace("\n", "\\n"), transport="rif_comms",
             recipient=pex(recipient)
         )
-        if not self._comms_client.is_subscribed_to(recipient):
-            self.log.info(
-                "subscribing to recipient", transport="rif_comms", recipient=pex(recipient)
-            )
-            self._comms_client.subscribe_to(recipient)
         # send the message
         self._comms_client.send_message(payload, recipient)  # TODO: exception handling for RIF Comms client
         self.log.info(
