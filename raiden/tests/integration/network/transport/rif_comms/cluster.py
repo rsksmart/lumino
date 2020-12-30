@@ -3,11 +3,11 @@ from raiden.tests.integration.network.transport.rif_comms.node import Node, Conf
 
 class Cluster:
     """
-        The Cluster class represents a set of topologies in which RIF Comms bootnode can be tested.
-        The topologies includes different scenarios, on each of them, it can be one or more rif comms nodes and clients present.
-        For example:
-        - Topology A) a rif comms node with two rif comms clients connected
-        - Topology B) two rif comms nodes, each of them with one client connected
+    The Cluster class represents a topology in which RIF Comms bootnodes can be tested.
+    These topologies includes different scenarios; there can be one or more RIF comms nodes and clients present for each of these.
+    For example:
+    - Topology A: a single RIF comms node with two RIF comms clients connected to it.
+    - Topology B: 2 RIF comms nodes, each of them with one client connected to it.
     """
 
     def __init__(self, nodes_to_clients: dict):
