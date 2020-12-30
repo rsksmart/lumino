@@ -235,6 +235,7 @@ class ContractSendChannelUpdateTransfer(ContractSendExpirableEvent):
             "expiration": str(self.expiration),
             "balance_proof": self.balance_proof,
             "triggered_by_block_hash": serialize_bytes(self.triggered_by_block_hash),
+            "our_address": to_checksum_address(self.our_address)
         }
 
         return result
@@ -245,6 +246,7 @@ class ContractSendChannelUpdateTransfer(ContractSendExpirableEvent):
             expiration=BlockExpiration(int(data["expiration"])),
             balance_proof=data["balance_proof"],
             triggered_by_block_hash=BlockHash(deserialize_bytes(data["triggered_by_block_hash"])),
+            our_address=to_canonical_address(data["our_address"])
         )
 
         return restored
