@@ -874,8 +874,7 @@ class JSONRPCClient:
         address: Address,
         transaction_name: str,
         transaction_executed: bool,
-        required_gas: int,
-        block_identifier: BlockSpecification,
+        required_gas: int
     ):
         """ After estimate gas failure checks if our address has enough balance.
 
@@ -891,7 +890,7 @@ class JSONRPCClient:
             return
 
         our_address = to_checksum_address(address)
-        balance = self.web3.eth.getBalance(our_address, block_identifier)
+        balance = self.web3.eth.getBalance(our_address, self.get_checking_block())
         required_balance = required_gas * self.gas_price()
         if balance < required_balance:
             msg = f"Failed to execute {transaction_name} due to insufficient ETH"

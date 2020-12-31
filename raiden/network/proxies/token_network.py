@@ -1,6 +1,6 @@
 from collections import defaultdict
-from typing import Any, Dict, List, NamedTuple, Optional, Tuple, Callable
 from dataclasses import dataclass
+from typing import Any, Dict, List, NamedTuple, Optional, Tuple, Callable
 
 import structlog
 from eth_utils import (
@@ -12,6 +12,18 @@ from eth_utils import (
 )
 from gevent.event import AsyncResult
 from gevent.lock import RLock, Semaphore
+from raiden_contracts.constants import (
+    CONTRACT_TOKEN_NETWORK,
+    GAS_REQUIRED_FOR_CLOSE_CHANNEL,
+    GAS_REQUIRED_FOR_OPEN_CHANNEL,
+    GAS_REQUIRED_FOR_SET_TOTAL_DEPOSIT,
+    GAS_REQUIRED_FOR_SETTLE_CHANNEL,
+    GAS_REQUIRED_FOR_UPDATE_BALANCE_PROOF,
+    ChannelInfoIndex,
+    ChannelState,
+    ParticipantInfoIndex,
+)
+from raiden_contracts.contract_manager import ContractManager
 from requests import HTTPError
 
 from raiden.constants import (
@@ -59,18 +71,6 @@ from raiden.utils.typing import (
     TokenAmount,
     TokenNetworkAddress,
     SignedTransaction)
-from raiden_contracts.constants import (
-    CONTRACT_TOKEN_NETWORK,
-    GAS_REQUIRED_FOR_CLOSE_CHANNEL,
-    GAS_REQUIRED_FOR_OPEN_CHANNEL,
-    GAS_REQUIRED_FOR_SET_TOTAL_DEPOSIT,
-    GAS_REQUIRED_FOR_SETTLE_CHANNEL,
-    GAS_REQUIRED_FOR_UPDATE_BALANCE_PROOF,
-    ChannelInfoIndex,
-    ChannelState,
-    ParticipantInfoIndex,
-)
-from raiden_contracts.contract_manager import ContractManager
 
 log = structlog.get_logger(__name__)  # pylint: disable=invalid-name
 
@@ -205,6 +205,13 @@ class TokenNetwork:
         if channel_exists:
             raise DuplicatedChannelError("Channel with given partner address already exists")
 
+        self.proxy.jsonrpc_client.check_for_insufficient_eth(
+            transaction_name="openChannel",
+            address=creator,
+            transaction_executed=False,
+            required_gas=GAS_REQUIRED_FOR_OPEN_CHANNEL
+        )
+
     def _new_channel_postconditions(self, creator: Address, partner: Address, block: BlockSpecification):
         channel_created = self._channel_exists_and_not_settled(
             participant1=creator, participant2=partner, block_identifier=block
@@ -234,8 +241,14 @@ class TokenNetwork:
                     log.critical("new_netting_channel_light failed", **log_details)
                     raise RaidenRecoverableError("creating new channel failed")
             except HTTPError as e:
-                log.warning("new_netting_channel failed: transaction malformed", ex=e, **log_details)
                 new_open_channel_transaction.set_exception(e)
+                self.proxy.jsonrpc_client.check_for_insufficient_eth(
+                    transaction_name="openChannel",
+                    address=creator,
+                    transaction_executed=False,
+                    required_gas=GAS_REQUIRED_FOR_OPEN_CHANNEL
+                )
+                log.warning("new_netting_channel failed: transaction malformed", ex=e, **log_details)
                 raise RawTransactionFailed("Light Client raw transaction malformed")
             except Exception as e:
                 log.warning("new_netting_channel failed", ex=e, **log_details)
@@ -246,7 +259,7 @@ class TokenNetwork:
             finally:
                 self.open_channel_transactions.pop(OpenChannelTrKey(creator, partner), None)
         else:
-            # If already exists wait for completition or exception
+            # If already exists wait for completion or exception
             self.open_channel_transactions[OpenChannelTrKey(creator, partner)].get()
 
         channel_identifier: ChannelID = self._detail_channel(
@@ -288,8 +301,7 @@ class TokenNetwork:
                 transaction_name="openChannel",
                 address=self.node_address,
                 transaction_executed=False,
-                required_gas=GAS_REQUIRED_FOR_OPEN_CHANNEL,
-                block_identifier=checking_block,
+                required_gas=GAS_REQUIRED_FOR_OPEN_CHANNEL
             )
             self._new_channel_postconditions(creator=self.node_address, partner=partner, block=checking_block)
 
@@ -674,6 +686,13 @@ class TokenNetwork:
             log.info("setTotalDeposit failed", reason=msg, **log_details)
             raise DepositMismatch(msg)
 
+        self.proxy.jsonrpc_client.check_for_insufficient_eth(
+            transaction_name="setTotalDeposit",
+            address=creator,
+            transaction_executed=False,
+            required_gas=GAS_REQUIRED_FOR_SET_TOTAL_DEPOSIT
+        )
+
     def _check_deposit_failure_reasons(
         self,
         channel_identifier: ChannelID,
@@ -690,8 +709,7 @@ class TokenNetwork:
             transaction_name="setTotalDeposit",
             address=creator,
             transaction_executed=transaction_executed,
-            required_gas=GAS_REQUIRED_FOR_SET_TOTAL_DEPOSIT,
-            block_identifier=block_identifier,
+            required_gas=GAS_REQUIRED_FOR_SET_TOTAL_DEPOSIT
         )
         error_type, msg = self._check_why_deposit_failed(
             channel_identifier=channel_identifier,
@@ -1035,6 +1053,7 @@ class TokenNetwork:
     def close_light(
         self,
         channel_identifier: ChannelID,
+        closing_participant: Address,
         partner: Address,
         balance_hash: BalanceHash,
         nonce: Nonce,
@@ -1129,6 +1148,14 @@ class TokenNetwork:
 
         def close_light_channel():
             checking_block = self.client.get_checking_block()
+
+            self.proxy.jsonrpc_client.check_for_insufficient_eth(
+                transaction_name="closeChannel",
+                address=closing_participant,
+                transaction_executed=False,
+                required_gas=GAS_REQUIRED_FOR_CLOSE_CHANNEL
+            )
+
             gas_limit = self.proxy.estimate_gas(
                 checking_block,
                 "closeChannel",
@@ -1189,14 +1216,12 @@ class TokenNetwork:
                 # therefore every call using this block has to handle pruned data.
                 failed_at = self.proxy.jsonrpc_client.get_block("latest")
                 failed_at_blockhash = encode_hex(failed_at["hash"])
-                failed_at_blocknumber = failed_at["number"]
 
                 self.proxy.jsonrpc_client.check_for_insufficient_eth(
                     transaction_name="closeChannel",
                     address=self.node_address,
                     transaction_executed=True,
-                    required_gas=GAS_REQUIRED_FOR_CLOSE_CHANNEL,
-                    block_identifier=failed_at_blocknumber,
+                    required_gas=GAS_REQUIRED_FOR_CLOSE_CHANNEL
                 )
 
                 detail = self._detail_channel(
@@ -1390,14 +1415,12 @@ class TokenNetwork:
                 # therefore every call using this block has to handle pruned data.
                 failed_at = self.proxy.jsonrpc_client.get_block("latest")
                 failed_at_blockhash = encode_hex(failed_at["hash"])
-                failed_at_blocknumber = failed_at["number"]
 
                 self.proxy.jsonrpc_client.check_for_insufficient_eth(
                     transaction_name="closeChannel",
                     address=self.node_address,
                     transaction_executed=True,
-                    required_gas=GAS_REQUIRED_FOR_CLOSE_CHANNEL,
-                    block_identifier=failed_at_blocknumber,
+                    required_gas=GAS_REQUIRED_FOR_CLOSE_CHANNEL
                 )
 
                 detail = self._detail_channel(
@@ -1496,7 +1519,8 @@ class TokenNetwork:
             raise RaidenUnrecoverableError("Couldn't verify the balance proof signature")
         else:
             if our_recovered_address != our_address:
-                raise RaidenUnrecoverableError("Invalid balance proof signature. Recovered address isnt light client address")
+                raise RaidenUnrecoverableError(
+                    "Invalid balance proof signature. Recovered address isnt light client address")
 
             if partner_recovered_address != partner_address:
                 raise RaidenUnrecoverableError("Invalid update transfer signature")
@@ -1504,14 +1528,14 @@ class TokenNetwork:
         # Check the preconditions for calling updateNonClosingBalanceProof at
         # the time the event was emitted.
         try:
-            #FIXME participant 1 and 2 values
+            # FIXME participant 1 and 2 values
             channel_onchain_detail = self._detail_channel(
                 participant1=our_address,
                 participant2=partner_address,
                 block_identifier=given_block_identifier,
                 channel_identifier=channel_identifier,
             )
-            #FIXME participant and partner values?
+            # FIXME participant and partner values?
             closer_details = self._detail_participant(
                 channel_identifier=channel_identifier,
                 participant=partner_address,
@@ -1690,8 +1714,7 @@ class TokenNetwork:
                     transaction_name="updateNonClosingBalanceProof",
                     address=self.node_address,
                     transaction_executed=False,
-                    required_gas=GAS_REQUIRED_FOR_UPDATE_BALANCE_PROOF,
-                    block_identifier=failed_at_blocknumber,
+                    required_gas=GAS_REQUIRED_FOR_UPDATE_BALANCE_PROOF
                 )
 
                 detail = self._detail_channel(
@@ -2005,8 +2028,7 @@ class TokenNetwork:
                 transaction_name="updateNonClosingBalanceProof",
                 address=self.node_address,
                 transaction_executed=False,
-                required_gas=GAS_REQUIRED_FOR_UPDATE_BALANCE_PROOF,
-                block_identifier=failed_at_blocknumber,
+                required_gas=GAS_REQUIRED_FOR_UPDATE_BALANCE_PROOF
             )
 
             detail = self._detail_channel(
@@ -2112,8 +2134,7 @@ class TokenNetwork:
                 transaction_name="unlock",
                 address=self.node_address,
                 transaction_executed=transaction_executed,
-                required_gas=UNLOCK_TX_GAS_LIMIT,
-                block_identifier=block,
+                required_gas=UNLOCK_TX_GAS_LIMIT
             )
             channel_settled = self.channel_is_settled(
                 participant1=participant,
@@ -2133,7 +2154,7 @@ class TokenNetwork:
         log.info("unlock successful", **log_details)
 
     def _settle_preconditions(
-        self, channel_identifier: ChannelID, partner: Address, block_identifier: BlockSpecification
+        self, channel_identifier: ChannelID, creator: Address, partner: Address, block_identifier: BlockSpecification
     ):
         if not self.client.can_query_state_for_block(block_identifier):
             raise NoStateForBlockIdentifier()
@@ -2145,6 +2166,12 @@ class TokenNetwork:
         #     block_identifier=block_identifier,
         #     channel_identifier=channel_identifier,
         # )
+        self.proxy.jsonrpc_client.check_for_insufficient_eth(
+            transaction_name="settleChannel",
+            address=creator,
+            transaction_executed=False,
+            required_gas=GAS_REQUIRED_FOR_SETTLE_CHANNEL
+        )
 
     def settle(
         self,
@@ -2205,6 +2232,7 @@ class TokenNetwork:
         try:
             self._settle_preconditions(
                 channel_identifier=channel_identifier,
+                creator=self.node_address,
                 partner=partner,
                 block_identifier=given_block_identifier,
             )
@@ -2239,6 +2267,7 @@ class TokenNetwork:
                                                          checking_block=checking_block,
                                                          error_prefix=e.tx_error_prefix,
                                                          log_details=log_details,
+                                                         creator=self.node_address,
                                                          partner=partner,
                                                          transaction_error=e.tx_error)
 
@@ -2265,6 +2294,7 @@ class TokenNetwork:
         try:
             self._settle_preconditions(
                 channel_identifier=channel_identifier,
+                creator=creator,
                 partner=partner,
                 block_identifier=given_block_identifier,
             )
@@ -2288,6 +2318,7 @@ class TokenNetwork:
                                                          checking_block=checking_block,
                                                          error_prefix=e.tx_error_prefix,
                                                          log_details=log_details,
+                                                         creator=creator,
                                                          partner=partner,
                                                          transaction_error=e.tx_error)
 
@@ -2298,6 +2329,7 @@ class TokenNetwork:
                                                 checking_block: BlockNumber,
                                                 error_prefix: str,
                                                 log_details: Dict,
+                                                creator: Address,
                                                 partner: Address,
                                                 transaction_error):
         """
@@ -2310,13 +2342,12 @@ class TokenNetwork:
 
         self.proxy.jsonrpc_client.check_for_insufficient_eth(
             transaction_name="settleChannel",
-            address=self.node_address,
+            address=creator,
             transaction_executed=transaction_error and transaction_error["blockNumber"] is not None,
-            required_gas=GAS_REQUIRED_FOR_SETTLE_CHANNEL,
-            block_identifier=block,
+            required_gas=GAS_REQUIRED_FOR_SETTLE_CHANNEL
         )
         msg = self._check_channel_state_after_settle(
-            participant1=self.node_address,
+            participant1=creator,
             participant2=partner,
             block_identifier=block,
             channel_identifier=channel_identifier,
