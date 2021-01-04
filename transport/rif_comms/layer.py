@@ -73,8 +73,8 @@ class Layer(TransportLayer[RIFCommsTransportNode]):
         return light_client
 
     def get_light_client_transport(self, address) -> LightClientNode:
-        # We handle the address of a RIFCommsTransportNode as bytes, therefore we ensure the comparison is correct
-        # using to_canonical_address -> bytes
+        # RIFCommsTransportNode addresses are bytes, therefore we ensure the comparison is correct
+        # by using the `to_canonical_address` method on the received address parameter.
         rif_comms_address = to_canonical_address(address)
         for light_client_transport in self.light_clients:
             if rif_comms_address == light_client_transport.address:
