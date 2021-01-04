@@ -193,8 +193,8 @@ class MatrixLayer(TransportLayer[MatrixTransportNode]):
         return light_client
 
     def get_light_client_transport(self, address) -> MatrixLightClientTransportNode:
-        # We handle the address of a MatrixLightClientTransportNode as checksum string, therefore we ensure the comparison is correct
-        # using to_checksum_address -> str
+        # MatrixLightClientTransportNode addresses are strings, therefore we ensure the comparison is correct
+        # by using the `to_checksum_address` method on the received address parameter.
         matrix_address = to_checksum_address(address)
         for light_client_transport in self.light_clients:
             if matrix_address == light_client_transport.address:
