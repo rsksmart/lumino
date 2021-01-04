@@ -196,9 +196,7 @@ class MatrixLayer(TransportLayer[MatrixTransportNode]):
         # We handle the address of a MatrixLightClientTransportNode as checksum string, therefore we ensure the comparison is correct
         # using to_checksum_address -> str
         matrix_address = to_checksum_address(address)
-        light_client_transport_result = None
         for light_client_transport in self.light_clients:
             if matrix_address == light_client_transport.address:
-                light_client_transport_result = light_client_transport
-                break
-        return light_client_transport_result
+                return light_client_transport
+        return None
