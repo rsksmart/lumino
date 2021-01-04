@@ -990,7 +990,7 @@ class RaidenService(Runnable):
                                                        light_client_address=light_client['address']):
                 if neighbour == ConnectionManager.BOOTSTRAP_ADDR:
                     continue
-                light_client_transport = self.transport.get_light_client_transport(light_client['address'])
+                light_client_transport = self.transport.get_light_client_transport_node(light_client['address'])
                 if light_client_transport is not None:
                     light_client_transport.whitelist(neighbour)
 
@@ -1324,7 +1324,7 @@ class RaidenService(Runnable):
             wal=self.wal
         )
         if is_handled_lc:
-            lc_transport = self.transport.get_light_client_transport(sender_address)
+            lc_transport = self.transport.get_light_client_transport_node(sender_address)
             exists = LightClientMessageHandler.get_message_for_order_and_address(
                 message_id=delivered.delivered_message_identifier,
                 payment_id=payment_id,
@@ -1356,7 +1356,7 @@ class RaidenService(Runnable):
             wal=self.wal
         )
         if is_handled_lc:
-            lc_transport = self.transport.get_light_client_transport(sender_address)
+            lc_transport = self.transport.get_light_client_transport_node(sender_address)
             LightClientMessageHandler.store_light_client_protocol_message(
                 identifier=processed.message_identifier,
                 message=processed,
