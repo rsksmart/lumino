@@ -2325,6 +2325,7 @@ class RestAPI:
         self.raiden_api.unlock_payment_light(signed_tx, token_address)
         return api_response(result=dict(), status_code=HTTPStatus.OK)
 
+    @api_safe_operation(is_light_client=True, lc_balance_required=True)
     def create_light_client_payment(
         self,
         registry_address: typing.PaymentNetworkID,
@@ -2346,15 +2347,7 @@ class RestAPI:
             return ApiErrorBuilder.build_and_log_error(
                 errors="There is no light client associated with the api key provided",
                 status_code=HTTPStatus.FORBIDDEN, log=log)
-        try:
-            hub_message = self.raiden_api.create_light_client_payment(registry_address, creator_address,
-                                                                      partner_address, token_address,
-                                                                      amount, secrethash, prev_secrethash)
-            return api_response(hub_message.to_dict())
-        except ChannelNotFound as e:
-            return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.NOT_FOUND, log=log)
-        except InsufficientFunds as e:
-            return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.PAYMENT_REQUIRED, log=log)
-        except UnhandledLightClient as e:
-            return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.FORBIDDEN, log=log)
-
+        hub_message = self.raiden_api.create_light_client_payment(registry_address, creator_address,
+                                                                  partner_address, token_address,
+                                                                  amount, secrethash, prev_secrethash)
+        return api_response(hub_message.to_dict())
