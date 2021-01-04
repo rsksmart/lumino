@@ -67,5 +67,5 @@ class Layer(ABC, Generic[TN]):
     @abstractmethod
     def get_light_client_transport(self, address) -> TransportNode:
         """
-        Finds the light client transport node by address
+        Returns a light client transport node instance managed by the transport layer, based on the given address.
         """
