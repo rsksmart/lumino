@@ -5,8 +5,7 @@ from urllib.parse import urlparse
 
 import click
 import structlog
-from eth_utils import to_normalized_address, decode_hex, remove_0x_prefix
-
+from eth_utils import to_normalized_address, decode_hex, remove_0x_prefix, to_checksum_address
 from raiden.api.python import RaidenAPI
 from raiden.constants import PATH_FINDING_BROADCASTING_ROOM, MONITORING_BROADCASTING_ROOM, Environment
 from raiden.exceptions import RaidenError
@@ -14,7 +13,7 @@ from raiden.lightclient.handlers.light_client_service import LightClientService
 from raiden.settings import DEFAULT_MATRIX_KNOWN_SERVERS
 from raiden.storage import sqlite, serialize
 from raiden.transfer import views
-from raiden.utils import typing
+from raiden.utils import typing, Address
 from raiden.utils.cli import get_matrix_servers
 from raiden.utils.signer import recover
 from transport.layer import Layer as TransportLayer
@@ -191,3 +190,12 @@ class MatrixLayer(TransportLayer[MatrixTransportNode]):
             self.add_light_client(light_client_transport)
 
         return light_client
+
+    def get_light_client_transport_node(self, address: Address) -> MatrixLightClientTransportNode:
+        # MatrixLightClientTransportNode addresses are strings, therefore we ensure the comparison is correct
+        # by using the `to_checksum_address` method on the received address parameter.
+        matrix_address = to_checksum_address(address)
+        for light_client_transport in self.light_clients:
+            if matrix_address == light_client_transport.address:
+                return light_client_transport
+        return None

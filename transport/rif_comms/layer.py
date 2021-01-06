@@ -4,7 +4,6 @@ from typing import List
 
 import click
 from eth_utils import to_canonical_address, remove_0x_prefix
-
 from raiden.exceptions import RaidenError
 from raiden.lightclient.handlers.light_client_service import LightClientService
 from raiden.storage import sqlite, serialize
@@ -71,3 +70,12 @@ class Layer(TransportLayer[RIFCommsTransportNode]):
             self.add_light_client(light_client_transport)
 
         return light_client
+
+    def get_light_client_transport_node(self, address: Address) -> LightClientNode:
+        # RIFCommsTransportNode addresses are bytes, therefore we ensure the comparison is correct
+        # by using the `to_canonical_address` method on the received address parameter.
+        rif_comms_address = to_canonical_address(address)
+        for light_client_transport in self.light_clients:
+            if rif_comms_address == light_client_transport.address:
+                return light_client_transport
+        return None
