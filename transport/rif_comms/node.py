@@ -44,13 +44,14 @@ class Node(TransportNode):
         # set up comms node
         self._rif_comms_connect_stream: Notification = None
         self._our_topic_stream: Notification = None
-        self._comms_client = RIFCommsClient(address, self._config["grpc_endpoint"])
+        self._comms_client = RIFCommsClient(address, self._config["grpc_endpoint"], self._config["grpc_client_timeout"])
 
         # initialize message queues
         self._address_to_message_queue: Dict[Address, MessageQueue] = dict()
 
         self._log = log.bind(node_address=pex(self.address))
-        self.log.info("RIFCommsNode init on GRPC endpoint: {}".format(self._config["grpc_endpoint"]))
+        self.log.info("RIFCommsNode init on GRPC endpoint: {} with timeout of {} seconds"
+                      .format(self._config["grpc_endpoint"], self._config["grpc_client_timeout"]))
 
     def start(self, raiden_service: RaidenService, message_handler: MessageHandler, prev_auth_data: str):
         """

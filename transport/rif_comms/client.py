@@ -27,15 +27,19 @@ class Client:
         StatusCode.FAILED_PRECONDITION: FailedPreconditionException
     }
 
-    def __init__(self, rsk_address: Address, grpc_api_endpoint: str):
+    def __init__(self, rsk_address: Address,
+                 grpc_api_endpoint: str,
+                 grpc_client_timeout: float = 30):
         """
         Constructs the RIF Communications Client.
         :param rsk_address: RSK address of the node that wants to use the RIF Communications server
         :param grpc_api_endpoint: GRPC URI of the RIF Communications pub-sub node
+        :param grpc_client_timeout: GRPC Client request timeout
         """
         self.rsk_address = RskAddress(address=to_checksum_address(rsk_address))
         self.grpc_channel = insecure_channel(grpc_api_endpoint)  # TODO: how to make this secure?
         self.stub = CommunicationsApiStub(self.grpc_channel)
+        self.grpc_client_timeout = grpc_client_timeout
 
     def connect(self):
         """
@@ -45,7 +49,7 @@ class Client:
         """
 
         try:
-            self.stub.ConnectToCommunicationsNode(self.rsk_address)
+            self.stub.ConnectToCommunicationsNode(self.rsk_address, timeout=self.grpc_client_timeout)
         except RpcError as rpc_error:
             raise self.get_exception(rpc_error)
 
@@ -58,7 +62,8 @@ class Client:
 
         try:
             return self.stub.LocatePeerId(
-                RskAddress(address=to_checksum_address(rsk_address))
+                RskAddress(address=to_checksum_address(rsk_address)),
+                timeout=self.grpc_client_timeout
             ).address
         except RpcError as rpc_error:
             raise self.get_exception(rpc_error)
@@ -77,7 +82,8 @@ class Client:
                 RskSubscription(
                     topic=RskAddress(address=to_checksum_address(rsk_address)),
                     subscriber=self.rsk_address
-                )
+                ),
+                timeout=self.grpc_client_timeout
             )
             for response in topic:
                 topic_id = response.channelPeerJoined.peerId
@@ -100,7 +106,8 @@ class Client:
                 RskSubscription(
                     topic=RskAddress(address=to_checksum_address(rsk_address)),
                     subscriber=self.rsk_address
-                )
+                ),
+                timeout=self.grpc_client_timeout
             ).value
         except RpcError as rpc_error:
             raise self.get_exception(rpc_error)
@@ -118,7 +125,8 @@ class Client:
                     sender=self.rsk_address,
                     receiver=RskAddress(address=to_checksum_address(rsk_address)),
                     message=Msg(payload=str.encode(payload)),
-                )
+                ),
+                timeout=self.grpc_client_timeout
             )
         except RpcError as rpc_error:
             raise self.get_exception(rpc_error)
@@ -134,7 +142,8 @@ class Client:
                 RskSubscription(
                     topic=RskAddress(address=to_checksum_address(rsk_address)),
                     subscriber=self.rsk_address,
-                )
+                ),
+                timeout=self.grpc_client_timeout
             )
         except RpcError as rpc_error:
             raise self.get_exception(rpc_error)
