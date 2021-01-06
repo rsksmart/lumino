@@ -3,21 +3,23 @@ from abc import ABC, abstractmethod
 
 class ClientException(Exception, ABC):
 
+    @property
     @abstractmethod
     def get_code(self):
         """
-
+        return the code property
         """
 
+    @property
     @abstractmethod
     def get_message(self):
         """
-
+        return the code property
         """
 
     def __str__(self):
         message = super(ClientException, self).__str__()
-        return f"Code: {self.get_code()}, Message: {message}"
+        return f"Code: {self.get_code}, Message: {message}"
 
 
 class InvalidArgumentException(ClientException):
