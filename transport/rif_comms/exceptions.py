@@ -1,4 +1,7 @@
 from abc import ABC, abstractmethod
+from typing import Union
+
+from grpc import RpcError, StatusCode
 
 
 class ClientException(Exception, ABC):
@@ -87,5 +90,27 @@ class TimeoutException(ClientException):
         return self.message
 
 
+EXCEPTION_MAPPING = {
+    StatusCode.DEADLINE_EXCEEDED: TimeoutException,
+    StatusCode.INTERNAL: InternalException,
+    StatusCode.INVALID_ARGUMENT: InvalidArgumentException,
+    StatusCode.NOT_FOUND: NotFoundException,
+    StatusCode.FAILED_PRECONDITION: FailedPreconditionException
+}
 
+
+def client_handled_operation(func):
+    def inner(client: "Client", *args, **kwargs):
+        try:
+            return func(client, *args, **kwargs)
+        except RpcError as error:
+            raise get_exception(error)
+    return inner
+
+
+def get_exception(rpc_error: RpcError) -> Union[RpcError, ClientException]:
+    if rpc_error.code() in EXCEPTION_MAPPING and EXCEPTION_MAPPING.get(rpc_error.code()):
+        exception = EXCEPTION_MAPPING.get(rpc_error.code())
+        return exception(code=rpc_error.code(), message=rpc_error.details())
+    return rpc_error
 
