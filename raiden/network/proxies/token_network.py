@@ -1073,7 +1073,7 @@ class TokenNetwork:
         Raises:
             RaidenRecoverableError: If the close call failed but it is not
                 critical.
-            RaidenUnrecoverableError: If the operation was ilegal at the
+            RaidenUnrecoverableError: If the operation was illegal at the
                 `given_block_identifier` or if the channel changes in a way that
                 cannot be recovered.
         """

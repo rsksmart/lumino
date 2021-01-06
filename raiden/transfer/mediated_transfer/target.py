@@ -612,7 +612,9 @@ def handle_block(
         lock_expiration_threshold=channel.get_receiver_expiration_threshold(lock),
     )
 
-    if lock_has_expired and target_state.state != "expired":
+    target_state_expired = target_state.state == TargetTransferState.EXPIRED
+
+    if lock_has_expired and not target_state_expired:
         failed = EventUnlockClaimFailed(
             identifier=transfer.payment_identifier,
             secrethash=transfer.lock.secrethash,
@@ -620,7 +622,7 @@ def handle_block(
         )
         target_state.state = TargetTransferState.EXPIRED
         events = [failed]
-    elif secret_known:
+    elif secret_known and not target_state_expired:
         events = events_for_onchain_secretreveal(
             target_state=target_state,
             channel_state=channel_state,
