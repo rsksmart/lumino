@@ -58,7 +58,9 @@ def test_connect():
         with pytest.raises(NotFoundException) as e:
             client._get_peer_id(address)
 
-        assert f"Rsk address {to_checksum_address(address)} not registered" == e.value.message
+        client_exception = e.value
+        assert client_exception.code == StatusCode.NOT_FOUND
+        assert client_exception.message == f"Rsk address {to_checksum_address(address)} not registered"
 
         # connect and check again
         client.connect()
