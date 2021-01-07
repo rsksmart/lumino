@@ -2,11 +2,15 @@ from typing import Dict
 
 import pytest
 from eth_utils import to_canonical_address, to_checksum_address
+from grpc import RpcError, StatusCode
+
 from raiden.tests.integration.network.transport.rif_comms.cluster import Cluster
 from raiden.tests.integration.network.transport.rif_comms.node import Node as CommsNode, Config as CommsConfig
 from raiden.tests.integration.network.transport.utils import generate_address
 from transport.rif_comms.client import Client
-from transport.rif_comms.exceptions import NotFoundException, FailedPreconditionException
+from transport.rif_comms.client_exception_handler import ClientExceptionHandler
+from transport.rif_comms.exceptions import NotFoundException, FailedPreconditionException, InvalidArgumentException
+from transport.rif_comms.proto.api_pb2 import RskAddress
 from transport.rif_comms.utils import notification_to_payload, get_sender_from_notification
 
 
@@ -18,6 +22,27 @@ def comms_clients(nodes_to_clients: dict) -> Dict[int, Client]:
 
     # teardown
     cluster.stop()
+
+
+def test_connect_failure():
+    # the comms_nodes fixture is not used to prevent automatic connect
+    nodes = []
+    try:
+        node = CommsNode(CommsConfig(node_id="A", amount_of_clients=1, auto_connect=False))
+        nodes.append(node)
+        stub = node.clients[0].stub
+
+        # bypass client.connect to provide invalid address
+        with pytest.raises(RpcError) as e:
+            stub.ConnectToCommunicationsNode(RskAddress(address="invalid"))
+
+        client_exception = ClientExceptionHandler.get_exception(e.value)
+        assert type(client_exception) == InvalidArgumentException
+        assert client_exception.code == StatusCode.INVALID_ARGUMENT
+        assert "not a valid RSK address" in client_exception.message
+    finally:
+        for node in nodes:
+            node.stop()
 
 
 def test_connect():
