@@ -4,7 +4,8 @@ import structlog
 from flask import request
 
 from raiden.api.validations.api_error_builder import ApiErrorBuilder
-from raiden.exceptions import InsufficientFunds, RawTransactionFailed, InvalidPaymentIdentifier
+from raiden.exceptions import InsufficientFunds, RawTransactionFailed, InvalidPaymentIdentifier, ChannelNotFound, \
+    UnhandledLightClient
 from raiden.lightclient.handlers.light_client_service import LightClientService
 
 log = structlog.get_logger(__name__)
@@ -81,6 +82,14 @@ def api_safe_operation(is_light_client=False, lc_balance_required=False):
             except (RawTransactionFailed, InvalidPaymentIdentifier) as e:
                 return ApiErrorBuilder.build_and_log_error(errors=str(e),
                                                            status_code=HTTPStatus.BAD_REQUEST,
+                                                           log=log)
+            except ChannelNotFound as e:
+                return ApiErrorBuilder.build_and_log_error(errors=str(e),
+                                                           status_code=HTTPStatus.NOT_FOUND,
+                                                           log=log)
+            except UnhandledLightClient as e:
+                return ApiErrorBuilder.build_and_log_error(errors=str(e),
+                                                           status_code=HTTPStatus.FORBIDDEN,
                                                            log=log)
             except Exception as e:
                 return ApiErrorBuilder.build_and_log_error(errors=str(e),

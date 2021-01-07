@@ -1740,39 +1740,41 @@ class RaidenAPI:
             # Here we can discriminate between a re-route and the first try to route a payment
             # if a prev_secrethash is set, then we need to filter the previous canceled routes.
 
-            token_network_id = views.get_token_network_by_token_address(
+            token_network = views.get_token_network_by_token_address(
                 chain_state, registry_address, token_address
             )
-            possible_routes, _ = routing.get_best_routes(
-                chain_state=chain_state,
-                token_network_id=token_network_id.address,
-                one_to_n_address=self.raiden.default_one_to_n_address,
-                from_address=InitiatorAddress(creator_address),
-                to_address=partner_address,
-                amount=amount,
-                previous_address=None,
-                config=self.raiden.config,
-                privkey=self.raiden.privkey,
-            )
-            if prev_secrethash:
-                current_payment_task = chain_state.get_payment_task(creator_address, prev_secrethash)
-                chain_state.clone_payment_task(creator_address, prev_secrethash, secrethash)
-                possible_routes = routes.filter_acceptable_routes(
-                    route_states=possible_routes,
-                    blacklisted_channel_ids=current_payment_task.manager_state.cancelled_channels
+
+            if token_network:
+                possible_routes, _ = routing.get_best_routes(
+                    chain_state=chain_state,
+                    token_network_id=token_network.address,
+                    one_to_n_address=self.raiden.default_one_to_n_address,
+                    from_address=InitiatorAddress(creator_address),
+                    to_address=partner_address,
+                    amount=amount,
+                    previous_address=None,
+                    config=self.raiden.config,
+                    privkey=self.raiden.privkey,
                 )
-            if possible_routes:
-                # TODO marcosmartinez7 This can be improved using next_channel_from_routes in order to filter channels without capacity
-                channel_state = views.get_channelstate_for(
-                    chain_state,
-                    registry_address,
-                    token_address,
-                    creator_address,
-                    possible_routes[0].node_address,
-                )
+                if prev_secrethash:
+                    current_payment_task = chain_state.get_payment_task(creator_address, prev_secrethash)
+                    chain_state.clone_payment_task(creator_address, prev_secrethash, secrethash)
+                    possible_routes = routes.filter_acceptable_routes(
+                        route_states=possible_routes, blacklisted_channel_ids=current_payment_task.manager_state.cancelled_channels
+                    )
+                if possible_routes:
+                    # TODO marcosmartinez7 This can be improved using next_channel_from_routes in order to filter channels without capacity
+                    channel_state = views.get_channelstate_for(
+                        chain_state,
+                        registry_address,
+                        token_address,
+                        creator_address,
+                        possible_routes[0].node_address,
+                    )
+            else:
+                raise UnknownTokenAddress("Token Network not Found")
 
         if channel_state:
-
             # checking the balance before creating the payment
             if amount > get_distributable(channel_state.our_state, channel_state.partner_state):
                 raise InsufficientFunds("Insufficient funds to create payment")
