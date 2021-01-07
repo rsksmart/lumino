@@ -40,5 +40,5 @@ class FailedPreconditionException(ClientException):
 
 class TimeoutException(ClientException):
     """
-    Request to RIF Comms pubsub bootnode exceeded
+    Request to RIF Comms pubsub bootnode took too long to finish
     """
