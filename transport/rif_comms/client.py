@@ -1,6 +1,7 @@
 from eth_utils import to_checksum_address
 from grpc import insecure_channel, RpcError
 
+from raiden.settings import DEFAULT_RIF_COMMS_GRPC_CLIENT_TIMEOUT
 from raiden.utils import Address
 from transport.rif_comms.client_exception_handler import ClientExceptionHandler
 from transport.rif_comms.proto.api_pb2 import (
@@ -30,7 +31,7 @@ class Client:
 
     def __init__(self, rsk_address: Address,
                  grpc_api_endpoint: str,
-                 grpc_client_timeout: float = 30):
+                 grpc_client_timeout: float = DEFAULT_RIF_COMMS_GRPC_CLIENT_TIMEOUT):
         """
         Constructs the RIF Communications Client.
         :param rsk_address: RSK address of the node that wants to use the RIF Communications server
