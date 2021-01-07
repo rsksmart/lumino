@@ -263,7 +263,8 @@ def test_send_message_invalid_address(comms_clients):
                 sender=client.rsk_address,
                 receiver=invalid_address,
                 message=Msg(payload=str.encode("echo"))
-            )
+            ),
+            timeout=client.grpc_client_timeout
         )
     assert f"{invalid_address.address} is not a valid RSK address" == e.value.details()
 
