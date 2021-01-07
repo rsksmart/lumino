@@ -5,7 +5,6 @@ import pytest
 from eth_utils import to_canonical_address, to_checksum_address
 from grpc import RpcError, StatusCode
 
-from raiden.settings import DEFAULT_RIF_COMMS_GRPC_CLIENT_TIMEOUT
 from raiden.tests.integration.network.transport.rif_comms.cluster import Cluster
 from raiden.tests.integration.network.transport.rif_comms.node import Node as CommsNode, Config as CommsConfig
 from raiden.tests.integration.network.transport.utils import generate_address
