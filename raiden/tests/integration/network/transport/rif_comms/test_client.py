@@ -1,13 +1,12 @@
 from typing import Dict
 
 import pytest
-from eth_utils import to_canonical_address
-from grpc._channel import _InactiveRpcError
-
+from eth_utils import to_canonical_address, to_checksum_address
 from raiden.tests.integration.network.transport.rif_comms.cluster import Cluster
 from raiden.tests.integration.network.transport.rif_comms.node import Node as CommsNode, Config as CommsConfig
 from raiden.tests.integration.network.transport.utils import generate_address
 from transport.rif_comms.client import Client
+from transport.rif_comms.exceptions import NotFoundException, FailedPreconditionException
 from transport.rif_comms.utils import notification_to_payload, get_sender_from_notification
 
 
@@ -30,10 +29,10 @@ def test_connect():
         client, address = node.clients[0], node.clients[0].rsk_address.address
 
         # no peer ID should be registered under this address yet
-        with pytest.raises(_InactiveRpcError) as e:
+        with pytest.raises(NotFoundException) as e:
             client._get_peer_id(address)
 
-        assert "not found" in str.lower(e.value.details())
+        assert f"Rsk address {to_checksum_address(address)} not registered" == e.value.message
 
         # connect and check again
         client.connect()
@@ -92,12 +91,17 @@ def test_subscribe_to_invalid(comms_clients):
     unregistered_address = generate_address()
     for client in comms_clients.values():
         # no subscriptions should be present
-        assert client._is_subscribed_to(unregistered_address) is False
+        with pytest.raises(NotFoundException) as e:
+            client._is_subscribed_to(unregistered_address)
+        assert f"Rsk address {to_checksum_address(unregistered_address)} not registered" == e.value.message
         # subscribe to unregistered address
-        topic_id, _ = client.subscribe_to(unregistered_address)
-        # FIXME: this should probably throw an exception rather than an empty result
-        assert topic_id is ""
-        assert client._is_subscribed_to(unregistered_address) is False
+        with pytest.raises(NotFoundException) as e:
+            client.subscribe_to(unregistered_address)
+        assert f"Rsk address {to_checksum_address(unregistered_address)} not registered" == e.value.message
+
+        with pytest.raises(NotFoundException) as e:
+            client._is_subscribed_to(unregistered_address)
+        assert f"Rsk address {to_checksum_address(unregistered_address)} not registered" == e.value.message
 
 
 @pytest.mark.parametrize("nodes_to_clients", [{"A": 1, "B": 1}, {"A": 2}])
@@ -297,16 +301,18 @@ def test_unsubscribe_from_invalid(comms_clients):
     client = comms_clients[1]
 
     # unsubscribe from non-subscribed address
-    with pytest.raises(_InactiveRpcError) as e:
+    with pytest.raises(FailedPreconditionException) as e:
         client.unsubscribe_from(client.rsk_address.address)
 
-    assert "not subscribed to" in str.lower(e.value.details())
+    assert f"not subscribed to {to_checksum_address(client.rsk_address.address)}" == e.value.message
+
+    address = generate_address()
 
     # unsubscribe from unregistered address
-    with pytest.raises(_InactiveRpcError) as e:
-        client.unsubscribe_from(generate_address())
+    with pytest.raises(NotFoundException) as e:
+        client.unsubscribe_from(address)
 
-    assert "not subscribed to" in str.lower(e.value.details())
+    assert f"Rsk address {to_checksum_address(address)} not registered" == e.value.message
 
 
 @pytest.mark.parametrize("nodes_to_clients", [{"A": 1, "B": 1}, {"A": 2}])

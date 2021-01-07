@@ -2,7 +2,7 @@ from eth_utils import to_checksum_address
 from grpc import insecure_channel, RpcError
 
 from raiden.utils import Address
-from transport.rif_comms.client_exception_handler import client_handled_operation, ClientExceptionHandler
+from transport.rif_comms.client_exception_handler import ClientExceptionHandler
 from transport.rif_comms.proto.api_pb2 import (
     Notification,
     Msg,
@@ -11,6 +11,16 @@ from transport.rif_comms.proto.api_pb2 import (
     RskSubscription
 )
 from transport.rif_comms.proto.api_pb2_grpc import CommunicationsApiStub
+
+
+def client_handled_operation(func):
+    def inner(client, *args, **kwargs):
+        try:
+            return func(client, *args, **kwargs)
+        except RpcError as error:
+            raise ClientExceptionHandler.get_exception(error)
+
+    return inner
 
 
 class Client:
@@ -135,13 +145,3 @@ class Client:
         # FIXME: EndCommunication pending implementation
         # self.stub.EndCommunication(Void())
         self.grpc_channel.unsubscribe(lambda: self.grpc_channel.close())
-
-
-def client_handled_operation(func):
-    def inner(client: Client, *args, **kwargs):
-        try:
-            return func(client, *args, **kwargs)
-        except RpcError as error:
-            raise ClientExceptionHandler.get_exception(error)
-
-    return inner
