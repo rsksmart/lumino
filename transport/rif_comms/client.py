@@ -15,11 +15,15 @@ from transport.rif_comms.proto.api_pb2_grpc import CommunicationsApiStub
 
 
 def client_handled_operation(func):
+    """
+        Decorator function that catches an RpcError exception and maps it
+        to a custom RIF COMMS Client exception
+    """
     def inner(client, *args, **kwargs):
         try:
             return func(client, *args, **kwargs)
         except RpcError as error:
-            raise ClientExceptionHandler.get_exception(error)
+            raise ClientExceptionHandler.map_exception(error)
 
     return inner
 
