@@ -443,6 +443,44 @@ def test_unsubscribe_from_non_subscribed_address(comms_clients):
     assert client_exception.message == f"Rsk address {to_checksum_address(address)} not registered"
 
 
+@pytest.mark.parametrize("nodes_to_clients", [{"A": 1}])
+def test_unsubscribe_from_invalid_address(comms_clients):
+    client = comms_clients[1]
+
+    # attempt to unsubscribe using an invalid address
+    invalid_address = RskAddress(address="0xfoobar")
+
+    # bypass client.unsubscribe_from to provide an invalid address as topic
+    with pytest.raises(RpcError) as e:
+        client.stub.SendMessageToRskAddress(
+            RskSubscription(
+                topic=invalid_address,
+                subscriber=client.rsk_address,
+            ),
+            timeout=client.grpc_client_timeout
+        )
+
+    client_exception = ClientExceptionHandler.get_exception(e.value)
+    assert type(client_exception) == NotFoundException
+    assert client_exception.code == StatusCode.INVALID_ARGUMENT
+    assert client_exception.message == f"{invalid_address.address} is not a valid RSK address"
+
+    # bypass client.unsubscribe_from to provide an invalid address as subscriber
+    with pytest.raises(RpcError) as e:
+        client.stub.SendMessageToRskAddress(
+            RskSubscription(
+                topic=client.rsk_address,
+                subscriber=invalid_address,
+            ),
+            timeout=client.grpc_client_timeout
+        )
+
+    client_exception = ClientExceptionHandler.get_exception(e.value)
+    assert type(client_exception) == InvalidArgumentException
+    assert client_exception.code == StatusCode.INVALID_ARGUMENT
+    assert client_exception.message == f"{invalid_address.address} is not a valid RSK address"
+
+
 @pytest.mark.parametrize("nodes_to_clients", [{"A": 1, "B": 1}, {"A": 2}])
 def test_unsubscribe_from_self(comms_clients):
     client_1 = comms_clients[1]
