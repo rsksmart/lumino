@@ -359,7 +359,7 @@ def options(func):
             option(
                 "--grpc-client-timeout",
                 help=(
-                    "RIF Comms client timeout for the grpc client.\n"
+                    "A floating point number specifying a timeout for RIF Comms Client requests, expressed in seconds.\n"
                     "Valid values:\n"
                     "A number of seconds, it can be float values"
                 ),

@@ -73,7 +73,7 @@ class Client:
         )
         for response in topic:
             topic_id = response.channelPeerJoined.peerId
-            return topic_id, topic
+            return topic_id, topic  # only 1 response is expected
         return None, topic
 
     @client_handled_operation
