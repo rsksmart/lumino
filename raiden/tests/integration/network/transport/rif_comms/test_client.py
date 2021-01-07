@@ -256,6 +256,17 @@ def test_send_message_invalid_address(comms_clients):
         )
     assert f"{invalid_address.address} is not a valid RSK address" == e.value.details()
 
+    with pytest.raises(RpcError) as e:
+        stub.SendMessageToRskAddress(
+            RskAddressPublish(
+                sender=invalid_address,
+                receiver=client.rsk_address,
+                message=Msg(payload=str.encode("echo"))
+            ),
+            timeout=client.grpc_client_timeout
+        )
+    assert f"{invalid_address.address} is not a valid RSK address" == e.value.details()
+
 
 @pytest.mark.parametrize("nodes_to_clients", [{"A": 1}])
 def test_send_message_self(comms_clients):
