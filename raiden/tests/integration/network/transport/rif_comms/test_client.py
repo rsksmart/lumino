@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Dict, Callable, Type
 
 import pytest
 from eth_utils import to_canonical_address, to_checksum_address
@@ -11,7 +11,7 @@ from raiden.utils import Address
 from transport.rif_comms.client import Client
 from transport.rif_comms.client_exception_handler import ClientExceptionHandler
 from transport.rif_comms.exceptions import NotFoundException, FailedPreconditionException, InvalidArgumentException, \
-    TimeoutException
+    TimeoutException, ClientException
 from transport.rif_comms.proto.api_pb2 import RskAddressPublish, Msg
 from transport.rif_comms.proto.api_pb2 import RskSubscription, RskAddress
 from transport.rif_comms.utils import notification_to_payload, get_sender_from_notification
@@ -536,48 +536,63 @@ def test_client_timeouts():
         client_1.grpc_client_timeout = 1e-100
 
         # connect timeout
-        with pytest.raises(TimeoutException) as e:
-            client_1.connect()
-
-        assert "Deadline Exceeded" == e.value.message
-        assert StatusCode.DEADLINE_EXCEEDED == e.value.code
+        expect_error(TimeoutException,
+                     "Deadline Exceeded",
+                     StatusCode.DEADLINE_EXCEEDED,
+                     client_1.connect)
 
         # _get_peer_id timeout
-        with pytest.raises(TimeoutException) as e:
-            client_1._get_peer_id(rsk_address=client_2.rsk_address.address)
-
-        assert "Deadline Exceeded" == e.value.message
-        assert StatusCode.DEADLINE_EXCEEDED == e.value.code
+        expect_error(TimeoutException,
+                     "Deadline Exceeded",
+                     StatusCode.DEADLINE_EXCEEDED,
+                     client_1._get_peer_id,
+                     rsk_address=client_2.rsk_address.address)
 
         # subscribe_to timeout
-        with pytest.raises(TimeoutException) as e:
-            client_1.subscribe_to(rsk_address=client_1.rsk_address.address)
-
-        assert "Deadline Exceeded" == e.value.message
-        assert StatusCode.DEADLINE_EXCEEDED == e.value.code
+        expect_error(TimeoutException,
+                     "Deadline Exceeded",
+                     StatusCode.DEADLINE_EXCEEDED,
+                     client_1.subscribe_to,
+                     rsk_address=client_1.rsk_address.address)
 
         # _is_subscribed_to timeout
-        with pytest.raises(TimeoutException) as e:
-            client_1._is_subscribed_to(rsk_address=client_1.rsk_address.address)
-
-        assert "Deadline Exceeded" == e.value.message
-        assert StatusCode.DEADLINE_EXCEEDED == e.value.code
+        expect_error(TimeoutException,
+                     "Deadline Exceeded",
+                     StatusCode.DEADLINE_EXCEEDED,
+                     client_1._is_subscribed_to,
+                     rsk_address=client_1.rsk_address.address)
 
         # send message timeout
-        message = "echo message"
-        with pytest.raises(TimeoutException) as e:
-            client_1.send_message(message, client_2.rsk_address.address)
-        assert "Deadline Exceeded" == e.value.message
-        assert StatusCode.DEADLINE_EXCEEDED == e.value.code
+        expect_error(TimeoutException,
+                     "Deadline Exceeded",
+                     StatusCode.DEADLINE_EXCEEDED,
+                     client_1.send_message,
+                     "echo message", client_2.rsk_address.address)
 
         # unsubscribe_from timeout
-        with pytest.raises(TimeoutException) as e:
-            client_1.unsubscribe_from(rsk_address=client_1.rsk_address.address)
-
-        assert "Deadline Exceeded" == e.value.message
-        assert StatusCode.DEADLINE_EXCEEDED == e.value.code
+        expect_error(TimeoutException,
+                     "Deadline Exceeded",
+                     StatusCode.DEADLINE_EXCEEDED,
+                     client_1.unsubscribe_from,
+                     rsk_address=client_1.rsk_address.address)
     finally:
         for node in nodes:
             # because node 2 can be already stopped, we cannot call stop() indiscriminately
             if not node._process.poll():  # if True, node is still running
                 node.stop()
+
+
+def expect_error(expected_exception: Type[ClientException],
+                 expected_message: str,
+                 expected_code: StatusCode,
+                 call: Callable,
+                 *args, **kwargs):
+    """
+        This function checks if an exception of type ClientException is raised on the call
+        and if that exception has some specific code and message
+    """
+    with pytest.raises(expected_exception) as e:
+        call(*args, **kwargs)
+
+    assert expected_message == e.value.message
+    assert expected_code == e.value.code
