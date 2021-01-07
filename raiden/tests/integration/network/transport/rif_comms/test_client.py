@@ -148,11 +148,28 @@ def test_subscribe_to_invalid_address(comms_clients):
     invalid_address = RskAddress(address=Address("0x123"))
 
     for client in comms_clients.values():
-        # bypass client.subscribe_to to provide invalid address
+        # bypass client.subscribe_to to provide invalid address as topic
         with pytest.raises(RpcError) as e:
             topic = client.stub.CreateTopicWithRskAddress(
                 RskSubscription(
                     topic=invalid_address,
+                    subscriber=client.rsk_address
+                ),
+                timeout=client.grpc_client_timeout
+            )
+            for _ in topic:
+                pytest.fail("exception should be raised before reaching this point")
+
+        client_exception = ClientExceptionHandler.get_exception(e.value)
+        assert type(client_exception) == InvalidArgumentException
+        assert client_exception.code == StatusCode.INVALID_ARGUMENT
+        assert client_exception.message == f"{invalid_address.address} is not a valid RSK address"
+
+        # bypass client.subscribe_to to provide invalid address as subscriber
+        with pytest.raises(RpcError) as e:
+            topic = client.stub.CreateTopicWithRskAddress(
+                RskSubscription(
+                    topic=client.rsk_address,
                     subscriber=invalid_address
                 ),
                 timeout=client.grpc_client_timeout
