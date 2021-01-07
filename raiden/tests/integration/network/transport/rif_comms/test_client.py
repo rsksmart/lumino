@@ -169,7 +169,7 @@ def test_subscribe_to_invalid_address(comms_clients):
                     topic=invalid_address,
                     subscriber=invalid_address
                 ),
-                timeout=30
+                timeout=client.grpc_client_timeout
             )
             for response in topic:
                 # should fail before this assert
