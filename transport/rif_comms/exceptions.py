@@ -16,29 +16,29 @@ class ClientException(Exception):
 
 class InvalidArgumentException(ClientException):
     """
-        An argument passed to the operation was invalid
+    An argument passed to the operation was invalid
     """
 
 
 class InternalException(ClientException):
     """
-        There was an internal error on the RIF Comms pubsub bootnode
+    There was an internal error on the RIF Comms pubsub bootnode
     """
 
 
 class NotFoundException(ClientException):
     """
-        Address wasnt found on the DHT of the RIF Comms pubsub bootnode
+    Address wasnt found on the DHT of the RIF Comms pubsub bootnode
     """
 
 
 class FailedPreconditionException(ClientException):
     """
-        A RIF Comms pubsub bootnode precondition failed
+    A RIF Comms pubsub bootnode precondition failed
     """
 
 
 class TimeoutException(ClientException):
     """
-        Request to RIF Comms pubsub bootnode exceeded
+    Request to RIF Comms pubsub bootnode exceeded
     """
