@@ -22,7 +22,7 @@ from raiden.utils.typing import Address
 from transport.message import Message as TransportMessage
 from transport.node import Node as TransportNode
 from transport.rif_comms.client import Client as RIFCommsClient
-from transport.rif_comms.exceptions import InvalidArgumentException, NotFoundException
+from transport.rif_comms.client_exception_handler import InvalidArgumentException, NotFoundException
 from transport.rif_comms.proto.api_pb2 import Notification
 from transport.rif_comms.utils import notification_to_payload, get_sender_from_notification
 from transport.utils import MessageQueue
@@ -238,7 +238,8 @@ class Node(TransportNode):
         try:
             self._comms_client.send_message(payload, recipient)
         except (NotFoundException, InvalidArgumentException) as e:
-            self.log.warn("RIF Comms send message failed", exception=e)
+            self.log.warn("RIF Comms send message exception", exception=e, message_payload=payload.replace("\n", "\\n"),
+                          recipient=pex(recipient))
 
         self.log.info(
             "RIF Comms send message", message_payload=payload.replace("\n", "\\n"), recipient=pex(recipient)

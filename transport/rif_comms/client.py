@@ -1,7 +1,8 @@
 from eth_utils import to_checksum_address
-from grpc import insecure_channel
+from grpc import insecure_channel, RpcError
+
 from raiden.utils import Address
-from transport.rif_comms.exceptions import client_handled_operation
+from transport.rif_comms.client_exception_handler import client_handled_operation, ClientExceptionHandler
 from transport.rif_comms.proto.api_pb2 import (
     Notification,
     Msg,
@@ -13,7 +14,6 @@ from transport.rif_comms.proto.api_pb2_grpc import CommunicationsApiStub
 
 
 class Client:
-
     """
     Class to connect and operate against a RIF Communications pub-sub node.
     """
@@ -29,8 +29,8 @@ class Client:
         """
         self.rsk_address = RskAddress(address=to_checksum_address(rsk_address))
         self.grpc_channel = insecure_channel(grpc_api_endpoint)  # TODO: how to make this secure?
-        self.stub = CommunicationsApiStub(self.grpc_channel)
         self.grpc_client_timeout = grpc_client_timeout
+        self.stub = CommunicationsApiStub(self.grpc_channel)
 
     @client_handled_operation
     def connect(self):
@@ -135,3 +135,13 @@ class Client:
         # FIXME: EndCommunication pending implementation
         # self.stub.EndCommunication(Void())
         self.grpc_channel.unsubscribe(lambda: self.grpc_channel.close())
+
+
+def client_handled_operation(func):
+    def inner(client: Client, *args, **kwargs):
+        try:
+            return func(client, *args, **kwargs)
+        except RpcError as error:
+            raise ClientExceptionHandler.get_exception(error)
+
+    return inner
