@@ -23,7 +23,7 @@ def client_handled_operation(func):
         try:
             return func(client, *args, **kwargs)
         except RpcError as error:
-            raise ClientExceptionHandler.get_exception(error)
+            raise ClientExceptionHandler.map_exception(error)
 
     return inner
 
