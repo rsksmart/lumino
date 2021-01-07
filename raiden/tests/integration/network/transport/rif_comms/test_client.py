@@ -2,11 +2,15 @@ from typing import Dict
 
 import pytest
 from eth_utils import to_canonical_address, to_checksum_address
+from grpc import RpcError, StatusCode
+
 from raiden.tests.integration.network.transport.rif_comms.cluster import Cluster
 from raiden.tests.integration.network.transport.rif_comms.node import Node as CommsNode, Config as CommsConfig
 from raiden.tests.integration.network.transport.utils import generate_address
+from raiden.utils import Address
 from transport.rif_comms.client import Client
-from transport.rif_comms.exceptions import NotFoundException, FailedPreconditionException
+from transport.rif_comms.exceptions import NotFoundException, FailedPreconditionException, InvalidArgumentException
+from transport.rif_comms.proto.api_pb2 import RskSubscription, RskAddress
 from transport.rif_comms.utils import notification_to_payload, get_sender_from_notification
 
 
@@ -102,6 +106,34 @@ def test_subscribe_to_invalid(comms_clients):
         with pytest.raises(NotFoundException) as e:
             client._is_subscribed_to(unregistered_address)
         assert f"Rsk address {to_checksum_address(unregistered_address)} not registered" == e.value.message
+
+        invalid_address = RskAddress(address=Address("an invalid rsk address"))
+        client.stub.CreateTopicWithRskAddress(
+            RskSubscription(
+                topic=invalid_address,
+                subscriber=invalid_address
+            ),
+            timeout=30
+        )
+
+
+@pytest.mark.parametrize("nodes_to_clients", [{"A": 1}, {"A": 2}])
+def test_subscribe_to_invalid_address(comms_clients):
+    invalid_address = RskAddress(address=Address("0x123"))
+    for client in comms_clients.values():
+        with pytest.raises(RpcError) as e:
+            topic = client.stub.CreateTopicWithRskAddress(
+                RskSubscription(
+                    topic=invalid_address,
+                    subscriber=invalid_address
+                ),
+                timeout=30
+            )
+            for response in topic:
+                # should fail before this assert
+                assert not response
+        assert "0x123 is not a valid RSK address" == e.value.details()
+        assert e.value.code() == StatusCode.INVALID_ARGUMENT
 
 
 @pytest.mark.parametrize("nodes_to_clients", [{"A": 1, "B": 1}, {"A": 2}])
