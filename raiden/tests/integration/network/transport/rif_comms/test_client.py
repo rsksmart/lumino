@@ -1,3 +1,4 @@
+import time
 from typing import Dict
 
 import pytest
@@ -534,7 +535,7 @@ def test_client_timeouts():
         nodes.append(node_2)
         client_2, address_2 = node_2.clients[0], node_2.clients[0].rsk_address.address
 
-        tiny_timeout = 0.0000000000000000000000000000000000001
+        tiny_timeout = 1e-100
 
         client_1.grpc_client_timeout = tiny_timeout
 
@@ -545,26 +546,12 @@ def test_client_timeouts():
         assert "Deadline Exceeded" == e.value.message
         assert StatusCode.DEADLINE_EXCEEDED == e.value.code
 
-        client_1.grpc_client_timeout = DEFAULT_RIF_COMMS_GRPC_CLIENT_TIMEOUT
-
-        client_1.connect()
-        client_2.connect()
-
-        client_1.grpc_client_timeout = tiny_timeout
-
         # _get_peer_id timeout
         with pytest.raises(TimeoutException) as e:
             client_1._get_peer_id(rsk_address=client_2.rsk_address.address)
 
         assert "Deadline Exceeded" == e.value.message
         assert StatusCode.DEADLINE_EXCEEDED == e.value.code
-
-        client_1.grpc_client_timeout = DEFAULT_RIF_COMMS_GRPC_CLIENT_TIMEOUT
-
-        peer_id = client_1._get_peer_id(rsk_address=client_2.rsk_address.address)
-        assert peer_id
-
-        client_1.grpc_client_timeout = tiny_timeout
 
         # subscribe_to timeout
         with pytest.raises(TimeoutException) as e:
@@ -573,27 +560,12 @@ def test_client_timeouts():
         assert "Deadline Exceeded" == e.value.message
         assert StatusCode.DEADLINE_EXCEEDED == e.value.code
 
-        client_1.grpc_client_timeout = DEFAULT_RIF_COMMS_GRPC_CLIENT_TIMEOUT
-
-        topic_id, topic = client_1.subscribe_to(rsk_address=client_1.rsk_address.address)
-
-        assert topic_id and topic
-
-        client_1.grpc_client_timeout = tiny_timeout
-
         # _is_subscribed_to timeout
         with pytest.raises(TimeoutException) as e:
             client_1._is_subscribed_to(rsk_address=client_1.rsk_address.address)
 
         assert "Deadline Exceeded" == e.value.message
         assert StatusCode.DEADLINE_EXCEEDED == e.value.code
-
-        client_1.grpc_client_timeout = DEFAULT_RIF_COMMS_GRPC_CLIENT_TIMEOUT
-
-        is_subscribed = client_1._is_subscribed_to(rsk_address=client_1.rsk_address.address)
-        assert is_subscribed
-
-        client_1.grpc_client_timeout = tiny_timeout
 
         # send message timeout
         message = "echo message"
@@ -602,28 +574,12 @@ def test_client_timeouts():
         assert "Deadline Exceeded" == e.value.message
         assert StatusCode.DEADLINE_EXCEEDED == e.value.code
 
-        client_1.grpc_client_timeout = DEFAULT_RIF_COMMS_GRPC_CLIENT_TIMEOUT
-
-        client_1.send_message(message, client_2.rsk_address.address)  # no exception should be raised
-
         # unsubscribe_from timeout
-        client_1.grpc_client_timeout = tiny_timeout
-
         with pytest.raises(TimeoutException) as e:
             client_1.unsubscribe_from(rsk_address=client_1.rsk_address.address)
 
         assert "Deadline Exceeded" == e.value.message
         assert StatusCode.DEADLINE_EXCEEDED == e.value.code
-
-        client_1.grpc_client_timeout = DEFAULT_RIF_COMMS_GRPC_CLIENT_TIMEOUT
-
-        is_subscribed = client_1._is_subscribed_to(rsk_address=client_1.rsk_address.address)
-
-        assert is_subscribed
-        client_1.unsubscribe_from(rsk_address=client_1.rsk_address.address)
-
-        is_subscribed = client_1._is_subscribed_to(rsk_address=client_1.rsk_address.address)
-        assert not is_subscribed
     finally:
         for node in nodes:
             # because node 2 can be already stopped, we cannot call stop() indiscriminately
