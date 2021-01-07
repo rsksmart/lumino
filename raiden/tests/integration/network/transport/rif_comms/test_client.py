@@ -32,11 +32,14 @@ def test_connect_failure():
     try:
         node = CommsNode(CommsConfig(node_id="A", amount_of_clients=1, auto_connect=False))
         nodes.append(node)
-        stub = node.clients[0].stub
+        client = node.clients[0]
 
         # bypass client.connect to provide invalid address
         with pytest.raises(RpcError) as e:
-            stub.ConnectToCommunicationsNode(RskAddress(address="invalid"))
+            client.stub.ConnectToCommunicationsNode(
+                RskAddress(address="invalid"),
+                timeout=client.grpc_client_timeout
+            )
 
         client_exception = ClientExceptionHandler.get_exception(e.value)
         assert type(client_exception) == InvalidArgumentException
@@ -118,19 +121,33 @@ def test_connect_peers():
 @pytest.mark.parametrize("nodes_to_clients", [{"A": 1}, {"A": 2}])
 def test_subscribe_to_invalid(comms_clients):
     unregistered_address = generate_address()
+
     for client in comms_clients.values():
+        expected_error = f"Rsk address {to_checksum_address(unregistered_address)} not registered"
+
         # no subscriptions should be present
         with pytest.raises(NotFoundException) as e:
             client._is_subscribed_to(unregistered_address)
-        assert f"Rsk address {to_checksum_address(unregistered_address)} not registered" == e.value.message
+
+        client_exception = e.value
+        assert client_exception.code == StatusCode.NOT_FOUND
+        assert client_exception.message == expected_error
+
         # subscribe to unregistered address
         with pytest.raises(NotFoundException) as e:
             client.subscribe_to(unregistered_address)
-        assert f"Rsk address {to_checksum_address(unregistered_address)} not registered" == e.value.message
 
+        client_exception = e.value
+        assert client_exception.code == StatusCode.NOT_FOUND
+        assert client_exception.message == expected_error
+
+        # subscription should still be absent
         with pytest.raises(NotFoundException) as e:
             client._is_subscribed_to(unregistered_address)
-        assert f"Rsk address {to_checksum_address(unregistered_address)} not registered" == e.value.message
+
+        client_exception = e.value
+        assert client_exception.code == StatusCode.NOT_FOUND
+        assert client_exception.message == expected_error
 
         invalid_address = RskAddress(address=Address("an invalid rsk address"))
         client.stub.CreateTopicWithRskAddress(
@@ -138,7 +155,7 @@ def test_subscribe_to_invalid(comms_clients):
                 topic=invalid_address,
                 subscriber=invalid_address
             ),
-            timeout=30
+            timeout=client.grpc_client_timeout
         )
 
 
