@@ -35,16 +35,17 @@ def test_connect_failure():
         client = node.clients[0]
 
         # bypass client.connect to provide invalid address
+        invalid_address = RskAddress(address="invalid")
         with pytest.raises(RpcError) as e:
             client.stub.ConnectToCommunicationsNode(
-                RskAddress(address="invalid"),
+                invalid_address,
                 timeout=client.grpc_client_timeout
             )
 
         client_exception = ClientExceptionHandler.get_exception(e.value)
         assert type(client_exception) == InvalidArgumentException
         assert client_exception.code == StatusCode.INVALID_ARGUMENT
-        assert "not a valid RSK address" in client_exception.message
+        assert client_exception.message == f"{invalid_address.address} is not a valid RSK address"
     finally:
         for node in nodes:
             node.stop()
@@ -119,13 +120,13 @@ def test_connect_peers():
 
 
 @pytest.mark.parametrize("nodes_to_clients", [{"A": 1}, {"A": 2}])
-def test_subscribe_to_invalid(comms_clients):
+def test_subscribe_to_unregistered_address(comms_clients):
     unregistered_address = generate_address()
 
     for client in comms_clients.values():
         expected_error = f"Rsk address {to_checksum_address(unregistered_address)} not registered"
 
-        # no subscriptions should be present
+        # attempt to check subscription to unregistered address
         with pytest.raises(NotFoundException) as e:
             client._is_subscribed_to(unregistered_address)
 
@@ -133,7 +134,7 @@ def test_subscribe_to_invalid(comms_clients):
         assert client_exception.code == StatusCode.NOT_FOUND
         assert client_exception.message == expected_error
 
-        # subscribe to unregistered address
+        # attempt to subscribe to unregistered address
         with pytest.raises(NotFoundException) as e:
             client.subscribe_to(unregistered_address)
 
@@ -141,41 +142,28 @@ def test_subscribe_to_invalid(comms_clients):
         assert client_exception.code == StatusCode.NOT_FOUND
         assert client_exception.message == expected_error
 
-        # subscription should still be absent
-        with pytest.raises(NotFoundException) as e:
-            client._is_subscribed_to(unregistered_address)
-
-        client_exception = e.value
-        assert client_exception.code == StatusCode.NOT_FOUND
-        assert client_exception.message == expected_error
-
-        invalid_address = RskAddress(address=Address("an invalid rsk address"))
-        client.stub.CreateTopicWithRskAddress(
-            RskSubscription(
-                topic=invalid_address,
-                subscriber=invalid_address
-            ),
-            timeout=client.grpc_client_timeout
-        )
-
 
 @pytest.mark.parametrize("nodes_to_clients", [{"A": 1}, {"A": 2}])
 def test_subscribe_to_invalid_address(comms_clients):
     invalid_address = RskAddress(address=Address("0x123"))
+
     for client in comms_clients.values():
+        # bypass client.subscribe_to to provide invalid address
         with pytest.raises(RpcError) as e:
             topic = client.stub.CreateTopicWithRskAddress(
                 RskSubscription(
                     topic=invalid_address,
                     subscriber=invalid_address
                 ),
-                timeout=30
+                timeout=client.grpc_client_timeout
             )
-            for response in topic:
-                # should fail before this assert
-                assert not response
-        assert "0x123 is not a valid RSK address" == e.value.details()
-        assert e.value.code() == StatusCode.INVALID_ARGUMENT
+            for _ in topic:
+                pytest.fail("exception should be raised before reaching this point")
+
+        client_exception = ClientExceptionHandler.get_exception(e.value)
+        assert type(client_exception) == InvalidArgumentException
+        assert client_exception.code == StatusCode.INVALID_ARGUMENT
+        assert client_exception.message == f"{invalid_address.address} is not a valid RSK address"
 
 
 @pytest.mark.parametrize("nodes_to_clients", [{"A": 1, "B": 1}, {"A": 2}])
