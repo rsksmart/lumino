@@ -533,9 +533,7 @@ def test_client_timeouts():
         nodes.append(node_2)
         client_2, address_2 = node_2.clients[0], node_2.clients[0].rsk_address.address
 
-        tiny_timeout = 1e-100
-
-        client_1.grpc_client_timeout = tiny_timeout
+        client_1.grpc_client_timeout = 1e-100
 
         # connect timeout
         with pytest.raises(TimeoutException) as e:
