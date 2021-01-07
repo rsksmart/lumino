@@ -23,7 +23,7 @@ from raiden.settings import (
     DEFAULT_PATHFINDING_MAX_PATHS,
     INITIAL_PORT,
     DEFAULT_RIF_COMMS_GRPC_ENDPOINT,
-    DEFAULT_RIF_COMMS_GRPC_CLIENT_TIMEOUT_SECONDS)
+    DEFAULT_RIF_COMMS_GRPC_CLIENT_TIMEOUT)
 from raiden.ui.startup import environment_type_to_contracts_version
 from raiden.utils import get_system_spec
 from raiden.utils.cli import (
@@ -363,7 +363,7 @@ def options(func):
                     "Valid values:\n"
                     "A number of seconds, it can be float values"
                 ),
-                default=DEFAULT_RIF_COMMS_GRPC_CLIENT_TIMEOUT_SECONDS,
+                default=DEFAULT_RIF_COMMS_GRPC_CLIENT_TIMEOUT,
                 type=float,
                 show_default=True,
             ),
