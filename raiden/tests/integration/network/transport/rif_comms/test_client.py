@@ -247,23 +247,29 @@ def test_subscribe_to_repeated(comms_clients):
 
 
 @pytest.mark.parametrize("nodes_to_clients", [{"A": 1}])
-def test_send_message_invalid(comms_clients):
+def test_send_message_unregistered_address(comms_clients):
     client = comms_clients[1]
-    # send message to unregistered peer
+
+    # attempt to send message to unregistered address
     unregistered_address = generate_address()
     with pytest.raises(NotFoundException) as e:
         client.send_message("echo", unregistered_address)
-    assert f"Rsk address {to_checksum_address(unregistered_address)} not registered" == e.value.message
+
+    client_exception = e.value
+    assert client_exception.code == StatusCode.NOT_FOUND
+    assert client_exception.message == f"Rsk address {to_checksum_address(unregistered_address)} not registered"
 
 
 @pytest.mark.parametrize("nodes_to_clients", [{"A": 1}])
 def test_send_message_invalid_address(comms_clients):
     client = comms_clients[1]
-    stub = client.stub
-    # send message to invalid address
+
+    # attempt to send message to invalid address
     invalid_address = RskAddress(address="0x123")
+
+    # bypass client.send_message to prove an invalid address
     with pytest.raises(RpcError) as e:
-        stub.SendMessageToRskAddress(
+        client.stub.SendMessageToRskAddress(
             RskAddressPublish(
                 sender=client.rsk_address,
                 receiver=invalid_address,
@@ -271,7 +277,11 @@ def test_send_message_invalid_address(comms_clients):
             ),
             timeout=client.grpc_client_timeout
         )
-    assert f"{invalid_address.address} is not a valid RSK address" == e.value.details()
+
+    client_exception = ClientExceptionHandler.get_exception(e.value)
+    assert type(client_exception) == InvalidArgumentException
+    assert client_exception.code == StatusCode.INVALID_ARGUMENT
+    assert client_exception.message == f"{invalid_address.address} is not a valid RSK address"
 
 
 @pytest.mark.parametrize("nodes_to_clients", [{"A": 1}])
