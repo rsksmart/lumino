@@ -2,11 +2,15 @@ from typing import Dict
 
 import pytest
 from eth_utils import to_canonical_address, to_checksum_address
+from grpc import RpcError
+from grpc._channel import _InactiveRpcError
+
 from raiden.tests.integration.network.transport.rif_comms.cluster import Cluster
 from raiden.tests.integration.network.transport.rif_comms.node import Node as CommsNode, Config as CommsConfig
 from raiden.tests.integration.network.transport.utils import generate_address
 from transport.rif_comms.client import Client
 from transport.rif_comms.exceptions import NotFoundException, FailedPreconditionException
+from transport.rif_comms.proto.api_pb2 import RskAddressPublish, RskAddress, Msg
 from transport.rif_comms.utils import notification_to_payload, get_sender_from_notification
 
 
@@ -168,13 +172,30 @@ def test_subscribe_to_repeated(comms_clients):
 
 
 @pytest.mark.parametrize("nodes_to_clients", [{"A": 1}])
-@pytest.mark.skip(reason="hangs, incomplete")
 def test_send_message_invalid(comms_clients):
     client = comms_clients[1]
     # send message to unregistered peer
-    # FIXME: raises no peers on routing table
-    client.send_message("echo", generate_address())
+    unregistered_address = generate_address()
+    with pytest.raises(NotFoundException) as e:
+        client.send_message("echo", unregistered_address)
+    assert f"Rsk address {to_checksum_address(unregistered_address)} not registered" == e.value.message
 
+
+@pytest.mark.parametrize("nodes_to_clients", [{"A": 1}])
+def test_send_message_invalid_address(comms_clients):
+    client = comms_clients[1]
+    stub = client.stub
+    # send message to invalid address
+    invalid_address = RskAddress(address="0x123")
+    with pytest.raises(RpcError) as e:
+        stub.SendMessageToRskAddress(
+            RskAddressPublish(
+                sender=client.rsk_address,
+                receiver=invalid_address,
+                message=Msg(payload=str.encode("echo"))
+            )
+        )
+    assert f"{invalid_address.address} is not a valid RSK address" == e.value.details()
 
 @pytest.mark.parametrize("nodes_to_clients", [{"A": 1}])
 def test_send_message_self(comms_clients):
