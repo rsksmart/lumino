@@ -468,7 +468,7 @@ def run_test_payment_timing_out_if_partner_does_not_respond(  # pylint: disable=
     def fake_receive(room, event):  # pylint: disable=unused-argument
         return True
 
-    with patch.object(app1.raiden.transport.hub_transport, "_handle_message", side_effect=fake_receive):
+    with patch.object(app1.raiden.transport.full_node, "_handle_message", side_effect=fake_receive):
         greenlet = gevent.spawn(
             RaidenAPI(app0.raiden).transfer,
             app0.raiden.default_registry.address,

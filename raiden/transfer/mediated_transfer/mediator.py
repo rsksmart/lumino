@@ -32,11 +32,9 @@ from raiden.transfer.state import (
     CHANNEL_STATE_CLOSED,
     CHANNEL_STATE_OPENED,
     NODE_NETWORK_REACHABLE,
-    NODE_NETWORK_UNREACHABLE,
     NettingChannelState,
     RouteState,
-    message_identifier_from_prng,
-    NODE_NETWORK_UNKNOWN
+    message_identifier_from_prng
 )
 from raiden.transfer.state_change import (
     ActionChangeNodeNetworkState,

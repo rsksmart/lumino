@@ -1,24 +1,24 @@
-from http import HTTPStatus
-
-import gevent
-import structlog
-from gevent import Greenlet
+import hashlib
 import random
 import string
-import hashlib
-from binascii import hexlify
-import os
-import dateutil.parser
 from datetime import datetime, date
+from http import HTTPStatus
+
+import dateutil.parser
+import gevent
+import structlog
 from dateutil.relativedelta import relativedelta
 from eth_utils import is_binary_address, to_checksum_address, to_canonical_address, to_normalized_address, encode_hex
-
-from ecies import encrypt
+from gevent import Greenlet
 
 import raiden.blockchain.events as blockchain_events
 from raiden import waiting, routing
 from raiden.api.validations.api_error_builder import ApiErrorBuilder
 from raiden.api.validations.channel_validator import ChannelValidator
+from raiden.billing.invoices.decoder.invoice_decoder import decode_invoice
+from raiden.billing.invoices.encoder.invoice_encoder import parse_options, encode_invoice
+from raiden.billing.invoices.options_args import OptionsArgs
+from raiden.billing.invoices.util.time_util import get_utc_unix_time, get_utc_expiration_time
 from raiden.constants import (
     GENESIS_BLOCK_NUMBER,
     RED_EYES_PER_TOKEN_NETWORK_LIMIT,
@@ -53,8 +53,8 @@ from raiden.lightclient.models.light_client_payment import LightClientPayment, L
 from raiden.lightclient.models.light_client_protocol_message import LightClientProtocolMessageType
 from raiden.messages import RequestMonitoring, LockedTransfer, RevealSecret, Unlock, Delivered, SecretRequest, \
     Processed, LockExpired
+from raiden.rns_constants import RNS_ADDRESS_ZERO
 from raiden.settings import DEFAULT_RETRY_TIMEOUT, DEVELOPMENT_CONTRACT_VERSION
-
 from raiden.transfer import architecture, views, routes
 from raiden.transfer.channel import get_distributable
 from raiden.transfer.events import (
@@ -62,7 +62,6 @@ from raiden.transfer.events import (
     EventPaymentSentFailed,
     EventPaymentSentSuccess,
 )
-
 from raiden.transfer.state import (
     BalanceProofSignedState,
     InitiatorTask,
@@ -73,10 +72,10 @@ from raiden.transfer.state import (
     ChainState,
     PaymentMappingState
 )
-
 from raiden.transfer.state_change import ActionChannelClose
-from raiden.utils import pex, typing
+from raiden.utils import pex, typing, random_secret, sha3
 from raiden.utils.gas_reserve import has_enough_gas_reserve
+from raiden.utils.rns import is_rns_address
 from raiden.utils.typing import (
     Address,
     Any,
@@ -100,16 +99,8 @@ from raiden.utils.typing import (
     TokenNetworkID,
     Tuple,
     SignedTransaction,
-    InitiatorAddress)
-
-from raiden.rns_constants import RNS_ADDRESS_ZERO
-from raiden.utils.rns import is_rns_address
-
-from raiden.billing.invoices.options_args import OptionsArgs
-from raiden.billing.invoices.util.time_util import get_utc_unix_time, get_utc_expiration_time
-from raiden.billing.invoices.encoder.invoice_encoder import parse_options, encode_invoice
-from raiden.billing.invoices.decoder.invoice_decoder import decode_invoice
-from raiden.utils import random_secret, sha3
+    InitiatorAddress
+)
 
 log = structlog.get_logger(__name__)  # pylint: disable=invalid-name
 
@@ -118,16 +109,6 @@ EVENTS_PAYMENT_HISTORY_RELATED = (
     EventPaymentSentFailed,
     EventPaymentReceivedSuccess,
 )
-
-from raiden.settings import (
-    DEFAULT_MATRIX_KNOWN_SERVERS
-)
-
-from raiden.utils.cli import get_matrix_servers
-
-from raiden.network.transport.matrix.utils import make_client
-
-from urllib.parse import urlparse
 
 
 def event_filter_for_payments(
@@ -1735,74 +1716,6 @@ class RaidenAPI:
     def get_all_light_clients(self):
         light_clients = self.raiden.wal.storage.get_all_light_clients()
         return light_clients
-
-    def get_data_for_registration_request(self, address):
-        # fetch list of known servers from raiden-network/raiden-tranport repo
-        available_servers_url = DEFAULT_MATRIX_KNOWN_SERVERS[self.raiden.config["environment_type"]]
-        available_servers = available_servers_url \
-            if self.raiden.config["environment_type"] == Environment.DEVELOPMENT \
-            else get_matrix_servers(available_servers_url)
-        client = make_client(available_servers)
-        server_url = client.api.base_url
-        server_name = urlparse(server_url).netloc
-        data_to_sign = {
-            "display_name_to_sign": "@" + to_normalized_address(address) + ":" + server_name,
-            "password_to_sign": server_name,
-            "seed_retry": "seed"}
-        return data_to_sign
-
-    def register_light_client(self,
-                              address,
-                              signed_password,
-                              server_name,
-                              signed_display_name,
-                              signed_seed_retry):
-
-        address = to_checksum_address(address)
-
-        light_client = self.raiden.wal.storage.get_light_client(address)
-
-        pubhex = self.raiden.config["pubkey"].hex()
-        encrypt_signed_password = encrypt(pubhex, signed_password.encode())
-        encrypt_signed_display_name = encrypt(pubhex, signed_display_name.encode())
-        encrypt_signed_seed_retry = encrypt(pubhex, signed_seed_retry.encode())
-
-        if light_client is None:
-
-            api_key = hexlify(os.urandom(20))
-            api_key = api_key.decode("utf-8")
-            # Check for limit light client
-            result = self.raiden.wal.storage.save_light_client(
-                api_key=api_key,
-                address=address,
-                encrypt_signed_password=encrypt_signed_password.hex(),
-                encrypt_signed_display_name=encrypt_signed_display_name.hex(),
-                encrypt_signed_seed_retry=encrypt_signed_seed_retry.hex(),
-                current_server_name=server_name,
-                pending_for_deletion=0
-            )
-
-            if result > 0:
-                result = {"address": address,
-                          "encrypt_signed_password": encrypt_signed_password.hex(),
-                          "encrypt_signed_display_name": encrypt_signed_display_name.hex(),
-                          "api_key": api_key,
-                          "encrypt_signed_seed_retry": encrypt_signed_seed_retry.hex(),
-                          "message": "successfully registered",
-                          "result_code": 200}
-            else:
-                result = {"message": "An unexpected error has occurred.",
-                          "result_code": 500}
-        else:
-            result = {"address": address,
-                      "encrypt_signed_password": encrypt_signed_password.hex(),
-                      "encrypt_signed_display_name": encrypt_signed_display_name.hex(),
-                      "api_key": light_client['api_key'],
-                      "encrypt_signed_seed_retry": encrypt_signed_seed_retry.hex(),
-                      "message": "Already registered",
-                      "result_code": 409}
-
-        return result
 
     def create_light_client_payment(
         self,

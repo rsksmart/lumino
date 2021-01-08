@@ -1,6 +1,8 @@
 from typing import Optional
 
 from eth_utils import decode_hex
+from raiden_contracts.constants import CONTRACT_TOKEN_NETWORK, ChannelEvent
+from raiden_contracts.contract_manager import ContractManager
 from web3.utils.filters import Filter
 
 from raiden.constants import GENESIS_BLOCK_NUMBER, UINT256_MAX
@@ -17,9 +19,8 @@ from raiden.utils.typing import (
     Nonce,
     Signature,
     TokenAmount,
-    SignedTransaction)
-from raiden_contracts.constants import CONTRACT_TOKEN_NETWORK, ChannelEvent
-from raiden_contracts.contract_manager import ContractManager
+    SignedTransaction
+)
 
 
 class PaymentChannel:

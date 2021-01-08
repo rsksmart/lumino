@@ -2,10 +2,10 @@ import pytest
 from eth_utils import to_checksum_address
 
 from raiden.constants import DISCOVERY_DEFAULT_ROOM, PATH_FINDING_BROADCASTING_ROOM
-from raiden.network.transport import MatrixTransport
 from raiden.tests.fixtures.variables import TransportProtocol
 from raiden.tests.utils.transport import generate_synapse_config, matrix_server_starter
 from raiden.utils import privatekey_to_address
+from transport.matrix.node import MatrixNode as MatrixTransportNode
 
 
 @pytest.fixture
@@ -66,7 +66,7 @@ def matrix_transports(
         server = local_matrix_servers[transport_index % len(local_matrix_servers)]
         address = to_checksum_address(privatekey_to_address(private_keys[transport_index]))
         transports.append(
-            MatrixTransport(
+            MatrixTransportNode(
                 address=address,
                 config={
                     "global_rooms": global_rooms,

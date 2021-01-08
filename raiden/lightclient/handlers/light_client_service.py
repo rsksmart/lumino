@@ -1,3 +1,8 @@
+import os
+from binascii import hexlify
+
+from ecies import encrypt
+from eth_utils import to_checksum_address
 from eth_utils.typing import ChecksumAddress
 
 from raiden.lightclient.lightclientmessages.hub_response_message import HubResponseMessage
@@ -74,3 +79,92 @@ class LightClientService:
                                          created_on=payment[6],
                                          payment_status=payment[7])
         return payment
+
+    @classmethod
+    def store_matrix_light_client(cls,
+                                  address,
+                                  signed_password,
+                                  server_name,
+                                  signed_display_name,
+                                  signed_seed_retry,
+                                  storage,
+                                  pubhex
+                                  ):
+
+        address = to_checksum_address(address)
+
+        light_client = storage.get_light_client(address)
+
+        encrypt_signed_password = encrypt(pubhex, signed_password.encode())
+        encrypt_signed_display_name = encrypt(pubhex, signed_display_name.encode())
+        encrypt_signed_seed_retry = encrypt(pubhex, signed_seed_retry.encode())
+
+        if light_client is None:
+
+            api_key = hexlify(os.urandom(20))
+            api_key = api_key.decode("utf-8")
+            # Check for limit light client
+            result = storage.save_light_client(
+                api_key=api_key,
+                address=address,
+                encrypt_signed_password=encrypt_signed_password.hex(),
+                encrypt_signed_display_name=encrypt_signed_display_name.hex(),
+                encrypt_signed_seed_retry=encrypt_signed_seed_retry.hex(),
+                current_server_name=server_name,
+                pending_for_deletion=0
+            )
+
+            if result > 0:
+                result = {"address": address,
+                          "encrypt_signed_password": encrypt_signed_password.hex(),
+                          "encrypt_signed_display_name": encrypt_signed_display_name.hex(),
+                          "api_key": api_key,
+                          "encrypt_signed_seed_retry": encrypt_signed_seed_retry.hex(),
+                          "message": "successfully registered",
+                          "result_code": 200}
+            else:
+                result = {"message": "An unexpected error has occurred.",
+                          "result_code": 500}
+        else:
+            result = {"address": address,
+                      "encrypt_signed_password": encrypt_signed_password.hex(),
+                      "encrypt_signed_display_name": encrypt_signed_display_name.hex(),
+                      "api_key": light_client['api_key'],
+                      "encrypt_signed_seed_retry": encrypt_signed_seed_retry.hex(),
+                      "message": "Already registered",
+                      "result_code": 409}
+
+        return result
+
+    @classmethod
+    def store_rif_comms_light_client(cls, address, storage):
+        address = to_checksum_address(address)
+
+        api_key = hexlify(os.urandom(20))
+        api_key = api_key.decode("utf-8")
+
+        light_client = storage.get_light_client(address)
+
+        if light_client is None:
+            result = storage.save_light_client(
+                api_key=api_key,
+                address=address,
+                encrypt_signed_password=None,
+                encrypt_signed_display_name=None,
+                encrypt_signed_seed_retry=None,
+                current_server_name=None,
+                pending_for_deletion=0
+            )
+            if result > 0:
+                return {"address": address,
+                        "message": "successfully registered",
+                        "api_key": api_key,
+                        "result_code": 200}
+            else:
+                return {"message": "An unexpected error has occurred.",
+                        "result_code": 500}
+        else:
+            return {"address": address,
+                    "api_key": light_client['api_key'],
+                    "message": "Already registered",
+                    "result_code": 409}

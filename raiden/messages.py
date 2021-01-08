@@ -9,7 +9,6 @@ from eth_utils import (
     to_normalized_address,
     to_checksum_address
 )
-
 from raiden.constants import UINT64_MAX, UINT256_MAX, EMPTY_PAYMENT_HASH_INVOICE
 from raiden.encoding import messages
 from raiden.encoding.format import buffer_for
@@ -21,7 +20,6 @@ from raiden.transfer.balance_proof import (
     pack_reward_proof,
 )
 from raiden.transfer.identifiers import CanonicalIdentifier
-
 from raiden.transfer.state import BalanceProofSignedState
 from raiden.transfer.utils import hash_balance_data
 from raiden.utils import ishash, pex, sha3
@@ -73,6 +71,7 @@ __all__ = (
     "SecretRequest",
     "SignedBlindedBalanceProof",
     "SignedMessage",
+    "SignedRetrieableMessage",
     "ToDevice",
     "Unlock",
     "decode",
@@ -154,7 +153,6 @@ def from_dict(data: dict) -> "Message":
                 "Invalid message data. Can not find the data type"
             ) from None
     return klass.from_dict(data)
-
 
 
 class Message:
@@ -1366,7 +1364,7 @@ class RefundTransfer(LockedTransfer):
             "chain_id": self.chain_id,
             "message_identifier": self.message_identifier,
             "payment_identifier": self.payment_identifier,
-            "payment_hash_invoice" : encode_hex(self.payment_hash_invoice),
+            "payment_hash_invoice": encode_hex(self.payment_hash_invoice),
             "nonce": self.nonce,
             "token_network_address": to_normalized_address(self.token_network_address),
             "token": to_normalized_address(self.token),
@@ -1428,7 +1426,6 @@ class LockExpired(EnvelopeMessage):
         secrethash: SecretHash,
         **kwargs,
     ):
-
         super().__init__(
             chain_id=chain_id,
             nonce=nonce,
@@ -1902,12 +1899,12 @@ class RequestRegisterSecret(Message):
         self.secret_registry_address = secret_registry_address
 
     def __eq__(self, other):
-
         return (
             super().__eq__(other)
             and isinstance(other, RequestRegisterSecret)
             and self.secret_registry_address == other.secret_registry_address
         )
+
     @classmethod
     def unpack(cls, packed):
         return cls(packed.secret_registry_address)
@@ -1928,6 +1925,7 @@ class RequestRegisterSecret(Message):
 
 class SettlementRequiredLightMessage(Message):
     """ Represents the settlement required message for the LC when we need the LC to sign and send a settlement """
+
     def __init__(self, channel_identifier: ChannelID, channel_network_identifier: TokenNetworkAddress,
                  participant1: Address, participant1_transferred_amount: TokenAmount,
                  participant1_locked_amount: TokenAmount, participant1_locksroot: Locksroot, participant2: Address,

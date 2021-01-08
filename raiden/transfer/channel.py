@@ -4,6 +4,7 @@ import random
 
 from eth_utils import encode_hex
 
+from raiden.billing.invoices.handlers.invoice_handler import handle_received_invoice
 from raiden.constants import (
     EMPTY_HASH_KECCAK,
     EMPTY_MERKLE_ROOT,
@@ -46,7 +47,8 @@ from raiden.transfer.mediated_transfer.state import (
 from raiden.transfer.mediated_transfer.state_change import (
     ReceiveLockExpired,
     ReceiveTransferRefund,
-    ReceiveLockExpiredLight)
+    ReceiveLockExpiredLight
+)
 from raiden.transfer.merkle_tree import LEAVES, compute_layers, merkleroot
 from raiden.transfer.state import (
     CHANNEL_STATE_CLOSED,
@@ -68,7 +70,8 @@ from raiden.transfer.state import (
     UnlockPartialProofState,
     make_empty_merkle_tree,
     message_identifier_from_prng,
-    balanceproof_from_envelope)
+    balanceproof_from_envelope
+)
 from raiden.transfer.state_change import (
     ActionChannelClose,
     ActionChannelSetFee,
@@ -79,7 +82,9 @@ from raiden.transfer.state_change import (
     ContractReceiveChannelSettled,
     ContractReceiveUpdateTransfer,
     ReceiveUnlock,
-    ContractReceiveChannelClosedLight, ContractReceiveChannelSettledLight)
+    ContractReceiveChannelClosedLight,
+    ContractReceiveChannelSettledLight
+)
 from raiden.transfer.utils import hash_balance_data
 from raiden.utils import pex
 from raiden.utils.signer import recover
@@ -115,9 +120,8 @@ from raiden.utils.typing import (
     TokenNetworkID,
     Tuple,
     Union,
-    cast)
-
-from raiden.billing.invoices.handlers.invoice_handler import handle_received_invoice
+    cast
+)
 
 # This should be changed to `Union[str, MerkleTreeState]`
 MerkletreeOrError = Tuple[bool, Optional[str], Optional[MerkleTreeState]]
@@ -566,8 +570,6 @@ def valid_lockedtransfer_check(
         channel_state=channel_state,
         sender_state=sender_state,
     )
-    print("is balance proof usable")
-    print(invalid_balance_proof_msg)
 
     result: MerkletreeOrError = (False, None, None, None)
 
@@ -1655,7 +1657,8 @@ def handle_receive_lock_expired(
 
 
 def handle_receive_lock_expired_light(
-    channel_state: NettingChannelState, state_change: ReceiveLockExpiredLight, block_number: BlockNumber, payment_id: PaymentID
+    channel_state: NettingChannelState, state_change: ReceiveLockExpiredLight, block_number: BlockNumber,
+    payment_id: PaymentID
 ) -> TransitionResult[NettingChannelState]:
     """Remove expired locks from channel states."""
     is_valid, msg, merkletree = is_valid_lock_expired(
@@ -1747,9 +1750,6 @@ def handle_receive_lockedtransfer_light(
     is_valid, msg, merkletree, handle_invoice_result = is_valid_lockedtransfer(
         mediated_transfer, channel_state, channel_state.partner_state, channel_state.our_state, storage
     )
-    print("is valid")
-    print(is_valid)
-    print(msg)
     if is_valid:
         assert merkletree, "is_valid_lock_expired should return merkletree if valid"
         channel_state.partner_state.balance_proof = mediated_transfer.balance_proof
@@ -1998,7 +1998,8 @@ def handle_channel_settled_light(
     if state_change.channel_identifier == channel_state.identifier:
         set_settled(channel_state, state_change.block_number)
 
-        our_locksroot, partner_locksroot = get_locksroot_from_state_change(channel_state.our_state.address, state_change)
+        our_locksroot, partner_locksroot = get_locksroot_from_state_change(channel_state.our_state.address,
+                                                                           state_change)
 
         should_clear_channel = (
             our_locksroot == EMPTY_MERKLE_ROOT and partner_locksroot == EMPTY_MERKLE_ROOT
@@ -2010,7 +2011,7 @@ def handle_channel_settled_light(
         channel_state.our_state.onchain_locksroot = our_locksroot
         channel_state.partner_state.onchain_locksroot = partner_locksroot
 
-        #TODO mmartinez7 unlock for light clients
+        # TODO mmartinez7 unlock for light clients
         onchain_unlock = ContractSendChannelBatchUnlockLight(
             canonical_identifier=channel_state.canonical_identifier,
             client=channel_state.our_state.address,

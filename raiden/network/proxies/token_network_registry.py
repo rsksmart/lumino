@@ -10,6 +10,8 @@ from eth_utils import (
     to_checksum_address,
     to_normalized_address,
 )
+from raiden_contracts.constants import CONTRACT_TOKEN_NETWORK_REGISTRY, EVENT_TOKEN_NETWORK_CREATED
+from raiden_contracts.contract_manager import ContractManager
 
 from raiden.constants import (
     GAS_REQUIRED_FOR_CREATE_ERC20_TOKEN_NETWORK,
@@ -36,8 +38,6 @@ from raiden.utils.typing import (
     TokenAddress,
     TokenAmount,
 )
-from raiden_contracts.constants import CONTRACT_TOKEN_NETWORK_REGISTRY, EVENT_TOKEN_NETWORK_CREATED
-from raiden_contracts.contract_manager import ContractManager
 
 log = structlog.get_logger(__name__)  # pylint: disable=invalid-name
 

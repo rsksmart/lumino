@@ -1,6 +1,6 @@
 from collections import defaultdict
-from typing import Any, Dict, List, NamedTuple, Optional, Tuple, Callable
 from dataclasses import dataclass
+from typing import Any, Dict, List, NamedTuple, Optional, Tuple, Callable
 
 import structlog
 from eth_utils import (
@@ -12,6 +12,18 @@ from eth_utils import (
 )
 from gevent.event import AsyncResult
 from gevent.lock import RLock, Semaphore
+from raiden_contracts.constants import (
+    CONTRACT_TOKEN_NETWORK,
+    GAS_REQUIRED_FOR_CLOSE_CHANNEL,
+    GAS_REQUIRED_FOR_OPEN_CHANNEL,
+    GAS_REQUIRED_FOR_SET_TOTAL_DEPOSIT,
+    GAS_REQUIRED_FOR_SETTLE_CHANNEL,
+    GAS_REQUIRED_FOR_UPDATE_BALANCE_PROOF,
+    ChannelInfoIndex,
+    ChannelState,
+    ParticipantInfoIndex,
+)
+from raiden_contracts.contract_manager import ContractManager
 from requests import HTTPError
 
 from raiden.constants import (
@@ -59,18 +71,6 @@ from raiden.utils.typing import (
     TokenAmount,
     TokenNetworkAddress,
     SignedTransaction)
-from raiden_contracts.constants import (
-    CONTRACT_TOKEN_NETWORK,
-    GAS_REQUIRED_FOR_CLOSE_CHANNEL,
-    GAS_REQUIRED_FOR_OPEN_CHANNEL,
-    GAS_REQUIRED_FOR_SET_TOTAL_DEPOSIT,
-    GAS_REQUIRED_FOR_SETTLE_CHANNEL,
-    GAS_REQUIRED_FOR_UPDATE_BALANCE_PROOF,
-    ChannelInfoIndex,
-    ChannelState,
-    ParticipantInfoIndex,
-)
-from raiden_contracts.contract_manager import ContractManager
 
 log = structlog.get_logger(__name__)  # pylint: disable=invalid-name
 
@@ -1519,7 +1519,8 @@ class TokenNetwork:
             raise RaidenUnrecoverableError("Couldn't verify the balance proof signature")
         else:
             if our_recovered_address != our_address:
-                raise RaidenUnrecoverableError("Invalid balance proof signature. Recovered address isnt light client address")
+                raise RaidenUnrecoverableError(
+                    "Invalid balance proof signature. Recovered address isnt light client address")
 
             if partner_recovered_address != partner_address:
                 raise RaidenUnrecoverableError("Invalid update transfer signature")
@@ -1527,14 +1528,14 @@ class TokenNetwork:
         # Check the preconditions for calling updateNonClosingBalanceProof at
         # the time the event was emitted.
         try:
-            #FIXME participant 1 and 2 values
+            # FIXME participant 1 and 2 values
             channel_onchain_detail = self._detail_channel(
                 participant1=our_address,
                 participant2=partner_address,
                 block_identifier=given_block_identifier,
                 channel_identifier=channel_identifier,
             )
-            #FIXME participant and partner values?
+            # FIXME participant and partner values?
             closer_details = self._detail_participant(
                 channel_identifier=channel_identifier,
                 participant=partner_address,

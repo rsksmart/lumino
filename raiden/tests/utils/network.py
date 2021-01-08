@@ -10,7 +10,6 @@ from raiden.app import App
 from raiden.network.blockchain_service import BlockChainService
 from raiden.network.rpc.client import JSONRPCClient
 from raiden.network.throttle import TokenBucket
-from raiden.network.transport import MatrixTransport, UDPTransport
 from raiden.raiden_event_handler import RaidenEventHandler
 from raiden.settings import DEFAULT_NUMBER_OF_BLOCK_CONFIRMATIONS, DEFAULT_RETRY_TIMEOUT
 from raiden.tests.utils.app import database_from_privatekey
@@ -18,10 +17,11 @@ from raiden.tests.utils.factories import UNIT_CHAIN_ID
 from raiden.tests.utils.protocol import HoldRaidenEventHandler, WaitForMessage
 from raiden.transfer.identifiers import CanonicalIdentifier
 from raiden.transfer.views import state_from_raiden
-from raiden.ui.app import _setup_matrix
-from raiden.utils import BlockNumber, merge_dict, pex, privatekey_to_address
+from raiden.utils import BlockNumber, merge_dict, pex
 from raiden.utils.typing import Address, Optional
 from raiden.waiting import wait_for_payment_network
+from transport.matrix.layer import MatrixLayer as MatrixTransportLayer
+from transport.udp.transport import UDPTransport
 
 CHAIN = object()  # Flag used by create a network does make a loop with the channels
 BlockchainServices = namedtuple(
@@ -371,7 +371,7 @@ def create_apps(
             user_deposit = blockchain.user_deposit(user_deposit_address)
 
         if use_matrix:
-            transport = _setup_matrix(config)
+            transport = MatrixTransportLayer(config)
         else:
             throttle_policy = TokenBucket(
                 config["transport"]["udp"]["throttle_capacity"],
