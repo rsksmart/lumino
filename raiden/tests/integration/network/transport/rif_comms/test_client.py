@@ -42,7 +42,7 @@ def test_connect_failure():
                 timeout=client.grpc_client_timeout
             )
 
-        client_exception = ClientExceptionHandler.get_exception(e.value)
+        client_exception = ClientExceptionHandler.map_exception(e.value)
         assert type(client_exception) == InvalidArgumentException
         assert client_exception.code == StatusCode.INVALID_ARGUMENT
         assert client_exception.message == f"{invalid_address.address} is not a valid RSK address"
@@ -160,7 +160,7 @@ def test_subscribe_to_invalid_address(comms_clients):
             for _ in topic:
                 pytest.fail("exception should be raised before reaching this point")
 
-        client_exception = ClientExceptionHandler.get_exception(e.value)
+        client_exception = ClientExceptionHandler.map_exception(e.value)
         assert type(client_exception) == InvalidArgumentException
         assert client_exception.code == StatusCode.INVALID_ARGUMENT
         assert client_exception.message == f"{invalid_address.address} is not a valid RSK address"
@@ -177,7 +177,7 @@ def test_subscribe_to_invalid_address(comms_clients):
             for _ in topic:
                 pytest.fail("exception should be raised before reaching this point")
 
-        client_exception = ClientExceptionHandler.get_exception(e.value)
+        client_exception = ClientExceptionHandler.map_exception(e.value)
         assert type(client_exception) == InvalidArgumentException
         assert client_exception.code == StatusCode.INVALID_ARGUMENT
         assert client_exception.message == f"{invalid_address.address} is not a valid RSK address"
@@ -278,7 +278,7 @@ def test_send_message_invalid_address(comms_clients):
             timeout=client.grpc_client_timeout
         )
 
-    client_exception = ClientExceptionHandler.get_exception(e.value)
+    client_exception = ClientExceptionHandler.map_exception(e.value)
     assert type(client_exception) == InvalidArgumentException
     assert client_exception.code == StatusCode.INVALID_ARGUMENT
     assert client_exception.message == f"{invalid_address.address} is not a valid RSK address"
@@ -294,7 +294,7 @@ def test_send_message_invalid_address(comms_clients):
             timeout=client.grpc_client_timeout
         )
 
-    client_exception = ClientExceptionHandler.get_exception(e.value)
+    client_exception = ClientExceptionHandler.map_exception(e.value)
     assert type(client_exception) == InvalidArgumentException
     assert client_exception.code == StatusCode.INVALID_ARGUMENT
     assert client_exception.message == f"{invalid_address.address} is not a valid RSK address"
@@ -460,7 +460,7 @@ def test_unsubscribe_from_invalid_address(comms_clients):
             timeout=client.grpc_client_timeout
         )
 
-    client_exception = ClientExceptionHandler.get_exception(e.value)
+    client_exception = ClientExceptionHandler.map_exception(e.value)
     assert type(client_exception) == NotFoundException
     assert client_exception.code == StatusCode.INVALID_ARGUMENT
     assert client_exception.message == f"{invalid_address.address} is not a valid RSK address"
@@ -475,7 +475,7 @@ def test_unsubscribe_from_invalid_address(comms_clients):
             timeout=client.grpc_client_timeout
         )
 
-    client_exception = ClientExceptionHandler.get_exception(e.value)
+    client_exception = ClientExceptionHandler.map_exception(e.value)
     assert type(client_exception) == InvalidArgumentException
     assert client_exception.code == StatusCode.INVALID_ARGUMENT
     assert client_exception.message == f"{invalid_address.address} is not a valid RSK address"
@@ -528,11 +528,9 @@ def test_client_timeouts():
         nodes.append(node_1)
         client_1, address_1 = node_1.clients[0], node_1.clients[0].rsk_address.address
 
-        node_2 = CommsNode(CommsConfig(node_id="B", amount_of_clients=1, auto_connect=False))
-        nodes.append(node_2)
-        client_2, address_2 = node_2.clients[0], node_2.clients[0].rsk_address.address
-
         client_1.grpc_client_timeout = 1e-100
+
+        client_2_address = generate_address()
 
         # connect timeout
         expect_error(TimeoutException,
@@ -545,7 +543,7 @@ def test_client_timeouts():
                      "Deadline Exceeded",
                      StatusCode.DEADLINE_EXCEEDED,
                      client_1._get_peer_id,
-                     rsk_address=client_2.rsk_address.address)
+                     rsk_address=client_2_address)
 
         # subscribe_to timeout
         expect_error(TimeoutException,
@@ -566,7 +564,7 @@ def test_client_timeouts():
                      "Deadline Exceeded",
                      StatusCode.DEADLINE_EXCEEDED,
                      client_1.send_message,
-                     "echo message", client_2.rsk_address.address)
+                     "echo message", client_2_address)
 
         # unsubscribe_from timeout
         expect_error(TimeoutException,

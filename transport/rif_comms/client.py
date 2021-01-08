@@ -19,7 +19,7 @@ def client_handled_operation(func):
         Decorator function that catches an RpcError exception and maps it
         to a custom RIF COMMS Client exception
     """
-    def inner(client, *args, **kwargs):
+    def inner(client: "Client", *args, **kwargs):
         try:
             return func(client, *args, **kwargs)
         except RpcError as error:
