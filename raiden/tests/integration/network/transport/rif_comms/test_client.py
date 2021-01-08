@@ -12,8 +12,7 @@ from transport.rif_comms.client import Client
 from transport.rif_comms.client_exception_handler import ClientExceptionHandler
 from transport.rif_comms.exceptions import NotFoundException, FailedPreconditionException, InvalidArgumentException, \
     TimeoutException, ClientException
-from transport.rif_comms.proto.api_pb2 import RskAddressPublish, Msg
-from transport.rif_comms.proto.api_pb2 import RskSubscription, RskAddress
+from transport.rif_comms.proto.api_pb2 import RskAddressPublish, Msg, RskSubscription, RskAddress
 from transport.rif_comms.utils import notification_to_payload, get_sender_from_notification
 
 
