@@ -1,4 +1,4 @@
-from typing import Dict, Callable, Type
+from typing import Dict, Callable, Union
 
 import pytest
 from eth_utils import to_canonical_address, to_checksum_address
@@ -36,16 +36,15 @@ def test_connect_failure():
 
         # bypass client.connect to provide invalid address
         invalid_address = RskAddress(address="invalid")
-        with pytest.raises(RpcError) as e:
-            client.stub.ConnectToCommunicationsNode(
-                invalid_address,
-                timeout=client.grpc_client_timeout
-            )
-
-        client_exception = ClientExceptionHandler.map_exception(e.value)
-        assert type(client_exception) == InvalidArgumentException
-        assert client_exception.code == StatusCode.INVALID_ARGUMENT
-        assert client_exception.message == f"{invalid_address.address} is not a valid RSK address"
+        expect_error(
+            expected_exception=RpcError,
+            expected_mapped_type=InvalidArgumentException,
+            expected_code=StatusCode.INVALID_ARGUMENT,
+            expected_message=f"{invalid_address.address} is not a valid RSK address",
+            call=client.stub.ConnectToCommunicationsNode,
+            request=invalid_address,
+            timeout=client.grpc_client_timeout,
+        )
     finally:
         for node in nodes:
             node.stop()
@@ -60,12 +59,14 @@ def test_connect():
         client, address = node.clients[0], node.clients[0].rsk_address.address
 
         # no peer ID should be registered under this address yet
-        with pytest.raises(NotFoundException) as e:
-            client._get_peer_id(address)
-
-        client_exception = e.value
-        assert client_exception.code == StatusCode.NOT_FOUND
-        assert client_exception.message == f"Rsk address {to_checksum_address(address)} not registered"
+        expect_error(
+            expected_exception=NotFoundException,
+            expected_mapped_type=None,
+            expected_code=StatusCode.NOT_FOUND,
+            expected_message=f"Rsk address {to_checksum_address(address)} not registered",
+            call=client._get_peer_id,
+            rsk_address=address,
+        )
 
         # connect and check again
         client.connect()
@@ -127,60 +128,71 @@ def test_subscribe_to_unregistered_address(comms_clients):
         expected_error = f"Rsk address {to_checksum_address(unregistered_address)} not registered"
 
         # attempt to check subscription to unregistered address
-        with pytest.raises(NotFoundException) as e:
-            client._is_subscribed_to(unregistered_address)
-
-        client_exception = e.value
-        assert client_exception.code == StatusCode.NOT_FOUND
-        assert client_exception.message == expected_error
+        expect_error(
+            expected_exception=NotFoundException,
+            expected_mapped_type=None,
+            expected_code=StatusCode.NOT_FOUND,
+            expected_message=expected_error,
+            call=client._is_subscribed_to,
+            rsk_address=unregistered_address,
+        )
 
         # attempt to subscribe to unregistered address
-        with pytest.raises(NotFoundException) as e:
-            client.subscribe_to(unregistered_address)
-
-        client_exception = e.value
-        assert client_exception.code == StatusCode.NOT_FOUND
-        assert client_exception.message == expected_error
+        expect_error(
+            expected_exception=NotFoundException,
+            expected_mapped_type=None,
+            expected_code=StatusCode.NOT_FOUND,
+            expected_message=expected_error,
+            call=client.subscribe_to,
+            rsk_address=unregistered_address,
+        )
 
 
 @pytest.mark.parametrize("nodes_to_clients", [{"A": 1}, {"A": 2}])
 def test_subscribe_to_invalid_address(comms_clients):
     invalid_address = RskAddress(address=Address("0x123"))
+    invalid_address_message = f"{invalid_address.address} is not a valid RSK address"
 
     for client in comms_clients.values():
         # bypass client.subscribe_to to provide invalid address as topic
-        with pytest.raises(RpcError) as e:
+        def subscribe_to_invalid_topic():
             topic = client.stub.CreateTopicWithRskAddress(
                 RskSubscription(
                     topic=invalid_address,
                     subscriber=client.rsk_address
                 ),
-                timeout=client.grpc_client_timeout
+                timeout=client.grpc_client_timeout,
             )
             for _ in topic:
                 pytest.fail("exception should be raised before reaching this point")
 
-        client_exception = ClientExceptionHandler.map_exception(e.value)
-        assert type(client_exception) == InvalidArgumentException
-        assert client_exception.code == StatusCode.INVALID_ARGUMENT
-        assert client_exception.message == f"{invalid_address.address} is not a valid RSK address"
+        expect_error(
+            expected_exception=RpcError,
+            expected_mapped_type=InvalidArgumentException,
+            expected_code=StatusCode.INVALID_ARGUMENT,
+            expected_message=invalid_address_message,
+            call=subscribe_to_invalid_topic,
+        )
 
         # bypass client.subscribe_to to provide invalid address as subscriber
-        with pytest.raises(RpcError) as e:
+        def subscribe_to_invalid_subscriber():
             topic = client.stub.CreateTopicWithRskAddress(
                 RskSubscription(
                     topic=client.rsk_address,
-                    subscriber=invalid_address
+                    subscriber=invalid_address,
                 ),
-                timeout=client.grpc_client_timeout
+                timeout=client.grpc_client_timeout,
             )
             for _ in topic:
                 pytest.fail("exception should be raised before reaching this point")
 
-        client_exception = ClientExceptionHandler.map_exception(e.value)
-        assert type(client_exception) == InvalidArgumentException
-        assert client_exception.code == StatusCode.INVALID_ARGUMENT
-        assert client_exception.message == f"{invalid_address.address} is not a valid RSK address"
+        expect_error(
+            expected_exception=RpcError,
+            expected_mapped_type=InvalidArgumentException,
+            expected_code=StatusCode.INVALID_ARGUMENT,
+            expected_message=invalid_address_message,
+            call=subscribe_to_invalid_subscriber,
+        )
 
 
 @pytest.mark.parametrize("nodes_to_clients", [{"A": 1, "B": 1}, {"A": 2}])
@@ -252,12 +264,15 @@ def test_send_message_unregistered_address(comms_clients):
 
     # attempt to send message to unregistered address
     unregistered_address = generate_address()
-    with pytest.raises(NotFoundException) as e:
-        client.send_message("echo", unregistered_address)
-
-    client_exception = e.value
-    assert client_exception.code == StatusCode.NOT_FOUND
-    assert client_exception.message == f"Rsk address {to_checksum_address(unregistered_address)} not registered"
+    expect_error(
+        expected_exception=NotFoundException,
+        expected_mapped_type=None,
+        expected_code=StatusCode.NOT_FOUND,
+        expected_message=f"Rsk address {to_checksum_address(unregistered_address)} not registered",
+        call=client.send_message,
+        payload="echo",
+        rsk_address=unregistered_address,
+    )
 
 
 @pytest.mark.parametrize("nodes_to_clients", [{"A": 1}])
@@ -266,38 +281,31 @@ def test_send_message_invalid_address(comms_clients):
 
     # attempt to send message using an invalid address
     invalid_address = RskAddress(address="0x123")
+    invalid_address_message = f"{invalid_address.address} is not a valid RSK address"
 
     # bypass client.send_message to provide an invalid address as receiver
-    with pytest.raises(RpcError) as e:
-        client.stub.SendMessageToRskAddress(
-            RskAddressPublish(
-                sender=client.rsk_address,
-                receiver=invalid_address,
-                message=Msg(payload=str.encode("echo"))
-            ),
-            timeout=client.grpc_client_timeout
-        )
-
-    client_exception = ClientExceptionHandler.map_exception(e.value)
-    assert type(client_exception) == InvalidArgumentException
-    assert client_exception.code == StatusCode.INVALID_ARGUMENT
-    assert client_exception.message == f"{invalid_address.address} is not a valid RSK address"
+    expect_error(
+        expected_exception=RpcError,
+        expected_mapped_type=InvalidArgumentException,
+        expected_code=StatusCode.INVALID_ARGUMENT,
+        expected_message=invalid_address_message,
+        call=client.stub.SendMessageToRskAddress,
+        request=RskAddressPublish(sender=client.rsk_address, receiver=invalid_address,
+                                  message=Msg(payload=str.encode("echo"))),
+        timeout=client.grpc_client_timeout,
+    )
 
     # bypass client.send_message to provide an invalid address as sender
-    with pytest.raises(RpcError) as e:
-        client.stub.SendMessageToRskAddress(
-            RskAddressPublish(
-                sender=invalid_address,
-                receiver=client.rsk_address,
-                message=Msg(payload=str.encode("echo"))
-            ),
-            timeout=client.grpc_client_timeout
-        )
-
-    client_exception = ClientExceptionHandler.map_exception(e.value)
-    assert type(client_exception) == InvalidArgumentException
-    assert client_exception.code == StatusCode.INVALID_ARGUMENT
-    assert client_exception.message == f"{invalid_address.address} is not a valid RSK address"
+    expect_error(
+        expected_exception=RpcError,
+        expected_mapped_type=InvalidArgumentException,
+        expected_code=StatusCode.INVALID_ARGUMENT,
+        expected_message=invalid_address_message,
+        call=client.stub.SendMessageToRskAddress,
+        request=RskAddressPublish(sender=invalid_address, receiver=client.rsk_address,
+                                  message=Msg(payload=str.encode("echo"))),
+        timeout=client.grpc_client_timeout,
+    )
 
 
 @pytest.mark.parametrize("nodes_to_clients", [{"A": 1}])
@@ -426,21 +434,25 @@ def test_unsubscribe_from_non_subscribed_address(comms_clients):
 
     address = client.rsk_address.address
     # attempt to unsubscribe from non-subscribed address
-    with pytest.raises(FailedPreconditionException) as e:
-        client.unsubscribe_from(address)
-
-    client_exception = e.value
-    assert client_exception.code == StatusCode.FAILED_PRECONDITION
-    assert client_exception.message == f"not subscribed to {to_checksum_address(address)}"
+    expect_error(
+        expected_exception=FailedPreconditionException,
+        expected_mapped_type=None,
+        expected_code=StatusCode.FAILED_PRECONDITION,
+        expected_message=f"not subscribed to {to_checksum_address(address)}",
+        call=client.unsubscribe_from,
+        rsk_address=address,
+    )
 
     address = generate_address()
     # attempt to unsubscribe from unregistered address
-    with pytest.raises(NotFoundException) as e:
-        client.unsubscribe_from(address)
-
-    client_exception = e.value
-    assert client_exception.code == StatusCode.NOT_FOUND
-    assert client_exception.message == f"Rsk address {to_checksum_address(address)} not registered"
+    expect_error(
+        expected_exception=NotFoundException,
+        expected_mapped_type=None,
+        expected_code=StatusCode.NOT_FOUND,
+        expected_message=f"Rsk address {to_checksum_address(address)} not registered",
+        call=client.unsubscribe_from,
+        rsk_address=address,
+    )
 
 
 @pytest.mark.parametrize("nodes_to_clients", [{"A": 1}])
@@ -449,36 +461,29 @@ def test_unsubscribe_from_invalid_address(comms_clients):
 
     # attempt to unsubscribe using an invalid address
     invalid_address = RskAddress(address="0xfoobar")
+    invalid_address_message = f"{invalid_address.address} is not a valid RSK address"
 
     # bypass client.unsubscribe_from to provide an invalid address as topic
-    with pytest.raises(RpcError) as e:
-        client.stub.SendMessageToRskAddress(
-            RskSubscription(
-                topic=invalid_address,
-                subscriber=client.rsk_address,
-            ),
-            timeout=client.grpc_client_timeout
-        )
-
-    client_exception = ClientExceptionHandler.map_exception(e.value)
-    assert type(client_exception) == NotFoundException
-    assert client_exception.code == StatusCode.INVALID_ARGUMENT
-    assert client_exception.message == f"{invalid_address.address} is not a valid RSK address"
+    expect_error(
+        expected_exception=RpcError,
+        expected_mapped_type=NotFoundException,
+        expected_code=StatusCode.INVALID_ARGUMENT,
+        expected_message=invalid_address_message,
+        call=client.stub.CloseTopicWithRskAddress,
+        request=RskSubscription(topic=invalid_address, subscriber=client.rsk_address),
+        timeout=client.grpc_client_timeout,
+    )
 
     # bypass client.unsubscribe_from to provide an invalid address as subscriber
-    with pytest.raises(RpcError) as e:
-        client.stub.SendMessageToRskAddress(
-            RskSubscription(
-                topic=client.rsk_address,
-                subscriber=invalid_address,
-            ),
-            timeout=client.grpc_client_timeout
-        )
-
-    client_exception = ClientExceptionHandler.map_exception(e.value)
-    assert type(client_exception) == InvalidArgumentException
-    assert client_exception.code == StatusCode.INVALID_ARGUMENT
-    assert client_exception.message == f"{invalid_address.address} is not a valid RSK address"
+    expect_error(
+        expected_exception=RpcError,
+        expected_mapped_type=NotFoundException,
+        expected_code=StatusCode.INVALID_ARGUMENT,
+        expected_message=invalid_address_message,
+        call=client.stub.CloseTopicWithRskAddress,
+        request=RskSubscription(topic=client.rsk_address, subscriber=invalid_address),
+        timeout=client.grpc_client_timeout,
+    )
 
 
 @pytest.mark.parametrize("nodes_to_clients", [{"A": 1, "B": 1}, {"A": 2}])
@@ -524,72 +529,99 @@ def test_unsubscribe_from_peers(comms_clients):
 def test_client_timeouts():
     nodes = []
     try:
-        node_1 = CommsNode(CommsConfig(node_id="A", amount_of_clients=1, auto_connect=False))
-        nodes.append(node_1)
-        client_1, address_1 = node_1.clients[0], node_1.clients[0].rsk_address.address
+        node = CommsNode(CommsConfig(node_id="A", amount_of_clients=1, auto_connect=False))
+        nodes.append(node)
+        client = node.clients[0]
 
-        client_1.grpc_client_timeout = 1e-100
+        client.grpc_client_timeout = 1e-100
 
-        client_2_address = generate_address()
+        utility_addr = generate_address()
+        expected_timeout_message = "Deadline Exceeded"
 
         # connect timeout
-        expect_error(TimeoutException,
-                     "Deadline Exceeded",
-                     StatusCode.DEADLINE_EXCEEDED,
-                     client_1.connect)
+        expect_error(
+            expected_exception=TimeoutException,
+            expected_mapped_type=None,
+            expected_code=StatusCode.DEADLINE_EXCEEDED,
+            expected_message=expected_timeout_message,
+            call=client.connect
+        )
 
         # _get_peer_id timeout
-        expect_error(TimeoutException,
-                     "Deadline Exceeded",
-                     StatusCode.DEADLINE_EXCEEDED,
-                     client_1._get_peer_id,
-                     rsk_address=client_2_address)
+        expect_error(
+            expected_exception=TimeoutException,
+            expected_mapped_type=None,
+            expected_code=StatusCode.DEADLINE_EXCEEDED,
+            expected_message=expected_timeout_message,
+            call=client._get_peer_id,
+            rsk_address=utility_addr
+        )
 
         # subscribe_to timeout
-        expect_error(TimeoutException,
-                     "Deadline Exceeded",
-                     StatusCode.DEADLINE_EXCEEDED,
-                     client_1.subscribe_to,
-                     rsk_address=client_1.rsk_address.address)
+        expect_error(
+            expected_exception=TimeoutException,
+            expected_mapped_type=None,
+            expected_code=StatusCode.DEADLINE_EXCEEDED,
+            expected_message=expected_timeout_message,
+            call=client.subscribe_to,
+            rsk_address=client.rsk_address.address
+        )
 
         # _is_subscribed_to timeout
-        expect_error(TimeoutException,
-                     "Deadline Exceeded",
-                     StatusCode.DEADLINE_EXCEEDED,
-                     client_1._is_subscribed_to,
-                     rsk_address=client_1.rsk_address.address)
+        expect_error(
+            expected_exception=TimeoutException,
+            expected_mapped_type=None,
+            expected_code=StatusCode.DEADLINE_EXCEEDED,
+            expected_message=expected_timeout_message,
+            call=client._is_subscribed_to,
+            rsk_address=client.rsk_address.address
+        )
 
         # send message timeout
-        expect_error(TimeoutException,
-                     "Deadline Exceeded",
-                     StatusCode.DEADLINE_EXCEEDED,
-                     client_1.send_message,
-                     "echo message", client_2_address)
+        expect_error(
+            expected_exception=TimeoutException,
+            expected_mapped_type=None,
+            expected_code=StatusCode.DEADLINE_EXCEEDED,
+            expected_message=expected_timeout_message,
+            call=client.send_message,
+            payload="echo message",
+            rsk_address=utility_addr,
+        )
 
         # unsubscribe_from timeout
-        expect_error(TimeoutException,
-                     "Deadline Exceeded",
-                     StatusCode.DEADLINE_EXCEEDED,
-                     client_1.unsubscribe_from,
-                     rsk_address=client_1.rsk_address.address)
+        expect_error(
+            expected_exception=TimeoutException,
+            expected_mapped_type=None,
+            expected_code=StatusCode.DEADLINE_EXCEEDED,
+            expected_message=expected_timeout_message,
+            call=client.unsubscribe_from,
+            rsk_address=client.rsk_address.address
+        )
     finally:
         for node in nodes:
-            # because node 2 can be already stopped, we cannot call stop() indiscriminately
-            if not node._process.poll():  # if True, node is still running
-                node.stop()
+            node.stop()
 
 
-def expect_error(expected_exception: Type[ClientException],
-                 expected_message: str,
-                 expected_code: StatusCode,
-                 call: Callable,
-                 *args, **kwargs):
+def expect_error(
+    expected_exception: Union[ClientException, RpcError],
+    expected_mapped_type: Union[ClientException, None],
+    expected_code: StatusCode,
+    expected_message: str,
+    call: Callable,
+    *args, **kwargs
+):
     """
-        This function checks if an exception of type ClientException is raised on the call
-        and if that exception has some specific code and message
+        This function checks if an exception of the ClientException type is raised during the given call
+        and if that exception has some specific code and message.
     """
     with pytest.raises(expected_exception) as e:
         call(*args, **kwargs)
 
-    assert expected_message == e.value.message
-    assert expected_code == e.value.code
+    if expected_mapped_type:
+        client_exception = ClientExceptionHandler.map_exception(e.value)
+        assert type(client_exception) == expected_mapped_type
+    else:
+        client_exception = e.value
+
+    assert client_exception.code == expected_code
+    assert client_exception.message == expected_message
