@@ -22,7 +22,9 @@ from raiden.settings import (
     DEFAULT_PATHFINDING_MAX_FEE,
     DEFAULT_PATHFINDING_MAX_PATHS,
     INITIAL_PORT,
-    DEFAULT_RIF_COMMS_GRPC_ENDPOINT)
+    DEFAULT_RIF_COMMS_GRPC_ENDPOINT,
+    DEFAULT_RIF_COMMS_GRPC_CLIENT_TIMEOUT
+)
 from raiden.ui.startup import environment_type_to_contracts_version
 from raiden.utils import get_system_spec
 from raiden.utils.cli import (
@@ -354,6 +356,20 @@ def options(func):
             ),
         ),
         option_group(
+            "RIF Comms Transport Options",
+            option(
+                "--grpc-client-timeout",
+                help=(
+                    "A floating point number specifying a timeout for RIF Comms Client requests, expressed in seconds.\n"
+                    "Valid values:\n"
+                    "An amount of seconds; integer or decimals are allowed."
+                ),
+                default=DEFAULT_RIF_COMMS_GRPC_CLIENT_TIMEOUT,
+                type=float,
+                show_default=True,
+            ),
+        ),
+        option_group(
             "Logging Options",
             option(
                 "--log-config",
@@ -497,21 +513,21 @@ def run(ctx, **kwargs):
             | no guarantees or representations  whatsoever, including as to the suitability or use of the Software for    |
             | any  purpose or regarding its compliance with any applicable laws or regulations. By using the Software,    |
             | you acknowledge that you have read this disclosure agreement, understand its contents, and assume all risks |
-            | related to the use of of the software; further, by answering yes below and accepting the terms of this      | 
-            | Agreement, you release and discharge RIF Labs, its officers, employees, or affiliates from, waive  any      | 
-            | claims you might have against RIF Labs, its officers, employees, or affiliates in connection with, and      | 
-            | agree not to sue RIF Labs or any of its officers, employees, or affiliates for any direct or indirect       | 
+            | related to the use of of the software; further, by answering yes below and accepting the terms of this      |
+            | Agreement, you release and discharge RIF Labs, its officers, employees, or affiliates from, waive  any      |
+            | claims you might have against RIF Labs, its officers, employees, or affiliates in connection with, and      |
+            | agree not to sue RIF Labs or any of its officers, employees, or affiliates for any direct or indirect       |
             | liability arising from the use of this Software.                                                            |
-            |                                                                                                             |  
-            |                                                                                                             |  
-            | Privacy Warning:                                                                                            |  
-            |                                                                                                             |  
-            | By using the RIF Lumino Payments Protocol, you acknowledge that your RSK address, channels, channel deposits| 
+            |                                                                                                             |
+            |                                                                                                             |
+            | Privacy Warning:                                                                                            |
+            |                                                                                                             |
+            | By using the RIF Lumino Payments Protocol, you acknowledge that your RSK address, channels, channel deposits|
             | settlements, and the RSK address of your channel counterparty will be stored on the RSK blockchain—that is, |
             | on servers of RSK node operators—and therefore will be publicly available. The parties running nodes on the |
             | RIF Lumino network may also download and store this same or related information or data, and information or |
             | data stored on Lumino nodes and  network channels will be publicly visible, including on a RIF Lumino block |
-            | explorer. By using the Software and by answering yes below, you acknowledge that information or data stored | 
+            | explorer. By using the Software and by answering yes below, you acknowledge that information or data stored |
             | on the Lumino network is extremely difficult to alter, remove, or delete; you further acknowledge that      |
             | information or data related to individual tokens transfers will be made available via  the Lumino Payments  |
             | Protocol to the recipient intermediating nodes of a specific transfer as well as to the Lumino server       |

@@ -138,6 +138,7 @@ def run_app(
     routing_mode: RoutingMode,
     config: Dict[str, Any],
     grpc_endpoint: str,
+    grpc_client_timeout: float,
     **kwargs: Any,  # FIXME: not used here, but still receives stuff in smoketest
 ):
     # pylint: disable=too-many-locals,too-many-branches,too-many-statements,unused-argument
@@ -193,6 +194,7 @@ def run_app(
     config["services"]["monitoring_enabled"] = enable_monitoring
     config["chain_id"] = network_id
     config["transport"]["rif_comms"]["grpc_endpoint"] = grpc_endpoint
+    config["transport"]["rif_comms"]["grpc_client_timeout"] = grpc_client_timeout
 
     setup_environment(config, environment_type)
 
