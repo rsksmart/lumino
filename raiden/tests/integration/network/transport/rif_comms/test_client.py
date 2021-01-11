@@ -557,16 +557,6 @@ def test_client_timeouts():
             rsk_address=utility_addr
         )
 
-        # subscribe_to timeout
-        expect_error(
-            expected_exception=TimeoutException,
-            expected_mapped_type=None,
-            expected_code=StatusCode.DEADLINE_EXCEEDED,
-            expected_message=expected_timeout_message,
-            call=client.subscribe_to,
-            rsk_address=client.rsk_address.address
-        )
-
         # _is_subscribed_to timeout
         expect_error(
             expected_exception=TimeoutException,

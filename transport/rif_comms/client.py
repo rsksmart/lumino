@@ -83,8 +83,7 @@ class Client:
             RskSubscription(
                 topic=RskAddress(address=to_checksum_address(rsk_address)),
                 subscriber=self.rsk_address
-            ),
-            timeout=self.grpc_client_timeout
+            )
         )
         for response in topic:
             topic_id = response.channelPeerJoined.peerId
