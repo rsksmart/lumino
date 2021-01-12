@@ -7,7 +7,8 @@ from web3.utils.filters import Filter
 
 from raiden.constants import GENESIS_BLOCK_NUMBER, UINT256_MAX
 from raiden.network.proxies.token_network import ChannelDetails, TokenNetwork
-from raiden.utils.filters import decode_event, get_filter_args_for_specific_event_from_channel
+from raiden.utils.filters import decode_event, get_filter_args_for_specific_event_from_channel, \
+    get_block_number_from_million_or_genesis
 from raiden.utils.typing import (
     AdditionalHash,
     Address,
@@ -34,7 +35,7 @@ class PaymentChannel:
             raise ValueError(f"channel_identifier {channel_identifier} is not a uint256")
 
         # FIXME: Issue #3958
-        from_block = GENESIS_BLOCK_NUMBER
+        from_block = get_block_number_from_million_or_genesis(token_network.proxy.contract.web3)
 
         # For this check it is perfectly fine to use a `latest` block number.
         # If the channel happened to be closed, even if the chanel is already
