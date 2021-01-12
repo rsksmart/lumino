@@ -382,16 +382,17 @@ def test_insufficient_funds(raiden_network, token_addresses, deposit):
 
 
 def run_test_insufficient_funds(raiden_network, token_addresses, deposit):
-    app0, app1 = raiden_network
+    initiator, target = raiden_network
     token_address = token_addresses[0]
 
-    result = RaidenAPI(app0.raiden).transfer(
-        registry_address=app0.raiden.default_registry.address,
+    result = RaidenAPI(initiator.raiden).transfer_and_wait(
+        registry_address=initiator.raiden.default_registry.address,
         token_address=token_address,
         amount=deposit + 1,
-        target=app1.raiden.address,
+        target=target.raiden.address,
         payment_hash_invoice=EMPTY_PAYMENT_HASH_INVOICE,
     )
+
     assert not result.payment_done.get()
 
 
@@ -467,7 +468,7 @@ def run_test_payment_timing_out_if_partner_does_not_respond(  # pylint: disable=
     def fake_receive(room, event):  # pylint: disable=unused-argument
         return True
 
-    with patch.object(app1.raiden.transport.hub_transport, "_handle_message", side_effect=fake_receive):
+    with patch.object(app1.raiden.transport.full_node, "_handle_message", side_effect=fake_receive):
         greenlet = gevent.spawn(
             RaidenAPI(app0.raiden).transfer,
             app0.raiden.default_registry.address,

@@ -8,10 +8,12 @@ from matrix_client.errors import MatrixRequestError
 from matrix_client.room import Room
 from matrix_client.user import User
 
-import raiden.network.transport.matrix.client
-import raiden.network.transport.matrix.utils
+import transport.matrix.client
+import transport.matrix.utils
 from raiden.exceptions import TransportError
-from raiden.network.transport.matrix.utils import (
+from raiden.tests.utils.factories import make_signer
+from raiden.utils.signer import recover
+from transport.matrix.utils import (
     join_global_room,
     login_or_register,
     make_client,
@@ -19,8 +21,6 @@ from raiden.network.transport.matrix.utils import (
     sort_servers_closest,
     validate_userid_signature,
 )
-from raiden.tests.utils.factories import make_signer
-from raiden.utils.signer import recover
 
 
 def test_join_global_room():
@@ -156,10 +156,10 @@ def test_sort_servers_closest(monkeypatch):
         return random.random() if cnt % 3 else None
 
     mock_get_http_rtt = Mock(
-        spec=raiden.network.transport.matrix.utils.get_http_rtt, side_effect=random_or_none
+        spec=transport.matrix.utils.get_http_rtt, side_effect=random_or_none
     )
 
-    monkeypatch.setattr(raiden.network.transport.matrix.utils, "get_http_rtt", mock_get_http_rtt)
+    monkeypatch.setattr(transport.matrix.utils, "get_http_rtt", mock_get_http_rtt)
 
     with pytest.raises(TransportError):
         sort_servers_closest(["ftp://server1.com", "server2.com"])
@@ -184,10 +184,10 @@ def test_make_client(monkeypatch):
     # valid but unreachable servers
     with pytest.raises(TransportError), monkeypatch.context() as m:
         mock_get_http_rtt = Mock(
-            spec=raiden.network.transport.matrix.utils.get_http_rtt, side_effect=lambda url: None
+            spec=transport.matrix.utils.get_http_rtt, side_effect=lambda url: None
         )
 
-        m.setattr(raiden.network.transport.matrix.utils, "get_http_rtt", mock_get_http_rtt)
+        m.setattr(transport.matrix.utils, "get_http_rtt", mock_get_http_rtt)
 
         make_client([f"http://server{i}.xyz" for i in range(3)])
 
@@ -195,11 +195,11 @@ def test_make_client(monkeypatch):
 
     # successful server contact with single (no-auto) server
     with monkeypatch.context() as m:
-        m.setattr(raiden.network.transport.matrix.client.GMatrixHttpApi, "_send", mock_send)
+        m.setattr(transport.matrix.client.GMatrixHttpApi, "_send", mock_send)
 
         url = "https://server1.xyz"
         client = make_client([url])
-        assert isinstance(client, raiden.network.transport.matrix.client.GMatrixClient)
+        assert isinstance(client, transport.matrix.client.GMatrixClient)
         assert client.api.base_url == url
 
 

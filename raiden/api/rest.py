@@ -2,45 +2,28 @@ import errno
 import json
 import logging
 import socket
-
+from datetime import datetime
 from http import HTTPStatus
 from typing import Dict, Union
 
 import gevent
 import gevent.pool
 import structlog
-from eth_utils import encode_hex, decode_hex, to_checksum_address
+from dateutil.relativedelta import relativedelta
+from eth_utils import encode_hex, decode_hex, to_checksum_address, to_canonical_address
 from flask import Flask, make_response, send_from_directory, url_for, request
-
+from flask_cors import CORS
 from flask_restful import Api, abort
 from gevent.pywsgi import WSGIServer
 from hexbytes import HexBytes
-
-from raiden.api.validations.light_client_authorization import requires_api_key
-from raiden.lightclient.handlers.light_client_message_handler import LightClientMessageHandler
 from raiden_webui import RAIDEN_WEBUI_PATH
-
-from raiden.api.validations.api_error_builder import ApiErrorBuilder
-from raiden.api.validations.api_status_codes import ERROR_STATUS_CODES
-from raiden.api.validations.channel_validator import ChannelValidator
-from raiden.lightclient.handlers.light_client_service import LightClientService
-from raiden.lightclient.lightclientmessages.light_client_non_closing_balance_proof import \
-    LightClientNonClosingBalanceProof
-from raiden.lightclient.models.light_client_protocol_message import LightClientProtocolMessageType
-from raiden.messages import LockedTransfer, Delivered, RevealSecret, Unlock, SecretRequest, Processed, \
-    LockExpired
-from raiden.rns_constants import RNS_ADDRESS_ZERO
-from raiden.utils.rns import is_rns_address
-from webargs.flaskparser import parser
-from raiden.api.objects import DashboardGraphItem
-from raiden.api.objects import DashboardTableItem
-from raiden.api.objects import DashboardGeneralItem
-from flask_cors import CORS
-from raiden.schedulers.setup import setup_schedule_config
-from datetime import datetime
 from web3 import Web3
+from webargs.flaskparser import parser
 
 from raiden.api.objects import AddressList, PartnersPerTokenList
+from raiden.api.objects import DashboardGeneralItem
+from raiden.api.objects import DashboardGraphItem
+from raiden.api.objects import DashboardTableItem
 from raiden.api.v1.encoding import (
     AddressListSchema,
     ChannelStateSchema,
@@ -55,7 +38,6 @@ from raiden.api.v1.encoding import (
     DashboardDataResponseTableItemSchema,
     DashboardDataResponseGeneralItemSchema,
     LuminoAddressConverter)
-
 from raiden.api.v1.resources import (
     AddressResource,
     BlockchainEventsNetworkResource,
@@ -85,7 +67,6 @@ from raiden.api.v1.resources import (
     PaymentInvoiceResource,
     ChannelsResourceLight,
     LightChannelsResourceByTokenAndPartnerAddress,
-    LightClientMatrixCredentialsBuildResource,
     LightClientResource,
     PaymentLightResource,
     CreatePaymentLightResource,
@@ -95,9 +76,22 @@ from raiden.api.v1.resources import (
     UnlockPaymentLightResource,
     SettlementLightResourceByTokenAndPartnerAddress
 )
-
-from raiden.constants import GENESIS_BLOCK_NUMBER, UINT256_MAX, Environment, EMPTY_PAYMENT_HASH_INVOICE
-
+from raiden.api.validations.api_error_builder import ApiErrorBuilder
+from raiden.api.validations.api_status_codes import ERROR_STATUS_CODES
+from raiden.api.validations.channel_validator import ChannelValidator
+from raiden.api.validations.decorators import api_safe_operation
+from raiden.billing.invoices.constants.errors import AUTO_PAY_INVOICE, INVOICE_EXPIRED, INVOICE_PAID
+from raiden.billing.invoices.constants.invoice_status import InvoiceStatus
+from raiden.billing.invoices.constants.invoice_type import InvoiceType
+from raiden.billing.invoices.decoder.invoice_decoder import get_tags_dict, get_unknown_tags_dict
+from raiden.billing.invoices.util.time_util import is_invoice_expired, UTC_FORMAT
+from raiden.constants import (
+    GENESIS_BLOCK_NUMBER,
+    UINT256_MAX,
+    Environment,
+    EMPTY_PAYMENT_HASH_INVOICE,
+    ErrorCode
+)
 from raiden.exceptions import (
     AddressWithoutCode,
     AlreadyRegisteredTokenAddress,
@@ -126,6 +120,15 @@ from raiden.exceptions import (
     RaidenRecoverableError,
     InvalidPaymentIdentifier
 )
+from raiden.lightclient.handlers.light_client_message_handler import LightClientMessageHandler
+from raiden.lightclient.handlers.light_client_service import LightClientService
+from raiden.lightclient.lightclientmessages.light_client_non_closing_balance_proof import \
+    LightClientNonClosingBalanceProof
+from raiden.lightclient.models.light_client_protocol_message import LightClientProtocolMessageType
+from raiden.messages import LockedTransfer, Delivered, RevealSecret, Unlock, SecretRequest, Processed, \
+    LockExpired
+from raiden.rns_constants import RNS_ADDRESS_ZERO
+from raiden.schedulers.setup import setup_schedule_config
 from raiden.transfer import channel, views
 from raiden.transfer.events import (
     EventPaymentReceivedSuccess,
@@ -139,22 +142,8 @@ from raiden.utils import (
     pex,
     sha3,
     typing)
+from raiden.utils.rns import is_rns_address
 from raiden.utils.runnable import Runnable
-
-from eth_utils import (
-    to_canonical_address
-)
-
-from raiden.billing.invoices.constants.invoice_type import InvoiceType
-from raiden.billing.invoices.constants.invoice_status import InvoiceStatus
-from raiden.billing.invoices.decoder.invoice_decoder import get_tags_dict, get_unknown_tags_dict
-
-from dateutil.relativedelta import relativedelta
-from raiden.billing.invoices.util.time_util import is_invoice_expired, UTC_FORMAT
-from raiden.billing.invoices.constants.errors import AUTO_PAY_INVOICE, INVOICE_EXPIRED, INVOICE_PAID
-
-from raiden.utils.signer import recover
-from raiden.ui.app import get_matrix_light_client_instance
 
 log = structlog.get_logger(__name__)
 
@@ -234,7 +223,6 @@ URLS_FN_V1 = [
     ),
 ]
 
-
 URLS_COMMON_V1 = [
     ("/tokens", TokensResource),
     ("/tokens/<hexaddress:token_address>", RegisterTokenResource),
@@ -255,10 +243,9 @@ URLS_HUB_V1 = [
     ("/payments_light", PaymentLightResource),
     ("/payments_light/create", CreatePaymentLightResource, "create_payment"),
     ("/payments_light/unlock/<hexaddress:token_address>", UnlockPaymentLightResource),
-    ('/payments_light/register_onchain_secret', RegisterSecretLightResource),
-    ('/light_clients/', LightClientResource),
-    ('/light_clients/matrix/credentials', LightClientMatrixCredentialsBuildResource,),
-    ("/light_client_messages", LightClientMessageResource, "Message polling"),
+    ("/payments_light/register_onchain_secret", RegisterSecretLightResource),
+    ("/light_clients/", LightClientResource),
+    ("/light_clients/messages", LightClientMessageResource, "Message polling"),
     ("/watchtower", WatchtowerResource),
 ]
 
@@ -709,6 +696,7 @@ class RestAPI:
             status_code=HTTPStatus.CREATED,
         )
 
+    @api_safe_operation(is_light_client=True, lc_balance_required=True)
     def open_light(
         self,
         registry_address: typing.PaymentNetworkID,
@@ -890,43 +878,35 @@ class RestAPI:
         ]
         return api_response(result=closed_channels)
 
-    @requires_api_key
+    @api_safe_operation(is_light_client=True, lc_balance_required=True)
     def register_secret_light(self, internal_msg_identifier: int, signed_tx: typing.SignedTransaction):
-        try:
-            message = LightClientMessageHandler.get_light_client_protocol_message_by_internal_identifier(
-                internal_msg_identifier=internal_msg_identifier,
-                wal=self.raiden_api.raiden.wal
+        message = LightClientMessageHandler.get_message_by_internal_identifier(
+            internal_msg_identifier=internal_msg_identifier,
+            wal=self.raiden_api.raiden.wal
+        )
+
+        if not message:
+            return ApiErrorBuilder.build_and_log_error(
+                errors=f"Light Client Message with internal_msg_identifier = {internal_msg_identifier} not found",
+                status_code=HTTPStatus.BAD_REQUEST,
+                log=log
             )
 
-            if not message:
-                return ApiErrorBuilder.build_and_log_error(
-                    errors=f"Light Client Message with internal_msg_identifier = {internal_msg_identifier} not found",
-                    status_code=HTTPStatus.BAD_REQUEST,
-                    log=log
-                )
-
-            if message.is_signed:
-                return ApiErrorBuilder.build_and_log_error(
-                    errors=f"Light Client Message with internal_msg_identifier = {internal_msg_identifier} already signed",
-                    status_code=HTTPStatus.CONFLICT,
-                    log=log
-                )
-
-            LightClientMessageHandler.update_onchain_light_client_protocol_message_set_signed_transaction(
-                internal_msg_identifier=internal_msg_identifier,
-                signed_message=signed_tx,
-                wal=self.raiden_api.raiden.wal
+        if message.is_signed:
+            return ApiErrorBuilder.build_and_log_error(
+                errors=f"Light Client Message with internal_msg_identifier = {internal_msg_identifier} already signed",
+                status_code=HTTPStatus.CONFLICT,
+                log=log
             )
 
-            self.raiden_api.register_secret_light(signed_tx)
-            return api_response(result=dict(), status_code=HTTPStatus.OK)
-        except InsufficientFunds as e:
-            return api_error(errors=str(e), status_code=HTTPStatus.PAYMENT_REQUIRED)
-        except (RawTransactionFailed, InvalidPaymentIdentifier) as e:
-            return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.BAD_REQUEST, log=log)
-        except Exception as e:
-            return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.INTERNAL_SERVER_ERROR, log=log)
+        LightClientMessageHandler.update_onchain_light_client_protocol_message_set_signed_transaction(
+            internal_msg_identifier=internal_msg_identifier,
+            signed_message=signed_tx,
+            wal=self.raiden_api.raiden.wal
+        )
 
+        self.raiden_api.register_secret_light(signed_tx)
+        return api_response(result=dict(), status_code=HTTPStatus.OK)
 
     def get_connection_managers_info(self, registry_address: typing.PaymentNetworkID):
         """Get a dict whose keys are token addresses and whose values are
@@ -1603,7 +1583,7 @@ class RestAPI:
         self.raiden_api.initiate_send_secret_request_light(sender_address, receiver_address, secret_request)
 
     def initiate_send_lock_expired_light(self, sender_address: typing.Address, receiver_address: typing.Address,
-                                         lock_expired: LockExpired, payment_id:int):
+                                         lock_expired: LockExpired, payment_id: int):
         self.raiden_api.initiate_send_lock_expired_light(sender_address, receiver_address, lock_expired, payment_id)
 
     def initiate_payment_light(
@@ -1665,8 +1645,9 @@ class RestAPI:
             return api_error(errors=str(e), status_code=HTTPStatus.PAYMENT_REQUIRED)
         return None
 
+    @api_safe_operation(is_light_client=True, lc_balance_required=True)
     def settlement_light(self,
-                         registry_address: typing.PaymentNetworkID,
+                         registry_address: typing.Address,
                          internal_msg_identifier: int,
                          token_address: typing.TokenAddress,
                          creator_address: typing.Address,
@@ -1698,7 +1679,7 @@ class RestAPI:
             )
             return result
 
-        message = LightClientMessageHandler.get_light_client_protocol_message_by_internal_identifier(
+        message = LightClientMessageHandler.get_message_by_internal_identifier(
             internal_msg_identifier=internal_msg_identifier,
             wal=self.raiden_api.raiden.wal
         )
@@ -1706,14 +1687,14 @@ class RestAPI:
         if not message:
             return ApiErrorBuilder.build_and_log_error(
                 errors="Light Client Message with internal_msg_identifier = {} not found"
-                       .format(internal_msg_identifier),
+                    .format(internal_msg_identifier),
                 status_code=HTTPStatus.BAD_REQUEST,
                 log=log
             )
 
         if message.is_signed:
             return ApiErrorBuilder.build_and_log_error(
-                errors="Message already signed",
+                errors=ErrorCode.MESSAGE_ALREADY_SIGNED,
                 status_code=HTTPStatus.CONFLICT,
                 log=log
             )
@@ -1734,14 +1715,16 @@ class RestAPI:
                 signed_settle_tx=signed_settle_tx
             )
             return self.update_channel_state(registry_address, channel_state)
-        except ChannelNotFound as e:
-            return api_error(
-                errors="Channel is already unlocked.",
-                status_code=HTTPStatus.NOT_FOUND
+        except ChannelNotFound:
+            return ApiErrorBuilder.build_and_log_error(
+                errors=ErrorCode.Settlement.CHANNEL_ALREADY_SETTLED,
+                status_code=HTTPStatus.NOT_FOUND,
+                log=log
             )
         except Exception as e:
             return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.BAD_REQUEST, log=log)
 
+    @api_safe_operation(is_light_client=True, lc_balance_required=True)
     def _deposit_light(
         self,
         registry_address: typing.PaymentNetworkID,
@@ -1838,6 +1821,7 @@ class RestAPI:
         result = self.channel_schema.dump(updated_channel_state)
         return api_response(result=result.data)
 
+    @api_safe_operation(is_light_client=True, lc_balance_required=True)
     def _close_light(
         self,
         registry_address: typing.PaymentNetworkID,
@@ -2137,62 +2121,18 @@ class RestAPI:
 
         return api_response(invoice)
 
-    def get_data_for_registration_request(self, address):
-        data_to_sign = self.raiden_api.get_data_for_registration_request(address)
-        return api_response(data_to_sign)
+    def light_client_onboarding_data(self, address):
+        onboarding_data = self.raiden_api.raiden.transport.light_client_onboarding_data(address)
+        return api_response(onboarding_data)
 
-    def register_light_client(self,
-                              address,
-                              signed_password,
-                              signed_display_name,
-                              signed_seed_retry,
-                              password,
-                              display_name,
-                              seed_retry):
-
-        # Recover lighclient address from password and signed_password
-        address_recovered_from_signed_password = recover(data=password.encode(),
-                                                         signature=decode_hex(signed_password))
-
-        # Recover lighclient address from display and signed_display_name
-        address_recovered_from_signed_display_name = recover(data=display_name.encode(),
-                                                             signature=decode_hex(signed_display_name))
-
-        # Recover lightclient addres from seed retry and signed_seed_retry
-        address_recovered_from_signed_seed_retry = recover(data=seed_retry.encode(),
-                                                           signature=decode_hex(signed_seed_retry))
-
-        if address_recovered_from_signed_password != address or \
-            address_recovered_from_signed_display_name != address or \
-            address_recovered_from_signed_seed_retry != address:
+    def register_light_client(self, registration_data: dict):
+        new_light_client = self.raiden_api.raiden.transport.register_light_client(self.raiden_api, registration_data)
+        if not new_light_client:
             return api_error(
                 errors="The signed data provided is not valid.",
                 status_code=HTTPStatus.CONFLICT,
             )
-
-        light_client = self.raiden_api.register_light_client(
-            address,
-            signed_password,
-            password,
-            signed_display_name,
-            signed_seed_retry)
-
-        if light_client is not None and light_client["result_code"] == 200:
-
-            matrix_light_client_transport_instance = get_matrix_light_client_instance(
-                self.raiden_api.raiden.config["transport"]["matrix"],
-                password=light_client["encrypt_signed_password"],
-                display_name=light_client["encrypt_signed_display_name"],
-                seed_retry=light_client["encrypt_signed_seed_retry"],
-                address=light_client["address"])
-
-            self.raiden_api.raiden.start_transport_in_runtime(transport=matrix_light_client_transport_instance,
-                                                              chain_state=views.state_from_raiden(
-                                                                  self.raiden_api.raiden))
-
-            self.raiden_api.raiden.transport.light_client_transports.append(matrix_light_client_transport_instance)
-
-        return api_response(light_client)
+        return api_response(new_light_client)
 
     def get_light_client_protocol_message(self, from_message: int):
         headers = request.headers
@@ -2274,7 +2214,7 @@ class RestAPI:
             lt = LockedTransfer.from_dict(message)
             self.initiate_payment_light(self.raiden_api.raiden.default_registry.address, lt.token, lt.initiator,
                                         lt.target, lt.locked_amount, lt.payment_identifier, payment_request.payment_id,
-                                        lt.lock.secrethash,previous_hash,
+                                        lt.lock.secrethash, previous_hash,
                                         EMPTY_PAYMENT_HASH_INVOICE, lt, lt.channel_identifier)
         elif message["type"] == "Delivered":
             delivered = Delivered.from_dict(message)
@@ -2299,43 +2239,37 @@ class RestAPI:
 
         return api_response("Received, message should be sent to partner")
 
-    @requires_api_key
-    def post_unlock_payment_light(self, internal_msg_identifier: int, signed_tx: typing.SignedTransaction, token_address: typing.TokenAddress):
-        try:
-            message = LightClientMessageHandler.get_light_client_protocol_message_by_internal_identifier(
-                internal_msg_identifier=internal_msg_identifier,
-                wal=self.raiden_api.raiden.wal
+    @api_safe_operation(is_light_client=True, lc_balance_required=True)
+    def post_unlock_payment_light(self, internal_msg_identifier: int, signed_tx: typing.SignedTransaction,
+                                  token_address: typing.TokenAddress):
+        message = LightClientMessageHandler.get_message_by_internal_identifier(
+            internal_msg_identifier=internal_msg_identifier,
+            wal=self.raiden_api.raiden.wal
+        )
+
+        if not message:
+            return ApiErrorBuilder.build_and_log_error(
+                errors=f"Light Client Message with internal_msg_identifier = {internal_msg_identifier} not found",
+                status_code=HTTPStatus.BAD_REQUEST,
+                log=log
             )
 
-            if not message:
-                return ApiErrorBuilder.build_and_log_error(
-                    errors=f"Light Client Message with internal_msg_identifier = {internal_msg_identifier} not found",
-                    status_code=HTTPStatus.BAD_REQUEST,
-                    log=log
-                )
-
-            if message.is_signed:
-                return ApiErrorBuilder.build_and_log_error(
-                    errors=f"Transaction for Message with internal_msg_identifier = {internal_msg_identifier} already sent",
-                    status_code=HTTPStatus.CONFLICT,
-                    log=log
-                )
-
-            LightClientMessageHandler.update_onchain_light_client_protocol_message_set_signed_transaction(
-                internal_msg_identifier=internal_msg_identifier,
-                signed_message=signed_tx,
-                wal=self.raiden_api.raiden.wal
+        if message.is_signed:
+            return ApiErrorBuilder.build_and_log_error(
+                errors=f"Transaction for Message with internal_msg_identifier = {internal_msg_identifier} already sent",
+                status_code=HTTPStatus.CONFLICT,
+                log=log
             )
-            self.raiden_api.unlock_payment_light(signed_tx, token_address)
-            return api_response(result=dict(), status_code=HTTPStatus.OK)
-        except InsufficientFunds as e:
-            return api_error(errors=str(e), status_code=HTTPStatus.PAYMENT_REQUIRED)
-        except (RawTransactionFailed, InvalidPaymentIdentifier) as e:
-            return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.BAD_REQUEST, log=log)
-        except Exception as e:
-            return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.INTERNAL_SERVER_ERROR,
-                                                       log=log)
 
+        LightClientMessageHandler.update_onchain_light_client_protocol_message_set_signed_transaction(
+            internal_msg_identifier=internal_msg_identifier,
+            signed_message=signed_tx,
+            wal=self.raiden_api.raiden.wal
+        )
+        self.raiden_api.unlock_payment_light(signed_tx, token_address)
+        return api_response(result=dict(), status_code=HTTPStatus.OK)
+
+    @api_safe_operation(is_light_client=True, lc_balance_required=True)
     def create_light_client_payment(
         self,
         registry_address: typing.PaymentNetworkID,
@@ -2357,13 +2291,7 @@ class RestAPI:
             return ApiErrorBuilder.build_and_log_error(
                 errors="There is no light client associated with the api key provided",
                 status_code=HTTPStatus.FORBIDDEN, log=log)
-        try:
-            hub_message = self.raiden_api.create_light_client_payment(registry_address, creator_address,
-                                                                      partner_address, token_address,
-                                                                      amount, secrethash, prev_secrethash)
-            return api_response(hub_message.to_dict())
-        except ChannelNotFound as e:
-            return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.NOT_FOUND, log=log)
-        except UnhandledLightClient as e:
-            return ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.FORBIDDEN, log=log)
-
+        hub_message = self.raiden_api.create_light_client_payment(registry_address, creator_address,
+                                                                  partner_address, token_address,
+                                                                  amount, secrethash, prev_secrethash)
+        return api_response(hub_message.to_dict())

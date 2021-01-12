@@ -22,6 +22,8 @@ from raiden.settings import (
     DEFAULT_PATHFINDING_MAX_FEE,
     DEFAULT_PATHFINDING_MAX_PATHS,
     INITIAL_PORT,
+    DEFAULT_RIF_COMMS_GRPC_ENDPOINT,
+    DEFAULT_RIF_COMMS_GRPC_CLIENT_TIMEOUT
 )
 from raiden.ui.startup import environment_type_to_contracts_version
 from raiden.utils import get_system_spec
@@ -41,7 +43,7 @@ from raiden.utils.cli import (
     validate_option_dependencies,
 )
 
-from .runners import EchoNodeRunner, MatrixRunner, UDPRunner
+from .runners import EchoNodeRunner, LuminoRunner
 
 log = structlog.get_logger(__name__)
 
@@ -52,10 +54,6 @@ OPTION_DEPENDENCIES: Dict[str, List[Tuple[str, Any]]] = {
     "pathfinding-iou-timeout": [("transport", "matrix"), ("routing-mode", RoutingMode.PFS)],
     "enable-monitoring": [("transport", "matrix")],
     "matrix-server": [("transport", "matrix")],
-    "listen-address": [("transport", "udp")],
-    "max-unresponsive-time": [("transport", "udp")],
-    "send-ping-time": [("transport", "udp")],
-    "nat": [("transport", "udp")],
 }
 
 
@@ -63,6 +61,7 @@ def options(func):
     """Having the common app options as a decorator facilitates reuse."""
     # Until https://github.com/pallets/click/issues/926 is fixed the options need to be re-defined
     # for every use
+
     options_ = [
         option(
             "--datadir",
@@ -150,9 +149,9 @@ def options(func):
         option("--console", help="Start the interactive raiden console", is_flag=True),
         option(
             "--transport",
-            help="Transport system to use. UDP is not recommended",
-            type=click.Choice(["udp", "matrix"]),
-            default="matrix",
+            help="Transport system to use",
+            type=click.Choice(["rif-comms", "matrix"]),
+            default="rif-comms",
             show_default=True,
         ),
         option(
@@ -343,6 +342,34 @@ def options(func):
             ),
         ),
         option_group(
+            "RIF Comms Transport Options",
+            option(
+                "--grpc-endpoint",
+                help=(
+                    "RIF Comms server to use for communication.\n"
+                    "Valid values:\n"
+                    "A URL pointing to a RIF Comms server"
+                ),
+                default=DEFAULT_RIF_COMMS_GRPC_ENDPOINT,
+                type=str,
+                show_default=True,
+            ),
+        ),
+        option_group(
+            "RIF Comms Transport Options",
+            option(
+                "--grpc-client-timeout",
+                help=(
+                    "A floating point number specifying a timeout for RIF Comms Client requests, expressed in seconds.\n"
+                    "Valid values:\n"
+                    "An amount of seconds; integer or decimals are allowed."
+                ),
+                default=DEFAULT_RIF_COMMS_GRPC_CLIENT_TIMEOUT,
+                type=float,
+                show_default=True,
+            ),
+        ),
+        option_group(
             "Logging Options",
             option(
                 "--log-config",
@@ -452,7 +479,6 @@ def options(func):
             ),
         ),
     ]
-
     for option_ in reversed(options_):
         func = option_(func)
     return func
@@ -474,13 +500,7 @@ def run(ctx, **kwargs):
         ctx.obj = kwargs
         return
 
-    if kwargs["transport"] == "udp":
-        runner = UDPRunner(kwargs, ctx)
-    elif kwargs["transport"] == "matrix":
-        runner = MatrixRunner(kwargs, ctx)
-    else:
-        # Shouldn't happen
-        raise RuntimeError(f"Invalid transport type '{kwargs['transport']}'")
+    runner = LuminoRunner(kwargs, ctx)
 
     click.secho(runner.welcome_string, fg="green")
     click.secho(
@@ -493,21 +513,21 @@ def run(ctx, **kwargs):
             | no guarantees or representations  whatsoever, including as to the suitability or use of the Software for    |
             | any  purpose or regarding its compliance with any applicable laws or regulations. By using the Software,    |
             | you acknowledge that you have read this disclosure agreement, understand its contents, and assume all risks |
-            | related to the use of of the software; further, by answering yes below and accepting the terms of this      | 
-            | Agreement, you release and discharge RIF Labs, its officers, employees, or affiliates from, waive  any      | 
-            | claims you might have against RIF Labs, its officers, employees, or affiliates in connection with, and      | 
-            | agree not to sue RIF Labs or any of its officers, employees, or affiliates for any direct or indirect       | 
+            | related to the use of of the software; further, by answering yes below and accepting the terms of this      |
+            | Agreement, you release and discharge RIF Labs, its officers, employees, or affiliates from, waive  any      |
+            | claims you might have against RIF Labs, its officers, employees, or affiliates in connection with, and      |
+            | agree not to sue RIF Labs or any of its officers, employees, or affiliates for any direct or indirect       |
             | liability arising from the use of this Software.                                                            |
-            |                                                                                                             |  
-            |                                                                                                             |  
-            | Privacy Warning:                                                                                            |  
-            |                                                                                                             |  
-            | By using the RIF Lumino Payments Protocol, you acknowledge that your RSK address, channels, channel deposits| 
+            |                                                                                                             |
+            |                                                                                                             |
+            | Privacy Warning:                                                                                            |
+            |                                                                                                             |
+            | By using the RIF Lumino Payments Protocol, you acknowledge that your RSK address, channels, channel deposits|
             | settlements, and the RSK address of your channel counterparty will be stored on the RSK blockchain—that is, |
             | on servers of RSK node operators—and therefore will be publicly available. The parties running nodes on the |
             | RIF Lumino network may also download and store this same or related information or data, and information or |
             | data stored on Lumino nodes and  network channels will be publicly visible, including on a RIF Lumino block |
-            | explorer. By using the Software and by answering yes below, you acknowledge that information or data stored | 
+            | explorer. By using the Software and by answering yes below, you acknowledge that information or data stored |
             | on the Lumino network is extremely difficult to alter, remove, or delete; you further acknowledge that      |
             | information or data related to individual tokens transfers will be made available via  the Lumino Payments  |
             | Protocol to the recipient intermediating nodes of a specific transfer as well as to the Lumino server       |

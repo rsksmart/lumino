@@ -837,7 +837,6 @@ def test_mediate_transfer():
         channels.get_routes_by_index([1]),
         channels.get_sub_channel(0),
         channels.sub_channel_map,
-        channels.nodeaddresses_to_networkstates,
         pseudo_random_generator,
         payer_transfer,
         block_number,
@@ -1266,7 +1265,6 @@ def test_payee_timeout_must_be_equal_to_payer_timeout():
         channel_set.get_routes_by_index([1]),
         channel_set.get_sub_channel(0),
         channel_set.sub_channel_map,
-        channel_set.nodeaddresses_to_networkstates,
         pseudo_random_generator,
         payer_transfer,
         block_number,
@@ -1409,7 +1407,6 @@ def test_mediator_lock_expired_with_new_block():
         possible_routes=channel_set.get_routes_by_index([1]),
         payer_channel=channel_set.get_sub_channel(0),
         channelidentifiers_to_channels=channel_set.sub_channel_map,
-        nodeaddresses_to_networkstates=channel_set.nodeaddresses_to_networkstates,
         pseudo_random_generator=pseudo_random_generator,
         payer_transfer=payer_transfer,
         block_number=block_number,
@@ -1465,7 +1462,6 @@ def test_mediator_must_not_send_lock_expired_when_channel_is_closed():
         possible_routes=channel_set.get_routes_by_index([1]),
         payer_channel=channel_set.get_sub_channel(0),
         channelidentifiers_to_channels=channel_set.sub_channel_map,
-        nodeaddresses_to_networkstates=channel_set.nodeaddresses_to_networkstates,
         pseudo_random_generator=pseudo_random_generator,
         payer_transfer=payer_transfer,
         block_number=block_number,
@@ -1742,52 +1738,6 @@ def test_mediator_lock_expired_after_receive_secret_reveal():
 
     assert secrethash not in channel_set.get_sub_channel(0).our_state.secrethashes_to_unlockedlocks
     assert search_for_item(iteration.events, SendLockExpired, {})
-
-
-def test_filter_reachable_routes():
-    """ Try to mediate a transfer where a node, that is part of the routes_order,
-    was unreachable and became reachable before the locked transfer expired.
-    Expected result is to route the transfer through this node.
-    """
-    partner1 = factories.NettingChannelEndStateProperties(address=HOP1)
-    partner2 = factories.replace(partner1, address=HOP2)
-    channel1 = factories.create(factories.NettingChannelStateProperties(partner_state=partner1))
-    channel2 = factories.create(factories.NettingChannelStateProperties(partner_state=partner2))
-
-    possible_routes = [
-        factories.make_route_from_channel(channel1),
-        factories.make_route_from_channel(channel2),
-    ]
-
-    # Both nodes are online
-    nodeaddresses_to_networkstates = factories.make_node_availability_map([HOP1, HOP2])
-
-    filtered_routes = mediator.filter_reachable_routes(
-        routes=possible_routes, nodeaddresses_to_networkstates=nodeaddresses_to_networkstates
-    )
-
-    assert possible_routes[0] in filtered_routes
-    assert possible_routes[1] in filtered_routes
-
-    # Only HOP2 is online
-    nodeaddresses_to_networkstates = factories.make_node_availability_map([HOP2])
-
-    filtered_routes = mediator.filter_reachable_routes(
-        routes=possible_routes, nodeaddresses_to_networkstates=nodeaddresses_to_networkstates
-    )
-
-    assert possible_routes[0] not in filtered_routes
-    assert possible_routes[1] in filtered_routes
-
-    # None of the route nodes are available
-    nodeaddresses_to_networkstates = factories.make_node_availability_map([])
-
-    filtered_routes = mediator.filter_reachable_routes(
-        routes=possible_routes, nodeaddresses_to_networkstates=nodeaddresses_to_networkstates
-    )
-
-    assert possible_routes[0] not in filtered_routes
-    assert possible_routes[1] not in filtered_routes
 
 
 def test_node_change_network_state_reachable_node():

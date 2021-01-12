@@ -258,8 +258,7 @@ class SecretRegistry:
                 transaction_name="registerSecretBatch",
                 address=self.node_address,
                 transaction_executed=True,
-                required_gas=gas_limit,
-                block_identifier=checking_block,
+                required_gas=gas_limit
             )
             error = "Call to registerSecretBatch couldn't be done"
 
