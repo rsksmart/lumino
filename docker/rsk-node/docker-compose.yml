@@ -4,7 +4,7 @@ services:
     rsk-node:
         image: "rsk-node-image"
         container_name: "rsk-node-container"
-        restart: "no"
+        restart: "always"
         ports:
             - "4444:4444"
             - "30305:30305"

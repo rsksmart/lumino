@@ -1,7 +1,8 @@
 #!/bin/bash
 
-# This script is to start and stop the image
-# Usage: ./image --start=<IMAGE_NAME> or --stop=<IMAGE_NAME>
+# This script is used to manage the containers
+# Usage: ./lumino-docker --start=<MODULE_NAME> | --stop=<MODULE_NAME> | --connect=<MODULE_NAME>
+
 SHOW_LOGS=0
 ACTION=""
 ROOT_PATH=$(pwd)
@@ -18,8 +19,8 @@ function args() {
     case "$1" in
       --start)
         ACTION="start"
-        IMAGE_NAME=$2
-        if [ "${IMAGE_NAME}" == "" ]; then
+        MODULE_NAME=$2
+        if [ "${MODULE_NAME}" == "" ]; then
           echo "You have to provide an image name"
           exit 1
         fi
@@ -28,8 +29,8 @@ function args() {
       ;;
       --connect)
         ACTION="connect"
-        IMAGE_NAME=$2
-        if [ "${IMAGE_NAME}" == "" ]; then
+        MODULE_NAME=$2
+        if [ "${MODULE_NAME}" == "" ]; then
           echo "You have to provide an image name"
           exit 1
         fi
@@ -38,8 +39,8 @@ function args() {
       ;;
       --stop)
         ACTION="stop"
-        IMAGE_NAME=$2
-        if [ "${IMAGE_NAME}" == "" ]; then
+        MODULE_NAME=$2
+        if [ "${MODULE_NAME}" == "" ]; then
           echo "You have to provide an image name"
           exit 1
         fi
@@ -69,22 +70,23 @@ function args() {
 
 function usage() {
   echo "Usage:
-  ./image --start=<IMAGE_NAME> (Optional --logs or -l): to start an specific image (with or without logs)
-  ./image --stop=<IMAGE_NAME>: to stop a specific image
-  ./image --help or -h: to show this help"
+  ./lumino-docker --start=<MODULE_NAME> (Optional --logs or -l): to start an specific module (with or without logs).
+  ./lumino-docker --stop=<MODULE_NAME>: to stop a specific module.
+  ./lumino-docker --connect=<MODULE_NAME>: to connect to a specific module.
+  ./lumino-docker --help or -h: to show this help."
 }
 
 function startImage() {
-  echo "Trying to start image ${IMAGE_NAME}"
-  cd "${ROOT_PATH}/${IMAGE_NAME}" || exit
+  echo "Trying to start image ${MODULE_NAME}"
+  cd "${ROOT_PATH}/${MODULE_NAME}" || exit
 
   echo "Checking deploy images..."
 
-  IMAGE=$(sudo docker images | grep ${IMAGE_NAME}-image)
+  IMAGE=$(sudo docker images | grep ${MODULE_NAME}-image)
 
   if [ "${IMAGE}" == "" ]; then
       echo "Generating image..."
-      sudo docker build --no-cache -t ${IMAGE_NAME}-image .
+      sudo docker build --no-cache -t "${MODULE_NAME}-image" .
   fi
 
   if [ "${SHOW_LOGS}" == 1 ]; then
@@ -93,7 +95,7 @@ function startImage() {
   else
     sudo docker-compose up -d
     exitOnFailure $?
-    echo "${IMAGE_NAME} is running"
+    echo "${MODULE_NAME} is running"
   fi
 }
 
@@ -104,14 +106,14 @@ function exitOnFailure() {
 }
 
 function stopImage() {
-  echo "Trying to stop image ${IMAGE_NAME}"
-  cd "${ROOT_PATH}/${IMAGE_NAME}" || exit
+  echo "Trying to stop image ${MODULE_NAME}"
+  cd "${ROOT_PATH}/${MODULE_NAME}" || exit
   sudo docker-compose down
   exitOnFailure $?
 }
 
 function connectImage() {
-  sudo docker exec -i -t ${IMAGE_NAME}-container /bin/bash
+  sudo docker exec -i -t "${MODULE_NAME}-container" /bin/bash
 }
 
 args "$0" "$@"
