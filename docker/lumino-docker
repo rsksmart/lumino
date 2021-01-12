@@ -1,0 +1,127 @@
+#!/bin/bash
+
+# This script is to start and stop the image
+# Usage: ./image --start=<IMAGE_NAME> or --stop=<IMAGE_NAME>
+SHOW_LOGS=0
+ACTION=""
+ROOT_PATH=$(pwd)
+
+function args() {
+  PARSED_ARGUMENTS=$(getopt -a -n alphabet -o hl --long start:,connect:,stop:,help,logs -- "$@")
+  VALID_ARGUMENTS=$?
+  if [ "$VALID_ARGUMENTS" != "0" ]; then
+    usage
+  fi
+  eval set -- "$PARSED_ARGUMENTS"
+  while :
+  do
+    case "$1" in
+      --start)
+        ACTION="start"
+        IMAGE_NAME=$2
+        if [ "${IMAGE_NAME}" == "" ]; then
+          echo "You have to provide an image name"
+          exit 1
+        fi
+        shift;
+        shift;
+      ;;
+      --connect)
+        ACTION="connect"
+        IMAGE_NAME=$2
+        if [ "${IMAGE_NAME}" == "" ]; then
+          echo "You have to provide an image name"
+          exit 1
+        fi
+        shift;
+        shift;
+      ;;
+      --stop)
+        ACTION="stop"
+        IMAGE_NAME=$2
+        if [ "${IMAGE_NAME}" == "" ]; then
+          echo "You have to provide an image name"
+          exit 1
+        fi
+        shift;
+        shift;
+      ;;
+      -h | --help)
+        usage
+        exit 0
+        shift;
+      ;;
+      -l | --logs)
+        SHOW_LOGS=1
+        echo "Image logs activated, we are going to run docker on attach mode"
+        shift;
+      ;;
+      # -- means the end of the arguments; drop this, and break out of the while loop
+      --) shift; break ;;
+      # If invalid options were passed, then getopt should have reported an error,
+      # which we checked as VALID_ARGUMENTS when getopt was called...
+      *) echo "Unexpected option: $1 - this should not happen."
+         usage
+         exit 1
+    esac
+  done
+}
+
+function usage() {
+  echo "Usage:
+  ./image --start=<IMAGE_NAME> (Optional --logs or -l): to start an specific image (with or without logs)
+  ./image --stop=<IMAGE_NAME>: to stop a specific image
+  ./image --help or -h: to show this help"
+}
+
+function startImage() {
+  echo "Trying to start image ${IMAGE_NAME}"
+  cd "${ROOT_PATH}/${IMAGE_NAME}" || exit
+
+  echo "Checking deploy images..."
+
+  IMAGE=$(sudo docker images | grep ${IMAGE_NAME}-image)
+
+  if [ "${IMAGE}" == "" ]; then
+      echo "Generating image..."
+      sudo docker build --no-cache -t ${IMAGE_NAME}-image .
+  fi
+
+  if [ "${SHOW_LOGS}" == 1 ]; then
+    sudo docker-compose up
+    exitOnFailure $?
+  else
+    sudo docker-compose up -d
+    exitOnFailure $?
+    echo "${IMAGE_NAME} is running"
+  fi
+}
+
+function exitOnFailure() {
+  if [ "$1" != 0 ]; then
+    exit 1
+  fi
+}
+
+function stopImage() {
+  echo "Trying to stop image ${IMAGE_NAME}"
+  cd "${ROOT_PATH}/${IMAGE_NAME}" || exit
+  sudo docker-compose down
+  exitOnFailure $?
+}
+
+function connectImage() {
+  sudo docker exec -i -t ${IMAGE_NAME}-container /bin/bash
+}
+
+args "$0" "$@"
+
+if [ "${ACTION}" == "start" ]; then
+  startImage
+elif [ "${ACTION}" == "stop" ]; then
+  stopImage
+elif [ "${ACTION}" == "connect" ]; then
+  connectImage
+fi
+
+exit 0

@@ -1,0 +1,10 @@
+version: "2.0"
+
+services:
+    rsk-node:
+        image: "rsk-node-image"
+        container_name: "rsk-node-container"
+        restart: "no"
+        ports:
+            - "4444:4444"
+            - "30305:30305"
