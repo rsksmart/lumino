@@ -10,7 +10,7 @@ ENV RSK_CORE_VERSION=${RSK_CORE_VERSION_NUMBER}-${RSK_CORE_VERSION_CODENAME}
 
 RUN apt-get update
 RUN apt-get install -y --no-install-recommends wget curl openjdk-8-jre supervisor systemd \
-                                    software-properties-common unzip zip ssh
+                                    software-properties-common unzip zip ssh lsof
 
 # Install RSK.
 RUN groupadd --gid 888 rsk && useradd rsk -d /var/lib/rsk -s /sbin/nologin --uid=888 --gid=888
@@ -30,6 +30,7 @@ COPY assets/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 COPY assets/rsk-db.zip /root
 COPY assets/information /root
 COPY assets/getInfo /usr/bin/getInfo
+COPY assets/node.conf /etc/rsk/regtest.conf
 
 # Downloading RSK Core
 RUN wget -P ${RSK_CORE_LOCATION} "https://github.com/rsksmart/rskj/releases/download/${RSK_CORE_VERSION_CODENAME}-${RSK_CORE_VERSION_NUMBER}/rskj-core-${RSK_CORE_VERSION_NUMBER}-${RSK_CORE_VERSION_CODENAME}-all.jar"

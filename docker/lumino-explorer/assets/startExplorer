@@ -1,0 +1,37 @@
+#!/bin/bash
+
+source "${HOME}/.sdkman/bin/sdkman-init.sh"
+
+MONGO_DATABASE_FOLDER="/var/lib/mongo"
+MONGO_LOGS_FOLDER="/var/logs/mongo"
+EXPLORER_LOGS_FOLDER="/var/logs/explorer"
+EXPLORER_ROOT_FOLDER="${HOME}/lumino-explorer/lumino-explorer-api"
+EXPLORER_POM_FILE="${EXPLORER_ROOT_FOLDER}/pom.xml"
+EXPLORER_DATABASE_SETUP_FILE="${EXPLORER_ROOT_FOLDER}/src/main/resources/database/lumino-explorer-api-database-setup.js"
+EXPLORER_PORT=8080
+SETUP_DATABASE=0
+
+if [ RSK_ENDPOINT == "" ]; then
+    RSK_ENDPOINT="http://rsk-node:4444"
+fi
+
+if [ ! -d "${MONGO_DATABASE_FOLDER}" ]; then
+    mkdir -p "${MONGO_DATABASE_FOLDER}"
+    SETUP_DATABASE=1
+fi
+
+if [ ! -d "${MONGO_LOGS_FOLDER}" ]; then
+    mkdir -p "${MONGO_LOGS_FOLDER}"
+fi
+
+if [ ! -d "${EXPLORER_LOGS_FOLDER}" ]; then
+    mkdir -p "${EXPLORER_LOGS_FOLDER}"
+fi
+
+mongod --dbpath "${MONGO_DATABASE_FOLDER}" --logpath "${MONGO_LOGS_FOLDER}/mongod.log" --fork
+
+if [ ${SETUP_DATABASE} == 1 ]; then
+    mongo "${EXPLORER_DATABASE_SETUP_FILE}"
+fi
+
+mvn -f "${EXPLORER_POM_FILE}" spring-boot:run -Dspring-boot.run.jvmArguments="-Dserver.port=${EXPLORER_PORT} -Drsk.blockchain.endpoint=${RSK_ENDPOINT}" > "${EXPLORER_LOGS_FOLDER}/server.log" 2>&1 &
