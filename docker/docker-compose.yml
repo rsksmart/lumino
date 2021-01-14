@@ -1,9 +1,22 @@
-version: "2.0"
+version: "2.2"
 
 services:
+    mongo-db:
+      image: "mongo"
+      restart: "no"
+      environment:
+        MONGO_INITDB_ROOT_USERNAME: root
+        MONGO_INITDB_ROOT_PASSWORD: infuy
+      networks: [ "local" ]
+    mysql-db:
+      image: "mysql"
+      command: --default-authentication-plugin=mysql_native_password
+      restart:  "no"
+      environment:
+        MYSQL_ROOT_PASSWORD: infuy
+      networks: [ "local" ]
     rsk-node:
         image: "rsk-node-image"
-        container_name: "rsk-node-container"
         restart: "no"
         networks: ["local"]
         ports:
@@ -11,15 +24,38 @@ services:
             - "30305"
 
     lumino-explorer:
-        environment:
-          RSK_ENDPOINT: 'http://rsk-node:4444'
+# Not used because startExplorer has all the parameters already set
+#      environment:
+#        EXPLORER_PORT: 8080
+#        RSK_ENDPOINT: "http://rsk-node:4444"
+#        MONGO_DB_HOST: "mongo-db"
+#        MONGO_DB_USERNAME: root
+#        MONGO_DB_PASSWORD: infuy
+#        TOKEN_NETWORK_REGISTRY: 0xed8c9163F888Bc2f9C4F299325003DA5fC8676DD
         image: "lumino-explorer-image"
-        container_name: "lumino-explorer-container"
         restart: "no"
         networks: ["local"]
-        depends_on: ["rsk-node"]
+        depends_on: ["mongo-db", "rsk-node"]
         ports:
             - "8080"
+    rif-notifier:
+# Not used because startNotifier has all the parameters already set
+#      environment:
+#        NOTIFIER_PORT: 8080
+#        RSK_ENDPOINT: "http://rsk-node:4444"
+#        NOTIFIER_DB_URL: "jdbc:mysql://mysql-db:3306/rif_notifier" # Not compatible with replica option
+#        NOTIFIER_DB_SCHEMA_NAME: "rif_notifier_1" # Not compatible with replica option
+#        NOTIFIER_DB_USERNAME: root
+#        NOTIFIER_DB_PASSWORD: infuy
+#        TOKEN_NETWORK_REGISTRY: 0xed8c9163F888Bc2f9C4F299325003DA5fC8676DD
+#        RNS_MULTICHAIN_CONTRACT: 0x73ec81da0C72DD112e06c09A6ec03B5544d26F05
+      image: "rif-notifier-image"
+      restart: "no"
+      networks: ["local"]
+      depends_on: ["mysql-db", "rsk-node"]
+      ports:
+        - "8081"
+      scale: 3
 
 networks:
   local:

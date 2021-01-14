@@ -10,7 +10,7 @@ ENV RSK_CORE_VERSION=${RSK_CORE_VERSION_NUMBER}-${RSK_CORE_VERSION_CODENAME}
 
 RUN apt-get update
 RUN apt-get install -y --no-install-recommends wget curl openjdk-8-jre supervisor systemd \
-                                    software-properties-common unzip zip ssh lsof
+                                    software-properties-common unzip zip ssh lsof nano
 
 # Install RSK.
 RUN groupadd --gid 888 rsk && useradd rsk -d /var/lib/rsk -s /sbin/nologin --uid=888 --gid=888
