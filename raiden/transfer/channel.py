@@ -1934,6 +1934,7 @@ def handle_channel_closed_light(
                 triggered_by_block_hash=state_change.block_hash,
                 lc_bp_signature=state_change.latest_update_non_closing_balance_proof_data.lc_balance_proof_signature
             )
+
             channel_state.update_transaction = TransactionExecutionStatus(
                 started_block_number=state_change.block_number,
                 finished_block_number=None,

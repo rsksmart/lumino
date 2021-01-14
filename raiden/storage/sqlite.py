@@ -1473,18 +1473,18 @@ class SQLiteStorage:
                    balance_proof,
                    lc_balance_proof_signature
             FROM light_client_balance_proof
-            WHERE channel_id  = ? AND sender = ? and token_network_address = ?
+            WHERE channel_id  = ? AND sender = ? AND token_network_address = ?
             ORDER BY nonce DESC
             """,
             (channel_id, to_checksum_address(non_closing_participant), to_checksum_address(token_network_address)),
         )
         return cursor.fetchone()
 
-    def delete_light_client_non_closing_balance_proof(self, channel_id, token_network_addresss):
+    def delete_light_client_non_closing_balance_proof(self, channel_id, token_network_address):
         with self.write_lock, self.conn:
             self.conn.execute(
-                "DELETE FROM light_client_balance_proof WHERE channel_id = ? and token_network_address = ?",
-                (channel_id, to_checksum_address(token_network_addresss),))
+                "DELETE FROM light_client_balance_proof WHERE channel_id = ? AND token_network_address = ?",
+                (channel_id, to_checksum_address(token_network_address),))
 
     def get_light_client_payment_locked_transfer(self,
                                                  payment_identifier,
