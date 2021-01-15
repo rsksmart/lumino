@@ -21,6 +21,15 @@ function is_number() {
     fi
 }
 
+function createNetworkIfMissing() {
+    NETWORK_NAME=local
+    NETWORK=$(sudo docker network ls --filter name=${NETWORK_NAME} -q)
+    if [ "${NETWORK}" == "" ]; then
+        echo "Creating network ${NETWORK_NAME}"
+        sudo docker network create ${NETWORK_NAME}
+    fi
+}
+
 function validateModuleName() {
     MODULE_NAME=$1
     if [ "${MODULE_NAME}" == "" ]; then
@@ -172,6 +181,17 @@ function doStopModules() {
     done
 }
 
+function doClean() {
+    echo "Cleaning docker system..."
+    # Stopping and removing all containers
+    sudo docker stop $(sudo docker ps -a -q)
+    sudo docker rm $(sudo docker ps -a -q)
+
+    # Removing images
+    sudo docker system prune -a -f
+    echo "Done!"
+}
+
 function manager() {
     if [ "$2" == "" ]; then
         echo "You need to specify at least one parameter, you can use --help to know how to use this command."
@@ -186,6 +206,10 @@ function manager() {
     ACTION=""
     while :; do
         case "$1" in
+        --clean)
+            ACTION="doClean"
+            shift
+            ;;
         --start)
             ACTION="doStart"
             shift
@@ -254,6 +278,8 @@ function manager() {
     done
     eval "${ACTION}"
 }
+
+createNetworkIfMissing
 
 manager "$0" "$@"
 
