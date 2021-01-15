@@ -27,7 +27,7 @@ RUN bash -c "source $HOME/.sdkman/bin/sdkman-init.sh && \
     rm -rf $HOME/.sdkman/archives/* && \
     rm -rf $HOME/.sdkman/tmp/*"
 
-# Install Lumino Explorer.
+# Install Rif Notifier
 RUN git clone https://github.com/rsksmart/rif-notifier.git $HOME/rif-notifier
 RUN cd $HOME/rif-notifier && git checkout $CURRENT_BRANCH
 RUN bash -c "source $HOME/.sdkman/bin/sdkman-init.sh && mvn clean compile -f $HOME/rif-notifier/pom.xml"

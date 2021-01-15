@@ -4,10 +4,11 @@ services:
     mongo-db:
       image: "mongo"
       restart: "no"
-      environment:
-        MONGO_INITDB_ROOT_USERNAME: root
-        MONGO_INITDB_ROOT_PASSWORD: infuy
       networks: [ "local" ]
+      ports:
+        - "27017"
+        - "27018"
+        - "27019"
     mysql-db:
       image: "mysql"
       command: --default-authentication-plugin=mysql_native_password
@@ -15,8 +16,11 @@ services:
       environment:
         MYSQL_ROOT_PASSWORD: infuy
       networks: [ "local" ]
+      ports:
+      - "3306"
+      - "33060"
     rsk-node:
-        image: "rsk-node-image"
+        image: "rsk-node-image:latest"
         restart: "no"
         networks: ["local"]
         ports:
@@ -32,7 +36,7 @@ services:
 #        MONGO_DB_USERNAME: root
 #        MONGO_DB_PASSWORD: infuy
 #        TOKEN_NETWORK_REGISTRY: 0xed8c9163F888Bc2f9C4F299325003DA5fC8676DD
-        image: "lumino-explorer-image"
+        image: "lumino-explorer-image:latest"
         restart: "no"
         networks: ["local"]
         depends_on: ["mongo-db", "rsk-node"]
@@ -49,12 +53,12 @@ services:
 #        NOTIFIER_DB_PASSWORD: infuy
 #        TOKEN_NETWORK_REGISTRY: 0xed8c9163F888Bc2f9C4F299325003DA5fC8676DD
 #        RNS_MULTICHAIN_CONTRACT: 0x73ec81da0C72DD112e06c09A6ec03B5544d26F05
-      image: "rif-notifier-image"
+      image: "rif-notifier-image:latest"
       restart: "no"
       networks: ["local"]
       depends_on: ["mysql-db", "rsk-node"]
       ports:
-        - "8081"
+        - "8080"
       scale: 3
 
 networks:

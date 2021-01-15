@@ -1,0 +1,260 @@
+#!/bin/bash
+
+SHOW_LOGS=0
+CLEAN_CACHE=0
+ROOT_PATH=$(pwd)
+
+RSK_MODULE_NAME="rsk-node"
+EXPLORER_MODULE_NAME="lumino-explorer"
+NOTIFIER_MODULE_NAME="rif-notifier"
+VALID_MODULES="${RSK_MODULE_NAME} ${EXPLORER_MODULE_NAME} ${NOTIFIER_MODULE_NAME}"
+NOTIFIER_REPLICAS=3
+RUN_IN_BACKGROUND=0
+INSTANCE_NUMBER=1
+
+# Utils
+function is_number() {
+    if [[ "$1" =~ ^[0-9]+$ ]] ; then
+        echo 1
+    else
+        echo 0
+    fi
+}
+
+function validateModuleName() {
+    MODULE_NAME=$1
+    if [ "${MODULE_NAME}" == "" ]; then
+        echo "You have to provide a module name"
+        exit 1
+    fi
+    IS_VALID_MODULE="0"
+    for VALID_MODULE in ${VALID_MODULES[*]};
+    do
+        IS_VALID_MODULE=$([[ "${VALID_MODULE}" == "${MODULE_NAME}" ]] && echo "1" || echo "0")
+        if [ "${IS_VALID_MODULE}" == "1" ]; then
+            break
+        fi
+    done
+    if [ "${IS_VALID_MODULE}" == "0" ]; then
+        echo "Invalid module name ${MODULE_NAME}, valid values are: ${VALID_MODULES[*]}"
+        exit 1
+    fi
+}
+function validateModuleNames() {
+    MODULE_NAMES=$1
+    if [ "" == "${MODULE_NAMES}" ]; then
+        echo "You need to specify at least one module name"
+        exit 1
+    fi
+    IFS=',' read -ra MODULE_NAMES <<< "${MODULE_NAMES}"
+    for MODULE_NAME in ${MODULE_NAMES[*]}; do
+        MODULE_NAME=$(echo "${MODULE_NAME}" | xargs)
+        validateModuleName "${MODULE_NAME}"
+    done
+}
+
+
+function showUsage() {
+    cat "${ROOT_PATH}/usage.md"
+}
+
+function exitOnFailure() {
+    if [ "$1" != 0 ]; then
+        exit 1
+    fi
+}
+
+# Manager functions
+
+function checkAndGenerateModuleImage() {
+    MODULE_NAME=$1
+    IMAGE_NAME="${MODULE_NAME}-image"
+    IMAGE=$(sudo docker images | grep "${IMAGE_NAME}")
+    if [ "${IMAGE}" == "" ]; then
+        echo "Generating missing image ${IMAGE_NAME} ..."
+        cd "${ROOT_PATH}/${MODULE_NAME}" || exit
+        sudo docker build --no-cache -t "${IMAGE_NAME}" .
+        cd "${ROOT_PATH}" || exit
+    fi
+}
+
+function checkAllImages() {
+    echo "Checking all required docker images"
+    checkAndGenerateModuleImage ${RSK_MODULE_NAME}
+    checkAndGenerateModuleImage ${EXPLORER_MODULE_NAME}
+    checkAndGenerateModuleImage ${NOTIFIER_MODULE_NAME}
+}
+
+function showModuleIp() {
+    MODULE_NAME=$1
+    MODULE_INSTANCE_NUMBER=$2
+    if [ "${MODULE_INSTANCE_NUMBER}" == "" ]; then
+        MODULE_INSTANCE_NUMBER=1
+    fi
+    validateModuleName "${MODULE_NAME}"
+    sudo docker inspect --format '{{ .NetworkSettings.Networks.local.IPAddress }}' "docker_${MODULE_NAME}_${MODULE_INSTANCE_NUMBER}"
+}
+
+function showAllModuleIps() {
+    RSK_NODE_IP=$(sudo docker inspect --format '{{ .NetworkSettings.Networks.local.IPAddress }}' docker_rsk-node_1)
+    EXPLORER_IP=$(sudo docker inspect --format '{{ .NetworkSettings.Networks.local.IPAddress }}' docker_lumino-explorer_1)
+    echo "Network Summary ---------------------"
+    echo "-------------------------------------"
+    echo "RSK NODE ----- ${RSK_NODE_IP}"
+    echo "LUMINO EXPLORER ----- ${EXPLORER_IP}"
+    for NOTIFIER_NUMBER in $(seq 1 ${NOTIFIER_REPLICAS}); do
+        RIF_NOTIFIER_IP=$(sudo docker inspect --format '{{ .NetworkSettings.Networks.local.IPAddress }}' "docker_rif-notifier_${NOTIFIER_NUMBER}")
+        echo "RIF_NOTIFIER_${NOTIFIER_NUMBER} ----- ${RIF_NOTIFIER_IP}"
+    done
+}
+
+function doStart() {
+    echo "Starting all modules"
+    checkAllImages
+    cd "${ROOT_PATH}" || exit
+    if [ "${RUN_IN_BACKGROUND}" == 0 ]; then
+        sudo docker-compose up --scale "${NOTIFIER_MODULE_NAME}=${NOTIFIER_REPLICAS}"
+    else
+        sudo docker-compose up -d --scale "${NOTIFIER_MODULE_NAME}=${NOTIFIER_REPLICAS}"
+    fi
+    exitOnFailure $?
+}
+
+function startModule() {
+    MODULE_NAME=$(echo "$1" | xargs)
+    cd "${ROOT_PATH}" || exit
+    if [ "${MODULE_NAME}" == "${NOTIFIER_MODULE_NAME}" ]; then
+        sudo docker-compose up -d --scale "${NOTIFIER_MODULE_NAME}=${NOTIFIER_REPLICAS}" "${MODULE_NAME}"
+    else
+        sudo docker-compose start "${MODULE_NAME}"
+    fi
+    exitOnFailure $?
+}
+
+function doStartModules() {
+    echo "Starting  Modules $*"
+    MODULE_NAMES=$(echo "$*" | xargs)
+    IFS=',' read -ra MODULE_NAMES <<< "${MODULE_NAMES}"
+    for MODULE_NAME in ${MODULE_NAMES[*]}; do
+        startModule "${MODULE_NAME}"
+    done
+}
+
+function doConnect() {
+    MODULE_NAME=$1
+    if [ "${INSTANCE_NUMBER}" == "" ]; then
+        INSTANCE_NUMBER=1
+    fi
+    echo "Trying to connect to ${MODULE_NAME} on instance ${INSTANCE_NUMBER}"
+    sudo docker exec -i -t "docker_${MODULE_NAME}_${INSTANCE_NUMBER}" /bin/bash
+}
+
+function doStop() {
+    echo "Stopping all modules"
+    cd "${ROOT_PATH}" || exit
+    sudo docker-compose down
+    exitOnFailure $?
+}
+
+function stopModule() {
+    MODULE_NAME=$(echo "$1" | xargs)
+    cd "${ROOT_PATH}" || exit
+    sudo docker-compose stop "${MODULE_NAME}"
+    exitOnFailure $?
+}
+
+function doStopModules() {
+    echo "Stopping Modules $*"
+    MODULE_NAMES=$(echo "$*" | xargs)
+    IFS=',' read -ra MODULE_NAMES <<< "${MODULE_NAMES}"
+    for MODULE_NAME in ${MODULE_NAMES[*]}; do
+        stopModule "${MODULE_NAME}"
+    done
+}
+
+function manager() {
+    if [ "$2" == "" ]; then
+        echo "You need to specify at least one parameter, you can use --help to know how to use this command."
+        exit 1
+    fi
+    PARSED_ARGUMENTS=$(getopt -a -n alphabet -o h --long clean,start,background,start-modules:,connect:,stop,stop-modules:,notifiers:,instance-number:,help -- "$@")
+    VALID_ARGUMENTS=$?
+    if [ "$VALID_ARGUMENTS" != "0" ]; then
+        showUsage
+    fi
+    eval set -- "$PARSED_ARGUMENTS"
+    ACTION=""
+    while :; do
+        case "$1" in
+        --start)
+            ACTION="doStart"
+            shift
+            ;;
+        --background)
+            RUN_IN_BACKGROUND=1
+            shift
+            ;;
+        --start-modules)
+            MODULE_NAMES=$(echo "$2" | xargs)
+            validateModuleNames "${MODULE_NAMES}"
+            ACTION="doStartModules ${MODULE_NAMES[*]}"
+            shift
+            shift
+            ;;
+        --connect)
+            MODULE_NAME=$(echo "$2" | xargs)
+            validateModuleName "${MODULE_NAME}"
+            ACTION="doConnect ${MODULE_NAME}"
+            shift
+            shift
+            ;;
+        --instance-number)
+            INSTANCE_NUMBER=$(echo "$2" | xargs)
+            shift
+            shift
+            ;;
+        --stop)
+            ACTION="doStop"
+            shift
+            ;;
+        --stop-modules)
+            MODULE_NAMES=$(echo "$2" | xargs)
+            validateModuleNames "${MODULE_NAMES}"
+            ACTION="doStopModules ${MODULE_NAMES[*]}"
+            shift
+            shift
+            ;;
+        --notifiers)
+            NOTIFIER_REPLICAS=$(echo "$2" | xargs)
+            if [[ $(is_number "${NOTIFIER_REPLICAS}") == 0 ]]; then
+                echo "Invalid notifiers parameter value: ${NOTIFIER_REPLICAS}, it should be a number."
+                exit 1
+            fi
+            shift
+            shift
+            ;;
+        -h | --help)
+            showUsage
+            exit 0
+            shift
+            ;;
+        # -- means the end of the arguments; drop this, and break out of the while loop
+        --)
+            shift
+            break
+            ;;
+        # If invalid options were passed, then getopt should have reported an error,
+        # which we checked as VALID_ARGUMENTS when getopt was called...
+        *)
+            echo "Unexpected option: $1 - this should not happen."
+            showUsage
+            exit 1
+            ;;
+        esac
+    done
+    eval "${ACTION}"
+}
+
+manager "$0" "$@"
+
+exit 0

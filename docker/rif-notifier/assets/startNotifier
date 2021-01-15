@@ -2,6 +2,7 @@
 
 source "${HOME}/.sdkman/bin/sdkman-init.sh"
 
+INIT_LOG=/root/init.log
 NOTIFIER_LOGS_FOLDER="/var/logs/notifier"
 NOTIFIER_ROOT_FOLDER="${HOME}/rif-notifier/"
 NOTIFIER_POM_FILE="${NOTIFIER_ROOT_FOLDER}/pom.xml"
@@ -42,20 +43,29 @@ if [ "${RNS_MULTICHAIN_CONTRACT}" == "" ]; then
     RNS_MULTICHAIN_CONTRACT=0x73ec81da0C72DD112e06c09A6ec03B5544d26F05
 fi
 
+echo "Starting Notifier:" >> ${INIT_LOG}
+echo "RSK_ENDPOINT=${RSK_ENDPOINT}" >> ${INIT_LOG}
+echo "NOTIFIER_PORT=${NOTIFIER_PORT}" >> ${INIT_LOG}
+echo "NOTIFIER_DB_URL=${NOTIFIER_DB_URL}" >> ${INIT_LOG}
+echo "NOTIFIER_DB_SCHEMA_NAME=${NOTIFIER_DB_SCHEMA_NAME}" >> ${INIT_LOG}
+echo "NOTIFIER_DB_USERNAME=${NOTIFIER_DB_USERNAME}" >> ${INIT_LOG}
+echo "NOTIFIER_DB_PASSWORD=${NOTIFIER_DB_PASSWORD}" >> ${INIT_LOG}
+echo "TOKEN_NETWORK_REGISTRY=${TOKEN_NETWORK_REGISTRY}" >> ${INIT_LOG}
+echo "RNS_MULTICHAIN_CONTRACT=${RNS_MULTICHAIN_CONTRACT}" >> ${INIT_LOG}
+
 # Init log folder
 if [ ! -d "${NOTIFIER_LOGS_FOLDER}" ]; then
-    mkdir -p "${NOTIFIER_LOGS_FOLDER}"
+    echo "Creating logs folder ${NOTIFIER_LOGS_FOLDER}" >> ${INIT_LOG}
+    mkdir -p "${NOTIFIER_LOGS_FOLDER}" >> ${INIT_LOG}
 fi
 
-# Init database
-echo "CREATE SCHEMA ${NOTIFIER_DB_SCHEMA_NAME};" | mysql -u ${NOTIFIER_DB_USERNAME} -p${NOTIFIER_DB_PASSWORD} --host mysql-db
-mysql -u ${NOTIFIER_DB_USERNAME} -p${NOTIFIER_DB_PASSWORD} --host mysql-db "${NOTIFIER_DB_SCHEMA_NAME}" < "${NOTIFIER_DATABASE_SETUP_FILE}"
+echo "Initializing notifier database" >> ${INIT_LOG}
 
-mvn -f "${NOTIFIER_POM_FILE}" spring-boot:run -Dspring-boot.run.jvmArguments=\
-    "-Dserver.port=${NOTIFIER_PORT}
-     -Drsk.blockchain.endpoint=${RSK_ENDPOINT}
-     -Dspring.datasource.url=${NOTIFIER_DB_URL}
-     -Dspring.datasource.username=${NOTIFIER_DB_USERNAME}
-     -Dspring.datasource.password=${NOTIFIER_DB_PASSWORD}
-     -Drsk.blockchain.tokennetworkregistry=${TOKEN_NETWORK_REGISTRY}
-     -Drsk.blockchain.multichaincontract=${RNS_MULTICHAIN_CONTRACT}" > "${NOTIFIER_LOGS_FOLDER}/server.log" 2>&1 &
+# Init database
+echo "CREATE SCHEMA ${NOTIFIER_DB_SCHEMA_NAME};" | mysql -u ${NOTIFIER_DB_USERNAME} -p${NOTIFIER_DB_PASSWORD} --host mysql-db >> ${INIT_LOG}
+mysql -u ${NOTIFIER_DB_USERNAME} -p${NOTIFIER_DB_PASSWORD} --host mysql-db "${NOTIFIER_DB_SCHEMA_NAME}" < "${NOTIFIER_DATABASE_SETUP_FILE}" >> ${INIT_LOG}
+
+echo "Running notifier" >> ${INIT_LOG}
+echo "mvn -f '${NOTIFIER_POM_FILE}' spring-boot:run -Dspring-boot.run.jvmArguments='-Dserver.port=${NOTIFIER_PORT} -Drsk.blockchain.endpoint=${RSK_ENDPOINT} -Dspring.datasource.url=${NOTIFIER_DB_URL} -Dspring.datasource.username=${NOTIFIER_DB_USERNAME} -Dspring.datasource.password=${NOTIFIER_DB_PASSWORD} -Drsk.blockchain.tokennetworkregistry=${TOKEN_NETWORK_REGISTRY} -Drsk.blockchain.multichaincontract=${RNS_MULTICHAIN_CONTRACT}' > '${NOTIFIER_LOGS_FOLDER}/server.log' 2>&1 &" >> ${INIT_LOG}
+
+mvn -f "${NOTIFIER_POM_FILE}" spring-boot:run -Dspring-boot.run.jvmArguments="-Dserver.port=${NOTIFIER_PORT} -Drsk.blockchain.endpoint=${RSK_ENDPOINT} -Dspring.datasource.url=${NOTIFIER_DB_URL} -Dspring.datasource.username=${NOTIFIER_DB_USERNAME} -Dspring.datasource.password=${NOTIFIER_DB_PASSWORD} -Drsk.blockchain.tokennetworkregistry=${TOKEN_NETWORK_REGISTRY} -Drsk.blockchain.multichaincontract=${RNS_MULTICHAIN_CONTRACT}" > "${NOTIFIER_LOGS_FOLDER}/server.log" 2>&1 &
