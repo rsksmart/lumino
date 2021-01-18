@@ -1,7 +1,7 @@
 #!/bin/bash
 
 SHOW_LOGS=0
-CLEAN_CACHE=0
+CLEAN_IMAGE_CACHE=0
 ROOT_PATH=$(pwd)
 
 RSK_MODULE_NAME="rsk-node"
@@ -84,6 +84,11 @@ function checkAndGenerateModuleImage() {
         cd "${ROOT_PATH}/${MODULE_NAME}" || exit
         sudo docker build --no-cache -t "${IMAGE_NAME}" .
         cd "${ROOT_PATH}" || exit
+    elif [ ${CLEAN_IMAGE_CACHE} == 1 ]; then
+        echo "Cleaning image cache for ${IMAGE_NAME} ..."
+        cd "${ROOT_PATH}/${MODULE_NAME}" || exit
+        sudo docker build --no-cache -t "${IMAGE_NAME}" .
+        cd "${ROOT_PATH}" || exit
     fi
 }
 
@@ -107,8 +112,6 @@ function showModuleIp() {
 function showAllModuleIps() {
     RSK_NODE_IP=$(sudo docker inspect --format '{{ .NetworkSettings.Networks.local.IPAddress }}' docker_rsk-node_1)
     EXPLORER_IP=$(sudo docker inspect --format '{{ .NetworkSettings.Networks.local.IPAddress }}' docker_lumino-explorer_1)
-    echo "Network Summary ---------------------"
-    echo "-------------------------------------"
     echo "RSK NODE ----- ${RSK_NODE_IP}"
     echo "LUMINO EXPLORER ----- ${EXPLORER_IP}"
     for NOTIFIER_NUMBER in $(seq 1 ${NOTIFIER_REPLICAS}); do
@@ -117,14 +120,23 @@ function showAllModuleIps() {
     done
 }
 
+function showRSKInformation() {
+    sudo docker exec -i -t docker_rsk-node_1 /usr/bin/getInfo
+    echo
+}
+
 function doStart() {
     echo "Starting all modules"
     checkAllImages
     cd "${ROOT_PATH}" || exit
     if [ "${RUN_IN_BACKGROUND}" == 0 ]; then
         sudo docker-compose up --scale "${NOTIFIER_MODULE_NAME}=${NOTIFIER_REPLICAS}"
+        if [ ${SHOW_LOGS} == 1 ]; then
+            sudo docker-compose logs
+        fi
     else
         sudo docker-compose up -d --scale "${NOTIFIER_MODULE_NAME}=${NOTIFIER_REPLICAS}"
+        showAllModuleIps
     fi
     exitOnFailure $?
 }
@@ -137,6 +149,9 @@ function startModule() {
     else
         sudo docker-compose start "${MODULE_NAME}"
     fi
+    if [ ${SHOW_LOGS} == 1 ]; then
+        sudo docker-compose logs
+    fi
     exitOnFailure $?
 }
 
@@ -146,6 +161,7 @@ function doStartModules() {
     IFS=',' read -ra MODULE_NAMES <<< "${MODULE_NAMES}"
     for MODULE_NAME in ${MODULE_NAMES[*]}; do
         startModule "${MODULE_NAME}"
+        showModuleIp "${MODULE_NAME}"
     done
 }
 
@@ -181,7 +197,7 @@ function doStopModules() {
     done
 }
 
-function doClean() {
+function doCleanAll() {
     echo "Cleaning docker system..."
     # Stopping and removing all containers
     sudo docker stop $(sudo docker ps -a -q)
@@ -189,7 +205,6 @@ function doClean() {
 
     # Removing images
     sudo docker system prune -a -f
-    echo "Done!"
 }
 
 function manager() {
@@ -197,7 +212,7 @@ function manager() {
         echo "You need to specify at least one parameter, you can use --help to know how to use this command."
         exit 1
     fi
-    PARSED_ARGUMENTS=$(getopt -a -n alphabet -o h --long clean,start,background,start-modules:,connect:,stop,stop-modules:,notifiers:,instance-number:,help -- "$@")
+    PARSED_ARGUMENTS=$(getopt -a -n alphabet -o h --long rsk-information,ip,ip-module:,clean,clean-all,start,background,start-modules:,connect:,stop,stop-modules:,notifiers:,instance-number:,logs,help -- "$@")
     VALID_ARGUMENTS=$?
     if [ "$VALID_ARGUMENTS" != "0" ]; then
         showUsage
@@ -207,7 +222,11 @@ function manager() {
     while :; do
         case "$1" in
         --clean)
-            ACTION="doClean"
+            CLEAN_IMAGE_CACHE=1
+            shift
+            ;;
+        --clean-all)
+            ACTION="doCleanAll"
             shift
             ;;
         --start)
@@ -257,6 +276,25 @@ function manager() {
             shift
             shift
             ;;
+        --logs)
+            SHOW_LOGS=1
+            shift
+            ;;
+        --ip)
+            ACTION="showAllModuleIps"
+            shift
+            ;;
+        --ip-module)
+            MODULE_NAME=$(echo "$2" | xargs)
+            validateModuleName "${MODULE_NAME}"
+            ACTION="showModuleIp ${MODULE_NAME}"
+            shift
+            shift
+            ;;
+        --rsk-information)
+            ACTION="showRSKInformation"
+            shift
+            ;;
         -h | --help)
             showUsage
             exit 0
@@ -276,10 +314,13 @@ function manager() {
             ;;
         esac
     done
-    eval "${ACTION}"
-}
 
-createNetworkIfMissing
+    if [ "${ACTION}" != "" ]; then
+        createNetworkIfMissing
+        eval "${ACTION}"
+        exitOnFailure
+    fi
+}
 
 manager "$0" "$@"
 
