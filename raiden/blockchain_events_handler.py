@@ -332,7 +332,7 @@ def handle_channel_closed(raiden: "RaidenService", event: Event):
                 if channel_state.our_state.address == closing_participant \
                 else channel_state.our_state.address
             latest_non_closing_balance_proof = LightClientMessageHandler.get_latest_light_client_non_closing_balance_proof(
-                channel_state.identifier, non_closing_participant, raiden.wal.storage
+                channel_state.identifier, non_closing_participant, token_network_identifier, raiden.wal.storage
             )
             channel_closed = ContractReceiveChannelClosedLight(
                 transaction_hash=transaction_hash,

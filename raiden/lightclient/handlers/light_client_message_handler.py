@@ -4,7 +4,6 @@ from typing import Any
 
 import structlog
 from eth_utils import to_checksum_address
-
 from raiden.lightclient.lightclientmessages.light_client_non_closing_balance_proof import \
     LightClientNonClosingBalanceProof
 from raiden.lightclient.models.light_client_payment import LightClientPayment, LightClientPaymentStatus
@@ -386,8 +385,16 @@ class LightClientMessageHandler:
         return storage.write_light_client_non_closing_balance_proof(non_closing_balance_proof_data)
 
     @classmethod
-    def get_latest_light_client_non_closing_balance_proof(cls, channel_id: int, non_closing_participant: Address, storage: SerializedSQLiteStorage):
-        latest_update_balance_proof_data = storage.get_latest_light_client_non_closing_balance_proof(channel_id, non_closing_participant)
+    def get_latest_light_client_non_closing_balance_proof(cls,
+                                                          channel_id: int,
+                                                          non_closing_participant: Address,
+                                                          token_network_address: Address,
+                                                          storage: SerializedSQLiteStorage):
+        latest_update_balance_proof_data = storage.get_latest_light_client_non_closing_balance_proof(
+            channel_id,
+            non_closing_participant,
+            token_network_address
+        )
         if latest_update_balance_proof_data:
             balance_proof_dict = json.loads(latest_update_balance_proof_data[7])
             balance_proof = Unlock.from_dict(balance_proof_dict) \
