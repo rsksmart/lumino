@@ -19,12 +19,16 @@ if [ "${RSK_ENDPOINT}" == "" ]; then
     RSK_ENDPOINT="http://rsk-node:4444"
 fi
 
-if [ "${NOTIFIER_DB_URL}" == "" ]; then
-    NOTIFIER_DB_URL="jdbc:mysql://mysql-db:3306/rif_notifier_${NOTIFIER_NAME}"
+if [ "${NOTIFIER_DB_HOST}" == "" ]; then
+    NOTIFIER_DB_HOST="mysql-db"
 fi
 
 if [ "${NOTIFIER_DB_SCHEMA_NAME}" == "" ]; then
     NOTIFIER_DB_SCHEMA_NAME="rif_notifier_${NOTIFIER_NAME}"
+fi
+
+if [ "${NOTIFIER_DB_URL}" == "" ]; then
+    NOTIFIER_DB_URL="jdbc:mysql://${NOTIFIER_DB_HOST}:3306/${NOTIFIER_DB_SCHEMA_NAME}"
 fi
 
 if [ "${NOTIFIER_DB_USERNAME}" == "" ]; then
@@ -46,6 +50,7 @@ fi
 echo "Starting Notifier:" >> ${INIT_LOG}
 echo "RSK_ENDPOINT=${RSK_ENDPOINT}" >> ${INIT_LOG}
 echo "NOTIFIER_PORT=${NOTIFIER_PORT}" >> ${INIT_LOG}
+echo "NOTIFIER_DB_HOST=${NOTIFIER_DB_HOST}" >> ${INIT_LOG}
 echo "NOTIFIER_DB_URL=${NOTIFIER_DB_URL}" >> ${INIT_LOG}
 echo "NOTIFIER_DB_SCHEMA_NAME=${NOTIFIER_DB_SCHEMA_NAME}" >> ${INIT_LOG}
 echo "NOTIFIER_DB_USERNAME=${NOTIFIER_DB_USERNAME}" >> ${INIT_LOG}
@@ -62,8 +67,8 @@ fi
 echo "Initializing notifier database" >> ${INIT_LOG}
 
 # Init database
-echo "CREATE SCHEMA ${NOTIFIER_DB_SCHEMA_NAME};" | mysql -u ${NOTIFIER_DB_USERNAME} -p${NOTIFIER_DB_PASSWORD} --host mysql-db >> ${INIT_LOG}
-mysql -u ${NOTIFIER_DB_USERNAME} -p${NOTIFIER_DB_PASSWORD} --host mysql-db "${NOTIFIER_DB_SCHEMA_NAME}" < "${NOTIFIER_DATABASE_SETUP_FILE}" >> ${INIT_LOG}
+echo "CREATE SCHEMA ${NOTIFIER_DB_SCHEMA_NAME};" | mysql -u ${NOTIFIER_DB_USERNAME} -p${NOTIFIER_DB_PASSWORD} --host ${NOTIFIER_DB_HOST} >> ${INIT_LOG}
+mysql -u ${NOTIFIER_DB_USERNAME} -p${NOTIFIER_DB_PASSWORD} --host ${NOTIFIER_DB_HOST} "${NOTIFIER_DB_SCHEMA_NAME}" < "${NOTIFIER_DATABASE_SETUP_FILE}" >> ${INIT_LOG}
 
 echo "Running notifier" >> ${INIT_LOG}
 echo "mvn -f '${NOTIFIER_POM_FILE}' spring-boot:run -Dspring-boot.run.jvmArguments='-Dserver.port=${NOTIFIER_PORT} -Drsk.blockchain.endpoint=${RSK_ENDPOINT} -Dspring.datasource.url=${NOTIFIER_DB_URL} -Dspring.datasource.username=${NOTIFIER_DB_USERNAME} -Dspring.datasource.password=${NOTIFIER_DB_PASSWORD} -Drsk.blockchain.tokennetworkregistry=${TOKEN_NETWORK_REGISTRY} -Drsk.blockchain.multichaincontract=${RNS_MULTICHAIN_CONTRACT}' > '${NOTIFIER_LOGS_FOLDER}/server.log' 2>&1 &" >> ${INIT_LOG}

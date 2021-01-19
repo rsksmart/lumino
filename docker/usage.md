@@ -16,9 +16,16 @@ It provides a way to manage the Lumino infrastructure without the need to know h
 * *--start-modules*: Start a subset of modules inside the Lumino infrastructure, it requires a comma separated list of module names.
     - Example: `./manager --start-modules=rsk-node,lumino-explorer` to start RSK Module only.
     
-* *--clean*: It cleans the module images.
-
+* *--clean*: It cleans all the module images.
+   
 * *--clean-all*: It cleans all the docker system (containers, networks, images, etc).
+
+* *--clean-modules*: It cleans only the specified module images. It requires a parameter with the specific modules.
+    - Example `./manager --clean-modules=rsk-node,rif-notifier`
+    - This is equals to run `./manager --build-modules=rsk-node,lumino-explorer,rif-notifier --clean`
+
+* *--build-modules*: This rebuild the specific module images. It requires a parameter with the specific modules.
+    - Example `./manager --build-modules=rsk-node,rif-notifier`
 
 * *--background*: It runs everything in background. You can see the logs using the flag --logs.
 
@@ -44,4 +51,11 @@ It provides a way to manage the Lumino infrastructure without the need to know h
     
 * *--rsk-information*: Shows the rsk network information, contracts, addresses, private keys, etc.
 
+* *--testnet*: Run testnet configuration on docker using a database from testnet. It requires a parameter to specify the testnet database.
+    - Example: `./manager --start --testnet=/some/path/to/testnet/database/`
+    **Note**: The path should be the folder containing the nodeId.properties.
+
 In all the flags the valid module names are: `rsk-node`, `lumino-explorer`, `rif-notifier`
+
+**Import: All the commands assume regtest as the network to work with, if you want to change it you need to specify
+the flag --testnet or --mainnet**

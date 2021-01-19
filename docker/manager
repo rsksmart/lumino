@@ -11,6 +11,10 @@ VALID_MODULES="${RSK_MODULE_NAME} ${EXPLORER_MODULE_NAME} ${NOTIFIER_MODULE_NAME
 NOTIFIER_REPLICAS=3
 RUN_IN_BACKGROUND=0
 INSTANCE_NUMBER=1
+REGTEST_CHAIN="regtest"
+CHAIN_NAME=${REGTEST_CHAIN}
+COMPOSE_FILE_NAME="docker-compose.${CHAIN_NAME}.yml"
+CHAIN_DATABASE_PATH="${HOME}/.rsk/${CHAIN_NAME}"
 
 # Utils
 function is_number() {
@@ -21,13 +25,32 @@ function is_number() {
     fi
 }
 
-function createNetworkIfMissing() {
+function validateChainDBPath() {
+    if [ "${CHAIN_DATABASE_PATH}" == "" ] ||  ! [ -d "${CHAIN_DATABASE_PATH}" ]; then
+        echo "You need to specify a valid database path."
+        exit 1
+    fi
+}
+
+function createMissingResources() {
     NETWORK_NAME=local
     NETWORK=$(sudo docker network ls --filter name=${NETWORK_NAME} -q)
     if [ "${NETWORK}" == "" ]; then
         echo "Creating network ${NETWORK_NAME}"
         sudo docker network create ${NETWORK_NAME}
     fi
+}
+
+function createRskDatabase() {
+    DATABASE_VOLUMEN="${ROOT_PATH}/rsk-node/database"
+    sudo rm -rf "${DATABASE_VOLUMEN}"
+    if [ "${CHAIN_NAME}" == "${REGTEST_CHAIN}" ]; then
+        unzip "${ROOT_PATH}/rsk-node/assets/regtest/rsk-db.zip" -d "${ROOT_PATH}/rsk-node/database"
+    else
+        validateChainDBPath
+        sudo ln -s "${CHAIN_DATABASE_PATH}" "${ROOT_PATH}/rsk-node/database"
+    fi
+    sudo chmod -R 777 "${ROOT_PATH}/rsk-node/database"
 }
 
 function validateModuleName() {
@@ -77,24 +100,61 @@ function exitOnFailure() {
 
 function checkAndGenerateModuleImage() {
     MODULE_NAME=$1
+    ARGS=$2
     IMAGE_NAME="${MODULE_NAME}-image"
+    if [ "${MODULE_NAME}" == "${RSK_MODULE_NAME}" ]; then
+        IMAGE_NAME="${MODULE_NAME}-${CHAIN_NAME}-image"
+    fi
     IMAGE=$(sudo docker images | grep "${IMAGE_NAME}")
+    DOCKER_BUILD_ARGS=""
+    if [ "${ARGS}" != "" ]; then
+        IFS=',' read -ra ARGS <<< "${ARGS}"
+        for ARG in ${ARGS[*]}; do
+            ARG=$(echo "${ARG}" | xargs)
+            DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS} --build-arg ${ARG}"
+        done
+    fi
     if [ "${IMAGE}" == "" ]; then
         echo "Generating missing image ${IMAGE_NAME} ..."
         cd "${ROOT_PATH}/${MODULE_NAME}" || exit
-        sudo docker build --no-cache -t "${IMAGE_NAME}" .
+        sudo docker build ${DOCKER_BUILD_ARGS} --no-cache -t "${IMAGE_NAME}" .
         cd "${ROOT_PATH}" || exit
     elif [ ${CLEAN_IMAGE_CACHE} == 1 ]; then
         echo "Cleaning image cache for ${IMAGE_NAME} ..."
         cd "${ROOT_PATH}/${MODULE_NAME}" || exit
-        sudo docker build --no-cache -t "${IMAGE_NAME}" .
+        sudo docker build ${DOCKER_BUILD_ARGS} --no-cache -t "${IMAGE_NAME}" .
         cd "${ROOT_PATH}" || exit
     fi
 }
 
+function buildModuleImage() {
+    MODULE_NAME=$1
+    ARGS=$2
+    IMAGE_NAME="${MODULE_NAME}-image"
+    if [ "${MODULE_NAME}" == "${RSK_MODULE_NAME}" ]; then
+        IMAGE_NAME="${MODULE_NAME}-${CHAIN_NAME}-image"
+    fi
+    DOCKER_BUILD_ARGS=""
+    if [ "${ARGS}" != "" ]; then
+        IFS=',' read -ra ARGS <<< "${ARGS}"
+        for ARG in ${ARGS[*]}; do
+            ARG=$(echo "${ARG}" | xargs)
+            DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS} --build-arg ${ARG}"
+        done
+    fi
+    echo "Generating image ${IMAGE_NAME} ..."
+    cd "${ROOT_PATH}/${MODULE_NAME}" || exit
+    if [ ${CLEAN_IMAGE_CACHE} == 1 ]; then
+        sudo docker build ${DOCKER_BUILD_ARGS} --no-cache -t "${IMAGE_NAME}" .
+    else
+        sudo docker build ${DOCKER_BUILD_ARGS} -t "${IMAGE_NAME}" .
+    fi
+    cd "${ROOT_PATH}" || exit
+}
+
 function checkAllImages() {
     echo "Checking all required docker images"
-    checkAndGenerateModuleImage ${RSK_MODULE_NAME}
+    checkAndGenerateModuleImage "${RSK_MODULE_NAME}" "CHAIN_NAME=${CHAIN_NAME}"
     checkAndGenerateModuleImage ${EXPLORER_MODULE_NAME}
     checkAndGenerateModuleImage ${NOTIFIER_MODULE_NAME}
 }
@@ -127,15 +187,17 @@ function showRSKInformation() {
 
 function doStart() {
     echo "Starting all modules"
+    createMissingResources
+    createRskDatabase
     checkAllImages
     cd "${ROOT_PATH}" || exit
     if [ "${RUN_IN_BACKGROUND}" == 0 ]; then
-        sudo docker-compose up --scale "${NOTIFIER_MODULE_NAME}=${NOTIFIER_REPLICAS}"
+        sudo docker-compose -f ${COMPOSE_FILE_NAME}  up --scale "${NOTIFIER_MODULE_NAME}=${NOTIFIER_REPLICAS}"
         if [ ${SHOW_LOGS} == 1 ]; then
-            sudo docker-compose logs
+            sudo docker-compose -f ${COMPOSE_FILE_NAME}  logs
         fi
     else
-        sudo docker-compose up -d --scale "${NOTIFIER_MODULE_NAME}=${NOTIFIER_REPLICAS}"
+        sudo docker-compose -f ${COMPOSE_FILE_NAME}  up -d --scale "${NOTIFIER_MODULE_NAME}=${NOTIFIER_REPLICAS}"
         showAllModuleIps
     fi
     exitOnFailure $?
@@ -144,19 +206,52 @@ function doStart() {
 function startModule() {
     MODULE_NAME=$(echo "$1" | xargs)
     cd "${ROOT_PATH}" || exit
+
+    if [ "${MODULE_NAME}" == "${RSK_MODULE_NAME}" ]; then
+        createRskDatabase
+    fi
+
     if [ "${MODULE_NAME}" == "${NOTIFIER_MODULE_NAME}" ]; then
-        sudo docker-compose up -d --scale "${NOTIFIER_MODULE_NAME}=${NOTIFIER_REPLICAS}" "${MODULE_NAME}"
+        sudo docker-compose -f ${COMPOSE_FILE_NAME} up -d --scale "${NOTIFIER_MODULE_NAME}=${NOTIFIER_REPLICAS}" "${MODULE_NAME}"
     else
-        sudo docker-compose start "${MODULE_NAME}"
+        sudo docker-compose -f ${COMPOSE_FILE_NAME} up -d "${MODULE_NAME}"
     fi
     if [ ${SHOW_LOGS} == 1 ]; then
-        sudo docker-compose logs
+        sudo docker-compose -f ${COMPOSE_FILE_NAME} logs
     fi
     exitOnFailure $?
 }
 
+function doBuildModules() {
+    echo "Building Modules $*"
+    MODULE_NAMES=$(echo "$*" | xargs)
+    IFS=',' read -ra MODULE_NAMES <<< "${MODULE_NAMES}"
+    for MODULE_NAME in ${MODULE_NAMES[*]}; do
+        if [ "${MODULE_NAME}" == "${RSK_MODULE_NAME}" ]; then
+            buildModuleImage "${MODULE_NAME}" "CHAIN_NAME=${CHAIN_NAME}"
+        else
+            buildModuleImage "${MODULE_NAME}"
+        fi
+    done
+}
+
+function doCleanModules() {
+    echo "Cleaning Modules $*"
+    MODULE_NAMES=$(echo "$*" | xargs)
+    IFS=',' read -ra MODULE_NAMES <<< "${MODULE_NAMES}"
+    for MODULE_NAME in ${MODULE_NAMES[*]}; do
+        CLEAN_IMAGE_CACHE=1
+        if [ "${MODULE_NAME}" == "${RSK_MODULE_NAME}" ]; then
+            checkAndGenerateModuleImage "${MODULE_NAME}" "CHAIN_NAME=${CHAIN_NAME}"
+        else
+            checkAndGenerateModuleImage "${MODULE_NAME}"
+        fi
+    done
+}
+
 function doStartModules() {
-    echo "Starting  Modules $*"
+    echo "Starting Modules $*"
+    createMissingResources
     MODULE_NAMES=$(echo "$*" | xargs)
     IFS=',' read -ra MODULE_NAMES <<< "${MODULE_NAMES}"
     for MODULE_NAME in ${MODULE_NAMES[*]}; do
@@ -177,14 +272,14 @@ function doConnect() {
 function doStop() {
     echo "Stopping all modules"
     cd "${ROOT_PATH}" || exit
-    sudo docker-compose down
+    sudo docker-compose -f ${COMPOSE_FILE_NAME}  down
     exitOnFailure $?
 }
 
 function stopModule() {
     MODULE_NAME=$(echo "$1" | xargs)
     cd "${ROOT_PATH}" || exit
-    sudo docker-compose stop "${MODULE_NAME}"
+    sudo docker-compose -f ${COMPOSE_FILE_NAME}  stop "${MODULE_NAME}"
     exitOnFailure $?
 }
 
@@ -212,12 +307,14 @@ function manager() {
         echo "You need to specify at least one parameter, you can use --help to know how to use this command."
         exit 1
     fi
-    PARSED_ARGUMENTS=$(getopt -a -n alphabet -o h --long rsk-information,ip,ip-module:,clean,clean-all,start,background,start-modules:,connect:,stop,stop-modules:,notifiers:,instance-number:,logs,help -- "$@")
+    PARSED_ARGUMENTS=$(getopt -a -n alphabet -o h --long rsk-db-path:,testnet,rsk-information,ip,ip-module:,clean,clean-all,clean-modules:,build-modules:,start,background,start-modules:,connect:,stop,stop-modules:,notifiers:,instance-number:,logs,help -- "$@")
     VALID_ARGUMENTS=$?
     if [ "$VALID_ARGUMENTS" != "0" ]; then
         showUsage
+        exit 1
     fi
     eval set -- "$PARSED_ARGUMENTS"
+    DB_ALREADY_SET=0
     ACTION=""
     while :; do
         case "$1" in
@@ -227,6 +324,13 @@ function manager() {
             ;;
         --clean-all)
             ACTION="doCleanAll"
+            shift
+            ;;
+        --clean-modules)
+            MODULE_NAMES=$(echo "$2" | xargs)
+            validateModuleNames "${MODULE_NAMES}"
+            ACTION="doCleanModules ${MODULE_NAMES[*]}"
+            shift
             shift
             ;;
         --start)
@@ -295,6 +399,36 @@ function manager() {
             ACTION="showRSKInformation"
             shift
             ;;
+        --testnet)
+            CHAIN_NAME="testnet"
+            COMPOSE_FILE_NAME="docker-compose.${CHAIN_NAME}.yml"
+            if [ ${DB_ALREADY_SET} == 0 ]; then
+                CHAIN_DATABASE_PATH="${HOME}/.rsk/${CHAIN_NAME}"
+            fi
+            shift
+            ;;
+        --mainnet)
+            CHAIN_NAME="mainnet"
+            COMPOSE_FILE_NAME="docker-compose.${CHAIN_NAME}.yml"
+            CHAIN_DATABASE_PATH="${HOME}/.rsk/${CHAIN_NAME}"
+            if [ ${DB_ALREADY_SET} == 0 ]; then
+                CHAIN_DATABASE_PATH="${HOME}/.rsk/${CHAIN_NAME}"
+            fi
+            shift
+            ;;
+        --rsk-db-path)
+            CHAIN_DATABASE_PATH=$(echo "$2" | xargs)
+            DB_ALREADY_SET=1
+            shift
+            shift
+            ;;
+        --build-modules)
+            MODULE_NAMES=$(echo "$2" | xargs)
+            validateModuleNames "${MODULE_NAMES}"
+            ACTION="doBuildModules ${MODULE_NAMES[*]}"
+            shift
+            shift
+            ;;
         -h | --help)
             showUsage
             exit 0
@@ -316,7 +450,6 @@ function manager() {
     done
 
     if [ "${ACTION}" != "" ]; then
-        createNetworkIfMissing
         eval "${ACTION}"
         exitOnFailure
     fi
@@ -325,3 +458,5 @@ function manager() {
 manager "$0" "$@"
 
 exit 0
+
+# TODO: Generar base de datos de regtest con papyrus en vez de wasabi y actualizar todos los datos en el information file

@@ -20,14 +20,6 @@ if [ "${TOKEN_NETWORK_REGISTRY}" == "" ]; then
     TOKEN_NETWORK_REGISTRY=0xed8c9163F888Bc2f9C4F299325003DA5fC8676DD
 fi
 
-if [ "${MONGO_DB_USERNAME}" == "" ]; then
-    MONGO_DB_USERNAME=root
-fi
-
-if [ "${MONGO_DB_PASSWORD}" == "" ]; then
-    MONGO_DB_PASSWORD=infuy
-fi
-
 if [ "${MONGO_DB_HOST}" == "" ]; then
     MONGO_DB_HOST="mongo-db"
 fi
@@ -36,10 +28,7 @@ echo "Starting Explorer:" >> ${INIT_LOG}
 echo "RSK_ENDPOINT=${RSK_ENDPOINT}" >> ${INIT_LOG}
 echo "EXPLORER_PORT=${EXPLORER_PORT}" >> ${INIT_LOG}
 echo "TOKEN_NETWORK_REGISTRY=${TOKEN_NETWORK_REGISTRY}" >> ${INIT_LOG}
-echo "MONGO_DB_USERNAME=${MONGO_DB_USERNAME}" >> ${INIT_LOG}
-echo "MONGO_DB_PASSWORD=${MONGO_DB_PASSWORD}" >> ${INIT_LOG}
 echo "MONGO_DB_HOST=${MONGO_DB_HOST}" >> ${INIT_LOG}
-
 
 # Init log folder
 if [ ! -d "${EXPLORER_LOGS_FOLDER}" ]; then
@@ -50,7 +39,7 @@ fi
 echo "Initializing explorer database" >> ${INIT_LOG}
 
 # Init database
-mongosh --host "${MONGO_DB_HOST}" -u "${MONGO_DB_USERNAME}" -p "${MONGO_DB_PASSWORD}" < "${EXPLORER_DATABASE_SETUP_FILE}" >> ${INIT_LOG}
+mongosh --host "${MONGO_DB_HOST}" < "${EXPLORER_DATABASE_SETUP_FILE}" >> ${INIT_LOG}
 
 echo "Running explorer" >> ${INIT_LOG}
 echo "mvn -f '${EXPLORER_POM_FILE}' spring-boot:run -Dspring-boot.run.jvmArguments='-Dserver.port=${EXPLORER_PORT} -Drsk.blockchain.endpoint=${RSK_ENDPOINT} -Dlumino.explorer.api.mongo.databasehost=${MONGO_DB_HOST} -Dlumino.contract.tokenNetworkRegistry=${TOKEN_NETWORK_REGISTRY}' > '${EXPLORER_LOGS_FOLDER}/server.log' 2>&1 &" >> ${INIT_LOG}

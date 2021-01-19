@@ -20,9 +20,11 @@ services:
       - "3306"
       - "33060"
     rsk-node:
-        image: "rsk-node-image:latest"
+        image: "rsk-node-regtest-image:latest"
         restart: "no"
         networks: ["local"]
+        volumes:
+          - "./rsk-node/database:/var/lib/rsk/database/regtest"
         ports:
             - "4444"
             - "30305"
@@ -33,8 +35,6 @@ services:
 #        EXPLORER_PORT: 8080
 #        RSK_ENDPOINT: "http://rsk-node:4444"
 #        MONGO_DB_HOST: "mongo-db"
-#        MONGO_DB_USERNAME: root
-#        MONGO_DB_PASSWORD: infuy
 #        TOKEN_NETWORK_REGISTRY: 0xed8c9163F888Bc2f9C4F299325003DA5fC8676DD
         image: "lumino-explorer-image:latest"
         restart: "no"
