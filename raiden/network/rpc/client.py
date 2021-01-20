@@ -28,7 +28,6 @@ from web3.utils.empty import empty
 from web3.utils.toolz import assoc
 
 from raiden import constants
-from raiden.constants import GENESIS_BLOCK_NUMBER
 from raiden.exceptions import (
     AddressWithoutCode,
     EthNodeCommunicationError,
@@ -43,7 +42,7 @@ from raiden.network.rpc.middleware import (
 from raiden.network.rpc.smartcontract_proxy import ContractProxy
 from raiden.utils import pex, privatekey_to_address
 from raiden.utils.ethereum_clients import is_supported_client
-from raiden.utils.filters import StatelessFilter, get_block_number_from_million_or_genesis
+from raiden.utils.filters import StatelessFilter
 from raiden.utils.solc import (
     solidity_library_symbol,
     solidity_resolve_symbols,
@@ -856,12 +855,11 @@ class JSONRPCClient:
         self,
         contract_address: Address,
         topics: List[str] = None,
-        from_block: BlockSpecification = GENESIS_BLOCK_NUMBER,
+        from_block: BlockSpecification = 0,
         to_block: BlockSpecification = "latest",
     ) -> List[Dict]:
         """ Get events for the given query. """
         logs_blocks_sanity_check(from_block, to_block)
-        from_block = get_block_number_from_million_or_genesis(self.web3)
         return self.web3.eth.getLogs(
             {
                 "fromBlock": from_block,

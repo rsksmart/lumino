@@ -6,7 +6,7 @@ from web3.utils.abi import filter_by_type
 from web3.utils.events import get_event_data
 from web3.utils.filters import LogFilter, construct_event_filter_params
 
-from raiden.constants import GENESIS_BLOCK_NUMBER, MILLION_BLOCK_NUMBER
+from raiden.constants import GENESIS_BLOCK_NUMBER
 from raiden.utils import block_specification_to_number
 from raiden.utils.typing import (
     Any,
@@ -130,8 +130,7 @@ class StatelessFilter(LogFilter):
         with self._lock:
             result: List[Dict[str, Any]] = []
             filter_from_number = block_specification_to_number(
-                block=self.filter_params.get("fromBlock", get_block_number_from_million_or_genesis(self.web3)),
-                web3=self.web3
+                block=self.filter_params.get("fromBlock", GENESIS_BLOCK_NUMBER), web3=self.web3
             )
             from_block_number = max(filter_from_number, self._last_block + 1)
 
@@ -149,7 +148,6 @@ class StatelessFilter(LogFilter):
     def get_all_entries(self, block_number: BlockNumber = None):
         with self._lock:
             filter_params = self.filter_params.copy()
-            filter_params["fromBlock"] = get_block_number_from_million_or_genesis(self.web3)
             block_number = block_number or self.web3.eth.blockNumber
 
             if self.filter_params.get("toBlock") in ("latest", "pending"):
@@ -157,17 +155,9 @@ class StatelessFilter(LogFilter):
 
             result = self.web3.eth.getLogs(filter_params)
             to_block = filter_params.get("toBlock")
-
             if to_block:
                 self._last_block = block_specification_to_number(block=to_block, web3=self.web3)
             else:
                 self._last_block = block_number
+
             return result
-
-
-def get_block_number_from_million_or_genesis(web3):
-    current_block = web3.eth.blockNumber
-    if current_block < MILLION_BLOCK_NUMBER:
-        return GENESIS_BLOCK_NUMBER
-    else:
-        return MILLION_BLOCK_NUMBER
