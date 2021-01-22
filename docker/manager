@@ -209,6 +209,9 @@ function startModule() {
 
     if [ "${MODULE_NAME}" == "${RSK_MODULE_NAME}" ]; then
         createRskDatabase
+        checkAndGenerateModuleImage "${MODULE_NAME}" "CHAIN_NAME=${CHAIN_NAME}"
+    else
+        checkAndGenerateModuleImage "${MODULE_NAME}"
     fi
 
     if [ "${MODULE_NAME}" == "${NOTIFIER_MODULE_NAME}" ]; then
@@ -307,7 +310,7 @@ function manager() {
         echo "You need to specify at least one parameter, you can use --help to know how to use this command."
         exit 1
     fi
-    PARSED_ARGUMENTS=$(getopt -a -n alphabet -o h --long rsk-db-path:,testnet,rsk-information,ip,ip-module:,clean,clean-all,clean-modules:,build-modules:,start,background,start-modules:,connect:,stop,stop-modules:,notifiers:,instance-number:,logs,help -- "$@")
+    PARSED_ARGUMENTS=$(getopt -a -n alphabet -o h --long rsk-db-path:,testnet,mainnet,rsk-information,ip,ip-module:,clean,clean-all,clean-modules:,build-modules:,start,background,start-modules:,connect:,stop,stop-modules:,notifiers:,instance-number:,logs,help -- "$@")
     VALID_ARGUMENTS=$?
     if [ "$VALID_ARGUMENTS" != "0" ]; then
         showUsage
