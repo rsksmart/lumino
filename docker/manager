@@ -461,5 +461,3 @@ function manager() {
 manager "$0" "$@"
 
 exit 0
-
-# TODO: Generar base de datos de regtest con papyrus en vez de wasabi y actualizar todos los datos en el information file
