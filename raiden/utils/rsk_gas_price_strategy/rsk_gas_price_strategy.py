@@ -172,6 +172,11 @@ def construct_time_based_gas_price_strategy(max_wait_seconds,
         else:
             latest_block_gas_price = int(latest_block_gas_price)
         gas_price = _compute_gas_price(probabilities, probability / 100)
+        # we multiply latest_block_gas_price * 1.10 because in RSK the computed gas price was lower than
+        # latest_block_gas_price and the latest_block_gas_price value was always the min gas price for the network.
+        # That was the root cause for the transactions to fail, so we add that extra 10% to avoid those gas price
+        # errors on mainnet.
+        # TODO: related with this issue https://jirainfuy.atlassian.net/browse/RLP-992
         max_gas = max(gas_price, latest_block_gas_price * 1.10)
         return max_gas
     return time_based_gas_price_strategy
