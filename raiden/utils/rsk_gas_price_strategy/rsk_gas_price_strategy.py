@@ -172,7 +172,7 @@ def construct_time_based_gas_price_strategy(max_wait_seconds,
         else:
             latest_block_gas_price = int(latest_block_gas_price)
         gas_price = _compute_gas_price(probabilities, probability / 100)
-        max_gas = max(gas_price, latest_block_gas_price)
+        max_gas = max(gas_price, latest_block_gas_price * 1.10)
         return max_gas
     return time_based_gas_price_strategy
 
