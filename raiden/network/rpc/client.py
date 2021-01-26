@@ -815,7 +815,7 @@ class JSONRPCClient:
 
             # if the transaction was added to the pool and then removed
             if transaction is None and last_result is not None:
-                raise Exception("invalid transaction, check gas price")
+                log.error("invalid transaction, check gas price")
 
             # the transaction was added to the pool and mined
             if transaction and transaction["blockNumber"] is not None:
@@ -830,7 +830,7 @@ class JSONRPCClient:
                 if block_number >= confirmation_block:
                     return transaction
 
-            gevent.sleep(1.0)
+            gevent.sleep(10)
 
     def new_filter(
         self,
