@@ -139,6 +139,44 @@ Run the Lumino setup with the following command:
 python setup.py develop
 ```
 
+## Start RIF Communications transport layer
+
+The comunication between Lumino nodes can be done both using RIF Communications (https://www.rifos.org/communications) and Matrix (https://matrix.org/).
+
+The default way, and the one we encourage to use for a more decentralized ecosystem, is RIF Communications. 
+
+In order to run Lumino using RIF Comms, you need to set up the RIF Communications bootnode. To use Matrix, no configuration is required. 
+
+### Set up a RIF Communications bootnode
+
+#### Requirements:
+
+- Node 14+ (14.13 recommended)
+
+#### Get the code
+
+- git clone https://github.com/rsksmart/rif-communications-pubsub-bootnode/tree/grpc-api 
+- run npm install 
+
+
+#### Create a key for the RIF Communications bootnode
+
+- Create the `config/keys/lumino` folder
+- execute `openssl ecparam -genkey -name secp256k1 -out ec_key.pem -param_enc explicit` and then `openssl pkcs8 -in ec_key.pem -topk8 -v2 aes-256-cbc -v2prf hmacWithSHA256 -outform DER -out ec_key_pkcs8_v2.der` and define a password
+
+#### Create a config file
+
+- go back to `config` folder
+- edit the `lumino.json5` file. modify the `key.password` value to your key's password
+- change the `key.privateKeyURLPath` to the config key path `[...]/config/keys/lumino/ec_key_pkcs8_v2.der`
+
+#### Start the node
+
+- At root folder, run `NODE_ENV=lumino npm run api-server`
+- You should see that the GRPC Api started on port `5013` 
+
+
+
 ## Start your RIF Lumino Node
 
 1. Go to `$RIF_LUMINO_PATH`.
@@ -159,6 +197,7 @@ python setup.py develop
         --rnsdomain $YOUR_RNS_DOMAIN
         --discoverable # if this flag is present, then your node will be registered on Lumino Explorer
         --hub-mode # if this flag is present, then your node will run in HUB mode
+        --transport # transport mode
     ```
     
     | FIELD                                     | DESCRIPTION                                                                                                                             |
@@ -172,6 +211,7 @@ python setup.py develop
     | `$ENDPOINT_REGISTRY_CONTRACT_ADDRESS`     | Address for the endpoint registry contract deployed (view contracts table).                                                             |
     | `no-sync-check`                           | This will allow you to bypass checking that the node is synchronized against etherscan.                                                 |
     | `$YOUR_RNS_DOMAIN`                        | You can supply the RNS address associated with your RSK node address, e.g. `--rnsdomain=lumino.rsk.co`                                 |
+    | `transport`                               | Transport mode for Lumino, rif-comms and matrix are supported. Defaults to rif-comms, e.g. `--transport=matrix`                                 |
 
     More configuration options can be found by browsing the code.
 

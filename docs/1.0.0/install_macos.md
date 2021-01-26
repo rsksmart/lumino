@@ -112,37 +112,77 @@ pip install -c constraints.txt --upgrade -r requirements-dev.txt
 python setup.py develop
 ```
 
+## Start RIF Communications transport layer
+
+The comunication between Lumino nodes can be done both using RIF Communications (https://www.rifos.org/communications) and Matrix (https://matrix.org/).
+
+The default way, and the one we encourage to use for a more decentralized ecosystem, is RIF Communications. 
+
+In order to run Lumino using RIF Comms, you need to set up the RIF Communications bootnode. To use Matrix, no configuration is required. 
+
+### Set up a RIF Communications bootnode
+
+#### Requirements:
+
+- Node 14+ (14.13 recommended)
+
+#### Get the code
+
+- git clone https://github.com/rsksmart/rif-communications-pubsub-bootnode/tree/grpc-api 
+- run npm install 
+
+
+#### Create a key for the RIF Communications bootnode
+
+- Create the `config/keys/lumino` folder
+- execute `openssl ecparam -genkey -name secp256k1 -out ec_key.pem -param_enc explicit` and then `openssl pkcs8 -in ec_key.pem -topk8 -v2 aes-256-cbc -v2prf hmacWithSHA256 -outform DER -out ec_key_pkcs8_v2.der` and define a password
+
+#### Create a config file
+
+- go back to `config` folder
+- edit the `lumino.json5` file. modify the `key.password` value to your key's password
+- change the `key.privateKeyURLPath` to the config key path `[...]/config/keys/lumino/ec_key_pkcs8_v2.der`
+
+#### Start the node
+
+- At root folder, run `NODE_ENV=lumino npm run api-server`
+- You should see that the GRPC Api started on port `5013` 
+
 ## Start your RIF Lumino Node
 
-1. Go to `$RIF_LUMINO_PATH`
-2. If you haven't execute it before, run: source ``clientEnv/bin/activate``
-3. Run the following command:
-
-```
-
-lumino
-    --keystore-path $KEYSTORE_PATH
-    --network-id 31
-    --eth-rpc-endpoint $RSK_NODE_URL
-    --environment-type development
-    --tokennetwork-registry-contract-address=$TOKENNETWORK_REGISTRY_CONTRACT_ADDRESS
-    --secret-registry-contract-address=$SECRET_REGISTRY_CONTRACT_ADDRESS
-    --endpoint-registry-contract-address=$ENDPOINT_REGISTRY_CONTRACT_ADDRESS
-    --no-sync-check
-    --api-address=127.0.0.1:5001
-    --rnsdomain $YOUR_RNS_DOMAIN
-    --discoverable  #If this flag is present, then your node will be registered on Lumino Explorer
-    --hub-mode #If this flag is present, then your node will run in HUB mode.
-```
-
-| FIELD                                   | DESCRIPTION                                                                |
-|-----------------------------------------|----------------------------------------------------------------------------|
-| `$KEYSTORE_PATH`                          | The path to your keystore                                                  |
-| `$RSK_NODE_URL`                           | URL of your RSK node (http://URL:PORT)                                     |
-| `$TOKENNETWORK_REGISTRY_CONTRACT_ADDRESS` | Address for the token registry contract deployed (view contracts table)    |
-| `$SECRET_REGISTRY_CONTRACT_ADDRESS`       | Address for the secret registry contract deployed (view contracts table)   |
-| `$ENDPOINT_REGISTRY_CONTRACT_ADDRESS`     | Address for the endpoint registry contract deployed (view contracts table) |
-| `$YOUR_RNS_DOMAIN`     | RNS address associated with your rsk node address. i.e: --rnsdomain=lumino.rsk.co |
+1. Go to `$RIF_LUMINO_PATH`.
+2. If you haven't executed it before, run `source clientEnv/bin/activate` to activate the virtual environment.
+3. Run the following command to start Lumino:
+    
+    ```shell script
+    lumino
+        --keystore-path $KEYSTORE_PATH
+        --network-id 33
+        --eth-rpc-endpoint $RSK_NODE_URL
+        --environment-type development
+        --tokennetwork-registry-contract-address $TOKENNETWORK_REGISTRY_CONTRACT_ADDRESS
+        --secret-registry-contract-address $SECRET_REGISTRY_CONTRACT_ADDRESS
+        --endpoint-registry-contract-address $ENDPOINT_REGISTRY_CONTRACT_ADDRESS
+        --no-sync-check
+        --api-address 127.0.0.1:5001
+        --rnsdomain $YOUR_RNS_DOMAIN
+        --discoverable # if this flag is present, then your node will be registered on Lumino Explorer
+        --hub-mode # if this flag is present, then your node will run in HUB mode
+        --transport # transport mode
+    ```
+    
+    | FIELD                                     | DESCRIPTION                                                                                                                             |
+    |-------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------|
+    | `$KEYSTORE_PATH`                          | The path to your keystore folder.                                                                                                       |
+    | `network-id`                              | The blockchain network ID you're connecting to. This must match the RSK node you're connecting to. `33` is regtest.                     |
+    | `$RSK_NODE_URL`                           | URL of the RSK node to connect to (`http://URL:PORT`). If you're running a local node, this will typically be `http://localhost:4444/`. |
+    | `environment-type`                        | You will need this set to `development` in order to use custom blockchain and contract addresses.                                       |
+    | `$TOKENNETWORK_REGISTRY_CONTRACT_ADDRESS` | Address for the token registry contract deployed (view contracts table).                                                                |
+    | `$SECRET_REGISTRY_CONTRACT_ADDRESS`       | Address for the secret registry contract deployed (view contracts table).                                                               |
+    | `$ENDPOINT_REGISTRY_CONTRACT_ADDRESS`     | Address for the endpoint registry contract deployed (view contracts table).                                                             |
+    | `no-sync-check`                           | This will allow you to bypass checking that the node is synchronized against etherscan.                                                 |
+    | `$YOUR_RNS_DOMAIN`                        | You can supply the RNS address associated with your RSK node address, e.g. `--rnsdomain=lumino.rsk.co`                                 |
+    | `transport`                               | Transport mode for Lumino, rif-comms and matrix are supported. Defaults to rif-comms, e.g. `--transport=matrix`                                 |
 
 
 
