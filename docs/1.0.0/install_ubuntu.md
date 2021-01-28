@@ -141,11 +141,11 @@ python setup.py develop
 
 ## Start RIF Communications transport layer
 
-The comunication between Lumino nodes can be done both using RIF Communications (https://www.rifos.org/communications) and Matrix (https://matrix.org/).
+The communication between Lumino nodes can be done both using RIF Communications (https://www.rifos.org/communications) and Matrix (https://matrix.org/).
 
-The default way, and the one we encourage to use for a more decentralized ecosystem, is RIF Communications. 
+The default way, and the one encouraged to be used for a more decentralized ecosystem, is RIF Communications. 
 
-In order to run Lumino using RIF Comms, you need to set up the RIF Communications bootnode. To use Matrix, no configuration is required. 
+In order to run Lumino using RIF Comms, you need to set up the RIF Communications node. To use Matrix, no configuration is required. 
 
 ### Set up a RIF Communications bootnode
 
