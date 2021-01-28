@@ -111,15 +111,6 @@ pip install -c constraints.txt --upgrade -r requirements-dev.txt
 ```
 python setup.py develop
 ```
-
-## Start RIF Communications transport layer
-
-The communication between Lumino nodes can be done both using RIF Communications (https://www.rifos.org/communications) and Matrix (https://matrix.org/).
-
-The default way, and the one we encourage to use for a more decentralized ecosystem, is RIF Communications. 
-
-In order to run Lumino using RIF Comms, you need to set up the RIF Communications bootnode. To use Matrix, no configuration is required. 
-
 ### Set up a RIF Communications bootnode
 
 #### Requirements:
@@ -128,8 +119,9 @@ In order to run Lumino using RIF Comms, you need to set up the RIF Communication
 
 #### Get the code
 
-- git clone https://github.com/rsksmart/rif-communications-pubsub-bootnode/tree/grpc-api 
-- run npm install 
+Download the code by executing `git clone https://github.com/rsksmart/rif-communications-pubsub-bootnode -b grpc-api`.
+
+After this, run `npm install` inside the cloned folder.
 
 
 #### Create a key for the RIF Communications bootnode
@@ -146,7 +138,22 @@ In order to run Lumino using RIF Comms, you need to set up the RIF Communication
 #### Start the node
 
 - At root folder, run `NODE_ENV=lumino npm run api-server`
-- You should see that the GRPC Api started on port `5013` 
+- You should see a log output similar to this one:
+
+```
+[INFO] 11:34:08 ts-node-dev ver. 1.1.1 (using ts-node ver. 9.1.1, typescript ver. 4.1.3)
+Loading encrypted DER key
+Node started, listening on addresses:
+/ip4/127.0.0.1/tcp/5011/p2p/16Uiu2HAmQswXYkmzDTgs2Em5JkhP8Y33CEhXQUHY3trctB1StTe7
+/ip4/127.0.0.1/tcp/5012/ws/p2p/16Uiu2HAmQswXYkmzDTgs2Em5JkhP8Y33CEhXQUHY3trctB1StTe7
+
+Listening on topics: 
+
+
+PEERID: 16Uiu2HAmQswXYkmzDTgs2Em5JkhP8Y33CEhXQUHY3trctB1StTe7
+GRPC Server started on port 5013
+```
+
 
 ## Start your RIF Lumino Node
 
@@ -169,6 +176,8 @@ In order to run Lumino using RIF Comms, you need to set up the RIF Communication
         --discoverable # if this flag is present, then your node will be registered on Lumino Explorer
         --hub-mode # if this flag is present, then your node will run in HUB mode
         --transport # transport mode
+        --grpc-endpoint # grpc endpoint of RIF Communications node  
+
     ```
     
     | FIELD                                     | DESCRIPTION                                                                                                                             |
@@ -183,6 +192,7 @@ In order to run Lumino using RIF Comms, you need to set up the RIF Communication
     | `no-sync-check`                           | This will allow you to bypass checking that the node is synchronized against etherscan.                                                 |
     | `$YOUR_RNS_DOMAIN`                        | You can supply the RNS address associated with your RSK node address, e.g. `--rnsdomain=lumino.rsk.co`                                 |
     | `transport`                               | Transport mode for Lumino, rif-comms and matrix are supported. Defaults to rif-comms, e.g. `--transport=matrix`                                 |
+    | `grpc-endpoint` | The communication endpoint for the RIF Comms node used for transport purposes. Note that the `transport` flag must be set to `rif-comms` (explicitly or by default) for this parameter to be used. Defaults to `"localhost:5013"`. |
 
 
 
