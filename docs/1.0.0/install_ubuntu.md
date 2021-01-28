@@ -155,8 +155,9 @@ In order to run Lumino using RIF Comms, you need to set up the RIF Communication
 
 #### Get the code
 
-- git clone https://github.com/rsksmart/rif-communications-pubsub-bootnode/tree/grpc-api 
-- run npm install 
+Download the code by executing `git clone https://github.com/rsksmart/rif-communications-pubsub-bootnode -b grpc-api`.
+
+After this, run `npm install` inside the cloned folder.
 
 
 #### Create a key for the RIF Communications bootnode
@@ -209,7 +210,7 @@ GRPC Server started on port 5013
         --rnsdomain $YOUR_RNS_DOMAIN
         --discoverable # if this flag is present, then your node will be registered on Lumino Explorer
         --hub-mode # if this flag is present, then your node will run in HUB mode
-        --transport # transport mode
+        --transport
         --grpc-endpoint # grpc endpoint of RIF Communications node  
    
     ```
@@ -225,7 +226,7 @@ GRPC Server started on port 5013
     | `$ENDPOINT_REGISTRY_CONTRACT_ADDRESS`     | Address for the endpoint registry contract deployed (view contracts table).                                                             |
     | `no-sync-check`                           | This will allow you to bypass checking that the node is synchronized against etherscan.                                                 |
     | `$YOUR_RNS_DOMAIN`                        | You can supply the RNS address associated with your RSK node address, e.g. `--rnsdomain=lumino.rsk.co`                                 |
-    | `transport`                               | Transport mode for Lumino, rif-comms and matrix are supported. Defaults to rif-comms, e.g. `--transport=matrix`                                 |
+    | `transport`                               | Transport mode for Lumino. Supported values are `rif-comms` and `matrix`. Example of use: `--transport=matrix`. Defaults to `rif-comms`. |
     | `grpc-endpoint` | The communication endpoint for the RIF Comms node used for transport purposes. Note that the `transport` flag must be set to `rif-comms` (explicitly or by default) for this parameter to be used. Defaults to `"localhost:5013"`. |
 
     More configuration options can be found by browsing the code.
