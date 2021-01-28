@@ -111,6 +111,15 @@ pip install -c constraints.txt --upgrade -r requirements-dev.txt
 ```
 python setup.py develop
 ```
+
+## Start RIF Communications transport layer
+	
+	The communication between Lumino nodes can be done both using RIF Communications (https://www.rifos.org/communications) and Matrix (https://matrix.org/).
+	
+	The default way, and the one encouraged to be used for a more decentralized ecosystem, is RIF Communications. 
+	
+	In order to run Lumino using RIF Comms, you need to set up the RIF Communications node. To use Matrix, no configuration is required. 
+	
 ### Set up a RIF Communications bootnode
 
 #### Requirements:
@@ -183,7 +192,7 @@ GRPC Server started on port 5013
         --rnsdomain $YOUR_RNS_DOMAIN
         --discoverable # if this flag is present, then your node will be registered on Lumino Explorer
         --hub-mode # if this flag is present, then your node will run in HUB mode
-        --transport # transport mode
+        --transport 
         --grpc-endpoint # grpc endpoint of RIF Communications node  
 
     ```
