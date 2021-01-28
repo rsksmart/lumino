@@ -162,8 +162,18 @@ After this, run `npm install` inside the cloned folder.
 
 #### Create a key for the RIF Communications bootnode
 
-- Create the `config/keys/lumino` folder
-- execute `openssl ecparam -genkey -name secp256k1 -out ec_key.pem -param_enc explicit` and then `openssl pkcs8 -in ec_key.pem -topk8 -v2 aes-256-cbc -v2prf hmacWithSHA256 -outform DER -out ec_key_pkcs8_v2.der` 
+1. Create the `config/keys/lumino` folder.
+2. Execute the following commands inside this folder: 
+
+```
+openssl ecparam -genkey -name secp256k1 -out ec_key.pem -param_enc explicit
+``` 
+and then 
+
+```
+openssl pkcs8 -in ec_key.pem -topk8 -v2 aes-256-cbc -v2prf hmacWithSHA256 -outform DER -out ec_key_pkcs8_v2.der
+``` 
+The latter one will require you to define a password.
 
 #### Create a config file
 
