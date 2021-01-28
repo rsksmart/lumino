@@ -162,20 +162,32 @@ In order to run Lumino using RIF Comms, you need to set up the RIF Communication
 #### Create a key for the RIF Communications bootnode
 
 - Create the `config/keys/lumino` folder
-- execute `openssl ecparam -genkey -name secp256k1 -out ec_key.pem -param_enc explicit` and then `openssl pkcs8 -in ec_key.pem -topk8 -v2 aes-256-cbc -v2prf hmacWithSHA256 -outform DER -out ec_key_pkcs8_v2.der` and define a password
+- execute `openssl ecparam -genkey -name secp256k1 -out ec_key.pem -param_enc explicit` and then `openssl pkcs8 -in ec_key.pem -topk8 -v2 aes-256-cbc -v2prf hmacWithSHA256 -outform DER -out ec_key_pkcs8_v2.der` 
 
 #### Create a config file
 
 - go back to `config` folder
-- edit the `lumino.json5` file. modify the `key.password` value to your key's password
+- edit the `lumino.json5` file. Modify the `key.password` value to your key's password
 - change the `key.privateKeyURLPath` to the config key path `[...]/config/keys/lumino/ec_key_pkcs8_v2.der`
 
 #### Start the node
 
 - At root folder, run `NODE_ENV=lumino npm run api-server`
-- You should see that the GRPC Api started on port `5013` 
+- You should see a log output similar to this one:
+
+```
+[INFO] 11:34:08 ts-node-dev ver. 1.1.1 (using ts-node ver. 9.1.1, typescript ver. 4.1.3)
+Loading encrypted DER key
+Node started, listening on addresses:
+/ip4/127.0.0.1/tcp/5011/p2p/16Uiu2HAmQswXYkmzDTgs2Em5JkhP8Y33CEhXQUHY3trctB1StTe7
+/ip4/127.0.0.1/tcp/5012/ws/p2p/16Uiu2HAmQswXYkmzDTgs2Em5JkhP8Y33CEhXQUHY3trctB1StTe7
+
+Listening on topics: 
 
 
+PEERID: 16Uiu2HAmQswXYkmzDTgs2Em5JkhP8Y33CEhXQUHY3trctB1StTe7
+GRPC Server started on port 5013
+```
 
 ## Start your RIF Lumino Node
 
@@ -198,6 +210,8 @@ In order to run Lumino using RIF Comms, you need to set up the RIF Communication
         --discoverable # if this flag is present, then your node will be registered on Lumino Explorer
         --hub-mode # if this flag is present, then your node will run in HUB mode
         --transport # transport mode
+        --grpc-endpoint # grpc endpoint of RIF Communications node  
+   
     ```
     
     | FIELD                                     | DESCRIPTION                                                                                                                             |
@@ -212,6 +226,7 @@ In order to run Lumino using RIF Comms, you need to set up the RIF Communication
     | `no-sync-check`                           | This will allow you to bypass checking that the node is synchronized against etherscan.                                                 |
     | `$YOUR_RNS_DOMAIN`                        | You can supply the RNS address associated with your RSK node address, e.g. `--rnsdomain=lumino.rsk.co`                                 |
     | `transport`                               | Transport mode for Lumino, rif-comms and matrix are supported. Defaults to rif-comms, e.g. `--transport=matrix`                                 |
+    | `grpc-endpoint` | The communication endpoint for the RIF Comms node used for transport purposes. Note that the `transport` flag must be set to `rif-comms` (explicitly or by default) for this parameter to be used. Defaults to `"localhost:5013"`. |
 
     More configuration options can be found by browsing the code.
 

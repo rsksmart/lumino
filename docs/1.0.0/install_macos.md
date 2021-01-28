@@ -114,7 +114,7 @@ python setup.py develop
 
 ## Start RIF Communications transport layer
 
-The comunication between Lumino nodes can be done both using RIF Communications (https://www.rifos.org/communications) and Matrix (https://matrix.org/).
+The communication between Lumino nodes can be done both using RIF Communications (https://www.rifos.org/communications) and Matrix (https://matrix.org/).
 
 The default way, and the one we encourage to use for a more decentralized ecosystem, is RIF Communications. 
 
@@ -135,12 +135,12 @@ In order to run Lumino using RIF Comms, you need to set up the RIF Communication
 #### Create a key for the RIF Communications bootnode
 
 - Create the `config/keys/lumino` folder
-- execute `openssl ecparam -genkey -name secp256k1 -out ec_key.pem -param_enc explicit` and then `openssl pkcs8 -in ec_key.pem -topk8 -v2 aes-256-cbc -v2prf hmacWithSHA256 -outform DER -out ec_key_pkcs8_v2.der` and define a password
+- execute `openssl ecparam -genkey -name secp256k1 -out ec_key.pem -param_enc explicit` and then `openssl pkcs8 -in ec_key.pem -topk8 -v2 aes-256-cbc -v2prf hmacWithSHA256 -outform DER -out ec_key_pkcs8_v2.der` 
 
 #### Create a config file
 
 - go back to `config` folder
-- edit the `lumino.json5` file. modify the `key.password` value to your key's password
+- edit the `lumino.json5` file. Modify the `key.password` value to your key's password
 - change the `key.privateKeyURLPath` to the config key path `[...]/config/keys/lumino/ec_key_pkcs8_v2.der`
 
 #### Start the node
