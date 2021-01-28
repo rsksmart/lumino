@@ -11,7 +11,7 @@
 
 ## Lumino Contracts
 
-The following are the addresses of the set of contracts for Lumino Network 
+The following are the addresses of the set of contracts for Lumino Network:
 
 
 
