@@ -275,13 +275,13 @@ function doStop() {
 function stopModule() {
     MODULE_NAME=$(echo "$1" | xargs)
     cd "${ROOT_PATH}" || exit
+    sudo docker-compose -f ${COMPOSE_FILE_NAME} stop "${MODULE_NAME}"
     if [ "${MODULE_NAME}" == "${NOTIFIER_MODULE_NAME}" ]; then
-        sudo docker-compose -f ${COMPOSE_FILE_NAME} stop "${ROOT_FOLDER_NAME}_mysql-db_1"
+        sudo docker-compose -f ${COMPOSE_FILE_NAME} stop "mysql-db"
     fi
     if [ "${MODULE_NAME}" == "${EXPLORER_MODULE_NAME}" ]; then
-        sudo docker-compose -f ${COMPOSE_FILE_NAME} stop "${ROOT_FOLDER_NAME}_mongo-db_1"
+        sudo docker-compose -f ${COMPOSE_FILE_NAME} stop "mongo-db"
     fi
-    sudo docker-compose -f ${COMPOSE_FILE_NAME}  stop "${MODULE_NAME}"
     exitOnFailure $?
 }
 
