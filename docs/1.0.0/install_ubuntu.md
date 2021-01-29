@@ -172,24 +172,24 @@ Please follow the instructions in the (RIF Communications installation page)[htt
         --rnsdomain $YOUR_RNS_DOMAIN
         --discoverable # if this flag is present, then your node will be registered on Lumino Explorer
         --hub-mode # if this flag is present, then your node will run in HUB mode
-        --transport
-        --grpc-endpoint # grpc endpoint of RIF Communications node  
+        --transport $TRANSPORT_MODE
+        --grpc-endpoint $GRPC_ENDPOINT
    
     ```
     
-    | FIELD                                     | DESCRIPTION                                                                                                                             |
-    |-------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------|
-    | `$KEYSTORE_PATH`                          | The path to your keystore folder.                                                                                                       |
-    | `network-id`                              | The blockchain network ID you're connecting to. This must match the RSK node you're connecting to. `33` is regtest.                     |
-    | `$RSK_NODE_URL`                           | URL of the RSK node to connect to (`http://URL:PORT`). If you're running a local node, this will typically be `http://localhost:4444/`. |
-    | `environment-type`                        | You will need this set to `development` in order to use custom blockchain and contract addresses.                                       |
-    | `$TOKENNETWORK_REGISTRY_CONTRACT_ADDRESS` | Address for the token registry contract deployed (view contracts table).                                                                |
-    | `$SECRET_REGISTRY_CONTRACT_ADDRESS`       | Address for the secret registry contract deployed (view contracts table).                                                               |
-    | `$ENDPOINT_REGISTRY_CONTRACT_ADDRESS`     | Address for the endpoint registry contract deployed (view contracts table).                                                             |
-    | `no-sync-check`                           | This will allow you to bypass checking that the node is synchronized against etherscan.                                                 |
-    | `$YOUR_RNS_DOMAIN`                        | You can supply the RNS address associated with your RSK node address, e.g. `--rnsdomain=lumino.rsk.co`                                 |
-    | `transport`                               | Transport mode for Lumino. Supported values are `rif-comms` and `matrix`. Example of use: `--transport=matrix`. Defaults to `rif-comms`. |
-    | `grpc-endpoint` | The communication endpoint for the RIF Comms node used for transport purposes. Note that the `transport` flag must be set to `rif-comms` (explicitly or by default) for this parameter to be used. Defaults to `"localhost:5013"`. |
+    | FIELD                                     | DESCRIPTION                                                                                                                              |
+    |-------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------|
+    | `$KEYSTORE_PATH`                          | The path to your keystore folder.                                                                                                        |
+    | `network-id`                              | The blockchain network ID you're connecting to. This must match the RSK node you're connecting to. `33` is regtest.                      |
+    | `$RSK_NODE_URL`                           | URL of the RSK node to connect to (`http://URL:PORT`). If you're running a local node, this will typically be `http://localhost:4444/`.  |
+    | `environment-type`                        | You will need this set to `development` in order to use custom blockchain and contract addresses.                                        |
+    | `$TOKENNETWORK_REGISTRY_CONTRACT_ADDRESS` | Address for the token registry contract deployed (view contracts table).                                                                 |
+    | `$SECRET_REGISTRY_CONTRACT_ADDRESS`       | Address for the secret registry contract deployed (view contracts table).                                                                |
+    | `$ENDPOINT_REGISTRY_CONTRACT_ADDRESS`     | Address for the endpoint registry contract deployed (view contracts table).                                                              |
+    | `no-sync-check`                           | This will allow you to bypass checking that the node is synchronized against etherscan.                                                  |
+    | `$YOUR_RNS_DOMAIN`                        | You can supply the RNS address associated with your RSK node address, e.g. `--rnsdomain=lumino.rsk.co`                                   |
+    | `$TRANSPORT_MODE`                         | Transport mode for Lumino. Supported values are `rif-comms` and `matrix`. Example of use: `--transport=matrix`. Defaults to `rif-comms`. |
+    | `$GRPC_ENDPOINT`                          | The communication endpoint for the RIF Comms node used for transport purposes. Note that the `transport` flag must be set to `rif-comms` (explicitly or by default) for this parameter to be used. Defaults to `"localhost:5013"`.                                                                                                                                  |
 
     More configuration options can be found by browsing the code.
 
