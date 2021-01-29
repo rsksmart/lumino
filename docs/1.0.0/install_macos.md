@@ -122,54 +122,7 @@ python setup.py develop
 	
 ### Set up a RIF Communications bootnode
 
-#### Requirements:
-
-- Node 14+ (14.13 recommended)
-
-#### Get the code
-
-Download the code by executing `git clone https://github.com/rsksmart/rif-communications-pubsub-bootnode -b grpc-api`.
-
-After this, run `npm install` inside the cloned folder.
-
-#### Create a key for the RIF Communications bootnode
-
-1. Create the `config/keys/lumino` folder.
-2. Execute the following commands inside this folder: 
-
-```
-openssl ecparam -genkey -name secp256k1 -out ec_key.pem -param_enc explicit
-``` 
-and then 
-
-```
-openssl pkcs8 -in ec_key.pem -topk8 -v2 aes-256-cbc -v2prf hmacWithSHA256 -outform DER -out ec_key_pkcs8_v2.der
-``` 
-The latter one will require you to define a password.
-#### Create a config file
-
-- go back to `config` folder
-- edit the `lumino.json5` file. Modify the `key.password` value to your key's password
-- change the `key.privateKeyURLPath` to the config key path `[...]/config/keys/lumino/ec_key_pkcs8_v2.der`
-
-#### Start the node
-
-- At root folder, run `NODE_ENV=lumino npm run api-server`
-- You should see a log output similar to this one:
-
-```
-[INFO] 11:34:08 ts-node-dev ver. 1.1.1 (using ts-node ver. 9.1.1, typescript ver. 4.1.3)
-Loading encrypted DER key
-Node started, listening on addresses:
-/ip4/127.0.0.1/tcp/5011/p2p/16Uiu2HAmQswXYkmzDTgs2Em5JkhP8Y33CEhXQUHY3trctB1StTe7
-/ip4/127.0.0.1/tcp/5012/ws/p2p/16Uiu2HAmQswXYkmzDTgs2Em5JkhP8Y33CEhXQUHY3trctB1StTe7
-
-Listening on topics: 
-
-
-PEERID: 16Uiu2HAmQswXYkmzDTgs2Em5JkhP8Y33CEhXQUHY3trctB1StTe7
-GRPC Server started on port 5013
-```
+Please follow the instructions in the (RIF Communications installation page)[https://github.com/rsksmart/rif-communications-pubsub-bootnode/tree/grpc-api].
 
 
 ## Start your RIF Lumino Node
