@@ -4,7 +4,7 @@ services:
     mongo-db:
       image: "mongo"
       restart: "no"
-      networks: [ "local" ]
+      networks: ["mainnet_network"]
       ports:
         - "27017"
         - "27018"
@@ -15,14 +15,14 @@ services:
       restart:  "no"
       environment:
         MYSQL_ROOT_PASSWORD: infuy
-      networks: [ "local" ]
+      networks: ["mainnet_network"]
       ports:
       - "3306"
       - "33060"
     rsk-node:
         image: "rsk-node-mainnet-image:latest"
         restart: "no"
-        networks: ["local"]
+        networks: ["mainnet_network"]
         volumes:
           - "./rsk-node/database:/var/lib/rsk/database/mainnet"
         ports:
@@ -37,7 +37,7 @@ services:
   #        MONGO_DB_HOST: "mongo-db"
         image: "lumino-explorer-image:latest"
         restart: "no"
-        networks: ["local"]
+        networks: ["mainnet_network"]
         depends_on: ["mongo-db", "rsk-node"]
         ports:
             - "8080"
@@ -53,12 +53,12 @@ services:
 #        NOTIFIER_DB_PASSWORD: infuy
       image: "rif-notifier-image:latest"
       restart: "no"
-      networks: ["local"]
+      networks: ["mainnet_network"]
       depends_on: ["mysql-db", "rsk-node"]
       ports:
         - "8080"
       scale: 3
 
 networks:
-  local:
+  mainnet_network:
     external: true

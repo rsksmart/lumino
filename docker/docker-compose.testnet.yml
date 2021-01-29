@@ -4,7 +4,7 @@ services:
     mongo-db:
       image: "mongo"
       restart: "no"
-      networks: [ "local" ]
+      networks: ["testnet_network"]
       ports:
         - "27017"
         - "27018"
@@ -15,14 +15,14 @@ services:
       restart:  "no"
       environment:
         MYSQL_ROOT_PASSWORD: infuy
-      networks: [ "local" ]
+      networks: ["testnet_network"]
       ports:
       - "3306"
       - "33060"
     rsk-node:
         image: "rsk-node-testnet-image:latest"
         restart: "no"
-        networks: ["local"]
+        networks: ["testnet_network"]
         volumes:
           - "./rsk-node/database:/var/lib/rsk/database/testnet"
         ports:
@@ -35,9 +35,9 @@ services:
   #        EXPLORER_PORT: 8080
   #        RSK_ENDPOINT: "http://rsk-node:4444"
   #        MONGO_DB_HOST: "mongo-db"
-        image: "lumino-explorer-image:latest"
+        image: "lumino-explorer-testnet-image:latest"
         restart: "no"
-        networks: ["local"]
+        networks: ["testnet_network"]
         depends_on: ["mongo-db", "rsk-node"]
         ports:
             - "8080"
@@ -51,14 +51,14 @@ services:
 #        NOTIFIER_DB_SCHEMA_NAME: "rif_notifier_1" # Not compatible with replica option
 #        NOTIFIER_DB_USERNAME: root
 #        NOTIFIER_DB_PASSWORD: infuy
-      image: "rif-notifier-image:latest"
+      image: "rif-notifier-testnet-image:latest"
       restart: "no"
-      networks: ["local"]
+      networks: ["testnet_network"]
       depends_on: ["mysql-db", "rsk-node"]
       ports:
         - "8080"
       scale: 3
 
 networks:
-  local:
+  testnet_network:
     external: true

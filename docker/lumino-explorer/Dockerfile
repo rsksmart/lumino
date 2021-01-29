@@ -39,7 +39,8 @@ RUN bash -c "source $HOME/.sdkman/bin/sdkman-init.sh && mvn clean compile -f $HO
 COPY assets/application.properties $HOME/lumino-explorer/lumino-explorer-api/src/main/resources/application-prod.properties
 COPY assets/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 COPY assets/startExplorer /usr/local/bin
-COPY assets/db-setup.js $HOME/lumino-explorer/lumino-explorer-api/src/main/resources/database/lumino-explorer-api-database-setup.js
+COPY assets/deleteDB.js /root/deleteDB.js
+COPY assets/createDB.js /root/createDB.js
 
 RUN chmod +x /usr/local/bin/startExplorer
 

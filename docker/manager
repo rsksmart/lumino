@@ -15,6 +15,10 @@ REGTEST_CHAIN="regtest"
 CHAIN_NAME=${REGTEST_CHAIN}
 COMPOSE_FILE_NAME="docker-compose.${CHAIN_NAME}.yml"
 CHAIN_DATABASE_PATH="${HOME}/.rsk/${CHAIN_NAME}"
+ROOT_FOLDER_NAME=${PWD##*/}
+NETWORK_NAME="${CHAIN_NAME}_network"
+RSK_CORE_VERSION_CODENAME=WASABI
+RSK_CORE_VERSION_NUMBER=1.2.0
 
 # Utils
 function is_number() {
@@ -33,7 +37,6 @@ function validateChainDBPath() {
 }
 
 function createMissingResources() {
-    NETWORK_NAME=local
     NETWORK=$(sudo docker network ls --filter name=${NETWORK_NAME} -q)
     if [ "${NETWORK}" == "" ]; then
         echo "Creating network ${NETWORK_NAME}"
@@ -101,10 +104,7 @@ function exitOnFailure() {
 function checkAndGenerateModuleImage() {
     MODULE_NAME=$1
     ARGS=$2
-    IMAGE_NAME="${MODULE_NAME}-image"
-    if [ "${MODULE_NAME}" == "${RSK_MODULE_NAME}" ]; then
-        IMAGE_NAME="${MODULE_NAME}-${CHAIN_NAME}-image"
-    fi
+    IMAGE_NAME="${MODULE_NAME}-${CHAIN_NAME}-image"
     IMAGE=$(sudo docker images | grep "${IMAGE_NAME}")
     DOCKER_BUILD_ARGS=""
     if [ "${ARGS}" != "" ]; then
@@ -130,10 +130,7 @@ function checkAndGenerateModuleImage() {
 function buildModuleImage() {
     MODULE_NAME=$1
     ARGS=$2
-    IMAGE_NAME="${MODULE_NAME}-image"
-    if [ "${MODULE_NAME}" == "${RSK_MODULE_NAME}" ]; then
-        IMAGE_NAME="${MODULE_NAME}-${CHAIN_NAME}-image"
-    fi
+    IMAGE_NAME="${MODULE_NAME}-${CHAIN_NAME}-image"
     DOCKER_BUILD_ARGS=""
     if [ "${ARGS}" != "" ]; then
         IFS=',' read -ra ARGS <<< "${ARGS}"
@@ -154,34 +151,30 @@ function buildModuleImage() {
 
 function checkAllImages() {
     echo "Checking all required docker images"
-    checkAndGenerateModuleImage "${RSK_MODULE_NAME}" "CHAIN_NAME=${CHAIN_NAME}"
-    checkAndGenerateModuleImage ${EXPLORER_MODULE_NAME}
-    checkAndGenerateModuleImage ${NOTIFIER_MODULE_NAME}
+    checkAndGenerateModuleImage "${RSK_MODULE_NAME}" "CHAIN_NAME=${CHAIN_NAME},RSK_CORE_VERSION_CODENAME=${RSK_CORE_VERSION_CODENAME},RSK_CORE_VERSION_NUMBER=${RSK_CORE_VERSION_NUMBER}"
+    checkAndGenerateModuleImage "${EXPLORER_MODULE_NAME}"
+    checkAndGenerateModuleImage "${NOTIFIER_MODULE_NAME}"
 }
 
 function showModuleIp() {
     MODULE_NAME=$1
-    MODULE_INSTANCE_NUMBER=$2
-    if [ "${MODULE_INSTANCE_NUMBER}" == "" ]; then
-        MODULE_INSTANCE_NUMBER=1
-    fi
     validateModuleName "${MODULE_NAME}"
-    sudo docker inspect --format '{{ .NetworkSettings.Networks.local.IPAddress }}' "docker_${MODULE_NAME}_${MODULE_INSTANCE_NUMBER}"
+    sudo docker inspect --format "{{ .NetworkSettings.Networks.${NETWORK_NAME}.IPAddress }}" "${ROOT_FOLDER_NAME}_${MODULE_NAME}_${INSTANCE_NUMBER}"
 }
 
 function showAllModuleIps() {
-    RSK_NODE_IP=$(sudo docker inspect --format '{{ .NetworkSettings.Networks.local.IPAddress }}' docker_rsk-node_1)
-    EXPLORER_IP=$(sudo docker inspect --format '{{ .NetworkSettings.Networks.local.IPAddress }}' docker_lumino-explorer_1)
+    RSK_NODE_IP=$(sudo docker inspect --format "{{ .NetworkSettings.Networks.${NETWORK_NAME}.IPAddress }}" "${ROOT_FOLDER_NAME}_rsk-node_1")
+    EXPLORER_IP=$(sudo docker inspect --format "{{ .NetworkSettings.Networks.${NETWORK_NAME}.IPAddress }}" "${ROOT_FOLDER_NAME}_lumino-explorer_1")
     echo "RSK NODE ----- ${RSK_NODE_IP}"
     echo "LUMINO EXPLORER ----- ${EXPLORER_IP}"
     for NOTIFIER_NUMBER in $(seq 1 ${NOTIFIER_REPLICAS}); do
-        RIF_NOTIFIER_IP=$(sudo docker inspect --format '{{ .NetworkSettings.Networks.local.IPAddress }}' "docker_rif-notifier_${NOTIFIER_NUMBER}")
+        RIF_NOTIFIER_IP=$(sudo docker inspect --format "{{ .NetworkSettings.Networks.${NETWORK_NAME}.IPAddress }}" "${ROOT_FOLDER_NAME}_rif-notifier_${NOTIFIER_NUMBER}")
         echo "RIF_NOTIFIER_${NOTIFIER_NUMBER} ----- ${RIF_NOTIFIER_IP}"
     done
 }
 
 function showRSKInformation() {
-    sudo docker exec -i -t docker_rsk-node_1 /usr/bin/getInfo
+    sudo docker exec -i -t ${ROOT_FOLDER_NAME}_rsk-node_1 /usr/bin/getInfo
     echo
 }
 
@@ -231,7 +224,7 @@ function doBuildModules() {
     IFS=',' read -ra MODULE_NAMES <<< "${MODULE_NAMES}"
     for MODULE_NAME in ${MODULE_NAMES[*]}; do
         if [ "${MODULE_NAME}" == "${RSK_MODULE_NAME}" ]; then
-            buildModuleImage "${MODULE_NAME}" "CHAIN_NAME=${CHAIN_NAME}"
+            buildModuleImage "${MODULE_NAME}" "CHAIN_NAME=${CHAIN_NAME},RSK_CORE_VERSION_CODENAME=${RSK_CORE_VERSION_CODENAME},RSK_CORE_VERSION_NUMBER=${RSK_CORE_VERSION_NUMBER}"
         else
             buildModuleImage "${MODULE_NAME}"
         fi
@@ -245,7 +238,7 @@ function doCleanModules() {
     for MODULE_NAME in ${MODULE_NAMES[*]}; do
         CLEAN_IMAGE_CACHE=1
         if [ "${MODULE_NAME}" == "${RSK_MODULE_NAME}" ]; then
-            checkAndGenerateModuleImage "${MODULE_NAME}" "CHAIN_NAME=${CHAIN_NAME}"
+            checkAndGenerateModuleImage "${MODULE_NAME}" "CHAIN_NAME=${CHAIN_NAME},RSK_CORE_VERSION_CODENAME=${RSK_CORE_VERSION_CODENAME},RSK_CORE_VERSION_NUMBER=${RSK_CORE_VERSION_NUMBER}"
         else
             checkAndGenerateModuleImage "${MODULE_NAME}"
         fi
@@ -269,7 +262,7 @@ function doConnect() {
         INSTANCE_NUMBER=1
     fi
     echo "Trying to connect to ${MODULE_NAME} on instance ${INSTANCE_NUMBER}"
-    sudo docker exec -i -t "docker_${MODULE_NAME}_${INSTANCE_NUMBER}" /bin/bash
+    sudo docker exec -i -t "${ROOT_FOLDER_NAME}_${MODULE_NAME}_${INSTANCE_NUMBER}" /bin/bash
 }
 
 function doStop() {
@@ -282,6 +275,12 @@ function doStop() {
 function stopModule() {
     MODULE_NAME=$(echo "$1" | xargs)
     cd "${ROOT_PATH}" || exit
+    if [ "${MODULE_NAME}" == "${NOTIFIER_MODULE_NAME}" ]; then
+        sudo docker-compose -f ${COMPOSE_FILE_NAME} stop "${ROOT_FOLDER_NAME}_mysql-db_1"
+    fi
+    if [ "${MODULE_NAME}" == "${EXPLORER_MODULE_NAME}" ]; then
+        sudo docker-compose -f ${COMPOSE_FILE_NAME} stop "${ROOT_FOLDER_NAME}_mongo-db_1"
+    fi
     sudo docker-compose -f ${COMPOSE_FILE_NAME}  stop "${MODULE_NAME}"
     exitOnFailure $?
 }
@@ -408,6 +407,9 @@ function manager() {
             if [ ${DB_ALREADY_SET} == 0 ]; then
                 CHAIN_DATABASE_PATH="${HOME}/.rsk/${CHAIN_NAME}"
             fi
+	    NETWORK_NAME="${CHAIN_NAME}_network"
+            RSK_CORE_VERSION_CODENAME=PAPYRUS
+            RSK_CORE_VERSION_NUMBER=2.1.0
             shift
             ;;
         --mainnet)
@@ -417,6 +419,9 @@ function manager() {
             if [ ${DB_ALREADY_SET} == 0 ]; then
                 CHAIN_DATABASE_PATH="${HOME}/.rsk/${CHAIN_NAME}"
             fi
+            NETWORK_NAME="${CHAIN_NAME}_network"
+	    RSK_CORE_VERSION_CODENAME=PAPYRUS
+            RSK_CORE_VERSION_NUMBER=2.1.0
             shift
             ;;
         --rsk-db-path)

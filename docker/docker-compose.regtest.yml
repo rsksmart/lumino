@@ -4,7 +4,7 @@ services:
     mongo-db:
       image: "mongo"
       restart: "no"
-      networks: [ "local" ]
+      networks: ["regtest_network"]
       ports:
         - "27017"
         - "27018"
@@ -15,14 +15,14 @@ services:
       restart:  "no"
       environment:
         MYSQL_ROOT_PASSWORD: infuy
-      networks: [ "local" ]
+      networks: ["regtest_network"]
       ports:
       - "3306"
       - "33060"
     rsk-node:
         image: "rsk-node-regtest-image:latest"
         restart: "no"
-        networks: ["local"]
+        networks: ["regtest_network"]
         volumes:
           - "./rsk-node/database:/var/lib/rsk/database/regtest"
         ports:
@@ -36,9 +36,9 @@ services:
 #        RSK_ENDPOINT: "http://rsk-node:4444"
 #        MONGO_DB_HOST: "mongo-db"
 #        TOKEN_NETWORK_REGISTRY: 0xed8c9163F888Bc2f9C4F299325003DA5fC8676DD
-        image: "lumino-explorer-image:latest"
+        image: "lumino-explorer-regtest-image:latest"
         restart: "no"
-        networks: ["local"]
+        networks: ["regtest_network"]
         depends_on: ["mongo-db", "rsk-node"]
         ports:
             - "8080"
@@ -53,14 +53,14 @@ services:
 #        NOTIFIER_DB_PASSWORD: infuy
 #        TOKEN_NETWORK_REGISTRY: 0xed8c9163F888Bc2f9C4F299325003DA5fC8676DD
 #        RNS_MULTICHAIN_CONTRACT: 0x73ec81da0C72DD112e06c09A6ec03B5544d26F05
-      image: "rif-notifier-image:latest"
+      image: "rif-notifier-regtest-image:latest"
       restart: "no"
-      networks: ["local"]
+      networks: ["regtest_network"]
       depends_on: ["mysql-db", "rsk-node"]
       ports:
         - "8080"
       scale: 3
 
 networks:
-  local:
+  regtest_network:
     external: true

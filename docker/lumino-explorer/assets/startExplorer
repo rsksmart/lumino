@@ -6,7 +6,8 @@ INIT_LOG=/root/init.log
 EXPLORER_LOGS_FOLDER="/var/logs/explorer"
 EXPLORER_ROOT_FOLDER="${HOME}/lumino-explorer/lumino-explorer-api"
 EXPLORER_POM_FILE="${EXPLORER_ROOT_FOLDER}/pom.xml"
-EXPLORER_DATABASE_SETUP_FILE="${EXPLORER_ROOT_FOLDER}/src/main/resources/database/lumino-explorer-api-database-setup.js"
+EXPLORER_CREATE_DB_FILE=/root/createDB.js
+EXPLORER_DELETE_DB_FILE=/root/deleteDB.js
 
 if [ "${RSK_ENDPOINT}" == "" ]; then
     RSK_ENDPOINT="http://rsk-node:4444"
@@ -39,7 +40,8 @@ fi
 echo "Initializing explorer database" >> ${INIT_LOG}
 
 # Init database
-mongosh --host "${MONGO_DB_HOST}" < "${EXPLORER_DATABASE_SETUP_FILE}" >> ${INIT_LOG}
+mongosh --host "${MONGO_DB_HOST}" < "${EXPLORER_DELETE_DB_FILE}" >> ${INIT_LOG}
+mongosh --host "${MONGO_DB_HOST}" < "${EXPLORER_CREATE_DB_FILE}" >> ${INIT_LOG}
 
 echo "Running explorer" >> ${INIT_LOG}
 echo "mvn -f '${EXPLORER_POM_FILE}' spring-boot:run -Dspring-boot.run.jvmArguments='-Dserver.port=${EXPLORER_PORT} -Drsk.blockchain.endpoint=${RSK_ENDPOINT} -Dlumino.explorer.api.mongo.databasehost=${MONGO_DB_HOST} -Dlumino.contract.tokenNetworkRegistry=${TOKEN_NETWORK_REGISTRY}' > '${EXPLORER_LOGS_FOLDER}/server.log' 2>&1 &" >> ${INIT_LOG}
