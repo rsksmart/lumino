@@ -1767,7 +1767,8 @@ class TokenNetwork:
         finally:
             # we need to delete the non closing balance proof from the database to avoid re-send it
             log.info("Deleting non closing balance proof for channel id " + str(channel_identifier), **log_details)
-            raiden.wal.storage.delete_light_client_non_closing_balance_proof(channel_id=channel_identifier)
+            raiden.wal.storage.delete_light_client_non_closing_balance_proof(channel_id=channel_identifier,
+                                                                             token_network_address=self.address)
 
     def update_transfer(
         self,

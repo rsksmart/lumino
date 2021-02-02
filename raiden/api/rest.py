@@ -2269,7 +2269,7 @@ class RestAPI:
         self.raiden_api.unlock_payment_light(signed_tx, token_address)
         return api_response(result=dict(), status_code=HTTPStatus.OK)
 
-    @api_safe_operation(is_light_client=True, lc_balance_required=True)
+    @api_safe_operation(is_light_client=True, lc_balance_required=False)
     def create_light_client_payment(
         self,
         registry_address: typing.PaymentNetworkID,

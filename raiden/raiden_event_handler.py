@@ -567,11 +567,13 @@ class RaidenEventHandler(EventHandler):
         raiden: "RaidenService", channel_update_event: ContractSendChannelUpdateTransferLight
     ):
         balance_proof = channel_update_event.balance_proof
+        token_network_identifier = channel_update_event.token_network_identifier
 
         # checking that this balance proof exists on the database
         db_balance_proof = raiden.wal.storage.get_latest_light_client_non_closing_balance_proof(
             channel_id=balance_proof.channel_identifier,
-            non_closing_participant=channel_update_event.lc_address
+            non_closing_participant=channel_update_event.lc_address,
+            token_network_address=token_network_identifier
         )
 
         if db_balance_proof:

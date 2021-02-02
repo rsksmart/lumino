@@ -520,7 +520,6 @@ class ContractReceiveChannelClosedLight(ContractReceiveStateChange):
             canonical_identifier=CanonicalIdentifier.from_dict(data["canonical_identifier"]),
             block_number=BlockNumber(int(data["block_number"])),
             block_hash=BlockHash(deserialize_bytes(data["block_hash"])),
-            closing_participant=to_canonical_address(data["closing_participant"]),
             non_closing_participant=to_canonical_address(data["non_closing_participant"]),
             latest_update_non_closing_balance_proof_data=latest_update_non_closing_balance_proof_data
         )
