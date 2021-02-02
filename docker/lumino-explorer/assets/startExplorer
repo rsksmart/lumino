@@ -1,13 +1,20 @@
 #!/bin/bash
 
 source "${HOME}/.sdkman/bin/sdkman-init.sh"
+source "${HOME}/.nvm/nvm.sh"
 
 INIT_LOG=/root/init.log
 EXPLORER_LOGS_FOLDER="/var/logs/explorer"
 EXPLORER_ROOT_FOLDER="${HOME}/lumino-explorer/lumino-explorer-api"
+EXPLORER_WEB_ROOT_FOLDER="${HOME}/lumino-explorer/lumino-explorer-web"
 EXPLORER_POM_FILE="${EXPLORER_ROOT_FOLDER}/pom.xml"
 EXPLORER_CREATE_DB_FILE=/root/createDB.js
 EXPLORER_DELETE_DB_FILE=/root/deleteDB.js
+
+
+if [ "${EXPLORER_API_URL}}" == "" ]; then
+    EXPLORER_API_URL="http://localhost:8080/api/v1/"
+fi
 
 if [ "${RSK_ENDPOINT}" == "" ]; then
     RSK_ENDPOINT="http://rsk-node:4444"
@@ -26,10 +33,16 @@ if [ "${MONGO_DB_HOST}" == "" ]; then
 fi
 
 echo "Starting Explorer:" >> ${INIT_LOG}
+echo "EXPLORER_API_URL=${EXPLORER_API_URL}" >> ${INIT_LOG}
 echo "RSK_ENDPOINT=${RSK_ENDPOINT}" >> ${INIT_LOG}
 echo "EXPLORER_PORT=${EXPLORER_PORT}" >> ${INIT_LOG}
 echo "TOKEN_NETWORK_REGISTRY=${TOKEN_NETWORK_REGISTRY}" >> ${INIT_LOG}
 echo "MONGO_DB_HOST=${MONGO_DB_HOST}" >> ${INIT_LOG}
+
+echo "Building web"
+cd "${EXPLORER_WEB_ROOT_FOLDER}" || exit
+npm install && REACT_APP_API_URL="${EXPLORER_API_URL}" npm run build --production
+mv "${EXPLORER_WEB_ROOT_FOLDER}/build" "/var/www/html/explorer"
 
 # Init log folder
 if [ ! -d "${EXPLORER_LOGS_FOLDER}" ]; then

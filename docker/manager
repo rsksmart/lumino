@@ -152,7 +152,7 @@ function buildModuleImage() {
 function checkAllImages() {
     echo "Checking all required docker images"
     checkAndGenerateModuleImage "${RSK_MODULE_NAME}" "CHAIN_NAME=${CHAIN_NAME},RSK_CORE_VERSION_CODENAME=${RSK_CORE_VERSION_CODENAME},RSK_CORE_VERSION_NUMBER=${RSK_CORE_VERSION_NUMBER}"
-    checkAndGenerateModuleImage "${EXPLORER_MODULE_NAME}"
+    checkAndGenerateModuleImage "${EXPLORER_MODULE_NAME}" "CHAIN_NAME=${CHAIN_NAME}"
     checkAndGenerateModuleImage "${NOTIFIER_MODULE_NAME}"
 }
 
@@ -203,6 +203,8 @@ function startModule() {
     if [ "${MODULE_NAME}" == "${RSK_MODULE_NAME}" ]; then
         createRskDatabase
         checkAndGenerateModuleImage "${MODULE_NAME}" "CHAIN_NAME=${CHAIN_NAME}"
+    elif [ "${MODULE_NAME}" == "${EXPLORER_MODULE_NAME}" ]; then
+        checkAndGenerateModuleImage "${MODULE_NAME}" "CHAIN_NAME=${CHAIN_NAME}"
     else
         checkAndGenerateModuleImage "${MODULE_NAME}"
     fi
@@ -225,6 +227,8 @@ function doBuildModules() {
     for MODULE_NAME in ${MODULE_NAMES[*]}; do
         if [ "${MODULE_NAME}" == "${RSK_MODULE_NAME}" ]; then
             buildModuleImage "${MODULE_NAME}" "CHAIN_NAME=${CHAIN_NAME},RSK_CORE_VERSION_CODENAME=${RSK_CORE_VERSION_CODENAME},RSK_CORE_VERSION_NUMBER=${RSK_CORE_VERSION_NUMBER}"
+        elif [ "${MODULE_NAME}" == "${EXPLORER_MODULE_NAME}" ]; then
+            buildModuleImage "${MODULE_NAME}" "CHAIN_NAME=${CHAIN_NAME}"
         else
             buildModuleImage "${MODULE_NAME}"
         fi
@@ -239,6 +243,8 @@ function doCleanModules() {
         CLEAN_IMAGE_CACHE=1
         if [ "${MODULE_NAME}" == "${RSK_MODULE_NAME}" ]; then
             checkAndGenerateModuleImage "${MODULE_NAME}" "CHAIN_NAME=${CHAIN_NAME},RSK_CORE_VERSION_CODENAME=${RSK_CORE_VERSION_CODENAME},RSK_CORE_VERSION_NUMBER=${RSK_CORE_VERSION_NUMBER}"
+        elif [ "${MODULE_NAME}" == "${EXPLORER_MODULE_NAME}" ]; then
+            checkAndGenerateModuleImage "${MODULE_NAME}" "CHAIN_NAME=${CHAIN_NAME}"
         else
             checkAndGenerateModuleImage "${MODULE_NAME}"
         fi
