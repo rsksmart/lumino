@@ -37,6 +37,7 @@ RUN bash -c "source $HOME/.sdkman/bin/sdkman-init.sh && \
 # Install Lumino Explorer.
 RUN git clone https://github.com/rsksmart/lumino-explorer.git $HOME/lumino-explorer
 RUN cd $HOME/lumino-explorer && git checkout $CURRENT_BRANCH
+RUN /bin/bash -c "source /root/.nvm/nvm.sh && npm install --prefix $HOME/lumino-explorer/lumino-explorer-web"
 RUN bash -c "source $HOME/.sdkman/bin/sdkman-init.sh && mvn clean compile -f $HOME/lumino-explorer/lumino-explorer-api/pom.xml"
 
 # Copy assets
