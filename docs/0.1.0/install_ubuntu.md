@@ -149,7 +149,7 @@ In order to run Lumino using RIF Comms, you need to set up the RIF Communication
 
 ### Set up a RIF Communications bootnode
 
-Please follow the instructions in the (RIF Communications installation page)[https://github.com/rsksmart/rif-communications-pubsub-bootnode/tree/grpc-api].
+Please follow the instructions in the [RIF Communications installation page](https://github.com/rsksmart/rif-communications-pubsub-bootnode/tree/grpc-api).
 
 
 ## Start your RIF Lumino Node
