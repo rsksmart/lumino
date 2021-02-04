@@ -7,7 +7,7 @@
 ## Install your own Lumino Node
 
 * [Install on Ubuntu](docs/0.1.0/install_ubuntu.md)
-* [Install on MacOS](docs/01/install_macos.md)
+* [Install on MacOS](docs/0.1.0/install_macos.md)
 
 ## Lumino Contracts
 
