@@ -273,7 +273,7 @@ def test_set_payee():
     assert transfers_pair[1].payer_state == "payer_pending"
     assert transfers_pair[1].payee_state == "payee_pending"
 
-    mediator.set_offchain_reveal_state(transfers_pair, setup.channel_set.partner_address(0))
+    mediator.set_offchain_reveal_state(transfers_pair, setup.channel_set.our_address(0))
 
     # payer address was used, no payee state should change
     assert transfers_pair[0].payer_state == "payer_pending"
@@ -282,7 +282,7 @@ def test_set_payee():
     assert transfers_pair[1].payer_state == "payer_pending"
     assert transfers_pair[1].payee_state == "payee_pending"
 
-    mediator.set_offchain_reveal_state(transfers_pair, setup.channel_set.partner_address(1))
+    mediator.set_offchain_reveal_state(transfers_pair, setup.channel_set.partner_address(0))
 
     # only the transfer where the address is a payee should change
     assert transfers_pair[0].payer_state == "payer_pending"
@@ -459,7 +459,7 @@ def test_events_for_balanceproof():
     setup = factories.make_transfers_pair(2, amount=10, block_number=1)
     last_pair = setup.transfers_pair[-1]
     last_pair.payee_state = "payee_secret_revealed"
-
+    
     # the lock is not in the danger zone yet
     payer_channel = mediator.get_payer_channel(setup.channel_set.channel_map[ChannelSet.ADDRESSES[0]], last_pair)
     payee_channel = mediator.get_payee_channel(setup.channel_set.channel_map[ChannelSet.ADDRESSES[0]], last_pair)
