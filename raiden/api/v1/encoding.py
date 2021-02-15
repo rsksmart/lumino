@@ -34,7 +34,7 @@ class HexAddressConverter(BaseConverter):
     @staticmethod
     def to_python(value):
         try:
-            value = to_checksum_address(value)
+            value = to_checksum_address(value.strip())
         except ValueError:
             raise InvalidEndpoint("Could not checksum address.")
 
