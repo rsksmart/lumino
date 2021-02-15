@@ -79,8 +79,7 @@ def deserialize_address_helper(self, value, attr, data):  # pylint: disable=unus
     # deserializing the value to checksum address, if the result is not ok then it should fail
     try:
         # we trim any whitespaces to avoid user error
-        value = value.strip()
-        value = to_checksum_address(value)
+        value = to_checksum_address(value.strip())
     except ValueError:
         self.fail("invalid_checksum")
 
