@@ -1,5 +1,5 @@
 import gevent
-from eth_utils import is_binary_address
+from eth_utils import is_binary_address, to_checksum_address
 from gevent.lock import Semaphore
 from raiden_contracts.contract_manager import ContractManager
 from requests import HTTPError
@@ -157,7 +157,7 @@ class BlockChainService:
             token.total_supply()
         except HTTPError:
             raise AddressWithoutTokenCode(
-                "Address {} does not provide a total token supply".format(token.address)
+                "Address {} does not provide a total token supply".format(to_checksum_address(token.address))
             )
 
     def discovery(self, discovery_address: Address) -> Discovery:
