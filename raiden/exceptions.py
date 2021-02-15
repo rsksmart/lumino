@@ -120,7 +120,6 @@ class InvalidPaymentIdentifier(RaidenError):
     pass
 
 
-
 class InvalidSettleTimeout(RaidenError):
     """ Raised when the user provided timeout value is less than the minimum
     settle timeout"""
@@ -195,6 +194,13 @@ class EthNodeInterfaceError(RaidenError):
 
 class AddressWithoutCode(RaidenError):
     """Raised on attempt to execute contract on address without a code."""
+
+    pass
+
+
+class AddressWithoutTokenCode(RaidenError):
+    """Raised on attempt to execute contract on address which isn't responding properly to a total_supply call.
+    This means it is most likely not an token smart contract."""
 
     pass
 
@@ -315,4 +321,3 @@ class ProxyTransactionError(RaidenError):
         super(ProxyTransactionError, self).__init__(f"A proxy transaction error has occurred: {tx_error_prefix}")
         self.tx_error_prefix = tx_error_prefix
         self.tx_error = tx_error
-
