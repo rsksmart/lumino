@@ -78,7 +78,6 @@ class AddressRnsField(fields.Field):
 def deserialize_address_helper(self, value, attr, data):  # pylint: disable=unused-argument
     # deserializing the value to checksum address, if the result is not ok then it should fail
     try:
-        # we trim any whitespaces to avoid user error
         value = to_checksum_address(value.strip())
     except ValueError:
         self.fail("invalid_checksum")
