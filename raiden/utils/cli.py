@@ -13,7 +13,6 @@ from typing import Any, Callable, Dict, List, Tuple, Union
 import click
 import requests
 from click._compat import term_len
-from click.formatting import iter_rows, measure_table, wrap_text
 from pytoml import TomlError, load
 from raiden_contracts.constants import NETWORKNAME_TO_ID
 
@@ -42,13 +41,13 @@ class HelpFormatter(click.HelpFormatter):
         """
         rows = list(rows)
         if widths is None:
-            widths = measure_table(rows)
+            widths = click.measure_table(rows)
         if len(widths) != 2:
             raise TypeError("Expected two columns for definition list")
 
         first_col = min(widths[0], col_max) + col_spacing
 
-        for first, second in iter_rows(rows, len(widths)):
+        for first, second in click.iter_rows(rows, len(widths)):
             self.write("%*s%s" % (self.current_indent, "", first))
             if not second:
                 self.write("\n")
@@ -60,7 +59,7 @@ class HelpFormatter(click.HelpFormatter):
                 self.write(" " * (first_col + self.current_indent))
 
             text_width = max(self.width - first_col - 2, 10)
-            lines = iter(wrap_text(second, text_width).splitlines())
+            lines = iter(click.wrap_text(second, text_width).splitlines())
             if lines:
                 self.write(next(lines) + "\n")
                 for line in lines:
@@ -151,7 +150,7 @@ class GroupableOptionCommand(CustomContextMixin, click.Command):
 
         if options:
             widths_a, widths_b = list(
-                zip(*[measure_table(group_options) for group_options in options.values()])
+                zip(*[click.measure_table(group_options) for group_options in options.values()])
             )
             widths = (max(widths_a), max(widths_b))
 
