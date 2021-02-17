@@ -34,10 +34,14 @@ class HexAddressConverter(BaseConverter):
     @staticmethod
     def to_python(value):
         try:
+            # we checksum the input value to avoid having errors later.
             value = to_checksum_address(value.strip())
         except ValueError:
             raise InvalidEndpoint("Could not checksum address.")
 
+        # TODO: we should remove these checks?
+        # all these checks are not necessary since we already checksum the input value.
+        # we keep them to avoid adding more changes now
         if not is_0x_prefixed(value):
             raise InvalidEndpoint("Not a valid hex address, 0x prefix missing.")
 
