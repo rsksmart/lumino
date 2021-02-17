@@ -8,7 +8,6 @@ from time import sleep
 
 import psutil
 import requests
-from requests import RequestException
 
 from raiden.utils.typing import Iterable, Optional, Port
 
@@ -99,7 +98,7 @@ def get_http_rtt(
             durations.append(
                 requests.request(method, url, timeout=timeout).elapsed.total_seconds()
             )
-        except (RequestException, OSError):
+        except (requests.RequestException, OSError):
             return None
         except Exception as ex:
             print(ex)
