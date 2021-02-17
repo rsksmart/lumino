@@ -5,7 +5,7 @@ from eth_utils import is_binary_address, to_checksum_address
 from raiden.api.validations.api_error_builder import ApiErrorBuilder
 from raiden.api.validations.validation_result import TokenExists, EnoughBalance
 from raiden.exceptions import AddressWithoutCode, InvalidSettleTimeout, InvalidAddress, DuplicatedChannelError, \
-    TokenNotRegistered, InsufficientGasReserve, UnknownTokenAddress
+    TokenNotRegistered, InsufficientGasReserve, UnknownTokenAddress, AddressWithoutTokenCode
 from raiden.network.blockchain_service import BlockChainService
 from raiden.network.proxies import Token, TokenNetworkRegistry, TokenNetwork
 from raiden.transfer import views
@@ -20,7 +20,7 @@ class ChannelValidator:
     def validate_token_exists(chain: BlockChainService, token_address: typing.TokenAddress, log) -> TokenExists:
         try:
             return TokenExists(None, True, chain.token(token_address))
-        except AddressWithoutCode as e:
+        except (AddressWithoutCode, AddressWithoutTokenCode) as e:
             return TokenExists(ApiErrorBuilder.build_and_log_error(errors=str(e), status_code=HTTPStatus.CONFLICT, log=log),
                                False, None)
 

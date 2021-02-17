@@ -1,7 +1,10 @@
 import gevent
-from eth_utils import is_binary_address
+from eth_utils import is_binary_address, to_checksum_address
 from gevent.lock import Semaphore
+from raiden_contracts.contract_manager import ContractManager
+from requests import HTTPError
 
+from raiden.exceptions import AddressWithoutTokenCode
 from raiden.network.proxies.discovery import Discovery
 from raiden.network.proxies.payment_channel import PaymentChannel
 from raiden.network.proxies.secret_registry import SecretRegistry
@@ -11,7 +14,10 @@ from raiden.network.proxies.token_network import TokenNetwork
 from raiden.network.proxies.token_network_registry import TokenNetworkRegistry
 from raiden.network.proxies.user_deposit import UserDeposit
 from raiden.network.rpc.client import JSONRPCClient
+from raiden.network.rpc.smartcontract_proxy import ContractProxy
+from raiden.rns_constants import RNS_RESOLVER_ADDRESS, RNS_RESOLVER_ABI
 from raiden.transfer.identifiers import CanonicalIdentifier
+from raiden.utils.namehash.namehash import namehash
 from raiden.utils.typing import (
     Address,
     BlockHash,
@@ -24,10 +30,6 @@ from raiden.utils.typing import (
     TokenNetworkAddress,
     Tuple,
 )
-from raiden_contracts.contract_manager import ContractManager
-from raiden.utils.namehash.namehash import namehash
-from raiden.network.rpc.smartcontract_proxy import ContractProxy
-from raiden.rns_constants import RNS_RESOLVER_ADDRESS, RNS_RESOLVER_ABI
 
 
 class BlockChainService:
@@ -44,8 +46,8 @@ class BlockChainService:
         self.address_to_user_deposit: Dict[Address, UserDeposit] = dict()
         self.address_to_service_registry: Dict[Address, ServiceRegistry] = dict()
         self.identifier_to_payment_channel: Dict[Address, Dict[
-                Tuple[TokenNetworkAddress, ChannelID], PaymentChannel
-            ]
+            Tuple[TokenNetworkAddress, ChannelID], PaymentChannel
+        ]
         ] = dict()
 
         self.client = jsonrpc_client
@@ -137,13 +139,26 @@ class BlockChainService:
 
         with self._token_creation_lock:
             if token_address not in self.address_to_token:
-                self.address_to_token[token_address] = Token(
+                token = Token(
                     jsonrpc_client=self.client,
                     token_address=token_address,
                     contract_manager=self.contract_manager,
                 )
 
+                self.check_token_has_supply(token)
+                self.address_to_token[token_address] = token
+
         return self.address_to_token[token_address]
+
+    @staticmethod
+    def check_token_has_supply(token: Token):
+        """ Checks that the given token address correctly responds to a total_supply call."""
+        try:
+            token.total_supply()
+        except HTTPError:
+            raise AddressWithoutTokenCode(
+                "Address {} does not provide a total token supply".format(to_checksum_address(token.address))
+            )
 
     def discovery(self, discovery_address: Address) -> Discovery:
         """ Return a proxy to interact with the discovery. """
