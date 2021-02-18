@@ -43,9 +43,9 @@ def migrate_db(storage):
 def main(db_file):
     global database_path
     database_path = db_file
-    migrate_db(
-        storage=sqlite.SQLiteStorage(db_file, serialize.JSONSerializer()),
-    )
+    storage = sqlite.SQLiteStorage(db_file)
+    storage.serializer = serialize.JSONSerializer()
+    migrate_db(storage)
 
 
 if __name__ == "__main__":
