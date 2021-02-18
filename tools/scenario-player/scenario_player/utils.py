@@ -39,12 +39,12 @@ log = structlog.get_logger(__name__)
 class TimeOutHTTPAdapter(HTTPAdapter):
     def __init__(self, *args, **kwargs):
         self.timeout = kwargs.pop('timeout', None)
-        super().__init__(*args, **kwargs)
+        super(HTTPAdapter, self).__init__(*args, **kwargs)
 
     def send(self, *args, **kwargs):
         if 'timeout' not in kwargs or not kwargs['timeout']:
             kwargs['timeout'] = self.timeout
-        return super().send(*args, **kwargs)
+        return super(HTTPAdapter, self).send(*args, **kwargs)
 
 
 class LogBuffer:
