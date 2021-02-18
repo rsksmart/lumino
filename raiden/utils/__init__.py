@@ -20,7 +20,6 @@ from eth_utils import (
 )
 from web3 import Web3
 
-import raiden
 from raiden import constants
 from raiden.exceptions import InvalidAddress
 from raiden.utils.signing import sha3  # noqa
@@ -137,6 +136,7 @@ def privatekey_to_address(private_key_bin: bytes) -> Address:
 
 
 def get_project_root() -> str:
+    import raiden
     return os.path.dirname(raiden.__file__)
 
 
@@ -150,6 +150,7 @@ def get_system_spec() -> Dict[str, str]:
     """
     import pkg_resources
     import platform
+    import raiden
 
     if sys.platform == "darwin":
         system_info = "macOS {} {}".format(platform.mac_ver()[0], platform.architecture()[0])
