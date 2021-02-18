@@ -156,7 +156,7 @@ class GMatrixHttpApi(MatrixHttpApi):
                 )
                 gevent.sleep(delay)
         else:
-            raise Exception("empty self.retry_delay()")
+            raise last_ex if last_ex else Exception("empty self.retry_delay() and last_ex is None")
 
     def send_to_device(self, event_type, messages, txn_id=None):  # pylint: disable=unused-argument
         started = time.time()
@@ -179,7 +179,7 @@ class GMatrixHttpApi(MatrixHttpApi):
                 )
                 gevent.sleep(delay)
         else:
-            raise last_ex
+            raise last_ex if last_ex else Exception("empty self.retry_delay() and last_ex is None")
 
 
 class GMatrixClient(MatrixClient):
