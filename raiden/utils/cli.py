@@ -158,6 +158,9 @@ class GroupableOptionCommand(CustomContextMixin, click.Command):
                 with formatter.section(option_group if option_group else "Options"):
                     formatter.write_dl(group_options, widths=widths)
 
+    def make_context(self, info_name, args, parent=None, **extra):
+        super(CustomContextMixin, self).make_context(info_name, args, parent=None, **extra)
+
 
 class GroupableOptionCommandGroup(CustomContextMixin, click.Group):
     def format_options(self, ctx, formatter):
@@ -169,6 +172,9 @@ class GroupableOptionCommandGroup(CustomContextMixin, click.Group):
 
     def group(self, *args, **kwargs):
         return super().group(*args, **{"cls": self.__class__, **kwargs})
+
+    def make_context(self, info_name, args, parent=None, **extra):
+        super(CustomContextMixin, self).make_context(info_name, args, parent=None, **extra)
 
 
 def command(name=None, cls=GroupableOptionCommand, **attrs):
