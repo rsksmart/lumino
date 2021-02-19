@@ -2,128 +2,184 @@
 
 ## Prerequisites
 
-1. Access to a synched RSK node. You can do this in a variety of ways:
-	1. Run your own node on TestNet or MainNet, see [https://github.com/rsksmart/rskj/wiki/Install-RskJ-and-join-the-RSK-Orchid-Mainnet-Beta](https://github.com/rsksmart/rskj/wiki/Install-RskJ-and-join-the-RSK-Orchid-Mainnet-Beta)
-	2. Compile and run a RSK node locally, see [https://github.com/rsksmart/rskj/wiki/Compile-and-run-a-RSK-node-locally](https://github.com/rsksmart/rskj/wiki/Compile-and-run-a-RSK-node-locally)
-2. An RSK account with an RBTC balance NOT lower than 0.001 RBTC
-3. XCode
+1. Access to a synced RSK node. You can do this in a variety of ways:
+	1. Run your own node on Testnet or Mainnet, see [Node (RSKj): Install](https://developers.rsk.co/rsk/node/install/).
+	2. Compile and run a RSK node locally, see [Node (RSKj): Contribute](https://developers.rsk.co/rsk/node/contribute/).
+
+## Recommended
+
+1. An RSK account with an RBTC balance of **at least** 0.001 RBTC, in order to be able to use the system.
 
 ## Install required libraries/software
 
-### Install command line tools
+### 1. Install command line tools
 
-```
+Do this by opening a terminal and executing:
+
+```shell script
 xcode-select --install
 ```
 
-### Install Homebrew
+### 2. Install Homebrew
 
-From a Terminal window run:
+You can install Homebrew by executing:
 
+```shell script
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
 ```
-/usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
-```
 
-### Install OpenSSL
+### 3. Install OpenSSL
 
-```
+Do this by executing:
+
+```shell script
 brew install openssl
 export LC_ALL="en_US.UTF-8"\nexport LC_CTYPE="en_US.UTF-8"
 export LIBRARY_PATH=$LIBRARY_PATH:/usr/local/opt/openssl/lib/
 ```
 
-### Install Python 3.7
+### 4. Install Python 3.7
 
+We'll need Python 3.7 specifically, so install it through:
 
+```shell script
+brew install python@3.7
 ```
-brew install python3
-```
 
-### Install PIP
+### 5. Install `pip`
 
-```
+The package installer for Python can be installed through:
+
+```shell script
 sudo easy_install pip
 ```
 
-### Install virtualenv
+### 6. Install `virtualenv`
 
+Install `virtualenv` by executing:
 
-
-```
+```shell script
 pip3 install virtualenv
 ```
 
-### Install libpq
+### 7. Install database tools
 
-```
+Execute these 2 commands:
+
+```shell script
 brew install libpq
 ```
 
-### Install postgresql
-
-```
+```shell script
 brew install postgresql
 ```
 
-### Install psycopg2
+### 8. Install other dependencies
 
-```
-env LDFLAGS="-I/usr/local/opt/openssl/include -L/usr/local/opt/openssl/lib" pip install psycopg2
+There are a few more tools that will be needed for the Lumino installation. 
+
+Execute these commands sequentially:
+
+```shell script
+brew install pkg-config
 ```
 
+```shell script
+brew install libtool
+```
+
+```shell script
+env LDFLAGS="-I/usr/local/opt/openssl/include -L/usr/local/opt/openssl/lib" pip3 install psycopg2
+```
+
+```shell script
+brew tap cuber/homebrew-libsecp256k1
+brew install libsecp256k1
+```
 
 ## Build RIF Lumino from code
 
-1. Get the code from [https://github.com/rsksmart/lumino/releases/tag/1.0.0](https://github.com/rsksmart/lumino/releases/tag/1.0.0)
-2. Uncompress the downloaded file
-2. Go to the path you uncompressed the code in the previous step (lets call this path `$RIF_LUMINO_PATH`)
-3. Create python virtual env for RIF Lumino (this needs to be performed only once) and execute the following command:
+### 1. Get the code
 
-```
+Get the code from [the Github page](https://github.com/rsksmart/lumino/). You can either clone the repo or get the compressed version from the [releases page](https://github.com/rsksmart/lumino/releases). 
+
+Let's call your local path in which the code resides `$RIF_LUMINO_PATH`.
+
+### 2. Create an environment
+
+You'll only need to create a python virtual environment for RIF Lumino once. 
+
+Execute the following command:
+
+```shell script
 virtualenv -p <PATH_TO_PYTHON3.7> clientEnv
 ```
 
 **Note:**
-Replace `<PATH_TO_PYTHON3.7>` with the path where Python3.7 is installed in your system. In the case of MacOS, this is usually `/usr/local/bin/python3.7`
 
-4. Activate python virtual env, by executing the following command:
+Replace `<PATH_TO_PYTHON3.7>` with the path where Python3.7 is installed in your system. In the case of MacOS, this is usually `/usr/local/bin/python3.7`.
 
+You can verify your path to Python3.7 by executing:
+```shell script
+which python3
 ```
+
+### 3. Activate the environment
+Activate the python virtual environment by executing the following command:
+
+```shell script
 source clientEnv/bin/activate
 ```
 
-5. Check if the Python version is correct inside the virtual environment by running:
+Check if the Python version is correct inside the virtual environment by running:
 
-```
+```shell script
 python --version
 ```
 
-This command should output version 3.7.x
+This command should output version 3.7.x.
 
-6. Install RIF Lumino requirements. Inside the virtual environment run the following command (this could take a few minutes):
+### 4. Make sure `pip` is up-to-date
 
+Having the latest `pip` can help solve conflicts with dependencies. You can update `pip` by executing:
+
+```shell script
+python -m pip install -U pip
 ```
-pip install -c constraints.txt --upgrade -r requirements-dev.txt
+
+### 5. Install RIF Lumino requirements in your environment
+
+Inside the virtual environment, run the following command (this could take a few minutes):
+
+```shell script
+pip install -r requirements.txt -c constraints.txt -e .
 ```
 
-7. Run Lumino setup with the following command:
+**If you experience an error** related to the `grpcio-tools` library, execute the following command while inside the environment:
 
+```shell script
+GRPC_PYTHON_BUILD_SYSTEM_ZLIB=true pip install grpcio-tools
 ```
+
+and then run `pip install -r requirements.txt -c constraints.txt -e .` again.
+
+Finally, run the Lumino setup with the following command:
+
+```shell script
 python setup.py develop
 ```
 
 ## Start RIF Communications transport layer
-	
-The communication between Lumino nodes can be done both using RIF Communications (https://www.rifos.org/communications) and Matrix (https://matrix.org/).
-	
+
+The communication between Lumino nodes can be done both using [RIF Communications](https://www.rifos.org/communications) and [Matrix](https://matrix.org/).
+
 The default way, and the one encouraged to be used for a more decentralized ecosystem, is RIF Communications. 
-	
+
 In order to run Lumino using RIF Comms, you need to set up the RIF Communications node. To use Matrix, no configuration is required. 
-	
+
 ### Set up a RIF Communications bootnode
 
-Please follow the instructions in the (RIF Communications installation page)[https://github.com/rsksmart/rif-communications-pubsub-bootnode/tree/grpc-api].
-
+Please follow the instructions in the [RIF Communications installation page](https://github.com/rsksmart/rif-communications-pubsub-bootnode/tree/grpc-api).
 
 ## Start your RIF Lumino Node
 
@@ -164,47 +220,46 @@ Please follow the instructions in the (RIF Communications installation page)[htt
     | `$TRANSPORT_MODE`                         | Transport mode for Lumino. Supported values are `rif-comms` and `matrix`. Example of use: `--transport=matrix`. Defaults to `rif-comms`. |
     | `$GRPC_ENDPOINT`                          | The communication endpoint for the RIF Comms node used for transport purposes. Note that the `transport` flag must be set to `rif-comms` (explicitly or by default) for this parameter to be used. Defaults to `"localhost:5013"`.                                                                                                                                  |
 
+    More configuration options can be found by browsing the code.
 
+4.  After you run Lumino you will be presented with the following message:
+    
+    ```
+    Welcome to RIF Lumino Payments Protocol, Version 0.1
+    ---------------------------------------------------------------------------------------------------------------
+    | This is an Alpha version of experimental open source software released under the MIT license. By using the  |
+    | RIF Lumino Payments Protocol (the “Software”), you acknowledge that this is a test version of the Software  |
+    | and assume the risk that the Software may contain errors and/or bugs. RIF Labs Limited (“RIF Labs”) makes   |
+    | no guarantees or representations  whatsoever, including as to the suitability or use of the Software for    |
+    | any  purpose or regarding its compliance with any applicable laws or regulations. By using the Software,    |
+    | you acknowledge that you have read this disclosure agreement, understand its contents, and assume all risks |
+    | related to the use of of the software; further, by answering yes below and accepting the terms of this      |
+    | Agreement, you release and discharge RIF Labs, its officers, employees, or affiliates from, waive  any      |
+    | claims you might have against RIF Labs, its officers, employees, or affiliates in connection with, and      |
+    | agree not to sue RIF Labs or any of its officers, employees, or affiliates for any direct or indirect       |
+    | liability arising from the use of this Software.                                                            |
+    |                                                                                                             |
+    |                                                                                                             |
+    | Privacy Warning:                                                                                            |
+    |                                                                                                             |
+    | By using the RIF Lumino Payments Protocol, you acknowledge that your RSK address, channels, channel deposits|
+    | settlements, and the RSK address of your channel counterparty will be stored on the RSK blockchain—that is, |
+    | on servers of RSK node operators—and therefore will be publicly available. The parties running nodes on the |
+    | RIF Lumino network may also download and store this same or related information or data, and information or |
+    | data stored on Lumino nodes and  network channels will be publicly visible, including on a RIF Lumino block |
+    | explorer. By using the Software and by answering yes below, you acknowledge that information or data stored |
+    | on the Lumino network is extremely difficult to alter, remove, or delete; you further acknowledge that      |
+    | information or data related to individual tokens transfers will be made available via  the Lumino Payments  |
+    | Protocol to the recipient intermediating nodes of a specific transfer as well as to the Lumino server       |
+    | operators.                                                                                                  |
+    ---------------------------------------------------------------------------------------------------------------
+    Have you read and understood and do you accept the RIF Lumino Disclosure Agreement and Privacy Warning? [y/N]:
+    ```
 
-4.  After you run lumino command you will be presented with the following message:
+5. After you've accepted, you will be asked to select the account you want to use. Select the account and enter your passphrase to continue.
 
-```
-Welcome to RIF Lumino Payments Protocol, Version 0.1
----------------------------------------------------------------------------------------------------------------
-| This is an Alpha version of experimental open source software released under the MIT license. By using the  |
-| RIF Lumino Payments Protocol (the “Software”), you acknowledge that this is a test version of the Software  |
-| and assume the risk that the Software may contain errors and/or bugs. RIF Labs Limited (“RIF Labs”) makes   |
-| no guarantees or representations  whatsoever, including as to the suitability or use of the Software for    |
-| any  purpose or regarding its compliance with any applicable laws or regulations. By using the Software,    |
-| you acknowledge that you have read this disclosure agreement, understand its contents, and assume all risks |
-| related to the use of of the software; further, by answering yes below and accepting the terms of this      |
-| Agreement, you release and discharge RIF Labs, its officers, employees, or affiliates from, waive  any      |
-| claims you might have against RIF Labs, its officers, employees, or affiliates in connection with, and      |
-| agree not to sue RIF Labs or any of its officers, employees, or affiliates for any direct or indirect       |
-| liability arising from the use of this Software.                                                            |
-|                                                                                                             |
-|                                                                                                             |
-| Privacy Warning:                                                                                            |
-|                                                                                                             |
-| By using the RIF Lumino Payments Protocol, you acknowledge that your RSK address, channels, channel deposits|
-| settlements, and the RSK address of your channel counterparty will be stored on the RSK blockchain—that is, |
-| on servers of RSK node operators—and therefore will be publicly available. The parties running nodes on the |
-| RIF Lumino network may also download and store this same or related information or data, and information or |
-| data stored on Lumino nodes and  network channels will be publicly visible, including on a RIF Lumino block |
-| explorer. By using the Software and by answering yes below, you acknowledge that information or data stored |
-| on the Lumino network is extremely difficult to alter, remove, or delete; you further acknowledge that      |
-| information or data related to individual tokens transfers will be made available via  the Lumino Payments  |
-| Protocol to the recipient intermediating nodes of a specific transfer as well as to the Lumino server       |
-| operators.                                                                                                  |
----------------------------------------------------------------------------------------------------------------
-Have you read and understood and do you accept the RIF Lumino Disclosure Agreement and Privacy Warning? [y/N]:
-```
+### Contract addresses for each network
 
+Go to [the Lumino Github repo](https://github.com/rsksmart/lumino) for the latest addresses of the contracts.
 
-5. After you accepted you will be asked to select the account you want to use. Select the account and enter your passphrase to continue.
-
-
-### Contract addresses on each environment
-
-
-Go to [https://github.com/rsksmart/lumino](https://github.com/rsksmart/lumino) for the updated addresses of the contracts.
+You can also use your own contract addresses if you're connecting to a local blockchain for development or testing purposes. 

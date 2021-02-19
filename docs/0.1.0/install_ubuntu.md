@@ -128,9 +128,9 @@ python --version
 
 This command should output version 3.7.x.
 
-### 4. Make sure `pip` is up to date
+### 4. Make sure `pip` is up-to-date
 
-Having the latest `pip` can help solve conflicts with dependencies. You can update `pip` by executing;
+Having the latest `pip` can help solve conflicts with dependencies. You can update `pip` by executing:
 
 ```shell script
 python -m pip install -U pip
@@ -152,7 +152,7 @@ python setup.py develop
 
 ## Start RIF Communications transport layer
 
-The communication between Lumino nodes can be done both using RIF Communications (https://www.rifos.org/communications) and Matrix (https://matrix.org/).
+The communication between Lumino nodes can be done both using [RIF Communications](https://www.rifos.org/communications) and [Matrix](https://matrix.org/).
 
 The default way, and the one encouraged to be used for a more decentralized ecosystem, is RIF Communications. 
 
