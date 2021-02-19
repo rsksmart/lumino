@@ -8,7 +8,7 @@
 
 ## Recommended
 
-1. An RSK account with an RBTC balance of **at least** 0.001 RBTC, in order to be able to use the system.
+1. An RSK account with an RBTC balance of **at least** 0.001 RBTC, in order to be able to use all of the system features.
 
 ## Install required libraries/software
 
