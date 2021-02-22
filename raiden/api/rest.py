@@ -462,9 +462,9 @@ class APIServer(Runnable):
                     for cookie in cookies:
                         cookie = cookie.split('=')
                         if cookie[0] == "token" and request.method != 'GET' and request.path != '/api/v1/tokenAction':
-                            self.rest_api.raiden_api.validate_token_app(cookie[1])
+                            return self.rest_api.raiden_api.validate_token_app(cookie[1])
                 elif 'HTTP_TOKEN' in request_headers.environ:
-                    self.rest_api.raiden_api.validate_token_app(request_headers.environ['HTTP_TOKEN'])
+                    return self.rest_api.raiden_api.validate_token_app(request_headers.environ['HTTP_TOKEN'])
                 if LIGHT_CLIENT_API_KEY_HEADER in request_headers.environ:
                     # we check that this api key is for a valid LC and that the LC
                     # is associated with a valid matrix server
