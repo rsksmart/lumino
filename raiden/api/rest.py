@@ -2095,6 +2095,7 @@ class RestAPI:
             )
         return api_response(result=search_result)
 
+    @api_safe_operation()
     def create_invoice(self,
                        currency_symbol,
                        token_address,
