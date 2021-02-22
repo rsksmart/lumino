@@ -462,9 +462,9 @@ class APIServer(Runnable):
                     for cookie in cookies:
                         cookie = cookie.split('=')
                         if cookie[0] == "token" and request.method != 'GET' and request.path != '/api/v1/tokenAction':
-                            self.rest_api.raiden_api.validate_token_app(cookie[1])
+                            return self.rest_api.raiden_api.validate_token_app(cookie[1])
                 elif 'HTTP_TOKEN' in request_headers.environ:
-                    self.rest_api.raiden_api.validate_token_app(request_headers.environ['HTTP_TOKEN'])
+                    return self.rest_api.raiden_api.validate_token_app(request_headers.environ['HTTP_TOKEN'])
                 if LIGHT_CLIENT_API_KEY_HEADER in request_headers.environ:
                     # we check that this api key is for a valid LC and that the LC
                     # is associated with a valid matrix server
@@ -1399,6 +1399,7 @@ class RestAPI:
         result = self.partner_per_token_list_schema.dump(schema_list)
         return api_response(result=result.data)
 
+    @api_safe_operation()
     def initiate_payment_with_invoice(self, registry_address: typing.PaymentNetworkID, coded_invoice):
 
         invoice_decoded = self.raiden_api.decode_invoice(coded_invoice)
@@ -2094,6 +2095,7 @@ class RestAPI:
             )
         return api_response(result=search_result)
 
+    @api_safe_operation()
     def create_invoice(self,
                        currency_symbol,
                        token_address,
