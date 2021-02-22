@@ -1399,6 +1399,7 @@ class RestAPI:
         result = self.partner_per_token_list_schema.dump(schema_list)
         return api_response(result=result.data)
 
+    @api_safe_operation()
     def initiate_payment_with_invoice(self, registry_address: typing.PaymentNetworkID, coded_invoice):
 
         invoice_decoded = self.raiden_api.decode_invoice(coded_invoice)
