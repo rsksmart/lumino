@@ -1,0 +1,66 @@
+version: "2.2"
+
+services:
+    mongo-db:
+      image: "mongo"
+      restart: "no"
+      networks: ["mainnet_network"]
+      ports:
+        - "27017"
+        - "27018"
+        - "27019"
+    mysql-db:
+      image: "mysql"
+      command: --default-authentication-plugin=mysql_native_password
+      restart:  "no"
+      environment:
+        MYSQL_ROOT_PASSWORD: infuy
+      networks: ["mainnet_network"]
+      ports:
+      - "3306"
+      - "33060"
+    rsk-node:
+        image: "rsk-node-mainnet-image:latest"
+        restart: "no"
+        networks: ["mainnet_network"]
+        volumes:
+          - "./rsk-node/database:/var/lib/rsk/database/mainnet"
+        ports:
+            - "4444"
+            - "30305"
+
+    lumino-explorer:
+        environment:
+          TOKEN_NETWORK_REGISTRY: "0x060B81E90894E1F38A625C186CB1F4f9dD86A2B5"
+          #EXPLORER_API_URL: "http://localhost:8080/api/v1/" # this can use a dns name defined on hosts file to map to the final ip.
+          #EXPLORER_PORT: 8080
+          #RSK_ENDPOINT: "http://rsk-node:4444"
+          #MONGO_DB_HOST: "mongo-db"
+        image: "lumino-explorer-mainnet-image:latest"
+        restart: "no"
+        networks: ["mainnet_network"]
+        depends_on: ["mongo-db", "rsk-node"]
+        ports:
+            - "8080"
+            - "80"
+    rif-notifier:
+      environment:
+        TOKEN_NETWORK_REGISTRY: "0x060B81E90894E1F38A625C186CB1F4f9dD86A2B5"
+        RNS_MULTICHAIN_CONTRACT: "0x99a12be4C89CbF6CFD11d1F2c029904a7B644368"
+        #NOTIFIER_PORT: 8080
+        #RSK_ENDPOINT: "http://rsk-node:4444"
+        #NOTIFIER_DB_URL: "jdbc:mysql://mysql-db:3306/rif_notifier" # Not compatible with replica option
+        #NOTIFIER_DB_SCHEMA_NAME: "rif_notifier_1" # Not compatible with replica option
+        #NOTIFIER_DB_USERNAME: root
+        #NOTIFIER_DB_PASSWORD: infuy
+      image: "rif-notifier-mainnet-image:latest"
+      restart: "no"
+      networks: ["mainnet_network"]
+      depends_on: ["mysql-db", "rsk-node"]
+      ports:
+        - "8080"
+      scale: 3
+
+networks:
+  mainnet_network:
+    external: true

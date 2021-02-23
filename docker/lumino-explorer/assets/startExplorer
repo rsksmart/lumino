@@ -1,0 +1,75 @@
+#!/bin/bash
+
+INIT_LOG=/root/init.log
+
+exec 3>&1 4>&2
+trap 'exec 2>&4 1>&3' 0 1 2 3
+exec 1>${INIT_LOG} 2>&1
+
+source "${HOME}/.sdkman/bin/sdkman-init.sh"
+source "${HOME}/.nvm/nvm.sh"
+
+EXPLORER_LOGS_FOLDER="/var/logs/explorer"
+EXPLORER_ROOT_FOLDER="${HOME}/lumino-explorer/lumino-explorer-api"
+EXPLORER_WEB_ROOT_FOLDER="${HOME}/lumino-explorer/lumino-explorer-web"
+EXPLORER_POM_FILE="${EXPLORER_ROOT_FOLDER}/pom.xml"
+EXPLORER_CREATE_DB_FILE=/root/createDB.js
+EXPLORER_DELETE_DB_FILE=/root/deleteDB.js
+HOST_IP=$(hostname -I)
+HOST_IP="${HOST_IP// /}"
+
+if [ "${EXPLORER_API_URL}" == "" ]; then
+    EXPLORER_API_URL="http://${HOST_IP}:8080/api/v1/"
+fi
+
+if [ "${RSK_ENDPOINT}" == "" ]; then
+    RSK_ENDPOINT="http://rsk-node:4444"
+fi
+
+if [ "${EXPLORER_PORT}" == "" ]; then
+    EXPLORER_PORT=8080
+fi
+
+if [ "${TOKEN_NETWORK_REGISTRY}" == "" ]; then
+    TOKEN_NETWORK_REGISTRY=0xed8c9163F888Bc2f9C4F299325003DA5fC8676DD
+fi
+
+if [ "${MONGO_DB_HOST}" == "" ]; then
+    MONGO_DB_HOST="mongo-db"
+fi
+
+echo "Starting Explorer:"
+echo "HOST_IP=${HOST_IP}"
+echo "EXPLORER_API_URL=${EXPLORER_API_URL}"
+echo "RSK_ENDPOINT=${RSK_ENDPOINT}"
+echo "EXPLORER_PORT=${EXPLORER_PORT}"
+echo "TOKEN_NETWORK_REGISTRY=${TOKEN_NETWORK_REGISTRY}"
+echo "MONGO_DB_HOST=${MONGO_DB_HOST}"
+
+echo "Building web"
+cd "${EXPLORER_WEB_ROOT_FOLDER}" || exit
+echo "Installing and building web"
+npm install && REACT_APP_API_URL="${EXPLORER_API_URL}" npm run build --production
+echo "Removing nginx directory"
+rm -rf "/var/www/html/explorer"
+echo "Moving production build to nginx directory"
+mv "${EXPLORER_WEB_ROOT_FOLDER}/build" "/var/www/html/explorer"
+echo "Starting nginx service"
+service nginx start
+
+# Init log folder
+if [ ! -d "${EXPLORER_LOGS_FOLDER}" ]; then
+    echo "Creating logs folder ${EXPLORER_LOGS_FOLDER}"
+    mkdir -p "${EXPLORER_LOGS_FOLDER}"
+fi
+
+echo "Initializing explorer database"
+
+# Init database
+mongosh --host "${MONGO_DB_HOST}" <"${EXPLORER_DELETE_DB_FILE}"
+mongosh --host "${MONGO_DB_HOST}" <"${EXPLORER_CREATE_DB_FILE}"
+
+echo "Running explorer"
+echo "mvn -f '${EXPLORER_POM_FILE}' spring-boot:run -Dspring-boot.run.jvmArguments='-Dserver.port=${EXPLORER_PORT} -Drsk.blockchain.endpoint=${RSK_ENDPOINT} -Dlumino.explorer.api.mongo.databasehost=${MONGO_DB_HOST} -Dlumino.contract.tokenNetworkRegistry=${TOKEN_NETWORK_REGISTRY}' > '${EXPLORER_LOGS_FOLDER}/server.log' 2>&1 &"
+
+mvn -f "${EXPLORER_POM_FILE}" spring-boot:run -Dspring-boot.run.jvmArguments="-Dserver.port=${EXPLORER_PORT} -Drsk.blockchain.endpoint=${RSK_ENDPOINT} -Dlumino.explorer.api.mongo.databasehost=${MONGO_DB_HOST} -Dlumino.contract.tokenNetworkRegistry=${TOKEN_NETWORK_REGISTRY}" >"${EXPLORER_LOGS_FOLDER}/server.log" 2>&1 &

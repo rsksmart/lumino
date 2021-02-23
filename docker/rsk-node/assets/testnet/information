@@ -1,0 +1,60 @@
+# LUMINO NETWORK
+
+- **EndpointRegistry:** 0xDbc02f59135811A934A7131A4013411696cE03f4
+- **SecretRegistry:** 0xed8c9163F888Bc2f9C4F299325003DA5fC8676DD
+- **TokenNetworkRegistry:** 0x47E5b7d85Da2004781FeD64aeEe414eA9CdC4f17
+
+## Lumino Token
+
+- **ContractAddress:** 0xd8561902A5cA61DD6320742e000494FB6f282175
+- **TokenNetworkAddress:** 0xc47293b3981cAe1eF8C30Fceac68af9661c9d31C
+
+## tRIF Token
+
+- **ContractAddress:** 0x19F64674D8A5B4E652319F5e239eFd3bc969A1fE
+- **TokenNetworkAddress:** 0x04665c8661A8039c945E3256fDf0a13700F1b99D
+
+### Comandos utilizados para deployar Lumino Contracts y Token en testnet
+
+```bash
+export PRIV_KEY=/home/jonathan/.ethereum/keystore/UTC--2020-12-02T15-48-25.457777902Z--c3f056b9cd29c4fc9209bb0f75e71a3360f9ea9f
+export VERSION="0.12.0"
+export MAX_TOKENS=1000000
+export PROVIDER="http://127.0.0.1:4444"
+python -m lumino_contracts.deploy lumino --rpc-provider $PROVIDER --private-key $PRIV_KEY  --gas-price 1  --contracts-version $VERSION --max-token-networks $MAX_TOKENS
+python -m lumino_contracts.deploy token --rpc-provider $PROVIDER --private-key $PRIV_KEY --gas-price 1 --token-supply 100000000000000 --token-name LuminoToken --token-decimals 18 --token-symbol LUM --contracts-version $VERSION
+export TokenNetworkRegistry="0x47E5b7d85Da2004781FeD64aeEe414eA9CdC4f17"
+export TOKEN="0xd8561902A5cA61DD6320742e000494FB6f282175"
+python -m lumino_contracts.deploy register --rpc-provider $PROVIDER --private-key $PRIV_KEY --gas-price 1 --gas-limit 6000000 --token-address $TOKEN --token-network-registry-address $TokenNetworkRegistry --contracts-version $VERSION --channel-participant-deposit-limit 10000000000000000000 --token-network-deposit-limit 1000000000000000000000
+```
+
+### Comandos utilizados para registrar tRIF en la Lumino Network
+
+```bash
+export TokenNetworkRegistry="0x47E5b7d85Da2004781FeD64aeEe414eA9CdC4f17"
+export TOKEN="0x19F64674D8A5B4E652319F5e239eFd3bc969A1fE"
+python -m lumino_contracts.deploy register --rpc-provider $PROVIDER --private-key $PRIV_KEY --gas-price 1 --gas-limit 6000000 --token-address $TOKEN --token-network-registry-address $TokenNetworkRegistry --contracts-version $VERSION --channel-participant-deposit-limit 10000000000000000000 --token-network-deposit-limit 1000000000000000000000
+```
+
+# RNS TestNet
+
+- **RNS registry:** 0x7d284aaac6e925aad802a53c0c69efe3764597b8
+- **Public resolver:** 0x1e7ae43e3503efb886104ace36051ea72b301cdf
+- **Multi-chain resolver:** 0x404308f2a2eec2cdc3cb53d7d295af11c903414e
+- **Name resolver:** 0x8587385ad60038bB181aFfDF687c4D1B80C4787e
+- **Reverse registrar:** 0xc1cb803d5169e0a9894bf0f8dcdf83090999842a
+- **RIF token:** 0x19F64674D8A5B4E652319F5e239eFd3bc969A1fE
+- **Auction registrar (legacy):** 0x3d1a11c623bd21375f2b69f4eec814f4ceeb1d8d
+- **RSK owner:** 0xca0a477e19bac7e0e172ccfd2e3c28a7200bdb71
+- **Name price:** 0x794f99f1a9382ba88b453ddb4bfa00acae8d50e8
+- **Bytes utils:** 0x7faf084ef72cb71f3383a5c568c70853ac4c298e
+- **FIFS registrar:** 0x36ffda909f941950a552011f2c50569fda14a169
+- **FIFS addr registrar:** 0x90734bd6bf96250a7b262e2bc34284b0d47c1e8d
+- **Renewer:** 0xe48ad1d5fbf61394b5a7d81ab2f36736a046657b
+
+## Deployer account
+
+Esta cuenta es con la que se deployo los contratos de lumino y por ende la que contiene los Lumino Tokens. Por lo que se puede utilizar como banco de tokens para pruebas. Ademas tiene saldo de tRIF.
+
+- **Address**: 0xC3f056b9cd29C4fC9209BB0F75e71A3360F9eA9f
+- **Private Key**: 0x02b9661e719a8df27be63e4bdba850af207c391719c2f4442dfb0070e97e0e30

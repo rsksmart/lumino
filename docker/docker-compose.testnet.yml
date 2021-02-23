@@ -1,0 +1,66 @@
+version: "2.2"
+
+services:
+    mongo-db:
+      image: "mongo"
+      restart: "no"
+      networks: ["testnet_network"]
+      ports:
+        - "27017"
+        - "27018"
+        - "27019"
+    mysql-db:
+      image: "mysql"
+      command: --default-authentication-plugin=mysql_native_password
+      restart:  "no"
+      environment:
+        MYSQL_ROOT_PASSWORD: infuy
+      networks: ["testnet_network"]
+      ports:
+      - "3306"
+      - "33060"
+    rsk-node:
+        image: "rsk-node-testnet-image:latest"
+        restart: "no"
+        networks: ["testnet_network"]
+        volumes:
+          - "./rsk-node/database:/var/lib/rsk/database/testnet"
+        ports:
+            - "4444"
+            - "30305"
+
+    lumino-explorer:
+        environment:
+          TOKEN_NETWORK_REGISTRY: "0x47E5b7d85Da2004781FeD64aeEe414eA9CdC4f17"
+          #EXPLORER_API_URL: "http://localhost:8080/api/v1/" # this can use a dns name defined on hosts file to map to the final ip.
+          #EXPLORER_PORT: 8080
+          #RSK_ENDPOINT: "http://rsk-node:4444"
+          #MONGO_DB_HOST: "mongo-db"
+        image: "lumino-explorer-testnet-image:latest"
+        restart: "no"
+        networks: ["testnet_network"]
+        depends_on: ["mongo-db", "rsk-node"]
+        ports:
+            - "8080"
+            - "80"
+    rif-notifier:
+      environment:
+        TOKEN_NETWORK_REGISTRY: "0x47E5b7d85Da2004781FeD64aeEe414eA9CdC4f17"
+        RNS_MULTICHAIN_CONTRACT: "0x404308f2a2eec2cdc3cb53d7d295af11c903414e"
+        #NOTIFIER_PORT: 8080
+        #RSK_ENDPOINT: "http://rsk-node:4444"
+        #NOTIFIER_DB_URL: "jdbc:mysql://mysql-db:3306/rif_notifier" # Not compatible with replica option
+        #NOTIFIER_DB_SCHEMA_NAME: "rif_notifier_1" # Not compatible with replica option
+        #NOTIFIER_DB_USERNAME: root
+        #NOTIFIER_DB_PASSWORD: infuy
+      image: "rif-notifier-testnet-image:latest"
+      restart: "no"
+      networks: ["testnet_network"]
+      depends_on: ["mysql-db", "rsk-node"]
+      ports:
+        - "8080"
+      scale: 3
+
+networks:
+  testnet_network:
+    external: true
