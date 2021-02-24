@@ -37,8 +37,8 @@ log = structlog.get_logger(__name__)
 # Seriously requests? For Humans?
 class TimeOutHTTPAdapter(HTTPAdapter):
     def __init__(self, *args, **kwargs):
-        self.timeout = kwargs.pop('timeout', None)
         super().__init__(*args, **kwargs)
+        self.timeout = kwargs.pop('timeout', None)
 
     def send(self, *args, **kwargs):
         if 'timeout' not in kwargs or not kwargs['timeout']:
