@@ -14,13 +14,12 @@ from tarfile import TarFile
 from typing import Any, Dict
 from zipfile import ZipFile
 
-import gevent
 import requests
 import structlog
 from cachetools.func import ttl_cache
 from eth_keyfile import create_keyfile_json
 from eth_utils import to_checksum_address
-from gevent import Greenlet
+from gevent import Greenlet, sleep, spawn, joinall
 from gevent.pool import Group, Pool
 from mirakuru import ProcessExitedWithError
 
@@ -324,7 +323,7 @@ class NodeRunner:
         keystore_file = keystore_path.joinpath('UTC--1')
         if not keystore_file.exists():
             log.debug('Initializing keystore', node=self._index)
-            gevent.sleep()
+            sleep()
             privkey = hashlib.sha256(
                 f'{self._runner.scenario_name}-{self._index}'.encode(),
             ).digest()
@@ -420,21 +419,21 @@ class NodeController:
             pool.join(raise_error=True)
             log.info('All nodes started')
 
-        starter = gevent.spawn(_start)
+        starter = spawn(_start)
         if wait:
             starter.get(block=True)
         return starter
 
     def stop(self):
         log.info('Stopping nodes')
-        stop_tasks = [gevent.spawn(runner.stop) for runner in self._node_runners]
-        gevent.joinall(stop_tasks, raise_error=True)
+        stop_tasks = [spawn(runner.stop) for runner in self._node_runners]
+        joinall(stop_tasks, raise_error=True)
         log.info('Nodes stopped')
 
     def kill(self):
         log.info('Killing nodes')
-        kill_tasks = [gevent.spawn(runner.kill) for runner in self._node_runners]
-        gevent.joinall(kill_tasks, raise_error=True)
+        kill_tasks = [spawn(runner.kill) for runner in self._node_runners]
+        joinall(kill_tasks, raise_error=True)
         log.info('Nodes killed')
 
     def initialize_nodes(self):
@@ -455,7 +454,7 @@ class NodeController:
                         raise ScenarioError(
                             f'Raiden node {runner._index} died with non-zero exit status',
                         ) from ex
-                gevent.sleep(.5)
+                sleep(.5)
 
         monitor_group = Group()
         for runner in self._node_runners:
@@ -465,4 +464,4 @@ class NodeController:
             while not monitor_group.join(.5, raise_error=True):
                 pass
 
-        return gevent.spawn(_wait)
+        return spawn(_wait)

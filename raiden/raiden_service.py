@@ -5,11 +5,11 @@ from collections import defaultdict
 from typing import Dict, List, NamedTuple, Union
 
 import filelock
-import gevent
 import structlog
 from eth_utils import is_binary_address, to_canonical_address, to_checksum_address
-from gevent import Greenlet
+from gevent import Greenlet, spawn, GreenletExit, killall
 from gevent.event import AsyncResult, Event
+from gevent.lock import Semaphore
 from raiden_contracts.contract_manager import ContractManager
 
 from raiden import constants, routing
@@ -348,9 +348,9 @@ class RaidenService(Runnable):
             self.serialization_file = None
             self.db_lock = None
 
-        self.event_poll_lock = gevent.lock.Semaphore()
-        self.gas_reserve_lock = gevent.lock.Semaphore()
-        self.payment_identifier_lock = gevent.lock.Semaphore()
+        self.event_poll_lock = Semaphore()
+        self.gas_reserve_lock = Semaphore()
+        self.payment_identifier_lock = Semaphore()
 
         # Flag used to skip the processing of all Raiden events during the
         # startup.
@@ -383,7 +383,7 @@ class RaidenService(Runnable):
 
         # start the registration early to speed up the start
         if self.config["transport_type"] == "udp":
-            endpoint_registration_greenlet = gevent.spawn(
+            endpoint_registration_greenlet = spawn(
                 self.discovery.register,
                 self.address,
                 self.config["transport"]["udp"]["external_ip"],
@@ -515,10 +515,10 @@ class RaidenService(Runnable):
         self.greenlet.name = f"RaidenService._run node:{pex(self.address)}"
         try:
             self.stop_event.wait()
-        except gevent.GreenletExit:  # killed without exception
+        except GreenletExit:  # killed without exception
             self.stop_event.set()
 
-            gevent.killall([self.alarm, self.transport])  # kill children
+            killall([self.alarm, self.transport])  # kill children
             raise  # re-raise to keep killed status
         except Exception:
             self.stop()
@@ -738,7 +738,7 @@ class RaidenService(Runnable):
             This is spawing a new greenlet for /each/ transaction. It's
             therefore /required/ that there is *NO* order among these.
         """
-        return gevent.spawn(self._handle_event, chain_state, raiden_event)
+        return spawn(self._handle_event, chain_state, raiden_event)
 
     def _handle_event(self, chain_state: ChainState, raiden_event: RaidenEvent):
         assert isinstance(chain_state, ChainState)

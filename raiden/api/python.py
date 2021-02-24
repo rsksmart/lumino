@@ -5,11 +5,10 @@ from datetime import datetime, date
 from http import HTTPStatus
 
 import dateutil.parser
-import gevent
 import structlog
 from dateutil.relativedelta import relativedelta
 from eth_utils import is_binary_address, to_checksum_address, to_canonical_address, to_normalized_address, encode_hex
-from gevent import Greenlet
+from gevent import Greenlet, joinall
 
 import raiden.blockchain.events as blockchain_events
 from raiden import waiting, routing
@@ -883,7 +882,7 @@ class RaidenAPI:
 
             greenlets.update(self.raiden.handle_state_change(channel_close))
 
-        gevent.joinall(greenlets, raise_error=True)
+        joinall(greenlets, raise_error=True)
 
     def channel_batch_close(
         self,
