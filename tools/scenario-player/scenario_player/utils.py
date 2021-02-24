@@ -35,7 +35,8 @@ log = structlog.get_logger(__name__)
 
 
 # Seriously requests? For Humans?
-class TimeOutHTTPAdapter(HTTPAdapter):
+# TODO: Skipping LGTM false positive warning
+class TimeOutHTTPAdapter(HTTPAdapter):  # lgtm [py/missing-call-to-init]
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.timeout = kwargs.pop('timeout', None)
