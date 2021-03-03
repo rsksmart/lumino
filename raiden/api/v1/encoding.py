@@ -546,7 +546,7 @@ class InvoiceCreateSchema(BaseSchema):
     currency_symbol = fields.String(required=True, missing=None)
     token_address = AddressField(required=True)
     partner_address = AddressField(required=True)
-    amount = fields.Integer(default=None, missing=None)
+    amount = fields.Float(default=None, missing=None)
     expires = fields.Integer(default=None, missing=None)
 
     class Meta:
