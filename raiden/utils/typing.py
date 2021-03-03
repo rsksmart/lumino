@@ -105,7 +105,7 @@ PaymentHashInvoice = NewType("PaymentHashInvoice", T_PaymentHashInvoice)
 T_PaymentAmount = int
 PaymentAmount = NewType("PaymentAmount", T_PaymentAmount)
 
-T_InvoiceAmount = float
+T_InvoiceAmount = int
 InvoiceAmount = NewType("InvoiceAmount", T_InvoiceAmount)
 
 T_Invoice_Expires = int
