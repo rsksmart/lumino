@@ -1462,6 +1462,7 @@ class RestAPI:
 
     def make_payment_with_invoice(self, registry_address, invoice):
         wei_amount = int(invoice['amount'])
+        print("MAKING PAYMENT OF", wei_amount)
         # We make payment with data of invoice
         result = self.initiate_payment(registry_address,
                                        to_canonical_address(invoice['token_address']),
