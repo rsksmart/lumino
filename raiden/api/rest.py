@@ -1461,7 +1461,7 @@ class RestAPI:
         return result
 
     def make_payment_with_invoice(self, registry_address, invoice):
-        wei_amount = Web3.toWei(invoice['amount'], 'ether')
+        wei_amount = invoice['amount']
         # We make payment with data of invoice
         result = self.initiate_payment(registry_address,
                                        to_canonical_address(invoice['token_address']),
