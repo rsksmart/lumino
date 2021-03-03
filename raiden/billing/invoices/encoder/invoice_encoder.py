@@ -61,9 +61,10 @@ def encode_invoice(addr, privkey):
 
     if addr.amount:
         amount = Decimal(str(addr.amount))
-        # We can only send down to millisatoshi.
-        if amount * 10 ** 12 % 10:
-            raise ValueError("Cannot encode {}: too many decimal places".format(
+        # the minimum amount for an invoice is the equivalent of 1 millisatoshi, in wei
+        # this is done for compatibility reasons with Lightning Invoices
+        if amount < 10000000:
+            raise ValueError("cannot generate invoice, amount {} is too low to comply with BOLT #11".format(
                 addr.amount))
 
         amount = addr.currency + shorten_amount(amount)
