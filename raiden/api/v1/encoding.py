@@ -33,6 +33,15 @@ class InvalidEndpoint(NotFound):
 class HexAddressConverter(BaseConverter):
     @staticmethod
     def to_python(value):
+        try:
+            # we checksum the input value to avoid having errors later.
+            value = to_checksum_address(value.strip())
+        except ValueError:
+            raise InvalidEndpoint("Could not checksum address.")
+
+        # TODO: we should remove these checks?
+        # all these checks are not necessary since we already checksum the input value.
+        # we keep them to avoid adding more changes now
         if not is_0x_prefixed(value):
             raise InvalidEndpoint("Not a valid hex address, 0x prefix missing.")
 
@@ -55,18 +64,7 @@ class LuminoAddressConverter(BaseConverter):
     def to_python(self, value):
         if is_rns_address(value):
             return value
-        if not is_0x_prefixed(value):
-            raise InvalidEndpoint('Not a valid hex address, 0x prefix missing.')
-
-        if not is_checksum_address(value):
-            raise InvalidEndpoint('Not a valid EIP55 encoded address.')
-
-        try:
-            value = to_canonical_address(value)
-        except ValueError:
-            raise InvalidEndpoint('Could not decode hex.')
-
-        return value
+        return HexAddressConverter.to_python(value)
 
 
 class AddressRnsField(fields.Field):
@@ -82,6 +80,12 @@ class AddressRnsField(fields.Field):
 
 
 def deserialize_address_helper(self, value, attr, data):  # pylint: disable=unused-argument
+    # deserializing the value to checksum address, if the result is not ok then it should fail
+    try:
+        value = to_checksum_address(value.strip())
+    except ValueError:
+        self.fail("invalid_checksum")
+
     if not is_0x_prefixed(value):
         self.fail("missing_prefix")
 
@@ -347,7 +351,7 @@ class ChannelPutSchema(BaseSchema):
     token_address = AddressField(required=True)
     partner_address = AddressField(required=True)
     settle_timeout = fields.Integer(missing=None)
-    total_deposit = fields.Integer(default=None, missing=None)
+    total_deposit = fields.Integer(default=0, missing=None)
 
     class Meta:
         strict = True
@@ -542,7 +546,7 @@ class InvoiceCreateSchema(BaseSchema):
     currency_symbol = fields.String(required=True, missing=None)
     token_address = AddressField(required=True)
     partner_address = AddressField(required=True)
-    amount = fields.Integer(default=None, missing=None)
+    amount = fields.Float(default=None, missing=None)
     expires = fields.Integer(default=None, missing=None)
 
     class Meta:

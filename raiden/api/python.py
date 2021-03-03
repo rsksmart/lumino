@@ -37,8 +37,6 @@ from raiden.exceptions import (
     InvalidAmount,
     InvalidSecret,
     InvalidSecretHash,
-    TokenAppNotFound,
-    TokenAppExpired,
     RaidenRecoverableError,
     UnknownTokenAddress,
     InvoiceCoding,
@@ -244,7 +242,9 @@ class RaidenAPI:
         token_result = self.get_token_action(token_app)
         result = {}
         if token_result is None:
-            raise TokenAppNotFound("Token app not found")
+            return ApiErrorBuilder.build_and_log_error(errors="Token app not found",
+                                                       status_code=HTTPStatus.BAD_REQUEST,
+                                                       log=log)
         if isinstance(token_result, tuple):
             result['identifier'] = token_result[0]
             result['token'] = token_result[1]
@@ -258,7 +258,9 @@ class RaidenAPI:
         diff_minutes = diff.total_seconds() / 60
         time_elapsed = diff_minutes - 30
         if time_elapsed > 30:
-            raise TokenAppExpired("Token app expired")
+            return ApiErrorBuilder.build_and_log_error(errors="Token app expired",
+                                                       status_code=HTTPStatus.BAD_REQUEST,
+                                                       log=log)
 
     def register_secret_light(self, signed_tx: typing.SignedTransaction):
         self.raiden.default_secret_registry.proxy.broadcast_signed_transaction_and_wait(signed_tx)

@@ -466,7 +466,7 @@ def test_unsubscribe_from_invalid_address(comms_clients):
     # bypass client.unsubscribe_from to provide an invalid address as topic
     expect_error(
         expected_exception=RpcError,
-        expected_mapped_type=NotFoundException,
+        expected_mapped_type=InvalidArgumentException,
         expected_code=StatusCode.INVALID_ARGUMENT,
         expected_message=invalid_address_message,
         call=client.stub.CloseTopicWithRskAddress,
@@ -477,7 +477,7 @@ def test_unsubscribe_from_invalid_address(comms_clients):
     # bypass client.unsubscribe_from to provide an invalid address as subscriber
     expect_error(
         expected_exception=RpcError,
-        expected_mapped_type=NotFoundException,
+        expected_mapped_type=InvalidArgumentException,
         expected_code=StatusCode.INVALID_ARGUMENT,
         expected_message=invalid_address_message,
         call=client.stub.CloseTopicWithRskAddress,
