@@ -45,6 +45,7 @@ def decode_invoice(coded_invoice, verbose=True):
         # amount required for payment.
         if amountstr != '':
             invoice.amount = unshorten_amount(amountstr)
+    print("DECODE_INVOICE()", invoice.amount)
 
     invoice.date = data.read(35).uint
 
