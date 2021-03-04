@@ -992,9 +992,6 @@ class SQLiteStorage:
 
         cursor = self.conn.cursor()
 
-        print(query[0])
-        print(query[1])
-
         cursor.execute(
             query[0],
             query[1],
