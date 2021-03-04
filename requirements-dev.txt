@@ -22,3 +22,6 @@ bump2version==0.5.8
 matrix-synapse==1.5.1
 json5
 pytest-repeat
+Pygments==2.7.4
+PyHamcrest==2.0.2
+Twisted==20.3.0
