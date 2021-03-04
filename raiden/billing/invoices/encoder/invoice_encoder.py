@@ -61,8 +61,8 @@ def encode_invoice(addr, privkey):
 
     if addr.amount:
         amount = Decimal(str(addr.amount))
-        # We can only send down to millisatoshi.
-        if amount * 10 ** 12 % 10:
+        # per BOLT #11: smallest amount allowed is 0.000000000001 units
+        if amount * 10 ** 13 % 10:
             raise ValueError("cannot generate invoice, amount {} is too low to comply with BOLT #11".format(
                 addr.amount))
 
