@@ -40,3 +40,6 @@ git+git://github.com/infuy/web3.py@rsk-4.8.2#egg=web3
 # RIF Comms protobuffer
 grpcio-tools==1.33.2
 grpcio==1.33.2
+Pygments==2.7.4
+PyHamcrest==2.0.2
+Twisted==20.3.0
