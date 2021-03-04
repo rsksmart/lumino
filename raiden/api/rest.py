@@ -1403,7 +1403,7 @@ class RestAPI:
     def initiate_payment_with_invoice(self, registry_address: typing.PaymentNetworkID, coded_invoice):
 
         invoice_decoded = self.raiden_api.decode_invoice(coded_invoice)
-        print("INVOICE_DECODED", invoice_decoded.amount)
+
         persistent_invoice = self.raiden_api.get_invoice(encode_hex(invoice_decoded.paymenthash))
 
         tags_dict = get_tags_dict(invoice_decoded.tags)
@@ -1461,8 +1461,7 @@ class RestAPI:
         return result
 
     def make_payment_with_invoice(self, registry_address, invoice):
-        wei_amount = int(invoice['amount'])
-        print("MAKING PAYMENT OF", wei_amount)
+        wei_amount = Web3.toWei(invoice['amount'], 'ether')
         # We make payment with data of invoice
         result = self.initiate_payment(registry_address,
                                        to_canonical_address(invoice['token_address']),

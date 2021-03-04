@@ -45,7 +45,6 @@ def decode_invoice(coded_invoice, verbose=True):
         # amount required for payment.
         if amountstr != '':
             invoice.amount = unshorten_amount(amountstr)
-    print("DECODE_INVOICE()", invoice.amount)
 
     invoice.date = data.read(35).uint
 
@@ -157,7 +156,6 @@ def unshorten_amount(amount):
     #* `u` (micro): multiply by 0.000001
     #* `n` (nano): multiply by 0.000000001
     #* `p` (pico): multiply by 0.000000000001
-    print("UNSHORTEN_AMOUNT BEGIN", amount)
     units = {
         'p': 10**12,
         'n': 10**9,
@@ -174,7 +172,6 @@ def unshorten_amount(amount):
     if unit in units.keys():
         return Decimal(amount[:-1]) / units[unit]
     else:
-        print("UNSHORTEN_AMOUNT END", Decimal(amount))
         return Decimal(amount)
 
 

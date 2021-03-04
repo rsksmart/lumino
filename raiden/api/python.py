@@ -1531,13 +1531,11 @@ class RaidenAPI:
         self.raiden.wal.storage.update_invoice(data)
 
     def create_invoice(self, data):
-        print("CREATING INVOICE")
         if data['already_coded_invoice']:
             persisted_invoice = self.persist_invoice(data)
         else:
             persisted_invoice = self.do_encode_invoce(data)
 
-        print("CREATED INVOICE", persisted_invoice)
         return persisted_invoice
 
     def persist_invoice(self, data):
