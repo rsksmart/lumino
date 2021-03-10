@@ -1,0 +1,58 @@
+#!/bin/bash
+
+if [ "" == "${ENV_NAME}" ]; then
+  ENV_NAME=nodeEnvironment
+fi
+
+if [ "" == "${TOKEN_NETWORK_REGISTRY}" ]; then
+  echo "You need to specify TOKEN_NETWORK_REGISTRY environment value."
+  exit 1
+fi
+
+if [ "" == "${SECRET_REGISTRY}" ]; then
+  echo "You need to specify SECRET_REGISTRY environment value."
+  exit 1
+fi
+
+if [ "" == "${ENDPOINT_REGISTRY}" ]; then
+  echo "You need to specify ENDPOINT_REGISTRY environment value."
+  exit 1
+fi
+
+if [ "" == "${HUB_MODE}" ]; then
+  HUB_MODE=0
+fi
+
+if [ "" == "${RSK_ENDPOINT}" ]; then
+  RSK_ENDPOINT="http://localhost:4444"
+fi
+
+if [ "" == "${EXPOSE_ENDPOINT}" ]; then
+  EXPOSE_ENDPOINT="http://localhost"
+fi
+
+if [ "" == "${NODE_PORT}" ]; then
+  NODE_PORT=5001
+fi
+
+if [ "" == "${NETWORK_ID}" ]; then
+  NETWORK_ID=33
+fi
+
+if [ "" == "${GRPC_ENDPOINT}" ]; then
+  GRPC_ENDPOINT=localhost:6012
+fi
+
+trap ctrl_c INT
+
+function ctrl_c() {
+	source deactivate
+}
+
+args $0 "$@"
+
+if [[ ${HUB_MODE} == 1 ]]; then
+    lumino --transport=rif-comms --grpc-endpoint ${GRPC_ENDPOINT} --hub-mode --keystore-path ~/.ethereum/keystore --network-id ${NETWORK_ID} --eth-rpc-endpoint ${RSK_ENDPOINT} --environment-type development --tokennetwork-registry-contract-address=${TOKEN_NETWORK_REGISTRY} --secret-registry-contract-address=${SECRET_REGISTRY} --endpoint-registry-contract-address=${ENDPOINT_REGISTRY} --no-sync-check --api-address=${EXPOSE_ENDPOINT}:${PORT}
+else
+    lumino --transport=matrix --grpc-endpoint ${GRPC_ENDPOINT} --keystore-path ~/.ethereum/keystore --network-id ${NETWORK_ID} --eth-rpc-endpoint ${RSK_ENDPOINT} --environment-type development --tokennetwork-registry-contract-address=${TOKEN_NETWORK_REGISTRY} --secret-registry-contract-address=${SECRET_REGISTRY} --endpoint-registry-contract-address=${ENDPOINT_REGISTRY} --no-sync-check --api-address=${EXPOSE_ENDPOINT}:${PORT}
+fi
