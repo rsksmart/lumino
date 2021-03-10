@@ -6,6 +6,7 @@ ENV RIF_COMMS_BRANCH=grpc-api
 ENV NODE_PORT=5001
 ENV NETWORK_ID=33
 ENV RSK_ENDPOINT="http://localhost:4444"
+ENV PYTHON_VERSION=3.7.3
 
 # Installing basic packages
 RUN apt-get update && \
@@ -13,14 +14,14 @@ RUN apt-get update && \
 	software-properties-common unzip zip ssh git libcurl4 openssl liblzma5 tar
 RUN apt-get install -y libsecp256k1-dev libssl-dev automake pkg-config libtool libffi-dev libgmp-dev libyaml-cpp-dev \
 	libreadline-gplv2-dev libncursesw5-dev libssl-dev \
-    libsqlite3-dev tk-dev libgdbm-dev libc6-dev libbz2-dev libffi-dev zlib1g-dev \
+    libsqlite3-dev tk-dev libgdbm-dev libc6-dev libbz2-dev libffi-dev zlib1g-dev && \
 	rm -rf /var/lib/apt/lists/* && \
 	rm -rf /tmp/*
 
-RUN cd /usr/src && wget https://www.python.org/ftp/python/3.7.3/Python-3.7.3.tgz \
-    && tar xzf Python-3.7.9.tgz && cd Python-3.7.9 && ./configure --enable-optimizations && make altinstall
+RUN cd /usr/src && wget https://www.python.org/ftp/python/$PYTHON_VERSION/Python-$PYTHON_VERSION.tgz \
+    && tar xzf Python-$PYTHON_VERSION.tgz && cd Python-$PYTHON_VERSION && ./configure --enable-optimizations && make altinstall
 
-RUN python3.7 -V && python -V
+RUN update-alternatives --install /usr/local/bin/python python /usr/local/bin/python3.7 0
 
 RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.35.3/install.sh | bash
 RUN /bin/bash -c "source /root/.nvm/nvm.sh && nvm install v14.13 && npm config set user 0 && npm config set unsafe-perm true"
@@ -36,7 +37,7 @@ COPY assets/createEnvironment /root/lumino
 COPY assets/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 RUN chmod +x /root/lumino/createEnvironment
 RUN chmod +x /root/lumino/startLumino
-RUN /bin/bash -c "source /root/.pyenv-setup && cd /root/lumino && ./createEnvironment"
+RUN cd /root/lumino && ./createEnvironment
 
 EXPOSE $NODE_PORT
 
