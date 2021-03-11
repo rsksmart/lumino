@@ -16,8 +16,8 @@ python -m venv ${ENV_NAME}
 
 source ${ENV_NAME}/bin/activate
 
-pip install -r requirements.txt -c constraints.txt -e .
+pip install --upgrade pip -r requirements.txt -c constraints.txt -e .
 
 python setup.py develop
 
-source deactivate
+deactivate

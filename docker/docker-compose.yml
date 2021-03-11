@@ -1,0 +1,15 @@
+version: "2.2"
+
+services:
+    lumino-node:
+        env_file:
+          - ".env"
+        build: "."
+        restart: "no"
+        network_mode: "host"
+        volumes:
+          - "./volumes/lumino-keystore:/root/.ethereum/keystore"
+          - "./volumes/rif-comms-key:/root/.rif-comms"
+          - "./volumes/rif-comms-config:/root/rif-communications-pubsub-bootnode/config"
+        ports:
+            - "5001:5001"

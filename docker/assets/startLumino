@@ -1,5 +1,19 @@
 #!/bin/bash
 
+# Setup node to run rif-comms node
+
+source /root/.nvm/nvm.sh && nvm use 14.13
+
+cd /root/rif-communications-pubsub-bootnode || exit 1
+
+# Run rif-comms with pm2
+
+NODE_ENV=server pm2 start --name rif-comms npm -- run api-server
+
+# Setup environment vars for lumino node
+
+cd /root/lumino || exit 1
+
 if [ "" == "${ENV_NAME}" ]; then
   ENV_NAME=nodeEnvironment
 fi
@@ -20,39 +34,64 @@ if [ "" == "${ENDPOINT_REGISTRY}" ]; then
 fi
 
 if [ "" == "${HUB_MODE}" ]; then
-  HUB_MODE=0
+  HUB_MODE="disabled"
 fi
 
 if [ "" == "${RSK_ENDPOINT}" ]; then
   RSK_ENDPOINT="http://localhost:4444"
 fi
 
-if [ "" == "${EXPOSE_ENDPOINT}" ]; then
-  EXPOSE_ENDPOINT="http://localhost"
-fi
-
 if [ "" == "${NODE_PORT}" ]; then
-  NODE_PORT=5001
+  NODE_PORT="5001"
 fi
 
 if [ "" == "${NETWORK_ID}" ]; then
-  NETWORK_ID=33
+  NETWORK_ID="33"
 fi
 
-if [ "" == "${GRPC_ENDPOINT}" ]; then
-  GRPC_ENDPOINT=localhost:6012
+if [ "" == "${GRPC_PORT}" ]; then
+  GRPC_PORT="6012"
 fi
+
+# Setup trap for Ctrl+C to stop lumino node and deactivate the environment and stop rif-comms
 
 trap ctrl_c INT
 
 function ctrl_c() {
-	source deactivate
+	deactivate
+	pm2 stop rif-comms
 }
 
-args $0 "$@"
+# Setup environment
 
-if [[ ${HUB_MODE} == 1 ]]; then
-    lumino --transport=rif-comms --grpc-endpoint ${GRPC_ENDPOINT} --hub-mode --keystore-path ~/.ethereum/keystore --network-id ${NETWORK_ID} --eth-rpc-endpoint ${RSK_ENDPOINT} --environment-type development --tokennetwork-registry-contract-address=${TOKEN_NETWORK_REGISTRY} --secret-registry-contract-address=${SECRET_REGISTRY} --endpoint-registry-contract-address=${ENDPOINT_REGISTRY} --no-sync-check --api-address=${EXPOSE_ENDPOINT}:${PORT}
-else
-    lumino --transport=matrix --grpc-endpoint ${GRPC_ENDPOINT} --keystore-path ~/.ethereum/keystore --network-id ${NETWORK_ID} --eth-rpc-endpoint ${RSK_ENDPOINT} --environment-type development --tokennetwork-registry-contract-address=${TOKEN_NETWORK_REGISTRY} --secret-registry-contract-address=${SECRET_REGISTRY} --endpoint-registry-contract-address=${ENDPOINT_REGISTRY} --no-sync-check --api-address=${EXPOSE_ENDPOINT}:${PORT}
+source ${ENV_NAME}/bin/activate
+
+# Setup the default command
+
+COMMAND="lumino --transport=rif-comms --grpc-endpoint localhost:${GRPC_PORT} --keystore-path ~/.ethereum/keystore --network-id ${NETWORK_ID} --eth-rpc-endpoint ${RSK_ENDPOINT} --environment-type development --tokennetwork-registry-contract-address=${TOKEN_NETWORK_REGISTRY} --secret-registry-contract-address=${SECRET_REGISTRY} --endpoint-registry-contract-address=${ENDPOINT_REGISTRY} --no-sync-check --api-address=http://localhost:${NODE_PORT}"
+
+# Adding the flag if HUB_MODE is enabled
+
+if [[ ${HUB_MODE} == "enabled" ]]; then
+    COMMAND+=" --hub-mode"
 fi
+
+# Print out the env variables to check information on console
+
+echo ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> Starting Lumino Node <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<"
+echo "ENV_NAME=${ENV_NAME}"
+echo "TOKEN_NETWORK_REGISTRY=${TOKEN_NETWORK_REGISTRY}"
+echo "SECRET_REGISTRY=${SECRET_REGISTRY}"
+echo "ENDPOINT_REGISTRY=${ENDPOINT_REGISTRY}"
+echo "RSK_ENDPOINT=${RSK_ENDPOINT}"
+echo "NETWORK_ID=${NETWORK_ID}"
+echo "GRPC_PORT=${GRPC_PORT}"
+echo "HUB_MODE=${HUB_MODE}"
+echo "COMMAND=${COMMAND}"
+echo ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> Starting Lumino Node <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<"
+
+# Executing the lumino node
+
+eval ${COMMAND}
+
+exit 0
