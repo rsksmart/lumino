@@ -11,5 +11,3 @@ services:
           - "./volumes/lumino-keystore:/root/.ethereum/keystore"
           - "./volumes/rif-comms-key:/root/.rif-comms"
           - "./volumes/rif-comms-config:/root/rif-communications-pubsub-bootnode/config"
-        ports:
-            - "5001:5001"
