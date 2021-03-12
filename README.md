@@ -16,7 +16,7 @@ You can run lumino with docker instead of installing everything locally.
 * **Pre-requisites**
     * Install docker
     * Install docker-compose
-    * Create a config file for rif-comms node to work with docker. [Here is how to do that.](./docker/docs/create-rif-comms-config.md)
+    * Create a config file for rif-comms node to work with docker, the config file needs to be called `server.json5`. [Here is how to do that.](./docker/docs/create-rif-comms-config.md)
     * Have a key for the rif-comms node. [Here is how to create it.](https://github.com/rsksmart/rif-communications-pubsub-bootnode/tree/grpc-api)
     * Have an account created to use with the lumino node.
     

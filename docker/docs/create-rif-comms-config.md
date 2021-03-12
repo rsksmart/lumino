@@ -46,3 +46,5 @@ The rif-comms configuration file has to be something like this:
 ```
 
 You can customize everything but be aware that these properties are relative to the docker container.
+
+**IMPORTANT: the config file needs to be saved with name server.json5**
