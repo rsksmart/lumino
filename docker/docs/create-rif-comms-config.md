@@ -45,6 +45,8 @@ The rif-comms configuration file has to be something like this:
 }
 ```
 
-You can customize everything but be aware that these properties are relative to the docker container.
+You can customize everything but be aware that these properties are relative to the docker container, if
+you edit the port configuration remember to update that in the `docker-compose.yml` file to expose those ports.
+ 
 
 **IMPORTANT: the config file needs to be saved with name server.json5**

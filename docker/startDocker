@@ -1,33 +1,6 @@
 #!/bin/bash
 
-RIF_COMMS_CONFIG_FOLDER=$1
-RIF_COMMS_KEY_FOLDER=$2
-LUMINO_KEYSTORE_FOLDER=$3
-
-function printUsage () {
-    echo "Usage: ./startDocker <RIF_COMMS_CONFIG_FOLDER> <RIF_COMMS_KEY_FOLDER> <LUMINO_KEYSTORE_FOLDER>"
-    echo "RIF_COMMS_CONFIG_FOLDER: folder containing the config file for rif-comms server called server.json5"
-    echo "RIF_COMMS_KEY_FOLDER: folder containing the key file to use for the rif-comms server"
-    echo "LUMINO_KEYSTORE_FOLDER: folder containing the keystore for lumino node"
-}
-
-if [ "" == "${RIF_COMMS_CONFIG_FOLDER}" ]; then
-  echo "You need to specify RIF_COMMS_CONFIG_FOLDER argument."
-  printUsage
-  exit 1
-fi
-
-if [ "" == "${RIF_COMMS_KEY_FOLDER}" ]; then
-  echo "You need to specify RIF_COMMS_KEY_FOLDER argument."
-  printUsage
-  exit 1
-fi
-
-if [ "" == "${LUMINO_KEYSTORE_FOLDER}" ]; then
-  echo "You need to specify LUMINO_KEYSTORE_FOLDER argument."
-  printUsage
-  exit 1
-fi
+ROOT_FOLDER_NAME=${PWD##*/}
 
 if ! command -v docker &> /dev/null
 then
@@ -50,13 +23,19 @@ function clean() {
 	echo "Done"
 }
 
-ln -s "${RIF_COMMS_CONFIG_FOLDER}" volumes/rif-comms-config
-ln -s "${RIF_COMMS_KEY_FOLDER}" volumes/rif-comms-key
-ln -s "${LUMINO_KEYSTORE_FOLDER}" volumes/lumino-keystore
+NETWORK=$(sudo docker network ls --filter name=lumino_network -q)
+if [ "${NETWORK}" == "" ]; then
+    echo "Creating network lumino_network"
+    sudo docker network create lumino_network
+fi
+
+source .env
+
+# TODO: tenemos que cargar el env dinamicamente, y arreglar el tema de los nombres de los contenedores
 
 sudo docker-compose build
 sudo docker-compose up -d
-sudo docker exec -it docker_lumino-node_1 "/root/lumino/startLumino"
+sudo docker exec -it "${ROOT_FOLDER_NAME}_lumino-node_1" "/root/lumino/startLumino"
 
 clean
 

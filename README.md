@@ -35,6 +35,7 @@ To run lumino on the docker container you have to do these steps:
         * Run `ln -s /folder/where/you/have/lumino/keystore volumes/lumino-keystore`
         * Run `ln -s /folder/where/you/have/rif-comms/key volumes/rif-comms-key`
         * Run `ln -s /folder/where/you/have/rif-comms/config volumes/rif-comms-config`
+        * Run `sudo docker network create lumino-network` to create the container network.
         * Run `sudo docker-compose build` to build the docker image.
         * Run `sudo docker-compose up -d` to start the lumino container.
         * Run `sudo docker exec -it docker_lumino-node_1 /root/lumino/startLumino` to run lumino and rif-comms nodes.

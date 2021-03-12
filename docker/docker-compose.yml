@@ -3,11 +3,11 @@ version: "2.2"
 services:
     lumino-node:
         env_file:
-          - ".env"
+          - "node1.env"
         build: "."
         restart: "no"
         network_mode: "host"
         volumes:
-          - "./volumes/lumino-keystore:/root/.ethereum/keystore"
-          - "./volumes/rif-comms-key:/root/.rif-comms"
-          - "./volumes/rif-comms-config:/root/rif-communications-pubsub-bootnode/config"
+          - "${LUMINO_KEYSTORE_FOLDER}:/root/.ethereum/keystore"
+          - "${RIF_CONFIG_KEY_FOLDER}:/root/.rif-comms"
+          - "${RIF_CONFIG_FOLDER}:/root/rif-communications-pubsub-bootnode/config"
