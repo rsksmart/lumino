@@ -92,6 +92,6 @@ echo ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> Starting Lumino Node <<<<<<<<<<<<<<
 
 # Executing the lumino node
 
-eval ${COMMAND}
+eval "${COMMAND}"
 
 exit 0
