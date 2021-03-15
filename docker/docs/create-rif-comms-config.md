@@ -28,7 +28,7 @@ You need to have a configuration file like this:
     type: "DER"
   },
   rooms: ["0xtestroom", "0xtestroom6", "0xtestroom3"],
-  grpcPort: "<GRPC_PORT>",
+  grpcPort: <GRPC_PORT>,
   displayPeerId: true,
   generatePeerWithSecp256k1Keys: true,
   authorization: {
