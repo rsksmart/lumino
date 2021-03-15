@@ -1,13 +1,24 @@
 version: "2.2"
 
 services:
-    lumino-node:
-        env_file:
-          - "node1.env"
+    lumino-node-1:
         build: "."
+        env_file:
+          - "environment/node1.env"
         restart: "no"
         network_mode: "host"
         volumes:
-          - "${LUMINO_KEYSTORE_FOLDER}:/root/.ethereum/keystore"
-          - "${RIF_CONFIG_KEY_FOLDER}:/root/.rif-comms"
-          - "${RIF_CONFIG_FOLDER}:/root/rif-communications-pubsub-bootnode/config"
+          - "/home/jonathan/.ethereum/keystore:/root/.ethereum/keystore"
+          - "/home/jonathan/.rif-comms:/root/.rif-comms"
+          - "/home/jonathan/workspace/rsk/rif-communications-pubsub-bootnode/config:/root/rif-communications-pubsub-bootnode/config"
+
+    lumino-node-2:
+      build: "."
+      env_file:
+        - "environment/node2.env"
+      restart: "no"
+      network_mode: "host"
+      volumes:
+        - "/home/jonathan/.ethereum/keystore:/root/.ethereum/keystore"
+        - "/home/jonathan/.rif-comms:/root/.rif-comms"
+        - "/home/jonathan/workspace/rsk/rif-communications-pubsub-bootnode/config:/root/rif-communications-pubsub-bootnode/config2"
