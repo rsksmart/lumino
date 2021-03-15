@@ -9,17 +9,17 @@ services:
         restart: "no"
         network_mode: "host"
         volumes:
-          - "${LUMINO_KEYSTORE_FILE}:/root/.ethereum/keystore/keyfile"
-          - "${RIF_COMMS_KEY_FILE}:/root/.rif-comms/server.der"
-          - "${RIF_COMMS_CONFIG_FILE}:/root/rif-communications-pubsub-bootnode/config/server.json5"
+          - "<LUMINO_KEYSTORE_FILE>/root/.ethereum/keystore/keyfile"
+          - "<RIF_COMMS_KEY_FILE>:/root/.rif-comms/server.der"
+          - "<RIF_COMMS_CONFIG_FILE>:/root/rif-communications-pubsub-bootnode/config/server.json5"
 
-#    lumino-node-2:
-#      build: "."
-#      env_file:
-#        - "environment/node2.env"
-#      restart: "no"
-#      network_mode: "host"
-#      volumes:
-#        - "${LUMINO_KEYSTORE_FILE}:/root/.ethereum/keystore/keyfile"
-#        - "${RIF_COMMS_KEY_FILE}:/root/.rif-comms/server.der"
-#        - "${RIF_COMMS_CONFIG_FILE}:/root/rif-communications-pubsub-bootnode/config/server.json5"
+    lumino-node-2:
+      build: "."
+      env_file:
+        - "environment/node2.env"
+      restart: "no"
+      network_mode: "host"
+      volumes:
+        - "<LUMINO_KEYSTORE_FILE>/root/.ethereum/keystore/keyfile"
+        - "<RIF_COMMS_KEY_FILE>:/root/.rif-comms/server.der"
+        - "<RIF_COMMS_CONFIG_FILE>:/root/rif-communications-pubsub-bootnode/config/server.json5"

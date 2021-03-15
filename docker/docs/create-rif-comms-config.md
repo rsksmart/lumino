@@ -1,4 +1,4 @@
-## Creating rif-comms configuration file
+## Creating rif-comms configuration file for docker
 
 You need to have a configuration file like this:
 
@@ -50,7 +50,7 @@ you edit the port configuration remember to check if other instances are running
 
 Basically what you need to change on that file are these parameters:
 
-**RPC_PORT**, **WS_PORT** and **GRPC_PORT** are generally consecutive, for example 6010, 6011 and 6012, if you want to manage multiple
+**RPC_PORT**, **WS_PORT** and **GRPC_PORT**, those are generally consecutive, for example 6010, 6011 and 6012, if you want to manage multiple
 nodes you need to remember this in order to not use the same ports for more than one server.
 
 **KEY_PASSWORD** is the key password for the key used by the rif-comms server.
@@ -59,7 +59,7 @@ nodes you need to remember this in order to not use the same ports for more than
 you need to update the `docker-compose.yml` and change the volume path relative to this key `RIF_COMMS_KEY_FILE:/root/.rif-comms/server.der`
 to match your new value.
 
-Here is an example of the config file:
+Here is an example of the config file using ports 6010 (rpc), 6011 (ws) and 6012 (grpc):
 
 ```json5
 {
