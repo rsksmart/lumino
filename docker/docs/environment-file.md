@@ -1,7 +1,10 @@
 ## Docker Environment file
 
-The docker environment file `lumino/docker/.env` contains the environment
+The docker environment files inside the environment folder `lumino/docker/environment` contains the environment
 variables that are needed to setup the lumino docker environment correctly.
+
+We have multiple files since it depends on the amount of lumino nodes you want to start. For example
+if you want to startup only one node you can edit `node1.env` file.
 
 The file looks something like this:
 
@@ -26,4 +29,4 @@ Where the values are explained here:
 * **RSK_ENDPOINT:** **(optional)** set the rsk node endpoint location, by default is `http://localhost:4444`.
 * **NODE_PORT:** **(optional)** the port where the lumino node will be exposed, by default is `5001`
 * **NETWORK_ID:** **(optional)** indicates the chain id to be used by the lumino node, by default is `33`.
-* **GRPC_PORT:** **(optional)** is the GRPC port where the rif-comms node will be running, by default is `6012`.
+* **GRPC_PORT:** **(optional)** is the GRPC port where the rif-comms node will be running, by default is `6012`. (Should match the same port as the rif-comms configuration file.)

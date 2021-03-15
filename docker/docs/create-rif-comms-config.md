@@ -1,6 +1,65 @@
 ## Creating rif-comms configuration file
 
-The rif-comms configuration file has to be something like this:
+You need to have a configuration file like this:
+
+```json5
+{
+  libp2p: {
+    addresses: {
+      listen: [
+        "/ip4/127.0.0.1/tcp/<RPC_PORT>",
+        "/ip4/127.0.0.1/tcp/<WS_PORT>/ws"
+      ]
+    },
+    config: {
+      peerDiscovery: {
+        bootstrap: {
+          enabled: false
+        }
+      }
+    }
+  },
+  loadPrivKeyFromFile: true,
+  key : {
+    createNew: false,
+    password: "<KEY_PASSWORD>",
+    openSSL: true,
+    privateKeyURLPath:"file:////root/.rif-comms/server.der",
+    type: "DER"
+  },
+  rooms: ["0xtestroom", "0xtestroom6", "0xtestroom3"],
+  grpcPort: "<GRPC_PORT>",
+  displayPeerId: true,
+  generatePeerWithSecp256k1Keys: true,
+  authorization: {
+    enabled: true,
+    expiresIn: '1h',
+    secret: '',
+    challengeSize: 32
+  },
+  log: {
+    level: "debug",
+    filter: null,
+    path: null
+  }
+}
+```
+
+You can customize everything but be aware that these properties are relative to the docker container, if
+you edit the port configuration remember to check if other instances are running on the same ports.
+
+Basically what you need to change on that file are these parameters:
+
+**RPC_PORT**, **WS_PORT** and **GRPC_PORT** are generally consecutive, for example 6010, 6011 and 6012, if you want to manage multiple
+nodes you need to remember this in order to not use the same ports for more than one server.
+
+**KEY_PASSWORD** is the key password for the key used by the rif-comms server.
+
+**IMPORTANT:** `privateKeyURLPath` property can't be changed since is relative to the container. If you want to change it anyway then 
+you need to update the `docker-compose.yml` and change the volume path relative to this key `RIF_COMMS_KEY_FILE:/root/.rif-comms/server.der`
+to match your new value.
+
+Here is an example of the config file:
 
 ```json5
 {
@@ -22,9 +81,9 @@ The rif-comms configuration file has to be something like this:
   loadPrivKeyFromFile: true,
   key : {
     createNew: false,
-    password: "<YOUR_KEY_PASSWORD_GOES_HERE>",
-    openSSL:true,
-    privateKeyURLPath:"file:////root/.rif-comms/<YOUR_KEY_FILE_NAME_GOES_HERE>",
+    password: "somepassword",
+    openSSL: true,
+    privateKeyURLPath:"file:////root/.rif-comms/server.der",
     type: "DER"
   },
   rooms: ["0xtestroom", "0xtestroom6", "0xtestroom3"],
@@ -44,9 +103,3 @@ The rif-comms configuration file has to be something like this:
   }
 }
 ```
-
-You can customize everything but be aware that these properties are relative to the docker container, if
-you edit the port configuration remember to update that in the `docker-compose.yml` file to expose those ports.
- 
-
-**IMPORTANT: the config file needs to be saved with name server.json5**

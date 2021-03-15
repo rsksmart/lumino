@@ -16,36 +16,32 @@ You can run lumino with docker instead of installing everything locally.
 * **Pre-requisites**
     * Install docker
     * Install docker-compose
-    * Create a config file for rif-comms node to work with docker, the config file needs to be called `server.json5`. [Here is how to do that.](./docker/docs/create-rif-comms-config.md)
+    * Create a config file for rif-comms node to work with docker.
+      [Here is how to do that.](./docker/docs/create-rif-comms-config.md)
     * Have a key for the rif-comms node. [Here is how to create it.](https://github.com/rsksmart/rif-communications-pubsub-bootnode/tree/grpc-api)
-    * Have an account created to use with the lumino node.
+    * Have an account created to use with the lumino node and locate 
+      the key file, usually that file is located under the home folder at
+      `.ethereum/keystore`.
     
 To run lumino on the docker container you have to do these steps:
 
 * Make sure you have all the pre-requisites specified above.
-* Locate the folder containing the keystore for your lumino accounts, 
-  the folder containing the key and the folder containing the configuration for the rif-comms node.
+* Locate the key files for lumino and rif-comms servers, also the config file for the rif-comms server.
 * Identify the network data necessary for the lumino node to work. That is the token network registry, 
   secret registry and endpoint registry contract addresses, also you need the rsk node endpoint location.
 * Open a terminal and move to the docker folder inside this repository.
-* Open the file .env there and edit the values to match your environment values, [here](./docker/docs/environment-file.md) we explain the content of that file.
-* After you configure the .env file inside the docker folder then save it.
-* Now we have 2 ways to do this, the automated way or the manual way:
-    * **Manual**:
-        * Run `ln -s /folder/where/you/have/lumino/keystore volumes/lumino-keystore`
-        * Run `ln -s /folder/where/you/have/rif-comms/key volumes/rif-comms-key`
-        * Run `ln -s /folder/where/you/have/rif-comms/config volumes/rif-comms-config`
-        * Run `sudo docker network create lumino-network` to create the container network.
-        * Run `sudo docker-compose build` to build the docker image.
-        * Run `sudo docker-compose up -d` to start the lumino container.
-        * Run `sudo docker exec -it docker_lumino-node_1 /root/lumino/startLumino` to run lumino and rif-comms nodes.
-        * After you finish working with the lumino node you can kill it with Ctrl-C but you need to clean up the links and the
-        running container, to do that you need to run:
-          * `sudo docker-compose down`
-          * `rm -rf volumes/*`
-    * **Automated**:
-        * You only need to run one command `./startDocker <RIF-COMMS_CONFIG_FOLDER_PATH> <RIF-COMMS_KEY_FOLDER_PATH> <LUMINO_KEYSTORE_FOLDER_PATH>`    
-        * The script will do everything for you, create the links for the volumes, start the container and the nodes, also it will cleanup everything if you kill it.
+* Inside the folder environment you have all the env files for your nodes, by default we have 2 but we can have more.
+  Open the file `node1.env` there and edit the values to match your environment values, [here](./docker/docs/environment-file.md) we explain the content of that file.
+* After you finish with the .env file/es inside the environment folder then save the changes.
+* Now you have to update your `docker-compose.yml` file where you will describe your services,
+  there you need to specify the lumino node services and wire the environment file/es updated above.
+  Also you have to bind the volumes with the real files in your host machine. [Here is how to it](link)
+  Now you need to run these commands to get the lumino node up and running:
+    * Run `sudo docker-compose build` to build the docker image.
+    * Run `sudo docker-compose up -d` to start the lumino container.
+    * Run `sudo docker exec -it docker_lumino-node-1_1 /root/lumino/startLumino` to run lumino and rif-comms nodes.
+    * After you finish working with the lumino node you can kill it with Ctrl-C but you need to clean up the
+        running container, to do that you need to run `sudo docker-compose down`.
 ## Lumino Contracts
 
 The following are the addresses of the set of contracts for Lumino Network per release
