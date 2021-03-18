@@ -1287,7 +1287,6 @@ class RaidenAPI:
                 offset=offset,
             )
         ]
-        print(len(events))
         for event in events:
             chain_state = views.state_from_raiden(self.raiden)
             for payment_network in chain_state.identifiers_to_paymentnetworks.values():
@@ -1296,7 +1295,6 @@ class RaidenAPI:
                         setattr(event.wrapped_event, 'token_address',
                                 to_normalized_address(token_network.token_address))
 
-        print(len(events))
         return events
 
     def get_raiden_events_payment_history_with_timestamps(

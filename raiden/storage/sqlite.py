@@ -927,7 +927,6 @@ class SQLiteStorage:
                                               event_type,
                                               limit,
                                               offset)
-        print(str(len(entries)))
         result = [
             TimestampedEvent(self.serializer.deserialize(entry[0]), entry[1])
             for entry in entries
@@ -989,8 +988,6 @@ class SQLiteStorage:
                                             to_date,
                                             limit,
                                             offset)
-        print(query[0])
-        print(str(query[1]))
         cursor = self.conn.cursor()
 
         cursor.execute(
