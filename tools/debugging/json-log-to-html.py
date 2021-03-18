@@ -17,7 +17,6 @@ from json import JSONDecodeError
 from typing import Any, Dict, Iterable, Set, Tuple
 
 import click
-from click import UsageError
 from click._compat import _default_text_stderr
 from colour import Color
 from eth_utils import is_address, to_canonical_address
@@ -292,7 +291,7 @@ def main(
     try:
         replacements = json.loads(replacements)
     except (JSONDecodeError, UnicodeDecodeError) as ex:
-        raise UsageError(f'Option "--replacements" contains invalid JSON: {ex}') from ex
+        raise click.UsageError(f'Option "--replacements" contains invalid JSON: {ex}') from ex
 
     time_from, _, time_to = time_range.partition("^")
     time_range = (

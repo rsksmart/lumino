@@ -12,15 +12,13 @@ from typing import Any, Callable, Dict, List, Tuple, Union
 
 import click
 import requests
-from click import BadParameter, Choice
 from click._compat import term_len
-from click.formatting import iter_rows, measure_table, wrap_text
 from pytoml import TomlError, load
-from .rsk_gas_price_strategy.rsk_gas_price_strategy import fast_gas_price_strategy, medium_gas_price_strategy
+from raiden_contracts.constants import NETWORKNAME_TO_ID
 
 from raiden.exceptions import InvalidAddress
 from raiden.utils import address_checksum_and_decode
-from raiden_contracts.constants import NETWORKNAME_TO_ID
+from .rsk_gas_price_strategy.rsk_gas_price_strategy import fast_gas_price_strategy, medium_gas_price_strategy
 
 LOG_CONFIG_OPTION_NAME = "log_config"
 
@@ -43,13 +41,13 @@ class HelpFormatter(click.HelpFormatter):
         """
         rows = list(rows)
         if widths is None:
-            widths = measure_table(rows)
+            widths = click.measure_table(rows)
         if len(widths) != 2:
             raise TypeError("Expected two columns for definition list")
 
         first_col = min(widths[0], col_max) + col_spacing
 
-        for first, second in iter_rows(rows, len(widths)):
+        for first, second in click.iter_rows(rows, len(widths)):
             self.write("%*s%s" % (self.current_indent, "", first))
             if not second:
                 self.write("\n")
@@ -61,7 +59,7 @@ class HelpFormatter(click.HelpFormatter):
                 self.write(" " * (first_col + self.current_indent))
 
             text_width = max(self.width - first_col - 2, 10)
-            lines = iter(wrap_text(second, text_width).splitlines())
+            lines = iter(click.wrap_text(second, text_width).splitlines())
             if lines:
                 self.write(next(lines) + "\n")
                 for line in lines:
@@ -152,13 +150,16 @@ class GroupableOptionCommand(CustomContextMixin, click.Command):
 
         if options:
             widths_a, widths_b = list(
-                zip(*[measure_table(group_options) for group_options in options.values()])
+                zip(*[click.measure_table(group_options) for group_options in options.values()])
             )
             widths = (max(widths_a), max(widths_b))
 
             for option_group, group_options in options.items():
                 with formatter.section(option_group if option_group else "Options"):
                     formatter.write_dl(group_options, widths=widths)
+
+    def make_context(self, info_name, args, parent=None, **extra):
+        return CustomContextMixin.make_context(self, info_name, args, parent, **extra)
 
 
 class GroupableOptionCommandGroup(CustomContextMixin, click.Group):
@@ -171,6 +172,9 @@ class GroupableOptionCommandGroup(CustomContextMixin, click.Group):
 
     def group(self, *args, **kwargs):
         return super().group(*args, **{"cls": self.__class__, **kwargs})
+
+    def make_context(self, info_name, args, parent=None, **extra):
+        return CustomContextMixin.make_context(self, info_name, args, parent, **extra)
 
 
 def command(name=None, cls=GroupableOptionCommand, **attrs):
@@ -265,7 +269,7 @@ class NetworkChoiceType(click.Choice):
             return NETWORKNAME_TO_ID[network_name]
 
 
-class EnumChoiceType(Choice):
+class EnumChoiceType(click.Choice):
     def __init__(self, enum_type: EnumMeta, case_sensitive=True):
         self._enum_type = enum_type
         # https://github.com/python/typeshed/issues/2942
@@ -467,7 +471,7 @@ def validate_option_dependencies(
             depended_option_name_int = depended_option_name.replace("-", "_")
             depended_option_actual_value = cli_params[depended_option_name_int]
             if depended_option_actual_value != depended_option_required_value:
-                raise BadParameter(
+                raise click.BadParameter(
                     f'This option is only available when option "--{depended_option_name}" '
                     f'is set to "{depended_option_required_value}". '
                     f'Current value: "{depended_option_actual_value}"',

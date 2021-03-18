@@ -1474,7 +1474,7 @@ class TokenNetwork:
         log.debug("updateNonClosingBalanceProof called", **log_details)
         from eth_utils import decode_hex
         non_closing_signature = decode_hex(non_closing_signature)
-        if balance_hash is EMPTY_HASH:
+        if balance_hash == EMPTY_HASH:
             raise RaidenUnrecoverableError("update_transfer called with an empty balance_hash")
 
         if nonce <= 0 or nonce > UINT256_MAX:
@@ -1793,7 +1793,7 @@ class TokenNetwork:
         }
         log.debug("updateNonClosingBalanceProof called", **log_details)
 
-        if balance_hash is EMPTY_HASH:
+        if balance_hash == EMPTY_HASH:
             raise RaidenUnrecoverableError("update_transfer called with an empty balance_hash")
 
         if nonce <= 0 or nonce > UINT256_MAX:

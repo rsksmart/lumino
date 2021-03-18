@@ -20,7 +20,8 @@ from eth_utils import (
 )
 from web3 import Web3
 
-import raiden
+from raiden import __file__ as raiden_file
+from raiden import __name__ as raiden_name
 from raiden import constants
 from raiden.exceptions import InvalidAddress
 from raiden.utils.signing import sha3  # noqa
@@ -137,7 +138,7 @@ def privatekey_to_address(private_key_bin: bytes) -> Address:
 
 
 def get_project_root() -> str:
-    return os.path.dirname(raiden.__file__)
+    return os.path.dirname(raiden_file)
 
 
 def get_relative_path(file_name: str) -> str:
@@ -161,7 +162,7 @@ def get_system_spec() -> Dict[str, str]:
         )
 
     try:
-        version = pkg_resources.require(raiden.__name__)[0].version
+        version = pkg_resources.require(raiden_name)[0].version
     except (pkg_resources.VersionConflict, pkg_resources.DistributionNotFound):
         raise RuntimeError(
             "Cannot detect Raiden version. Did you do python setup.py?  "

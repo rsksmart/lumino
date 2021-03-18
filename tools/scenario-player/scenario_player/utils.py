@@ -11,12 +11,11 @@ from pathlib import Path
 from typing import Dict, Union
 
 import click
-import mirakuru
 import requests
 import structlog
 from eth_keyfile import decode_keyfile_json
 from eth_utils import encode_hex, to_checksum_address
-from mirakuru import AlreadyRunning, TimeoutExpired
+from mirakuru import AlreadyRunning, TimeoutExpired, HTTPExecutor as MirakuruHTTPExecutor
 from mirakuru.base import ENV_UUID, IGNORED_ERROR_CODES
 from requests.adapters import HTTPAdapter
 from web3 import HTTPProvider, Web3
@@ -36,10 +35,11 @@ log = structlog.get_logger(__name__)
 
 
 # Seriously requests? For Humans?
-class TimeOutHTTPAdapter(HTTPAdapter):
+# TODO: Skipping LGTM false positive warning
+class TimeOutHTTPAdapter(HTTPAdapter):  # lgtm [py/missing-call-to-init]
     def __init__(self, *args, **kwargs):
-        self.timeout = kwargs.pop('timeout', None)
         super().__init__(*args, **kwargs)
+        self.timeout = kwargs.pop('timeout', None)
 
     def send(self, *args, **kwargs):
         if 'timeout' not in kwargs or not kwargs['timeout']:
@@ -86,7 +86,7 @@ class ChainConfigType(click.ParamType):
         return name, rpc_url
 
 
-class HTTPExecutor(mirakuru.HTTPExecutor):
+class HTTPExecutor(MirakuruHTTPExecutor):
     def start(self, stdout=subprocess.PIPE, stderr=subprocess.PIPE):
         """ Merged copy paste from the inheritance chain with modified stdout/err behaviour """
         if self.pre_start_check():

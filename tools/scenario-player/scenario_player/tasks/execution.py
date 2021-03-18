@@ -1,9 +1,8 @@
 from typing import Any
 
 import click
-import gevent
 import structlog
-from gevent import Greenlet
+from gevent import Greenlet, sleep
 from gevent.pool import Group
 
 from scenario_player.runner import ScenarioRunner
@@ -71,4 +70,4 @@ class WaitTask(Task):
     _name = 'wait'
 
     def _run(self, *args, **kwargs):
-        gevent.sleep(self._config)
+        sleep(self._config)
