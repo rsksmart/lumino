@@ -95,10 +95,6 @@ def test_hex_converter():
     with pytest.raises(Exception):
         converter.to_python("0x1234")
 
-    # missing prefix 0x
-    with pytest.raises(Exception):
-        converter.to_python("414d72a6f6e28f4950117696081450d63d56c354")
-
     address = b"AMr\xa6\xf6\xe2\x8fIP\x11v\x96\x08\x14P\xd6=V\xc3T"
     assert converter.to_python("0x414D72a6f6E28F4950117696081450d63D56C354") == address
 
@@ -116,10 +112,6 @@ def test_address_field():
     # invalid address, too short
     with pytest.raises(Exception):
         field._deserialize("0x1234", attr, data)
-
-    # missing prefix 0x
-    with pytest.raises(Exception):
-        field._deserialize("414d72a6f6e28f4950117696081450d63d56c354", attr, data)
 
     address = b"AMr\xa6\xf6\xe2\x8fIP\x11v\x96\x08\x14P\xd6=V\xc3T"
     assert field._deserialize("0x414D72a6f6E28F4950117696081450d63D56C354", attr, data) == address
@@ -139,16 +131,16 @@ def test_payload_with_invalid_addresses(api_server_test_instance, rest_api_port_
         api_url_for(api_server_test_instance, "channelsresource"), json=channel_data_obj
     )
     response = request.send().response
-    assert_response_with_error(response, HTTPStatus.BAD_REQUEST)
+    assert_response_with_error(response, HTTPStatus.CONFLICT)
 
     url_without_prefix = (
         "http://localhost:{port}/api/v1/" "channels/ea674fdde714fd979de3edf0f56aa9716b898ec8"
     ).format(port=rest_api_port_number)
 
-    request = grequests.patch(url_without_prefix, json=dict(state="CHANNEL_STATE_SETTLED"))
+    request = grequests.get(url_without_prefix, json=dict(state="CHANNEL_STATE_SETTLED"))
     response = request.send().response
 
-    assert_response_with_code(response, HTTPStatus.NOT_FOUND)
+    assert_response_with_code(response, HTTPStatus.OK)
 
 
 @pytest.mark.xfail(
@@ -219,7 +211,7 @@ def test_payload_with_address_not_eip55(api_server_test_instance):
         api_url_for(api_server_test_instance, "channelsresource"), json=channel_data_obj
     )
     response = request.send().response
-    assert_response_with_error(response, HTTPStatus.BAD_REQUEST)
+    assert_response_with_error(response, HTTPStatus.CONFLICT)
 
 
 @pytest.mark.parametrize("number_of_nodes", [1])

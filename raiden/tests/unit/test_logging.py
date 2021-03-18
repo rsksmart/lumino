@@ -114,8 +114,8 @@ def test_basic_logging(capsys, module, level, logger, disabled_debug, tmpdir):
         assert captured.err == ""
     else:
         assert "test event" in captured.err
-        assert "key=value" in captured.err
-        assert "foo=bar" in captured.err
+        assert "key\x1b[0m=\x1b[35mvalue" in captured.err
+        assert "foo\x1b[0m=\x1b[35mbar" in captured.err
 
 
 def test_redacted_request(capsys, tmpdir):
