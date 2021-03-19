@@ -5,7 +5,7 @@ import socket
 from datetime import datetime
 from http import HTTPStatus
 from typing import Dict, Union
-
+import os
 import gevent
 import gevent.pool
 import structlog
@@ -492,19 +492,19 @@ class APIServer(Runnable):
         self._is_raiden_running()
 
     def _set_ui_endpoint(self):
-        # Overrides the backend url in the ui bundle
-        with open(self.flask_app.root_path + '/webui/static/endpointConfig.js') as f:
-            lines = f.readlines()
+        """ Replaces the content of endpointConfig with the right content for the running node """
 
-        lines[0] = "const backendUrl='http://" + self.config['host'] + ":" + str(self.config['port']) + "'; \n"
-        lines[1] = "const nodeAddress = '" + to_checksum_address(self.rest_api.raiden_api.address) + "'; \n"
-        if self.config['rnsdomain']:
-            lines[2] = "const rnsDomain = '" + self.config['rnsdomain'] + "';\n"
-        else:
-            lines[2] = "const rnsDomain = null \n"
-        lines[3] = "const chainEndpoint = '" + self.config['rskendpoint'] + "'; \n"
+        os.remove(self.flask_app.root_path + '/webui/static/endpointConfig.js')
 
         with open(self.flask_app.root_path + '/webui/static/endpointConfig.js', "w") as f:
+            lines = list()
+            lines[0] = "const backendUrl='http://" + self.config['host'] + ":" + str(self.config['port']) + "'; \n"
+            lines[1] = "const nodeAddress = '" + to_checksum_address(self.rest_api.raiden_api.address) + "'; \n"
+            if self.config['rnsdomain']:
+                lines[2] = "const rnsDomain = '" + self.config['rnsdomain'] + "';\n"
+            else:
+                lines[2] = "const rnsDomain = null \n"
+            lines[3] = "const chainEndpoint = '" + self.config['rskendpoint'] + "'; \n"
             f.writelines(lines)
 
     def _is_raiden_running(self):
