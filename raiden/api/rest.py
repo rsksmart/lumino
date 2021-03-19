@@ -494,17 +494,24 @@ class APIServer(Runnable):
     def _set_ui_endpoint(self):
         """ Replaces the content of endpointConfig with the right content for the running node """
 
-        os.remove(self.flask_app.root_path + '/webui/static/endpointConfig.js')
+        endpoint_config_file_path = self.flask_app.root_path + '/webui/static/endpointConfig.js'
+
+        if os.path.exists(endpoint_config_file_path):
+            os.remove(endpoint_config_file_path)
 
         with open(self.flask_app.root_path + '/webui/static/endpointConfig.js', "w") as f:
             lines = list()
-            lines[0] = "const backendUrl='http://" + self.config['host'] + ":" + str(self.config['port']) + "'; \n"
-            lines[1] = "const nodeAddress = '" + to_checksum_address(self.rest_api.raiden_api.address) + "'; \n"
+            lines.append("const backendUrl='http://" + self.config['host'] + ":" + str(self.config['port']) + "'; \n")
+            lines.append("const nodeAddress = '" + to_checksum_address(self.rest_api.raiden_api.address) + "'; \n")
             if self.config['rnsdomain']:
-                lines[2] = "const rnsDomain = '" + self.config['rnsdomain'] + "';\n"
+                lines.append("const rnsDomain = '" + self.config['rnsdomain'] + "';\n")
             else:
-                lines[2] = "const rnsDomain = null \n"
-            lines[3] = "const chainEndpoint = '" + self.config['rskendpoint'] + "'; \n"
+                lines.append("const rnsDomain = null \n")
+            lines.append("const chainEndpoint = '" + self.config['rskendpoint'] + "'; \n")
+            lines.append("window.luminoUrl = backendUrl;\n")
+            lines.append("window.nodeAddress= nodeAddress;\n")
+            lines.append("window.rnsDomain = rnsDomain;\n")
+            lines.append("window.chainEndpoint = chainEndpoint;\n")
             f.writelines(lines)
 
     def _is_raiden_running(self):
