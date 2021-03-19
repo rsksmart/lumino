@@ -1287,7 +1287,6 @@ class RaidenAPI:
                 offset=offset,
             )
         ]
-
         for event in events:
             chain_state = views.state_from_raiden(self.raiden)
             for payment_network in chain_state.identifiers_to_paymentnetworks.values():
