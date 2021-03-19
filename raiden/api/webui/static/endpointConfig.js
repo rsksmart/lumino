@@ -1,8 +1,7 @@
-// this file will be overwritten by the lumino node when running inside flask webapp
-const backendUrl='http://localhost:5001';
-const nodeAddress = '0x4E7eA0919a88f9103e6eE5323D24A1073d79fb0D';
-const rnsDomain = 'dev.rsk.co';
-const chainEndpoint = 'http://localhost:4444';
+const backendUrl='http://localhost:5000'; 
+const nodeAddress = '0x223c10155C348195F40e427FeD7e0FB7D1C4d025'; 
+const rnsDomain = null 
+const chainEndpoint = 'http://172.19.0.2:4444'; 
 
 window.luminoUrl = backendUrl;
 window.nodeAddress= nodeAddress;
