@@ -927,7 +927,6 @@ class SQLiteStorage:
                                               event_type,
                                               limit,
                                               offset)
-
         result = [
             TimestampedEvent(self.serializer.deserialize(entry[0]), entry[1])
             for entry in entries
@@ -989,7 +988,6 @@ class SQLiteStorage:
                                             to_date,
                                             limit,
                                             offset)
-
         cursor = self.conn.cursor()
 
         cursor.execute(
@@ -1019,36 +1017,22 @@ class SQLiteStorage:
                 state_events
             WHERE
                 json_extract(state_events.data,
-                        '$._type') IN ({}) {} {} {} {}
+                        '$._type') IN ({}) {} {} {}
             LIMIT ? OFFSET ?
 
                     """
 
-        target_query = ""
-        initiator_query = ""
-        or_conditional = False
+        nodes_query = self._get_query_for_node_addresses(target_address, initiator_address, our_address)
 
         event_type_result = self._get_event_type_query(event_type)
         token_network_identifier_result = self._get_token_network_identifier_query(token_network_identifier)
 
-        if target_address is not None and target_address.lower() == our_address.lower():
-            event_type_result = self._get_event_type_query(1)
-        elif target_address is not None:
-            target_query = self._get_query_for_node_address('target', or_conditional)
-
-        if initiator_address is not None and initiator_address.lower() == our_address.lower():
-            event_type_result = self._get_event_type_query(3)
-        elif initiator_address is not None:
-            if target_address:
-                or_conditional = True
-            initiator_query = self._get_query_for_node_address('initiator', or_conditional)
 
         event_range_query = self._get_date_range_query(from_date, to_date)
         query = query.format(', '.join(['"{}"'.format(value) for value in event_type_result]),
                              token_network_identifier_result,
                              event_range_query,
-                             target_query,
-                             initiator_query)
+                             nodes_query)
 
         tuple_for_execute = self._get_tuple_to_get_payments(token_network_identifier,
                                                             our_address,
@@ -1057,23 +1041,27 @@ class SQLiteStorage:
                                                             from_date,
                                                             to_date,
                                                             limit,
-                                                            offset,
-                                                            or_conditional)
+                                                            offset)
 
         return query, tuple_for_execute
 
+    @classmethod
+    def _get_query_for_node_addresses(cls, target_address, initiator_address, our_address):
+        if not target_address and not initiator_address:
+            return ""
+        nodes_query_parts = []
+        if target_address:
+            nodes_query_parts.append(cls._get_query_for_node_address("target", target_address, our_address))
+        if initiator_address:
+            nodes_query_parts.append(cls._get_query_for_node_address("initiator", initiator_address, our_address))
+        return " AND " + " AND ".join(nodes_query_parts)
+
     @staticmethod
-    def _get_query_for_node_address(node_address_label, or_contiional):
+    def _get_query_for_node_address(label, address, our_address):
+        if address.lower() == our_address.lower():
+            return f" json_extract(state_events.data, '$.{label}') IS NULL "
+        return f" json_extract(state_events.data, '$.{label}') = ? "
 
-        result = " AND json_extract(state_events.data, '$.{}') = ? "
-
-        if or_contiional:
-            result = " OR json_extract(state_events.data, '$.{}') = ?  " \
-                     " AND json_extract(state_events.data, '$.token_network_identifier') = ?"
-
-        if node_address_label is not None:
-            result = result.format(node_address_label)
-        return result
 
     @staticmethod
     def _get_token_network_identifier_query(token_network_identifier):
@@ -1118,23 +1106,20 @@ class SQLiteStorage:
                                    from_date,
                                    to_date,
                                    limit,
-                                   offset,
-                                   or_conditional):
+                                   offset):
 
         result = [limit, offset]
 
-        if initiator_address is not None and initiator_address.lower() != our_address.lower():
-            if or_conditional:
-                result.insert(0, token_network_identifier)
+        if initiator_address and initiator_address.lower() != our_address.lower():
             result.insert(0, initiator_address)
-        if target_address is not None and target_address.lower() != our_address.lower():
+        if target_address and target_address.lower() != our_address.lower():
             result.insert(0, target_address)
         if from_date is not None and to_date is not None:
             result.insert(0, to_date)
             result.insert(0, from_date)
-        if from_date is not None and to_date is None:
+        elif from_date is not None:
             result.insert(0, from_date)
-        if to_date is not None and from_date is None:
+        elif to_date is not None:
             result.insert(0, to_date)
         if token_network_identifier is not None:
             result.insert(0, token_network_identifier)
