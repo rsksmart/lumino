@@ -402,6 +402,7 @@ class APIServer(Runnable):
 
         flask_app = Flask(__name__)
 
+        cors_domain_list = ["*"]
         if cors_domain_list:
             CORS(flask_app, origins=cors_domain_list)
 
