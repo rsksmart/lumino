@@ -865,6 +865,7 @@ class RestAPI:
 
         return api_response(result=dict(), status_code=HTTPStatus.NO_CONTENT)
 
+    @api_safe_operation()
     def leave(self, registry_address: typing.PaymentNetworkID, token_address: typing.TokenAddress):
         log.debug(
             "Leaving token network",
