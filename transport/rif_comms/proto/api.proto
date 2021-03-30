@@ -1,0 +1,215 @@
+syntax = "proto3";
+package communicationsapi;
+
+
+service CommunicationsApi {
+    //Server side stream, there's no need for a bidirectional stream, it's only needed so
+    //The client can be notified of events in their subscriptions
+
+    //Open a data stream with the server, it can only receive messages
+    rpc ConnectToCommunicationsNode(RskAddress) returns (Notification);
+
+    //Close the data stream
+    rpc EndCommunication(Void) returns (Void);
+
+    //Publish a message in a channel
+    rpc Publish (PublishPayload) returns (Void);
+
+    //Subscribe to a channel
+    rpc Subscribe (Channel) returns (Void);
+
+    //Unsubscribe to a channel
+    rpc Unsubscribe (Channel) returns (Void);
+
+    //Get the subscribers of a participating channel
+    rpc GetSubscribers(Channel) returns (Subscribers);
+
+    //Query if a subscriber exists in a participating channel
+    rpc HasSubscriber(Subscriber) returns (BooleanResponse);
+
+    //Query if a subscriber exists in a participating channel
+    rpc IsSubscribedToRskAddress(RskSubscription) returns (BooleanResponse);
+
+    //Send a direct message to a peer
+    rpc SendMessage(Msg) returns (Void);
+
+    /////LUMINO SPECIFIC COMMANDS
+
+    //Obtains peerId from RSKAddress
+    rpc LocatePeerId(RskAddress) returns (PeerId);
+
+    //Creates topic for specific peerID/Rsk Address
+    rpc CreateTopicWithPeerId(PeerId) returns (stream Notification);
+    rpc CreateTopicWithRskAddress(RskSubscription) returns (stream Notification);
+
+    //Close Topic for a specific topicID
+    rpc CloseTopicWithRskAddress (RskSubscription) returns (Void);
+
+    //Send Message to Specified Topic
+    rpc SendMessageToTopic(PublishPayload) returns (Void);
+
+    // Send message to topic binded to an specific RSK address
+    rpc SendMessageToRskAddress(RskAddressPublish) returns (Void);
+
+    //Update RSK Address after invitation
+    rpc UpdateAddress(RskAddress) returns (Void);
+
+}
+
+//The topic
+message Channel {
+    string channelId = 1;
+}
+
+message RskAddress {
+    string address = 1;
+    bool exclusive= 2;
+}
+
+message RskSubscription {
+    RskAddress subscriber = 1;
+    RskAddress topic =  2;
+}
+
+message PeerId {
+    string address = 1;
+    bool exclusive= 2;
+}
+
+message PeerSubscription {
+    PeerId subscriber = 1;
+    PeerId topic =  2;
+}
+
+/*RPC needs a message, so when there are no params to send, this empty message is used*/
+message Void {}
+
+//The message raw payload has no restrictions, the applications can model it as fits best.
+message Msg {
+    bytes payload = 1;
+}
+
+
+//Message used to publish a message in a specific topic
+message PublishPayload {
+    Channel topic = 1;
+    Msg message = 2;
+}
+
+message RskAddressPublish {
+    RskAddress receiver = 1;
+    RskAddress sender = 2;
+    Msg message = 3;
+}
+
+// Set of peerIDs subscribed to a specific channel
+message Subscribers {
+    repeated string peerId = 1;
+}
+
+//Information mapping a user to a channel subscription
+message Subscriber {
+    string peerId = 1;
+    Channel channel = 2;
+}
+
+//A simple message format to define a boolean response
+message BooleanResponse {
+    bool value = 1;
+}
+
+
+/*The unidirectional stream from the server only sends one these kind of messages each time*/
+message Notification {
+    oneof notification_type {
+        PeerNewMsg peerNewMsg = 1;
+        PeerChannelInvite peerChannelInvite = 2;
+        PeerSignatureRequest peerSignatureRequest = 3;
+        ChannelNewData channelNewData = 4;
+        ChannelPeerLeft channelPeerLeft = 5;
+        ChannelPeerJoined channelPeerJoined = 6;
+        ServerNotification serverNotification = 7;
+        SubscribeError subscribeError = 8;
+        ConnectCommsError connectCommsError = 9;
+        EndCommsError endCommsError = 10;
+        
+    }
+}
+
+//A new direct message from a peer has been received
+message PeerNewMsg {
+    Msg message = 1;    // The payload, when using communications-pubsub, it will include:
+    //from:  PeerId sending the message
+    //to: PeeId of the intended recipient
+    //data: actual payload of the message
+    optional string peerId=2;   //peerId of the sender (it already comes in the payload if pubsub-node is used)
+    optional bytes signature =3;    //signature of info above (payload | peerId) (e.g, with RSK account key)
+}
+
+//A invitation to a channel from a peer
+message PeerChannelInvite {
+    Channel channel = 1; // Channel being invited to
+    string peerId = 2;  // PeerId making the invitation
+    optional bytes nonce = 3; // Nonce identifying this specific message invite
+    optional bytes signature = 4; //signature of information above (channel.channelId | peerId | nonce)
+}
+
+//A peer is requiring you to sign a payload with the key used in the solution (e.g, RSK account key)
+message PeerSignatureRequest {
+    bytes dataToSign = 1; //The raw information that needs to be signed
+    string peerId = 2; //sender of the request
+    bytes nonce = 3; //Nonce identifying this specific signature request
+    optional bytes signature = 4; //signature of  (dataToSign | peerId | nonce)
+}
+
+//The response message of PeerSignatureRequest
+message PeerSignatureResponse {
+    string peerId = 1; //PeerId of the signer
+    bytes signedNonce = 2; //The nonce of the PeerSignatureRequest being signed
+    bytes dataSignature = 3; //The signature of PeerSignatureRequest.dataToSign
+    optional bytes signature = 4; //Signature of (peerId | signedNonce | dataSignature)
+}
+
+//You've received new data from a subscribed channel
+message ChannelNewData {
+    optional PeerId peer = 1; // PeerID of the publisher
+    optional RskAddress sender = 2; // RskAddress of the sender
+    bytes data = 3; // The actual information published
+    bytes nonce = 4; // Sequence number of the publisher's publications in the channel/s
+    repeated Channel channel = 5; //List of topics where the data was published
+}
+
+//A peer left from one of your subscribed channels
+message ChannelPeerLeft {
+    Channel channel = 1;
+    string peerId = 2;
+}
+
+//A peer joined to one of your subscribed channels
+message ChannelPeerJoined {
+    Channel channel = 1;
+    string peerId = 2;
+}
+
+//Used by the server to notify about uncategorized internal events
+message ServerNotification {
+    bytes notification = 1;
+    bytes payload = 2;
+}
+
+
+//A subscribe has failed
+message SubscribeError {
+    Channel channel = 1;
+    string reason = 2;
+}
+
+//Comms could not be terminated
+message EndCommsError {
+    string reason = 1;
+}
+
+//Comms could not be initialized
+message ConnectCommsError {
+    string reason = 1;
+}

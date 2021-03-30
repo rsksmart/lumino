@@ -1,7 +1,6 @@
 from unittest.mock import Mock
 
 import pytest
-
 from raiden.app import App
 from raiden.constants import (
     DISCOVERY_DEFAULT_ROOM,
@@ -9,7 +8,6 @@ from raiden.constants import (
     PATH_FINDING_BROADCASTING_ROOM,
 )
 from raiden.message_handler import MessageHandler
-from raiden.network.transport import MatrixTransport
 from raiden.raiden_event_handler import RaidenEventHandler
 from raiden.settings import DEFAULT_NUMBER_OF_BLOCK_CONFIRMATIONS
 from raiden.tests.utils.detect_failure import raise_on_failure
@@ -17,6 +15,7 @@ from raiden.tests.utils.events import search_for_item
 from raiden.tests.utils.network import CHAIN
 from raiden.tests.utils.transfer import transfer
 from raiden.transfer.state_change import Block
+from transport.matrix.node import MatrixNode as MatrixTransportNode
 
 
 @pytest.mark.parametrize("number_of_nodes", [1])
@@ -113,9 +112,9 @@ def run_test_regression_transport_global_queues_are_initialized_on_restart_for_s
 
     app0.stop()
 
-    transport = MatrixTransport(app0.config["transport"]["matrix"])
+    transport = MatrixTransportNode(app0.config["transport"]["matrix"])
     transport.send_async = Mock()
-    transport._send_raw = Mock()
+    transport.send_message = Mock()
 
     old_start_transport = transport.start
 
@@ -127,7 +126,7 @@ def run_test_regression_transport_global_queues_are_initialized_on_restart_for_s
         assert len(transport._global_send_queue) == 2
         # No other messages were sent at this point
         transport.send_async.assert_not_called()
-        transport._send_raw.assert_not_called()
+        transport.send_message.assert_not_called()
         old_start_transport(*args, **kwargs)
 
     transport.start = start_transport

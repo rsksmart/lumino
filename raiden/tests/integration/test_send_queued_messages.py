@@ -3,8 +3,8 @@ import pytest
 
 from raiden import waiting
 from raiden.app import App
+from raiden.constants import EMPTY_PAYMENT_HASH_INVOICE
 from raiden.message_handler import MessageHandler
-from raiden.network.transport import MatrixTransport
 from raiden.raiden_event_handler import RaidenEventHandler
 from raiden.tests.utils.detect_failure import raise_on_failure
 from raiden.tests.utils.events import raiden_events_search_for_item
@@ -18,6 +18,7 @@ from raiden.transfer import views
 from raiden.transfer.events import EventPaymentSentSuccess
 from raiden.transfer.mediated_transfer.events import SendSecretReveal
 from raiden.utils import BlockNumber
+from transport.matrix.node import MatrixNode as MatrixTransportNode
 
 
 @pytest.mark.parametrize("deposit", [10])
@@ -66,7 +67,7 @@ def run_test_send_queued_messages(raiden_network, deposit, token_addresses, netw
     # restart app0
     app0.raiden.stop()
 
-    new_transport = MatrixTransport(app0.raiden.config["transport"]["matrix"])
+    new_transport = MatrixTransportNode(app0.raiden.config["transport"]["matrix"])
 
     raiden_event_handler = RaidenEventHandler()
     message_handler = MessageHandler()
@@ -187,6 +188,7 @@ def run_test_payment_statuses_are_restored(raiden_network, token_addresses, netw
             amount=amount,
             target=app1.raiden.address,
             identifier=identifier,
+            payment_hash_invoice=EMPTY_PAYMENT_HASH_INVOICE,
         )
         assert payment_status.payment_identifier == identifier
 
@@ -201,7 +203,7 @@ def run_test_payment_statuses_are_restored(raiden_network, token_addresses, netw
         default_secret_registry=app0.raiden.default_secret_registry,
         default_service_registry=app0.raiden.default_service_registry,
         default_one_to_n_address=app0.raiden.default_one_to_n_address,
-        transport=MatrixTransport(app0.raiden.config["transport"]["matrix"]),
+        transport=MatrixTransportNode(app0.raiden.address, app0.raiden.config["transport"]["matrix"]),
         raiden_event_handler=raiden_event_handler,
         message_handler=message_handler,
         discovery=app0.raiden.discovery,

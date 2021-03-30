@@ -3,6 +3,7 @@ from unittest.mock import Mock, patch
 
 import requests
 
+from raiden.messages import Message
 from raiden.storage.serialize import JSONSerializer
 from raiden.storage.sqlite import SerializedSQLiteStorage
 from raiden.storage.wal import WriteAheadLog
@@ -66,7 +67,7 @@ class MockChain:
         self.node_address = node_address
         self.client = MockJSONRPCClient()
 
-    def payment_channel(self, canonical_identifier: CanonicalIdentifier):
+    def payment_channel(self, creator_address: Address, canonical_identifier: CanonicalIdentifier):
         return MockPaymentChannel(self.token_network, canonical_identifier.channel_identifier)
 
     def token_network_registry(  # pylint: disable=unused-argument, no-self-use
@@ -144,9 +145,9 @@ class MockRaidenService:
 
         self.wal.log_and_dispatch(state_change)
 
-    def on_message(self, message):
+    def on_message(self, message: Message, message_receiver_address: Address, is_light_client: bool = False):
         if self.message_handler:
-            self.message_handler.on_message(self, message)
+            self.message_handler.on_message(self, message, message_receiver_address, is_light_client)
 
     def handle_and_track_state_change(self, state_change):
         pass
@@ -171,7 +172,9 @@ def make_raiden_service_mock(
     raiden_service.wal = wal
 
     token_network = MockTokenNetwork()
-    token_network.channelidentifiers_to_channels[channel_identifier] = MockChannelState()
+    address_channels = dict()
+    address_channels[channel_identifier] = MockChannelState()
+    token_network.channelidentifiers_to_channels[raiden_service.address] = address_channels
     token_network.partneraddresses_to_channelidentifiers[partner] = [channel_identifier]
 
     payment_network = MockPaymentNetwork()

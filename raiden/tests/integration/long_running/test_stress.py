@@ -15,12 +15,12 @@ from raiden.api.python import RaidenAPI
 from raiden.api.rest import APIServer, RestAPI
 from raiden.app import App
 from raiden.message_handler import MessageHandler
-from raiden.network.transport import UDPTransport
 from raiden.raiden_event_handler import RaidenEventHandler
 from raiden.tests.integration.api.utils import wait_for_listening_port
 from raiden.tests.utils.transfer import assert_synced_channel_state, wait_assert
 from raiden.transfer import views
 from raiden.utils.cli import LogLevelConfigType
+from transport.udp.transport import UDPTransport
 
 log = structlog.get_logger(__name__)
 
@@ -347,7 +347,6 @@ def test_stress(
     port_generator,
     skip_if_not_udp,  # pylint: disable=unused-argument
 ):
-
     config_converter = LogLevelConfigType()
     logging_levels = config_converter.convert(
         value=request.config.option.log_config or "", param=None, ctx=None

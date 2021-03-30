@@ -3,7 +3,7 @@ import random
 import gevent
 import pytest
 
-from raiden.constants import EMPTY_MERKLE_ROOT, UINT64_MAX
+from raiden.constants import EMPTY_MERKLE_ROOT, UINT64_MAX, EMPTY_PAYMENT_HASH_INVOICE
 from raiden.messages import Lock, LockedTransfer, RevealSecret, Unlock
 from raiden.tests.fixtures.variables import TransportProtocol
 from raiden.tests.integration.fixtures.raiden_network import CHAIN, wait_for_channels
@@ -11,10 +11,10 @@ from raiden.tests.utils.detect_failure import raise_on_failure
 from raiden.tests.utils.events import raiden_state_changes_search_for_item, search_for_item
 from raiden.tests.utils.factories import UNIT_CHAIN_ID
 from raiden.tests.utils.network import payment_channel_open_and_deposit
-from raiden.tests.utils.transfer import get_channelstate, transfer
+from raiden.tests.utils.transfer import get_channelstate, transfer, sign_and_inject
 from raiden.transfer import views
 from raiden.transfer.mediated_transfer.events import SendSecretReveal
-from raiden.transfer.mediated_transfer.state_change import ReceiveTransferRefundCancelRoute
+from raiden.transfer.mediated_transfer.state_change import ActionTransferReroute
 from raiden.utils import sha3
 
 # pylint: disable=too-many-locals
@@ -102,7 +102,11 @@ def run_test_regression_revealsecret_after_secret(
         views.state_from_app(app0), payment_network_identifier, token
     )
     payment_status = app0.raiden.mediated_transfer_async(
-        token_network_identifier, amount=1, target=app2.raiden.address, identifier=identifier
+        token_network_identifier=token_network_identifier,
+        amount=1,
+        target=app2.raiden.address,
+        identifier=identifier,
+        payment_hash_invoice=EMPTY_PAYMENT_HASH_INVOICE,
     )
     assert payment_status.payment_done.wait()
 
@@ -118,7 +122,7 @@ def run_test_regression_revealsecret_after_secret(
         host_port = None
         app1.raiden.transport.receive(reveal_data, host_port)
     elif transport_protocol is TransportProtocol.MATRIX:
-        app1.raiden.transport._receive_message(reveal_secret)  # pylint: disable=protected-access
+        app1.raiden.transport.full_node._receive_message(reveal_secret)  # pylint: disable=protected-access
     else:
         raise TypeError("Unknown TransportProtocol")
 
@@ -174,7 +178,7 @@ def run_test_regression_multiple_revealsecret(raiden_network, token_addresses, t
         message_identifier=random.randint(0, UINT64_MAX),
         payment_identifier=payment_identifier,
         nonce=nonce,
-        token_network_address=app0.raiden.default_registry.address,
+        token_network_address=token_network_identifier,
         token=token,
         channel_identifier=channelstate_0_1.identifier,
         transferred_amount=transferred_amount,
@@ -184,15 +188,16 @@ def run_test_regression_multiple_revealsecret(raiden_network, token_addresses, t
         lock=lock,
         target=app1.raiden.address,
         initiator=app0.raiden.address,
+        payment_hash_invoice=EMPTY_PAYMENT_HASH_INVOICE
     )
-    app0.raiden.sign(mediated_transfer)
+    sign_and_inject(mediated_transfer, app0.raiden.signer, app1)
 
     if transport_protocol is TransportProtocol.UDP:
         message_data = mediated_transfer.encode()
         host_port = None
-        app1.raiden.transport.receive(message_data, host_port)
+        app1.raiden.transport.full_node.receive(message_data, host_port)
     elif transport_protocol is TransportProtocol.MATRIX:
-        app1.raiden.transport._receive_message(mediated_transfer)
+        app1.raiden.transport.full_node._receive_message(mediated_transfer)
     else:
         raise TypeError("Unknown TransportProtocol")
 
@@ -217,11 +222,11 @@ def run_test_regression_multiple_revealsecret(raiden_network, token_addresses, t
     if transport_protocol is TransportProtocol.UDP:
         messages = [unlock.encode(), reveal_secret.encode()]
         host_port = None
-        receive_method = app1.raiden.transport.receive
+        receive_method = app1.raiden.transport.full_node.receive
         wait = set(gevent.spawn_later(0.1, receive_method, data, host_port) for data in messages)
     elif transport_protocol is TransportProtocol.MATRIX:
         messages = [unlock, reveal_secret]
-        receive_method = app1.raiden.transport._receive_message
+        receive_method = app1.raiden.transport.full_node._receive_message
         wait = set(gevent.spawn_later(0.1, receive_method, data) for data in messages)
     else:
         raise TypeError("Unknown TransportProtocol")
@@ -288,5 +293,5 @@ def run_regression_payment_complete_after_refund_to_the_initiator(
     )
 
     assert raiden_state_changes_search_for_item(
-        raiden=app0, item_type=ReceiveTransferRefundCancelRoute, attributes={}
+        raiden=app0, item_type=ActionTransferReroute, attributes={}
     )

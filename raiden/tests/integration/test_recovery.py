@@ -6,7 +6,6 @@ from raiden import waiting
 from raiden.api.python import RaidenAPI
 from raiden.app import App
 from raiden.message_handler import MessageHandler
-from raiden.network.transport import UDPTransport
 from raiden.raiden_event_handler import RaidenEventHandler
 from raiden.tests.utils.events import search_for_item
 from raiden.tests.utils.network import CHAIN
@@ -22,6 +21,7 @@ from raiden.transfer.state_change import (
     ContractReceiveChannelSettled,
 )
 from raiden.utils import create_default_identifier
+from transport.udp.transport import UDPTransport
 
 
 @pytest.mark.parametrize("deposit", [10])
@@ -210,10 +210,10 @@ def test_recovery_unhappy_case(
     )
 
     channel01 = views.get_channelstate_for(
-        views.state_from_app(app1),
-        app1.raiden.default_registry.address,
-        token_address,
-        app0.raiden.address,
+        chain_state=views.state_from_app(app1),
+        payment_network_id=app1.raiden.default_registry.address,
+        token_address=token_address,
+        creator_address=app0.raiden.address
     )
 
     waiting.wait_for_settle(

@@ -1,8 +1,8 @@
 import gevent
 from gevent.event import Event
 
-from raiden.network.transport.udp.udp_utils import event_first_of
 from raiden.utils.notifying_queue import NotifyingQueue
+from transport.udp.utils import event_first_of
 
 
 def add_element_to_queue(queue, element):

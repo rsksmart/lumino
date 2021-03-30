@@ -6,6 +6,8 @@ from eth_utils import (
     to_normalized_address,
 )
 from gevent.lock import RLock
+from raiden_contracts.constants import CONTRACT_USER_DEPOSIT, GAS_REQUIRED_FOR_UDC_DEPOSIT
+from raiden_contracts.contract_manager import ContractManager
 
 from raiden.exceptions import DepositMismatch, InvalidAddress, RaidenUnrecoverableError
 from raiden.network.proxies.token import Token
@@ -13,8 +15,6 @@ from raiden.network.rpc.client import JSONRPCClient, check_address_has_code
 from raiden.network.rpc.transactions import check_transaction_threw
 from raiden.utils import pex, safe_gas_limit
 from raiden.utils.typing import Address, Balance, BlockSpecification, Dict, TokenAmount, Tuple
-from raiden_contracts.constants import CONTRACT_USER_DEPOSIT, GAS_REQUIRED_FOR_UDC_DEPOSIT
-from raiden_contracts.contract_manager import ContractManager
 
 log = structlog.get_logger(__name__)  # pylint: disable=invalid-name
 
@@ -118,8 +118,7 @@ class UserDeposit:
                     transaction_name="deposit",
                     address=self.node_address,
                     transaction_executed=transaction_executed,
-                    required_gas=GAS_REQUIRED_FOR_UDC_DEPOSIT,
-                    block_identifier=block,
+                    required_gas=GAS_REQUIRED_FOR_UDC_DEPOSIT
                 )
 
                 msg = self._check_why_deposit_failed(

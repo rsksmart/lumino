@@ -63,7 +63,9 @@ def run_test_locksroot_loading_during_channel_settle_handling(raiden_chain, toke
         app0=app0, app1=app1, token_network_identifier=token_network_identifier
     )
 
-    channel = app0.raiden.chain.payment_channel(channel_state.canonical_identifier)
+    channel = app0.raiden.chain.payment_channel(
+        app0.raiden.chain.client.address, channel_state.canonical_identifier
+    )
     balance_proof = channel_state.partner_state.balance_proof
     block_number = app0.raiden.chain.block_number()
 
@@ -92,7 +94,9 @@ def run_test_locksroot_loading_during_channel_settle_handling(raiden_chain, toke
 
     # make sure the block was pruned
     with pytest.raises(ValueError, match="pruned"):
-        channel = app0.raiden.chain.payment_channel(channel_state.canonical_identifier)
+        channel = app0.raiden.chain.payment_channel(
+            channel_state.our_state.address, channel_state.canonical_identifier
+        )
         channel.detail(block_identifier=close_event_pruned_at)
 
     # This must not raise when the settle event is being raised and the

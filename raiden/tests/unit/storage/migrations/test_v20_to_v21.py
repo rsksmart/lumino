@@ -85,7 +85,7 @@ def assert_snapshots_are_transformed(storage: SQLiteStorage) -> None:
             )
             assert tn_to_pn[token_network["address"]] == payment_network["address"], msg
 
-    for task in snapshot["payment_mapping"]["secrethashes_to_task"].values():
+    for task in snapshot["payment_states_by_address"]["secrethashes_to_task"].values():
         if "raiden.transfer.state.InitiatorTask" in task["_type"]:
             for initiator in task["manager_state"]["initiator_transfers"].values():
                 msg = "allocated_fee was not initialized in the initiator transfer description"

@@ -28,8 +28,9 @@ If you want to create your own RIF Lumino network for development or custom use 
 
 ## Useful Links
 
-* [RIF Lumino Network](https://www.rifos.org/rif-lumino-network/)
+* [RIF Lumino Network](https://developers.rsk.co/rif/lumino/)
 * [http://explorer.lumino.rifos.org/](https://explorer.lumino.rifos.org/)
 * [RIF Lumino Contracts](https://github.com/rsksmart/lumino-contracts) 
 * [RIF Lumino Web](https://github.com/rsksmart/lumino-web) 
 * [RIF Lumino Explorer](https://github.com/rsksmart/lumino-explorer) 
+

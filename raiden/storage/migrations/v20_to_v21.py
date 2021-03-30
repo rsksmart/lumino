@@ -15,7 +15,7 @@ def _transform_snapshot(raw_snapshot: str) -> str:
     """
     snapshot = json.loads(raw_snapshot)
 
-    for task in snapshot["payment_mapping"]["secrethashes_to_task"].values():
+    for task in snapshot["payment_states_by_address"]["secrethashes_to_task"].values():
         if "raiden.transfer.state.InitiatorTask" in task["_type"]:
             for initiator in task["manager_state"]["initiator_transfers"].values():
                 msg = "v20 initiator task should not contain allocated_fee"

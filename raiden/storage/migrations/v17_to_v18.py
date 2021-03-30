@@ -28,7 +28,7 @@ def _transform_snapshot(raw_snapshot: str) -> str:
     receiving node comes back online.
     """
     snapshot = json.loads(raw_snapshot)
-    secrethash_to_task = snapshot["payment_mapping"]["secrethashes_to_task"]
+    secrethash_to_task = snapshot["payment_states_by_address"]["secrethashes_to_task"]
     for task in secrethash_to_task.values():
         if task["_type"] != "raiden.transfer.state.MediatorTask":
             continue

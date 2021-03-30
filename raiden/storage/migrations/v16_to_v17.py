@@ -24,7 +24,7 @@ def _transform_snapshot(raw_snapshot):
     - `InitiatorTransferState` has a new attribute `transfer_state`
     """
     snapshot = json.loads(raw_snapshot)
-    secrethash_to_task = snapshot["payment_mapping"]["secrethashes_to_task"]
+    secrethash_to_task = snapshot["payment_states_by_address"]["secrethashes_to_task"]
     for secrethash, task in secrethash_to_task.items():
         if task["_type"] != "raiden.transfer.state.InitiatorTask":
             continue

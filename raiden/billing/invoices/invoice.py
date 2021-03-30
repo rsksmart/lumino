@@ -2,7 +2,7 @@ import time
 from binascii import hexlify
 
 
-class Invoice(object):
+class Invoice:
     def __init__(self, paymenthash=None, amount=None, currency=None, tags=None, date=None):
         self.date = int(time.time()) if not date else int(date)
         self.tags = [] if not tags else tags

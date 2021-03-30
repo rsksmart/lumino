@@ -1,6 +1,5 @@
-from typing import TYPE_CHECKING
-
-from eth_utils import to_bytes, to_canonical_address, to_checksum_address, to_hex, to_normalized_address
+from eth_utils import to_bytes, to_canonical_address, to_checksum_address, to_hex, to_normalized_address, decode_hex, \
+    encode_hex
 
 from raiden.constants import UINT256_MAX
 from raiden.transfer.architecture import (
@@ -9,8 +8,8 @@ from raiden.transfer.architecture import (
     Event,
     SendMessageEvent,
 )
-from raiden.transfer.state import BalanceProofSignedState, NettingChannelState
 from raiden.transfer.identifiers import CanonicalIdentifier
+from raiden.transfer.state import BalanceProofSignedState, NettingChannelState
 from raiden.utils import pex, serialization, sha3
 from raiden.utils.serialization import deserialize_bytes, serialize_bytes
 from raiden.utils.typing import (
@@ -35,13 +34,6 @@ from raiden.utils.typing import (
     TokenNetworkID,
     Signature)
 
-if TYPE_CHECKING:
-    # pylint: disable=unused-import
-    from raiden.transfer.state import BalanceProofSignedState
-
-
-# pylint: disable=too-many-arguments,too-few-public-methods
-
 
 class ContractSendChannelClose(ContractSendEvent):
     """ Event emitted to close the netting channel.
@@ -54,23 +46,26 @@ class ContractSendChannelClose(ContractSendEvent):
         canonical_identifier: CanonicalIdentifier,
         balance_proof: Optional["BalanceProofSignedState"],
         triggered_by_block_hash: BlockHash,
-        signed_close_tx: str
+        signed_close_tx: str,
+        our_address: Address
     ) -> None:
         super().__init__(triggered_by_block_hash)
         self.canonical_identifier = canonical_identifier
         self.balance_proof = balance_proof
         self.signed_close_tx = signed_close_tx
+        self.our_address = our_address
 
     def __repr__(self) -> str:
         return (
             "<ContractSendChannelClose channel:{} token_network:{} "
-            "balance_proof:{} triggered_by_block_hash:{} signed_close_tx:{}>"
+            "balance_proof:{} triggered_by_block_hash:{} signed_close_tx:{} our_address:{}>"
         ).format(
             self.canonical_identifier.channel_identifier,
             pex(self.canonical_identifier.token_network_address),
             self.balance_proof,
             pex(self.triggered_by_block_hash),
-            self.signed_close_tx
+            self.signed_close_tx,
+            pex(self.our_address)
         )
 
     def __eq__(self, other: Any) -> bool:
@@ -80,6 +75,7 @@ class ContractSendChannelClose(ContractSendEvent):
             and self.canonical_identifier == other.canonical_identifier
             and self.balance_proof == other.balance_proof
             and self.signed_close_tx == other.signed_close_tx
+            and self.our_address == other.our_address
         )
 
     def __ne__(self, other: Any) -> bool:
@@ -98,7 +94,8 @@ class ContractSendChannelClose(ContractSendEvent):
             "canonical_identifier": self.canonical_identifier.to_dict(),
             "balance_proof": self.balance_proof,
             "triggered_by_block_hash": serialize_bytes(self.triggered_by_block_hash),
-            "signed_close_tx": self.signed_close_tx
+            "signed_close_tx": self.signed_close_tx,
+            "our_address": to_normalized_address(self.our_address)
         }
         return result
 
@@ -111,7 +108,8 @@ class ContractSendChannelClose(ContractSendEvent):
             canonical_identifier=CanonicalIdentifier.from_dict(data["canonical_identifier"]),
             balance_proof=data["balance_proof"],
             triggered_by_block_hash=BlockHash(deserialize_bytes(data["triggered_by_block_hash"])),
-            signed_close_tx=data["signed_close_tx"]
+            signed_close_tx=data["signed_close_tx"],
+            our_address=to_canonical_address(data["our_address"])
         )
 
         return restored
@@ -121,11 +119,12 @@ class ContractSendChannelSettle(ContractSendEvent):
     """ Event emitted if the netting channel must be settled. """
 
     def __init__(
-        self, canonical_identifier: CanonicalIdentifier, triggered_by_block_hash: BlockHash, channel_state: NettingChannelState
+        self, canonical_identifier: CanonicalIdentifier, triggered_by_block_hash: BlockHash,
+        channel_state: NettingChannelState
     ):
         super().__init__(triggered_by_block_hash)
         canonical_identifier.validate()
-        self.channel_state= channel_state
+        self.channel_state = channel_state
         self.canonical_identifier = canonical_identifier
 
     @property
@@ -174,6 +173,21 @@ class ContractSendChannelSettle(ContractSendEvent):
         return restored
 
 
+class ContractSendChannelSettleLight(ContractSendChannelSettle):
+    """ Event emitted if the netting channel must be settled for light clients. """
+
+    def __init__(
+        self,
+        canonical_identifier: CanonicalIdentifier,
+        triggered_by_block_hash: BlockHash,
+        channel_state: NettingChannelState
+    ):
+        super().__init__(
+            canonical_identifier=canonical_identifier,
+            triggered_by_block_hash=triggered_by_block_hash,
+            channel_state=channel_state)
+
+
 class ContractSendChannelUpdateTransfer(ContractSendExpirableEvent):
     """ Event emitted if the netting channel balance proof must be updated. """
 
@@ -182,9 +196,11 @@ class ContractSendChannelUpdateTransfer(ContractSendExpirableEvent):
         expiration: BlockExpiration,
         balance_proof: "BalanceProofSignedState",
         triggered_by_block_hash: BlockHash,
+        our_address: Address
     ) -> None:
         super().__init__(triggered_by_block_hash, expiration)
         self.balance_proof = balance_proof
+        self.our_address = our_address
 
     @property
     def token_network_identifier(self) -> TokenNetworkAddress:
@@ -220,6 +236,7 @@ class ContractSendChannelUpdateTransfer(ContractSendExpirableEvent):
             "expiration": str(self.expiration),
             "balance_proof": self.balance_proof,
             "triggered_by_block_hash": serialize_bytes(self.triggered_by_block_hash),
+            "our_address": to_checksum_address(self.our_address)
         }
 
         return result
@@ -230,6 +247,7 @@ class ContractSendChannelUpdateTransfer(ContractSendExpirableEvent):
             expiration=BlockExpiration(int(data["expiration"])),
             balance_proof=data["balance_proof"],
             triggered_by_block_hash=BlockHash(deserialize_bytes(data["triggered_by_block_hash"])),
+            our_address=to_canonical_address(data["our_address"])
         )
 
         return restored
@@ -368,6 +386,77 @@ class ContractSendChannelBatchUnlock(ContractSendEvent):
         return restored
 
 
+class ContractSendChannelBatchUnlockLight(ContractSendEvent):
+    """ Event emitted when the lock must be claimed on-chain. """
+
+    def __init__(
+        self,
+        canonical_identifier: CanonicalIdentifier,
+        client: Address,
+        participant: Address,
+        triggered_by_block_hash: BlockHash,
+    ) -> None:
+        super().__init__(triggered_by_block_hash)
+        self.canonical_identifier = canonical_identifier
+        self.participant = participant
+        self.client = client
+
+    @property
+    def token_network_identifier(self) -> TokenNetworkAddress:
+        return TokenNetworkAddress(self.canonical_identifier.token_network_address)
+
+    @property
+    def channel_identifier(self) -> ChannelID:
+        return self.canonical_identifier.channel_identifier
+
+    def __repr__(self) -> str:
+        return (
+            "<ContractSendChannelBatchUnlock token_network_id:{} "
+            "channel:{} participant:{} triggered_by_block_hash:{} client{}"
+            ">"
+        ).format(
+            pex(self.token_network_identifier),
+            self.channel_identifier,
+            pex(self.participant),
+            pex(self.triggered_by_block_hash),
+            pex(self.client),
+        )
+
+    def __eq__(self, other: Any) -> bool:
+        return (
+            super().__eq__(other)
+            and isinstance(other, ContractSendChannelBatchUnlockLight)
+            and self.canonical_identifier == other.canonical_identifier
+            and self.participant == other.participant
+            and self.client == other.client
+        )
+
+    def __ne__(self, other: Any) -> bool:
+        return not self.__eq__(other)
+
+    def to_dict(self) -> Dict[str, Any]:
+        result = {
+            "canonical_identifier": self.canonical_identifier.to_dict(),
+            "participant": to_checksum_address(self.participant),
+            "client": to_checksum_address(self.client),
+            "triggered_by_block_hash": serialize_bytes(self.triggered_by_block_hash),
+        }
+
+        return result
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "ContractSendChannelBatchUnlockLight":
+        restored = cls(
+            canonical_identifier=CanonicalIdentifier.from_dict(data["canonical_identifier"]),
+            participant=to_canonical_address(data["participant"]),
+            triggered_by_block_hash=BlockHash(deserialize_bytes(data["triggered_by_block_hash"])),
+            client=to_canonical_address(data["client"]),
+
+        )
+
+        return restored
+
+
 class ContractSendSecretReveal(ContractSendExpirableEvent):
     """ Event emitted when the lock must be claimed on-chain. """
 
@@ -414,6 +503,48 @@ class ContractSendSecretReveal(ContractSendExpirableEvent):
         )
 
         return restored
+
+
+class ContractSendSecretRevealLight(Event):
+    """ Event emitted when the lock must be claimed on-chain by a light client. """
+
+    def __init__(
+        self, payment_identifier: int, message_id: int, light_client_address: Address
+    ) -> None:
+        self.payment_identifier = payment_identifier
+        self.message_id = message_id
+        self.light_client_address = light_client_address
+
+    def __repr__(self) -> str:
+        return f"<ContractSendSecretRevealLight triggered for payment {self.payment_identifier} " \
+               f"and light_client_address {self.light_client_address}>"
+
+    def __eq__(self, other: Any) -> bool:
+        return (
+            isinstance(other, ContractSendSecretRevealLight)
+            and self.payment_identifier == other.payment_identifier
+            and self.message_id == other.message_id
+            and self.light_client_address == other.light_client_address
+            and super().__eq__(other)
+        )
+
+    def __ne__(self, other: Any) -> bool:
+        return not self.__eq__(other)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "payment_identifier": self.payment_identifier,
+            "message_id": str(self.message_id),
+            "light_client_address": encode_hex(self.light_client_address),
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "ContractSendSecretRevealLight":
+        return cls(
+            payment_identifier=data["payment_identifier"],
+            message_id=data["message_id"],
+            light_client_address=Address(decode_hex(data["light_client_address"]))
+        )
 
 
 class EventPaymentSentSuccess(Event):

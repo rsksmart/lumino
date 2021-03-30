@@ -26,6 +26,7 @@ var/
 *.egg-info/
 .installed.cfg
 *.egg
+pip-wheel-metadata/
 
 
 # PyInstaller
@@ -48,6 +49,7 @@ coverage.xml
 *,cover
 .pytest_cache/
 mypy-out.txt
+*.hypothesis/
 
 # Pyenv
 .python-version
@@ -84,7 +86,7 @@ raiden-debug_*.log
 
 # venvs
 venv/
-clientEnv/
+*Env/
 
 # test keystores
 keystores

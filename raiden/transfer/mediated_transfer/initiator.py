@@ -3,6 +3,7 @@ import random
 from eth_utils import to_canonical_address
 
 from raiden.constants import MAXIMUM_PENDING_TRANSFERS
+from raiden.lightclient.models.light_client_protocol_message import LightClientProtocolMessageType
 from raiden.messages import LockedTransfer, Unlock
 from raiden.settings import DEFAULT_WAIT_BEFORE_LOCK_REMOVAL
 from raiden.transfer import channel
@@ -16,23 +17,23 @@ from raiden.transfer.mediated_transfer.events import (
     EventUnlockSuccess,
     SendLockedTransfer,
     SendSecretReveal,
-    SendLockedTransferLight, StoreMessageEvent, SendSecretRevealLight, SendBalanceProofLight)
+    SendLockedTransferLight, StoreMessageEvent, SendSecretRevealLight)
 from raiden.transfer.mediated_transfer.state import (
     InitiatorTransferState,
     TransferDescriptionWithSecretState,
-    LockedTransferUnsignedState, TransferDescriptionWithoutSecretState)
+    TransferDescriptionWithoutSecretState)
 from raiden.transfer.mediated_transfer.state_change import (
     ReceiveSecretRequest,
     ReceiveSecretReveal,
-    ReceiveSecretRequestLight, ActionSendSecretRevealLight, ReceiveSecretRevealLight, ActionSendUnlockLight)
+    ReceiveSecretRequestLight, ActionSendSecretRevealLight, ReceiveSecretRevealLight)
 from raiden.transfer.merkle_tree import merkleroot
 from raiden.transfer.state import (
     CHANNEL_STATE_OPENED,
     NettingChannelState,
     RouteState,
-    message_identifier_from_prng,
-    BalanceProofUnsignedState, HashTimeLockState)
-from raiden.transfer.state_change import Block, ContractReceiveSecretReveal, StateChange
+    message_identifier_from_prng)
+from raiden.transfer.state_change import Block, ContractReceiveSecretReveal, StateChange, \
+    ContractReceiveSecretRevealLight
 from raiden.transfer.utils import is_valid_secret_reveal
 from raiden.utils.typing import (
     MYPY_ANNOTATION,
@@ -111,6 +112,7 @@ def handle_block(
     """ Checks if the lock has expired, and if it has sends a remove expired
     lock and emits the failing events.
     """
+
     secrethash = initiator_state.transfer.lock.secrethash
     locked_lock = channel_state.our_state.secrethashes_to_lockedlocks.get(secrethash)
 
@@ -131,7 +133,6 @@ def handle_block(
         block_number=state_change.block_number,
         lock_expiration_threshold=lock_expiration_threshold,
     )
-
     events: List[Event] = list()
 
     if lock_has_expired and initiator_state.transfer_state != "transfer_expired":
@@ -141,6 +142,7 @@ def handle_block(
                 channel_state=channel_state,
                 locked_lock=locked_lock,
                 pseudo_random_generator=pseudo_random_generator,
+                payment_identifier=initiator_state.transfer.payment_identifier
             )
             events.extend(expired_lock_events)
 
@@ -234,30 +236,22 @@ def next_channel_from_routes(
 
 def try_new_route_light(
     channelidentifiers_to_channels: ChannelMap,
-    available_routes: List[RouteState],
+    channel_state: NettingChannelState,
     transfer_description: TransferDescriptionWithoutSecretState,
     signed_locked_transfer: LockedTransfer
 ) -> TransitionResult[InitiatorTransferState]:
-    channel_state = next_channel_from_routes(
-        available_routes=available_routes,
-        channelidentifiers_to_channels=channelidentifiers_to_channels,
-        transfer_amount=transfer_description.amount,
-        initiator=to_canonical_address(transfer_description.initiator)
-    )
-
+    initiator = signed_locked_transfer.initiator
+    channel_identifier = signed_locked_transfer.channel_identifier
+    channel_state = channelidentifiers_to_channels[initiator].get(channel_identifier)
     events: List[Event] = list()
     if channel_state is None:
-        if not available_routes:
-            reason = "there is no route available"
-        else:
-            reason = "none of the available routes could be used"
         # TODO mmartinez handle persistance with status failure?
         transfer_failed = EventPaymentSentFailed(
             payment_network_identifier=transfer_description.payment_network_identifier,
             token_network_identifier=transfer_description.token_network_identifier,
             identifier=transfer_description.payment_identifier,
             target=transfer_description.target,
-            reason=reason,
+            reason="none of the available routes could be used",
         )
         events.append(transfer_failed)
 
@@ -291,21 +285,25 @@ def try_new_route_light(
 
         # Check that the constructed merkletree is equals to the sent by the light client.
         calculated_locksroot = merkleroot(merkletree)
-        if signed_locked_transfer.locksroot.__eq__(calculated_locksroot):
+        if signed_locked_transfer.locksroot == calculated_locksroot:
             initiator_state = InitiatorTransferState(
                 transfer_description=transfer_description,
                 channel_identifier=channel_state.identifier,
                 transfer=calculated_transfer,
                 revealsecret=None,
             )
-            store_signed_lt = StoreMessageEvent(signed_locked_transfer.message_identifier,
-                                                signed_locked_transfer.payment_identifier, 1, signed_locked_transfer,
-                                                True)
-
+            store_signed_lt = StoreMessageEvent(message_id=signed_locked_transfer.message_identifier,
+                                                payment_id=signed_locked_transfer.payment_identifier,
+                                                message_order=1,
+                                                message=signed_locked_transfer,
+                                                is_signed=True,
+                                                message_type=LightClientProtocolMessageType.PaymentSuccessful,
+                                                light_client_address=signed_locked_transfer.sender)
             events.append(lockedtransfer_event)
             events.append(store_signed_lt)
 
         else:
+            # pylint: disable=no-member
             transfer_failed = EventPaymentSentFailed(
                 payment_network_identifier=transfer_description.payment_network_identifier,
                 token_network_identifier=transfer_description.token_network_identifier,
@@ -515,8 +513,13 @@ def handle_secretrequest_light(
         iteration = TransitionResult(initiator_state, list())
 
     elif is_valid_secretrequest and is_message_from_target:
-        store_event = StoreMessageEvent(state_change.secret_request_message.message_identifier,
-                                        state_change.payment_identifier, 5, state_change.secret_request_message, True)
+        store_event = StoreMessageEvent(message_id=state_change.secret_request_message.message_identifier,
+                                        payment_id=state_change.payment_identifier,
+                                        message_order=5,
+                                        message=state_change.secret_request_message,
+                                        is_signed=True,
+                                        message_type=LightClientProtocolMessageType.PaymentSuccessful,
+                                        light_client_address=initiator_state.transfer.initiator)
         initiator_state.received_secret_request = True
         iteration = TransitionResult(initiator_state, [store_event])
 
@@ -544,7 +547,7 @@ def handle_send_secret_reveal_light(
     transfer_description = initiator_state.transfer_description
     recipient = transfer_description.target
     revealsecret = SendSecretRevealLight(
-        sender= Address(state_change.sender),
+        sender=Address(state_change.sender),
         recipient=Address(recipient),
         channel_identifier=CHANNEL_IDENTIFIER_GLOBAL_QUEUE,
         message_identifier=message_identifier,
@@ -554,8 +557,14 @@ def handle_send_secret_reveal_light(
 
     initiator_state.revealsecret = revealsecret
     initiator_state.received_secret_request = True
-    store_message_event = StoreMessageEvent(message_identifier, transfer_description.payment_identifier, 7,
-                                            state_change.reveal_secret, True)
+
+    store_message_event = StoreMessageEvent(message_id=message_identifier,
+                                            payment_id=transfer_description.payment_identifier,
+                                            message_order=7,
+                                            message=state_change.reveal_secret,
+                                            is_signed=True,
+                                            message_type=LightClientProtocolMessageType.PaymentSuccessful,
+                                            light_client_address=transfer_description.initiator)
     iteration = TransitionResult(initiator_state, [revealsecret, store_message_event])
     return iteration
 
@@ -601,13 +610,20 @@ def handle_offchain_secretreveal_light(
         )
         unlock_msg = Unlock.from_event(unlock_lock)
 
-        store_received_secret_reveal_event = StoreMessageEvent(state_change.secret_reveal_message.message_identifier,
-                                                               transfer_description.payment_identifier, 9,
-                                                               state_change.secret_reveal_message,
-                                                               True)
-        store_created_unlock_event = StoreMessageEvent(message_identifier, transfer_description.payment_identifier, 11,
-                                                       unlock_msg, False)
-
+        store_received_secret_reveal_event = StoreMessageEvent(message_id=state_change.secret_reveal_message.message_identifier,
+                                                               payment_id=transfer_description.payment_identifier,
+                                                               message_order=9,
+                                                               message=state_change.secret_reveal_message,
+                                                               is_signed=True,
+                                                               message_type=LightClientProtocolMessageType.PaymentSuccessful,
+                                                               light_client_address=transfer_description.initiator)
+        store_created_unlock_event = StoreMessageEvent(message_id=message_identifier,
+                                                       payment_id=transfer_description.payment_identifier,
+                                                       message_order=11,
+                                                       message=unlock_msg,
+                                                       is_signed=False,
+                                                       message_type=LightClientProtocolMessageType.PaymentSuccessful,
+                                                       light_client_address=transfer_description.initiator)
         events = list()
         events.append(store_received_secret_reveal_event)
         events.append(store_created_unlock_event)
@@ -706,6 +722,38 @@ def handle_onchain_secretreveal(
     return iteration
 
 
+def handle_onchain_secretreveal_light(
+    initiator_state: InitiatorTransferState,
+    state_change: ContractReceiveSecretRevealLight,
+    channel_state: NettingChannelState,
+    pseudo_random_generator: random.Random,
+) -> TransitionResult[InitiatorTransferState]:
+    """ When a secret is revealed on-chain all nodes learn the secret.
+
+    This checks that the on-chain secret corresponds to the one used by the
+    initiator.
+    """
+    iteration: TransitionResult[InitiatorTransferState]
+    secret = state_change.secret
+    secrethash = initiator_state.transfer_description.secrethash
+    is_valid_secret = is_valid_secret_reveal(
+        state_change=state_change, transfer_secrethash=secrethash, secret=secret
+    )
+    is_lock_expired = state_change.block_number > initiator_state.transfer.lock.expiration
+
+    is_lock_unlocked = is_valid_secret and not is_lock_expired
+
+    if is_lock_unlocked:
+        channel.register_onchain_secret(
+            channel_state=channel_state,
+            secret=secret,
+            secrethash=secrethash,
+            secret_reveal_block_number=state_change.block_number,
+        )
+
+    return TransitionResult(initiator_state, [])
+
+
 def state_transition(
     initiator_state: InitiatorTransferState,
     state_change: StateChange,
@@ -740,6 +788,11 @@ def state_transition(
     elif type(state_change) == ContractReceiveSecretReveal:
         assert isinstance(state_change, ContractReceiveSecretReveal), MYPY_ANNOTATION
         iteration = handle_onchain_secretreveal(
+            initiator_state, state_change, channel_state, pseudo_random_generator
+        )
+    elif type(state_change) == ContractReceiveSecretRevealLight:
+        assert isinstance(state_change, ContractReceiveSecretRevealLight), MYPY_ANNOTATION
+        iteration = handle_onchain_secretreveal_light(
             initiator_state, state_change, channel_state, pseudo_random_generator
         )
     elif type(state_change) == ActionSendSecretRevealLight:

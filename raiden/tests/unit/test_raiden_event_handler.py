@@ -35,6 +35,7 @@ def test_handle_contract_send_channelunlock_already_unlocked():
         chain_state=state_from_raiden(raiden),
         token_network_id=token_network_identifier,
         partner_address=participant,
+        creator_address=raiden.address
     )
 
     channel_state.our_state.onchain_locksroot = EMPTY_MERKLE_ROOT

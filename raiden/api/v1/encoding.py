@@ -10,7 +10,6 @@ from eth_utils import (
 )
 from marshmallow import Schema, SchemaOpts, fields, post_dump, post_load, pre_load
 
-from raiden.lightclient.lightclientmessages.hub_message import HubMessage
 from raiden.utils.rns import is_rns_address
 from webargs import validate
 from werkzeug.exceptions import NotFound
@@ -34,6 +33,15 @@ class InvalidEndpoint(NotFound):
 class HexAddressConverter(BaseConverter):
     @staticmethod
     def to_python(value):
+        try:
+            # we checksum the input value to avoid having errors later.
+            value = to_checksum_address(value.strip())
+        except ValueError:
+            raise InvalidEndpoint("Could not checksum address.")
+
+        # TODO: we should remove these checks?
+        # all these checks are not necessary since we already checksum the input value.
+        # we keep them to avoid adding more changes now
         if not is_0x_prefixed(value):
             raise InvalidEndpoint("Not a valid hex address, 0x prefix missing.")
 
@@ -56,18 +64,7 @@ class LuminoAddressConverter(BaseConverter):
     def to_python(self, value):
         if is_rns_address(value):
             return value
-        if not is_0x_prefixed(value):
-            raise InvalidEndpoint('Not a valid hex address, 0x prefix missing.')
-
-        if not is_checksum_address(value):
-            raise InvalidEndpoint('Not a valid EIP55 encoded address.')
-
-        try:
-            value = to_canonical_address(value)
-        except ValueError:
-            raise InvalidEndpoint('Could not decode hex.')
-
-        return value
+        return HexAddressConverter.to_python(value)
 
 
 class AddressRnsField(fields.Field):
@@ -83,6 +80,12 @@ class AddressRnsField(fields.Field):
 
 
 def deserialize_address_helper(self, value, attr, data):  # pylint: disable=unused-argument
+    # deserializing the value to checksum address, if the result is not ok then it should fail
+    try:
+        value = to_checksum_address(value.strip())
+    except ValueError:
+        self.fail("invalid_checksum")
+
     if not is_0x_prefixed(value):
         self.fail("missing_prefix")
 
@@ -348,7 +351,7 @@ class ChannelPutSchema(BaseSchema):
     token_address = AddressField(required=True)
     partner_address = AddressField(required=True)
     settle_timeout = fields.Integer(missing=None)
-    total_deposit = fields.Integer(default=None, missing=None)
+    total_deposit = fields.Integer(default=0, missing=None)
 
     class Meta:
         strict = True
@@ -362,7 +365,6 @@ class ChannelLightPutSchema(BaseSchema):
     partner_address = AddressField(required=True)
     signed_tx = fields.String(required=True)
     settle_timeout = fields.Integer(missing=None)
-    total_deposit = fields.Integer(default=None, missing=None)
 
     class Meta:
         strict = True
@@ -376,6 +378,7 @@ class CreatePaymentLightPostSchema(BaseSchema):
     token_address = AddressField(required=True)
     amount = fields.Integer(required=True)
     secrethash = SecretHashField(required=True)
+    prev_secrethash = SecretHashField(missing=None)
 
     class Meta:
         strict = True
@@ -383,7 +386,7 @@ class CreatePaymentLightPostSchema(BaseSchema):
         decoding_class = dict
 
 
-class PaymentLightGetSchema(BaseSchema):
+class LightClientMessageGetSchema(BaseSchema):
     from_message = fields.Int(required=True)
 
     class Meta:
@@ -392,11 +395,13 @@ class PaymentLightGetSchema(BaseSchema):
 
 
 class PaymentLightPutSchema(BaseSchema):
-    message_id = fields.Integer(required=True)
+    payment_id = fields.Integer(required=True)
     message_order = fields.Integer(required=True)
     message = fields.Dict(required=True)
     sender = AddressField(required=True)
     receiver = AddressField(required=True)
+    message_type_value = fields.String(required=True)
+    additional_metadata = fields.Dict(required=False, default=None, missing=None)
 
     class Meta:
         strict = True
@@ -485,6 +490,17 @@ class ChannelLightPatchSchema(BaseSchema):
         decoding_class = dict
 
 
+class SettlementLightSchema(BaseSchema):
+    signed_settle_tx = fields.String(required=True)
+    channel_identifier = fields.Integer(required=True)
+    internal_msg_identifier = fields.Integer(required=True)
+
+    class Meta:
+        strict = True
+        # decoding to a dict is required by the @use_kwargs decorator from webargs:
+        decoding_class = dict
+
+
 class PaymentSchema(BaseSchema):
     initiator_address = AddressField(missing=None)
     target_address = AddressField(missing=None)
@@ -493,6 +509,15 @@ class PaymentSchema(BaseSchema):
     identifier = fields.Integer(missing=None)
     secret = SecretField(missing=None)
     secret_hash = SecretHashField(missing=None)
+
+    class Meta:
+        strict = True
+        decoding_class = dict
+
+
+class UnlockPaymentLightPostSchema(BaseSchema):
+    signed_tx = fields.String(required=True)
+    internal_msg_identifier = fields.Integer(required=True)
 
     class Meta:
         strict = True
@@ -521,7 +546,7 @@ class InvoiceCreateSchema(BaseSchema):
     currency_symbol = fields.String(required=True, missing=None)
     token_address = AddressField(required=True)
     partner_address = AddressField(required=True)
-    amount = fields.Integer(default=None, missing=None)
+    amount = fields.Float(default=None, missing=None)
     expires = fields.Integer(default=None, missing=None)
 
     class Meta:
@@ -530,14 +555,8 @@ class InvoiceCreateSchema(BaseSchema):
         decoding_class = dict
 
 
-class LightClientSchema(BaseSchema):
-    address = AddressField(required=True)
-    signed_password = fields.String(required=True)
-    signed_display_name = fields.String(required=True)
-    signed_seed_retry = fields.String(required=True)
-    password = fields.String(required=True)
-    display_name = fields.String(required=True)
-    seed_retry = fields.String(required=True)
+class LightClientRegistrationSchema(BaseSchema):
+    registration_data = fields.Dict(required=True)
 
     class Meta:
         strict = True
@@ -554,8 +573,18 @@ class TokenActionRequestSchema(BaseSchema):
         decoding_class = dict
 
 
-class LightClientMatrixCredentialsBuildSchema(BaseSchema):
+class LightClientOnboardingDataSchema(BaseSchema):
     address = AddressField()
+
+    class Meta:
+        strict = True
+        # decoding to a dict is required by the @use_kwargs decorator from webargs
+        decoding_class = dict
+
+
+class RegisterSecretLightSchema(BaseSchema):
+    signed_tx = fields.String(required=True)
+    internal_msg_identifier = fields.Integer(required=True)
 
     class Meta:
         strict = True

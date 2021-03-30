@@ -760,7 +760,7 @@
     "0xa1df380F45A626836a11e4D37FA9b7C036653883": "reachable"
   },
   "our_address": "0xfAa27b8ab57942EF7b1f5Bee0F4c667474a827A3",
-  "payment_mapping": {
+  "payment_states_by_address": {
     "secrethashes_to_task": {
       "0xf1d7ebe2607a3ddfeb3e1becada3d597ef41c4816ab50af20d0112a8188296fb": {
         "token_network_identifier": "0xEBA8ee3A64B600D226d74fC6DEC03107c51cB360",

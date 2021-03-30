@@ -2,7 +2,6 @@ import pytest
 
 from raiden.constants import EMPTY_HASH, EMPTY_SIGNATURE
 from raiden.exceptions import (
-    ChannelOutdatedError,
     RaidenRecoverableError,
     RaidenUnrecoverableError,
 )
@@ -30,6 +29,7 @@ def test_payment_channel_proxy_basics(
     assert channel_identifier is not None
 
     channel_proxy_1 = chain.payment_channel(
+        creator_address=privatekey_to_address(private_keys[1]),
         canonical_identifier=CanonicalIdentifier(
             chain_identifier=chain_id,
             token_network_address=token_network_address,
@@ -90,6 +90,7 @@ def test_payment_channel_proxy_basics(
     assert new_channel_identifier is not None
 
     channel_proxy_2 = chain.payment_channel(
+        creator_address=privatekey_to_address(private_keys[1]),
         canonical_identifier=CanonicalIdentifier(
             chain_identifier=chain_id,
             token_network_address=token_network_address,
@@ -101,7 +102,7 @@ def test_payment_channel_proxy_basics(
     assert channel_proxy_2.opened("latest") is True
 
     msg = "The channel was already closed, the second call must fail"
-    with pytest.raises(RaidenRecoverableError, message=msg):
+    with pytest.raises(RaidenRecoverableError):
         channel_proxy_1.close(
             nonce=0,
             balance_hash=EMPTY_HASH,
@@ -109,9 +110,10 @@ def test_payment_channel_proxy_basics(
             signature=EMPTY_SIGNATURE,
             block_identifier=block_before_close,
         )
+        pytest.fail(msg)
 
     msg = "The channel is not open at latest, this must raise"
-    with pytest.raises(RaidenUnrecoverableError, message=msg):
+    with pytest.raises(RaidenUnrecoverableError):
         channel_proxy_1.close(
             nonce=0,
             balance_hash=EMPTY_HASH,
@@ -119,7 +121,12 @@ def test_payment_channel_proxy_basics(
             signature=EMPTY_SIGNATURE,
             block_identifier="latest",
         )
+        pytest.fail(msg)
 
-    msg = "The channel is closed, set total deposit must fail"
-    with pytest.raises(ChannelOutdatedError, message=msg):
+    msg = (
+        "The channel was not opened at the provided block (latest). "
+        "This call should never have been attempted."
+    )
+    with pytest.raises(RaidenRecoverableError):
         channel_proxy_1.set_total_deposit(total_deposit=20, block_identifier="latest")
+        pytest.fail(msg)

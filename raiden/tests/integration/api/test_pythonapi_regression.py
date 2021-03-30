@@ -6,7 +6,6 @@ from raiden.api.python import RaidenAPI
 from raiden.tests.utils.detect_failure import raise_on_failure
 from raiden.constants import EMPTY_PAYMENT_HASH_INVOICE
 
-
 @pytest.mark.parametrize("number_of_nodes", [2])
 @pytest.mark.parametrize("channels_per_node", [1])
 def test_close_regression(raiden_network, deposit, token_addresses):
@@ -59,6 +58,7 @@ def run_test_close_regression(raiden_network, deposit, token_addresses):
         token_address,
         [channel12.identifier],
         app0.raiden.alarm.sleep_time,
+        partner_addresses=[app0.raiden.address]
     )
     node1_expected_balance = node1_balance_before + deposit - amount
     node2_expected_balance = node2_balance_before + deposit + amount

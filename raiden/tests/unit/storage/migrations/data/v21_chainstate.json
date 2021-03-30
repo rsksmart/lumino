@@ -662,7 +662,7 @@
     },
     "nodeaddresses_to_networkstates": {},
     "our_address": "0x87A749D9b9c0c91AC009AeeBd74313D1a736A24C",
-    "payment_mapping": {
+    "payment_states_by_address": {
       "secrethashes_to_task": {},
       "_type": "raiden.transfer.state.PaymentMappingState",
       "_version": 0
@@ -1339,7 +1339,7 @@
     },
     "nodeaddresses_to_networkstates": {},
     "our_address": "0x87A749D9b9c0c91AC009AeeBd74313D1a736A24C",
-    "payment_mapping": {
+    "payment_states_by_address": {
       "secrethashes_to_task": {},
       "_type": "raiden.transfer.state.PaymentMappingState",
       "_version": 0
@@ -2077,7 +2077,7 @@
       "0xe3B942e7821A0970EA79185A738BfBd3BC382AAb": "reachable"
     },
     "our_address": "0x87A749D9b9c0c91AC009AeeBd74313D1a736A24C",
-    "payment_mapping": {
+    "payment_states_by_address": {
       "secrethashes_to_task": {},
       "_type": "raiden.transfer.state.PaymentMappingState",
       "_version": 0
@@ -2828,7 +2828,7 @@
       "0xe3B942e7821A0970EA79185A738BfBd3BC382AAb": "reachable"
     },
     "our_address": "0x87A749D9b9c0c91AC009AeeBd74313D1a736A24C",
-    "payment_mapping": {
+    "payment_states_by_address": {
       "secrethashes_to_task": {},
       "_type": "raiden.transfer.state.PaymentMappingState",
       "_version": 0
@@ -3591,7 +3591,7 @@
       "0xe3B942e7821A0970EA79185A738BfBd3BC382AAb": "reachable"
     },
     "our_address": "0x87A749D9b9c0c91AC009AeeBd74313D1a736A24C",
-    "payment_mapping": {
+    "payment_states_by_address": {
       "secrethashes_to_task": {},
       "_type": "raiden.transfer.state.PaymentMappingState",
       "_version": 0
@@ -4342,7 +4342,7 @@
       "0xe3B942e7821A0970EA79185A738BfBd3BC382AAb": "reachable"
     },
     "our_address": "0x87A749D9b9c0c91AC009AeeBd74313D1a736A24C",
-    "payment_mapping": {
+    "payment_states_by_address": {
       "secrethashes_to_task": {},
       "_type": "raiden.transfer.state.PaymentMappingState",
       "_version": 0
@@ -5110,7 +5110,7 @@
       "0xe3B942e7821A0970EA79185A738BfBd3BC382AAb": "reachable"
     },
     "our_address": "0x87A749D9b9c0c91AC009AeeBd74313D1a736A24C",
-    "payment_mapping": {
+    "payment_states_by_address": {
       "secrethashes_to_task": {
         "0xac9a0f05fd29b9f52f6b8dc486e00285dff8dd6bb5077a67d9e47fe09f8fcf27": {
           "token_network_identifier": "0x31F486f03875aA82781F3d1207294Cf7F4B0399F",
@@ -5973,7 +5973,7 @@
       "0xe3B942e7821A0970EA79185A738BfBd3BC382AAb": "reachable"
     },
     "our_address": "0x87A749D9b9c0c91AC009AeeBd74313D1a736A24C",
-    "payment_mapping": {
+    "payment_states_by_address": {
       "secrethashes_to_task": {
         "0xac9a0f05fd29b9f52f6b8dc486e00285dff8dd6bb5077a67d9e47fe09f8fcf27": {
           "token_network_identifier": "0x31F486f03875aA82781F3d1207294Cf7F4B0399F",
@@ -6833,7 +6833,7 @@
       "0xe3B942e7821A0970EA79185A738BfBd3BC382AAb": "reachable"
     },
     "our_address": "0x87A749D9b9c0c91AC009AeeBd74313D1a736A24C",
-    "payment_mapping": {
+    "payment_states_by_address": {
       "secrethashes_to_task": {
         "0xac9a0f05fd29b9f52f6b8dc486e00285dff8dd6bb5077a67d9e47fe09f8fcf27": {
           "token_network_identifier": "0x31F486f03875aA82781F3d1207294Cf7F4B0399F",
@@ -7669,7 +7669,7 @@
       "0xe3B942e7821A0970EA79185A738BfBd3BC382AAb": "reachable"
     },
     "our_address": "0x87A749D9b9c0c91AC009AeeBd74313D1a736A24C",
-    "payment_mapping": {
+    "payment_states_by_address": {
       "secrethashes_to_task": {
         "0xac9a0f05fd29b9f52f6b8dc486e00285dff8dd6bb5077a67d9e47fe09f8fcf27": {
           "token_network_identifier": "0x31F486f03875aA82781F3d1207294Cf7F4B0399F",
@@ -8510,7 +8510,7 @@
       "0xe3B942e7821A0970EA79185A738BfBd3BC382AAb": "reachable"
     },
     "our_address": "0x87A749D9b9c0c91AC009AeeBd74313D1a736A24C",
-    "payment_mapping": {
+    "payment_states_by_address": {
       "secrethashes_to_task": {
         "0xac9a0f05fd29b9f52f6b8dc486e00285dff8dd6bb5077a67d9e47fe09f8fcf27": {
           "token_network_identifier": "0x31F486f03875aA82781F3d1207294Cf7F4B0399F",
@@ -9352,7 +9352,7 @@
       "0xe3B942e7821A0970EA79185A738BfBd3BC382AAb": "reachable"
     },
     "our_address": "0x87A749D9b9c0c91AC009AeeBd74313D1a736A24C",
-    "payment_mapping": {
+    "payment_states_by_address": {
       "secrethashes_to_task": {
         "0xac9a0f05fd29b9f52f6b8dc486e00285dff8dd6bb5077a67d9e47fe09f8fcf27": {
           "token_network_identifier": "0x31F486f03875aA82781F3d1207294Cf7F4B0399F",
@@ -10194,7 +10194,7 @@
       "0xe3B942e7821A0970EA79185A738BfBd3BC382AAb": "reachable"
     },
     "our_address": "0x87A749D9b9c0c91AC009AeeBd74313D1a736A24C",
-    "payment_mapping": {
+    "payment_states_by_address": {
       "secrethashes_to_task": {
         "0xac9a0f05fd29b9f52f6b8dc486e00285dff8dd6bb5077a67d9e47fe09f8fcf27": {
           "token_network_identifier": "0x31F486f03875aA82781F3d1207294Cf7F4B0399F",
@@ -11036,7 +11036,7 @@
       "0xe3B942e7821A0970EA79185A738BfBd3BC382AAb": "reachable"
     },
     "our_address": "0x87A749D9b9c0c91AC009AeeBd74313D1a736A24C",
-    "payment_mapping": {
+    "payment_states_by_address": {
       "secrethashes_to_task": {
         "0xac9a0f05fd29b9f52f6b8dc486e00285dff8dd6bb5077a67d9e47fe09f8fcf27": {
           "token_network_identifier": "0x31F486f03875aA82781F3d1207294Cf7F4B0399F",
@@ -11878,7 +11878,7 @@
       "0xe3B942e7821A0970EA79185A738BfBd3BC382AAb": "reachable"
     },
     "our_address": "0x87A749D9b9c0c91AC009AeeBd74313D1a736A24C",
-    "payment_mapping": {
+    "payment_states_by_address": {
       "secrethashes_to_task": {
         "0xac9a0f05fd29b9f52f6b8dc486e00285dff8dd6bb5077a67d9e47fe09f8fcf27": {
           "token_network_identifier": "0x31F486f03875aA82781F3d1207294Cf7F4B0399F",
@@ -12720,7 +12720,7 @@
       "0xe3B942e7821A0970EA79185A738BfBd3BC382AAb": "reachable"
     },
     "our_address": "0x87A749D9b9c0c91AC009AeeBd74313D1a736A24C",
-    "payment_mapping": {
+    "payment_states_by_address": {
       "secrethashes_to_task": {
         "0xac9a0f05fd29b9f52f6b8dc486e00285dff8dd6bb5077a67d9e47fe09f8fcf27": {
           "token_network_identifier": "0x31F486f03875aA82781F3d1207294Cf7F4B0399F",
@@ -13567,7 +13567,7 @@
       "0xe3B942e7821A0970EA79185A738BfBd3BC382AAb": "reachable"
     },
     "our_address": "0x87A749D9b9c0c91AC009AeeBd74313D1a736A24C",
-    "payment_mapping": {
+    "payment_states_by_address": {
       "secrethashes_to_task": {
         "0xac9a0f05fd29b9f52f6b8dc486e00285dff8dd6bb5077a67d9e47fe09f8fcf27": {
           "token_network_identifier": "0x31F486f03875aA82781F3d1207294Cf7F4B0399F",
@@ -14422,7 +14422,7 @@
       "0xe3B942e7821A0970EA79185A738BfBd3BC382AAb": "reachable"
     },
     "our_address": "0x87A749D9b9c0c91AC009AeeBd74313D1a736A24C",
-    "payment_mapping": {
+    "payment_states_by_address": {
       "secrethashes_to_task": {
         "0xac9a0f05fd29b9f52f6b8dc486e00285dff8dd6bb5077a67d9e47fe09f8fcf27": {
           "token_network_identifier": "0x31F486f03875aA82781F3d1207294Cf7F4B0399F",
@@ -15279,7 +15279,7 @@
       "0xe3B942e7821A0970EA79185A738BfBd3BC382AAb": "reachable"
     },
     "our_address": "0x87A749D9b9c0c91AC009AeeBd74313D1a736A24C",
-    "payment_mapping": {
+    "payment_states_by_address": {
       "secrethashes_to_task": {
         "0xac9a0f05fd29b9f52f6b8dc486e00285dff8dd6bb5077a67d9e47fe09f8fcf27": {
           "token_network_identifier": "0x31F486f03875aA82781F3d1207294Cf7F4B0399F",
@@ -16042,7 +16042,7 @@
       "0xe3B942e7821A0970EA79185A738BfBd3BC382AAb": "reachable"
     },
     "our_address": "0x87A749D9b9c0c91AC009AeeBd74313D1a736A24C",
-    "payment_mapping": {
+    "payment_states_by_address": {
       "secrethashes_to_task": {
         "0xac9a0f05fd29b9f52f6b8dc486e00285dff8dd6bb5077a67d9e47fe09f8fcf27": {
           "token_network_identifier": "0x31F486f03875aA82781F3d1207294Cf7F4B0399F",

@@ -49,6 +49,7 @@ def test_is_transaction_effect_satisfied(chain_state, token_network_id, netting_
         partner_onchain_locksroot=EMPTY_MERKLE_ROOT,
         block_number=1,
         block_hash=make_block_hash(),
+        participant1=netting_channel_state.our_state.address
     )
 
     iteration = state_transition(chain_state=chain_state, state_change=channel_settled, storage=None)
