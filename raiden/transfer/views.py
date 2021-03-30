@@ -602,9 +602,6 @@ def filter_channels_by_partneraddress(
     if not token_network:
         return result
 
-    channelsResult = []
-    # for partner in partner_addresses:
-
     for node_address in token_network.partneraddresses_to_channelidentifiers.keys():
         if node_address in token_network.channelidentifiers_to_channels:
             channels = token_network.channelidentifiers_to_channels[node_address]
@@ -613,14 +610,9 @@ def filter_channels_by_partneraddress(
                     for partner_address in partner_addresses:
                         if channel.partner_state.address == partner_address:
                             if channel.close_transaction is None or channel.close_transaction.result != 'success':
-                                channelsResult.append(channel)
+                                result.append(channel)
 
-    states = filter_channels_by_status(channelsResult, [CHANNEL_STATE_UNUSABLE])
-    # If multiple channel states are found, return the last one.
-    if states:
-        result.append(states[-1])
-
-    return result
+    return filter_channels_by_status(result, [CHANNEL_STATE_UNUSABLE])
 
 
 def filter_channels_by_status(
