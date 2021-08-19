@@ -1,6 +1,6 @@
 aniso8601==3.0.2
 treq==20.4.1
-
+tzlocal<3.0
 appnope==0.1.0
 asn1crypto==0.24.0
 attrdict==2.0.0
