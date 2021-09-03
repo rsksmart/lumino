@@ -1,7 +1,7 @@
 import pytest
 
 from raiden.constants import UINT64_MAX, UINT256_MAX
-from raiden.messages import Ping, RequestMonitoring, SignedBlindedBalanceProof, UpdatePFS
+from raiden.messages import Ping, RequestMonitoring, SignedBlindedBalanceProof
 from raiden.tests.utils import factories
 from raiden.tests.utils.tests import fixture_all_combinations
 from raiden.transfer.balance_proof import (
@@ -101,24 +101,6 @@ def test_request_monitoring():
     )
 
     assert request_monitoring.verify_request_monitoring(PARTNER_ADDRESS, ADDRESS)
-
-
-def test_update_pfs():
-    properties = factories.BalanceProofSignedStateProperties(pkey=PRIVKEY)
-    balance_proof = factories.create(properties)
-    channel_state = factories.create(factories.NettingChannelStateProperties())
-    channel_state.our_state.balance_proof = balance_proof
-    channel_state.partner_state.balance_proof = balance_proof
-    message = UpdatePFS.from_channel_state(channel_state=channel_state)
-
-    assert message.signature == b""
-    privkey2, address2 = factories.make_privkey_address()
-    signer2 = LocalSigner(privkey2)
-    message.sign(signer2)
-    assert recover(message._data_to_sign(), message.signature) == address2
-
-    assert message == UpdatePFS.from_dict(message.to_dict())
-
 
 def test_tamper_request_monitoring():
     """ This test shows ways, how the current implementation of the RequestMonitoring's

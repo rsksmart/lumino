@@ -58,13 +58,14 @@ def parse_options(options):
 
 
 def encode_invoice(addr, privkey):
-
     if addr.amount:
         amount = Decimal(str(addr.amount))
-        # We can only send down to millisatoshi.
-        if amount * 10 ** 12 % 10:
-            raise ValueError("Cannot encode {}: too many decimal places".format(
-                addr.amount))
+        precision = amount.as_tuple().exponent * -1
+        # per BOLT #11: smallest amount allowed is 0.000000000001 units
+        if precision > 12:
+            raise ValueError(
+                "cannot generate invoice, amount {} has too many decimal places to comply with BOLT #11".format(
+                    addr.amount))
 
         amount = addr.currency + shorten_amount(amount)
     else:
@@ -148,7 +149,7 @@ def shorten_amount(amount):
     """ Given an amount in bitcoin, shorten it
     """
     # Convert to pico initially
-    amount = int(amount * 10**12)
+    amount = int(amount * 10 ** 12)
     units = ['p', 'n', 'u', 'm', '']
     for unit in units:
         if amount % 1000 == 0:

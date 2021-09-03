@@ -12,7 +12,7 @@ from raiden.tests.utils.events import check_nested_attrs
 from raiden.transfer.architecture import Event as RaidenEvent, TransitionResult
 from raiden.transfer.mediated_transfer.events import SendBalanceProof, SendSecretRequest
 from raiden.transfer.state import ChainState
-from raiden.utils import pex, typing
+from raiden.utils import pex, typing, Address
 
 log = structlog.get_logger(__name__)
 
@@ -43,10 +43,10 @@ class WaitForMessage(MessageHandler):
         self.waiting[message_type].append(waiting)
         return waiting.async_result
 
-    def on_message(self, raiden: RaidenService, message: Message) -> None:
+    def on_message(self, raiden: RaidenService, message: Message, message_receiver_address: Address, is_light_client: bool = False) -> None:
         # First handle the message, and then set the events, to ensure the
         # expected side-effects of the message are applied
-        super().on_message(raiden, message)
+        super().on_message(raiden, message, message_receiver_address, is_light_client)
 
         for waiting in self.waiting[type(message)]:
             if check_nested_attrs(message, waiting.attributes):
@@ -146,8 +146,8 @@ def dont_handle_lock_expired_mock(app):
     """Takes in a raiden app and returns a mock context where lock_expired is not processed
     """
 
-    def do_nothing(raiden, message):  # pylint: disable=unused-argument
-        pass
+    def do_nothing(raiden, message, is_light_client):  # pylint: disable=unused-argument
+        return []
 
     return patch.object(
         app.raiden.message_handler, "handle_message_lockexpired", side_effect=do_nothing

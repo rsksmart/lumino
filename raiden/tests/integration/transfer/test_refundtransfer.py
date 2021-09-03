@@ -71,8 +71,11 @@ def run_test_refund_messages(raiden_chain, token_addresses, deposit, network_wai
     refund_amount = deposit // 2
     identifier = 1
     payment_status = app0.raiden.mediated_transfer_async(
-        token_network_identifier, refund_amount, app2.raiden.address, identifier,
-        payment_hash_invoice=EMPTY_PAYMENT_HASH_INVOICE
+        token_network_identifier=token_network_identifier,
+        amount=refund_amount,
+        target=app2.raiden.address,
+        identifier=identifier,
+        payment_hash_invoice=EMPTY_PAYMENT_HASH_INVOICE,
     )
     msg = "Must fail, there are no routes available"
     assert payment_status.payment_done.wait() is False, msg
@@ -215,7 +218,10 @@ def run_test_refund_transfer(
     identifier_refund = 3
     amount_refund = 50
     payment_status = app0.raiden.mediated_transfer_async(
-        token_network_identifier, amount_refund, app2.raiden.address, identifier_refund,
+        token_network_identifier=token_network_identifier,
+        amount=amount_refund,
+        target=app2.raiden.address,
+        identifier=identifier_refund,
         payment_hash_invoice=EMPTY_PAYMENT_HASH_INVOICE
     )
     msg = "there is no path with capacity, the transfer must fail"
@@ -268,7 +274,7 @@ def run_test_refund_transfer(
     # Additional checks for LockExpired causing nonce mismatch after refund transfer:
     # https://github.com/raiden-network/raiden/issues/3146#issuecomment-447378046
     # At this point make sure that the initiator has not deleted the payment task
-    assert secrethash in state_from_raiden(app0.raiden).payment_mapping.secrethashes_to_task
+    assert secrethash in state_from_raiden(app0.raiden).payment_states_by_address[app0.raiden.address].secrethashes_to_task
 
     # Wait for lock lock expiration but make sure app0 never processes LockExpired
     with dont_handle_lock_expired_mock(app0):
@@ -279,7 +285,7 @@ def run_test_refund_transfer(
         )
         # make sure that app0 still has the payment task for the secrethash
         # https://github.com/raiden-network/raiden/issues/3183
-        assert secrethash in state_from_raiden(app0.raiden).payment_mapping.secrethashes_to_task
+        assert secrethash in state_from_raiden(app0.raiden).payment_states_by_address[app0.raiden.address].secrethashes_to_task
 
         # make sure that app1 sent a lock expired message for the secrethash
         send_lock_expired = raiden_events_search_for_item(
@@ -323,8 +329,8 @@ def run_test_refund_transfer(
     # and since the lock expired message has been sent and processed then the
     # payment task should have been deleted from both nodes
     # https://github.com/raiden-network/raiden/issues/3183
-    assert secrethash not in state_from_raiden(app0.raiden).payment_mapping.secrethashes_to_task
-    assert secrethash not in state_from_raiden(app1.raiden).payment_mapping.secrethashes_to_task
+    assert secrethash not in state_from_raiden(app0.raiden).payment_states_by_address[app0.raiden.address].secrethashes_to_task
+    assert secrethash not in state_from_raiden(app1.raiden).payment_states_by_address[app1.raiden.address].secrethashes_to_task
 
 
 @pytest.mark.parametrize("privatekey_seed", ["test_different_view_of_last_bp_during_unlock:{}"])
@@ -484,7 +490,7 @@ def run_test_different_view_of_last_bp_during_unlock(
     # Additional checks for LockExpired causing nonce mismatch after refund transfer:
     # https://github.com/raiden-network/raiden/issues/3146#issuecomment-447378046
     # At this point make sure that the initiator has not deleted the payment task
-    assert secrethash in state_from_raiden(app0.raiden).payment_mapping.secrethashes_to_task
+    assert secrethash in state_from_raiden(app0.raiden).payment_states_by_address[app0.raiden.address].secrethashes_to_task
 
     with dont_handle_node_change_network_state():
         # now app1 goes offline
@@ -672,6 +678,7 @@ def run_test_refund_transfer_after_2nd_hop(
     assert send_locked1
 
     send_refund1 = raiden_events_search_for_item(app1.raiden, SendRefundTransfer, {})
+
     assert send_refund1
 
     lock1 = send_locked1.transfer.lock

@@ -120,7 +120,6 @@ class InvalidPaymentIdentifier(RaidenError):
     pass
 
 
-
 class InvalidSettleTimeout(RaidenError):
     """ Raised when the user provided timeout value is less than the minimum
     settle timeout"""
@@ -195,6 +194,13 @@ class EthNodeInterfaceError(RaidenError):
 
 class AddressWithoutCode(RaidenError):
     """Raised on attempt to execute contract on address without a code."""
+
+    pass
+
+
+class AddressWithoutTokenCode(RaidenError):
+    """Raised on attempt to execute contract on address which isn't responding properly to a total_supply call.
+    This means it is most likely not an token smart contract."""
 
     pass
 
@@ -305,3 +311,13 @@ class RawTransactionFailed(RaidenError):
 class UnhandledLightClient(RaidenRecoverableError):
     """Raised if someone tries to create a channel using this node as a hub and the light clients are not registered."""
 
+
+class ProxyTransactionError(RaidenError):
+    """ Raised when an operation is sent out to the blockchain and it returns an error and we need to handle it """
+
+    def __init__(self,
+                 tx_error_prefix: str,
+                 tx_error: Optional[Any]):
+        super(ProxyTransactionError, self).__init__(f"A proxy transaction error has occurred: {tx_error_prefix}")
+        self.tx_error_prefix = tx_error_prefix
+        self.tx_error = tx_error

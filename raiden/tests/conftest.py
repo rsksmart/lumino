@@ -1,7 +1,12 @@
 # pylint: disable=wrong-import-position,redefined-outer-name,unused-wildcard-import,wildcard-import
 from gevent import monkey  # isort:skip # noqa
-
 monkey.patch_all()  # isort:skip # noqa
+
+# the following lines are needed to use grpc with monkey patched gevent. see:
+# - https://github.com/grpc/grpc/pull/14561
+# - https://github.com/vinays/grpc-gevent-mokey
+import grpc._cython.cygrpc
+grpc._cython.cygrpc.init_grpc_gevent()
 
 import datetime
 import os
@@ -11,7 +16,6 @@ import tempfile
 from pathlib import Path
 
 import gevent
-import pytest
 from _pytest.pathlib import LOCK_TIMEOUT, ensure_reset_dir, make_numbered_dir_with_cleanup
 from _pytest.tmpdir import get_user
 
@@ -22,7 +26,6 @@ from raiden.tests.utils.transport import make_requests_insecure
 from raiden.utils.cli import LogLevelConfigType
 
 pytest.register_assert_rewrite("raiden.tests.utils.eth_node")
-pytest.register_assert_rewrite("raiden.tests.utils.factories")
 pytest.register_assert_rewrite("raiden.tests.utils.messages")
 pytest.register_assert_rewrite("raiden.tests.utils.network")
 pytest.register_assert_rewrite("raiden.tests.utils.protocol")

@@ -1,5 +1,4 @@
-import string
-from typing import Dict
+from typing import Dict, Union
 
 from flask import Blueprint
 from flask_restful import Resource
@@ -24,17 +23,19 @@ from raiden.api.v1.encoding import (
     PaymentInvoiceSchema,
     ChannelLightPutSchema,
     ChannelLightPatchSchema,
-    LightClientSchema,
-    LightClientMatrixCredentialsBuildSchema,
+    LightClientRegistrationSchema,
+    LightClientOnboardingDataSchema,
     PaymentLightPutSchema,
     CreatePaymentLightPostSchema,
-    PaymentLightGetSchema,
-    WatchtowerPutResource)
-from raiden.messages import SignedBlindedBalanceProof, Unlock
-
-from raiden.utils import typing
-
+    WatchtowerPutResource,
+    LightClientMessageGetSchema,
+    RegisterSecretLightSchema,
+    UnlockPaymentLightPostSchema,
+    SettlementLightSchema
+)
 from raiden.constants import EMPTY_PAYMENT_HASH_INVOICE
+from raiden.messages import Unlock, LockedTransfer
+from raiden.utils import typing
 
 
 def create_blueprint():
@@ -81,7 +82,7 @@ class ChannelsResourceLight(BaseResource):
         this translates to 'get all light channels the node is connected with'
         """
         return self.rest_api.get_channel_list(
-            self.rest_api.raiden_api.raiden.default_registry.addressF
+            self.rest_api.raiden_api.raiden.default_registry.address
         )
 
     @use_kwargs(put_schema, locations=("json",))
@@ -149,6 +150,24 @@ class LightChannelsResourceByTokenAndPartnerAddress(BaseResource):
 
     def get(self, **kwargs):
         return self.rest_api.get_channel(
+            registry_address=self.rest_api.raiden_api.raiden.default_registry.address, **kwargs
+        )
+
+
+class UnlockPaymentLightResource(BaseResource):
+    post_schema = UnlockPaymentLightPostSchema()
+
+    @use_kwargs(post_schema)
+    def post(self, internal_msg_identifier: int, signed_tx: typing.SignedTransaction, **kwargs):
+        return self.rest_api.post_unlock_payment_light(internal_msg_identifier, signed_tx, **kwargs)
+
+
+class SettlementLightResourceByTokenAndPartnerAddress(BaseResource):
+    schema = SettlementLightSchema
+
+    @use_kwargs(schema, locations=("json",))
+    def post(self, **kwargs):
+        return self.rest_api.settlement_light(
             registry_address=self.rest_api.raiden_api.raiden.default_registry.address, **kwargs
         )
 
@@ -233,6 +252,7 @@ class RegisterTokenResource(BaseResource):
             self.rest_api.raiden_api.raiden.default_registry.address, token_address
         )
 
+
 class GetTokenResource(BaseResource):
     def get(self, token_network):
         return self.rest_api.get_token_for_token_network(
@@ -293,7 +313,8 @@ class CreatePaymentLightResource(BaseResource):
         partner_address: typing.Address,
         token_address: typing.TokenAddress,
         amount: typing.TokenAmount,
-        secrethash: typing.SecretHash
+        secrethash: typing.SecretHash,
+        prev_secrethash: typing.SecretHash = None
     ):
         return self.rest_api.create_light_client_payment(
             registry_address=self.rest_api.raiden_api.raiden.default_registry.address,
@@ -301,29 +322,36 @@ class CreatePaymentLightResource(BaseResource):
             partner_address=partner_address,
             token_address=token_address,
             amount=amount,
-            secrethash=secrethash
+            secrethash=secrethash,
+            prev_secrethash=prev_secrethash
         )
 
 
-class PaymentLightResource(BaseResource):
-    put_schema = PaymentLightPutSchema
-    get_schema = PaymentLightGetSchema
-
-    @use_kwargs(put_schema, locations=("json",))
-    def put(self,
-            message_id: int,
-            message_order: int,
-            sender: typing.AddressHex,
-            receiver: typing.AddressHex,
-            message: Dict):
-        """
-        put a signed message associated with a payment of a light client
-        """
-        return self.rest_api.receive_light_client_protocol_message(message_id, message_order, sender, receiver, message)
+class LightClientMessageResource(BaseResource):
+    get_schema = LightClientMessageGetSchema
 
     @use_kwargs(get_schema, locations=("query",))
     def get(self, from_message):
         return self.rest_api.get_light_client_protocol_message(from_message)
+
+
+class PaymentLightResource(BaseResource):
+    put_schema = PaymentLightPutSchema
+
+    @use_kwargs(put_schema, locations=("json",))
+    def put(self,
+            payment_id: int,
+            message_order: int,
+            sender: typing.AddressHex,
+            receiver: typing.AddressHex,
+            message: Dict,
+            message_type_value: str,
+            additional_metadata: Dict = None):
+        """
+        put a signed message associated with a payment of a light client
+        """
+        return self.rest_api.receive_light_client_protocol_message(payment_id, message_order, sender, receiver, message,
+                                                                   message_type_value, additional_metadata)
 
 
 class PaymentResource(BaseResource):
@@ -491,40 +519,34 @@ class InvoiceResource(BaseResource):
         )
 
 
-class LightClientMatrixCredentialsBuildResource(BaseResource):
-    get_schema = LightClientMatrixCredentialsBuildSchema()
+class RegisterSecretLightResource(BaseResource):
+    post_schema = RegisterSecretLightSchema()
 
-    @use_kwargs(get_schema, locations=("query",))
-    def get(self,
-            address: typing.Address = None):
-        """
-        This method receives a registration request.
-        """
-        return self.rest_api.get_data_for_registration_request(address)
+    @use_kwargs(post_schema)
+    def post(self, internal_msg_identifier: int, signed_tx: typing.ByteString):
+        return self.rest_api.register_secret_light(internal_msg_identifier, signed_tx)
 
 
 class LightClientResource(BaseResource):
-    post_schema = LightClientSchema()
+    get_schema = LightClientOnboardingDataSchema()
+    post_schema = LightClientRegistrationSchema()
+
+    @use_kwargs(get_schema, locations=("query",))
+    def get(self, address: typing.Address = None):
+        """
+        This method receives a light client request for onboarding data.
+        """
+        return self.rest_api.light_client_onboarding_data(
+            address
+        )
 
     @use_kwargs(post_schema, locations=("json",))
-    def post(
-        self,
-        address: typing.Address = None,
-        signed_password: typing.ByteString = None,
-        signed_display_name: typing.ByteString = None,
-        signed_seed_retry: typing.ByteString = None,
-        password: typing.ByteString = None,
-        display_name: typing.ByteString = None,
-        seed_retry: typing.ByteString = None
-    ):
+    def post(self, registration_data: dict):
+        """
+        This method receives a light client request for registration.
+        """
         return self.rest_api.register_light_client(
-            address=address,
-            signed_password=signed_password,
-            signed_display_name=signed_display_name,
-            signed_seed_retry=signed_seed_retry,
-            password=password,
-            display_name=display_name,
-            seed_retry=seed_retry
+            registration_data=registration_data
         )
 
 
@@ -540,7 +562,7 @@ class WatchtowerResource(BaseResource):
             channel_id: int,
             token_network_address: typing.TokenNetworkAddress,
             lc_bp_signature: typing.Signature,
-            partner_balance_proof: Unlock
+            partner_balance_proof: Union[Unlock, LockedTransfer]
             ):
         """
         put a signed balance proof to be used by the hub, submitting it when the channel between a light client

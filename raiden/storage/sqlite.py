@@ -1,18 +1,18 @@
+import datetime
 import sqlite3
 import threading
 from contextlib import contextmanager
-import datetime
 
+from dateutil.relativedelta import relativedelta
 from eth_utils import to_checksum_address
 
 from raiden.constants import RAIDEN_DB_VERSION, SQLITE_MIN_REQUIRED_VERSION
 from raiden.exceptions import InvalidDBData, InvalidNumberInput
+from raiden.lightclient.models.client_model import ClientType
 from raiden.storage.serialize import SerializationBase
-from raiden.storage.utils import DB_SCRIPT_CREATE_TABLES, TimestampedEvent, DB_UPDATE_TABLES
+from raiden.storage.utils import DB_SCRIPT_CREATE_TABLES, TimestampedEvent
 from raiden.utils import get_system_spec
-from raiden.utils.typing import Any, Dict, Iterator, List, NamedTuple, Optional, Tuple, Union
-from dateutil.relativedelta import relativedelta
-from raiden.lightclient.client_model import ClientType
+from raiden.utils.typing import Any, Dict, Iterator, List, NamedTuple, Optional, Tuple, Union, SignedTransaction
 
 
 class EventRecord(NamedTuple):
@@ -158,24 +158,32 @@ class SQLiteStorage:
             cursor = self.conn.execute(
                 "INSERT INTO light_client_payment("
                 "payment_id, "
-                "light_client_address, "
                 "partner_address, "
                 "is_lc_initiator, "
                 "token_network_id, "
                 "amount, "
                 "created_on, "
                 "payment_status "
-                ") VALUES(?, ?, ?, ?, ?,  ?, ?, ?)",
+                ") VALUES(?, ?, ?, ?,  ?, ?, ?)",
                 (str(light_client_payment.payment_id),
-                 to_checksum_address(light_client_payment.light_client_address),
                  light_client_payment.partner_address,
                  light_client_payment.is_lc_initiator,
                  light_client_payment.token_network_id,
-                 light_client_payment.amount,
+                 str(light_client_payment.amount),
                  light_client_payment.created_on,
                  str(light_client_payment.payment_status.value))
             )
             last_id = cursor.lastrowid
+        return last_id
+
+    def update_light_client_payment_status(self, light_client_payment_id, status):
+        with self.write_lock, self.conn:
+            cursor = self.conn.execute(
+                "UPDATE light_client_payment SET payment_status = ? WHERE payment_id = ?",
+                (str(status.value), light_client_payment_id)
+            )
+            last_id = cursor.lastrowid
+
         return last_id
 
     def write_light_client_protocol_message(self, msg_dto):
@@ -184,58 +192,96 @@ class SQLiteStorage:
                 "INSERT INTO light_client_protocol_message("
                 "identifier, "
                 "message_order, "
+                "message_type, "
                 "unsigned_message, "
                 "signed_message, "
-                "light_client_payment_id "
-                ")"
-                "VALUES(?, ?, ?, ?, ?)",
+                "light_client_payment_id, "
+                "light_client_address)"
+                "VALUES(?, ?, ?, ?, ?, ?, ?)",
                 (str(msg_dto.identifier),
                  msg_dto.message_order,
+                 str(msg_dto.message_type.value),
                  msg_dto.unsigned_message,
                  msg_dto.signed_message,
-                 str(msg_dto.light_client_payment_id),
-                 ),
+                 str(msg_dto.light_client_payment_id) if msg_dto.light_client_payment_id else None,
+                 to_checksum_address(msg_dto.light_client_address)),
             )
             last_id = cursor.lastrowid
         return last_id
 
-    def write_light_client_protocol_messages(self, msg_dtos):
-        with self.write_lock, self.conn:
-            cursor = self.conn.executemany(
-                "INSERT INTO light_client_protocol_message("
-                "identifier, "
-                "message_order, "
-                "unsigned_message, "
-                "signed_message, "
-                "light_client_payment_id "
-                ")"
-                "VALUES(?, ?, ?, ?, ?)",
-                msg_dtos,
-            )
-            last_id = cursor.lastrowid
-        return last_id
-
-    def is_light_client_protocol_message_already_stored(self, payment_id: int, order: int):
+    def get_message_by_content(self,
+                               light_client_address,
+                               message_type,
+                               unsigned_message):
         cursor = self.conn.cursor()
         cursor.execute(
             """
             SELECT *
-                FROM light_client_protocol_message WHERE light_client_payment_id = ? and message_order = ?;
+                FROM light_client_protocol_message lcpm
+                WHERE lcpm.light_client_address == ?
+                AND lcpm.message_type == ?
+                AND lcpm.unsigned_message == ?
             """,
-            (str(payment_id), order)
+            (to_checksum_address(light_client_address), str(message_type), str(unsigned_message)))
+
+        return cursor.fetchone()
+
+    def get_message_for_payment(self,
+                                message_id: int,
+                                payment_id: int,
+                                order: int,
+                                message_type: str,
+                                message_protocol_type: str,
+                                light_client_address: str):
+        cursor = self.conn.cursor()
+        cursor.execute(
+            """
+            SELECT identifier,
+                   message_order,
+                   unsigned_message,
+                   signed_message,
+                   light_client_payment_id,
+                   message_type,
+                   light_client_address,
+                   internal_msg_identifier
+            FROM light_client_protocol_message
+            WHERE identifier = ?
+            AND light_client_payment_id = ?
+            AND message_order = ?
+            AND message_type = ?
+            AND (json_extract(light_client_protocol_message.unsigned_message, '$') IS NOT NULL
+            AND json_extract(light_client_protocol_message.unsigned_message, '$.type') == ?
+            OR json_extract(light_client_protocol_message.signed_message, '$') IS NOT NULL
+            AND json_extract(light_client_protocol_message.signed_message, '$.type') == ?)
+            AND light_client_address = ?
+            """,
+            (str(message_id),
+             str(payment_id),
+             order,
+             message_type,
+             message_protocol_type,
+             message_protocol_type,
+             to_checksum_address(light_client_address))
         )
 
         return cursor.fetchone()
 
-    def is_light_client_protocol_message_already_stored_with_message_id(self, message_id: int, payment_id: int,
-                                                                        order: int):
+    def get_message_for_order_and_address(self,
+                                          message_id: int,
+                                          payment_id: int,
+                                          order: int,
+                                          light_client_address: str):
         cursor = self.conn.cursor()
         cursor.execute(
             """
             SELECT *
-                FROM light_client_protocol_message WHERE identifier = ? and light_client_payment_id = ? and message_order = ?;
+                FROM light_client_protocol_message
+                WHERE identifier = ?
+                AND light_client_payment_id = ?
+                AND message_order = ?
+                AND light_client_address = ?;
             """,
-            (str(message_id), str(payment_id), order)
+            (str(message_id), str(payment_id), order, to_checksum_address(light_client_address))
         )
 
         return cursor.fetchone()
@@ -339,18 +385,18 @@ class SQLiteStorage:
 
         cursor.execute(
             """
-            SELECT 
-                identifier, 
-                type, 
-                status, 
-                expiration_date, 
-                encode, 
-                payment_hash, 
-                secret, 
-                currency, 
-                amount, 
-                description, 
-                target_address, 
+            SELECT
+                identifier,
+                type,
+                status,
+                expiration_date,
+                encode,
+                payment_hash,
+                secret,
+                currency,
+                amount,
+                description,
+                target_address,
                 token_address
             FROM invoices WHERE payment_hash = ?;
             """,
@@ -380,13 +426,15 @@ class SQLiteStorage:
 
         cursor.execute(
             """
-            SELECT 
+            SELECT
                 address,
                 password,
                 api_key,
                 type,
                 display_name,
-                seed_retry
+                seed_retry,
+                current_server_name,
+                pending_for_deletion
             FROM client;
             """,
             ()
@@ -398,15 +446,11 @@ class SQLiteStorage:
 
         return light_clients
 
-    def light_clients_to_list_of_dicts(self, light_clients):
+    @staticmethod
+    def light_clients_to_list_of_dicts(light_clients):
         list_of_dicts = []
         for light_client in light_clients:
-            light_client_dict = {"address": light_client[0],
-                                 "password": light_client[1],
-                                 "api_key": light_client[2],
-                                 "type": light_client[3],
-                                 "display_name": light_client[4],
-                                 "seed_retry": light_client[5]}
+            light_client_dict = SQLiteStorage.get_client_values(light_client)
             list_of_dicts.append(light_client_dict)
 
         return list_of_dicts
@@ -416,29 +460,57 @@ class SQLiteStorage:
 
         cursor.execute(
             """
-            SELECT 
+            SELECT
                 address,
                 password,
                 api_key,
                 type,
                 display_name,
-                seed_retry
+                seed_retry,
+                current_server_name,
+                pending_for_deletion
             FROM client WHERE address = ?;
             """,
             (address,)
         )
 
-        light_client = cursor.fetchone()
-        light_client_dict = None
-        if light_client is not None:
-            light_client_dict = {"address": light_client[0],
-                                 "password": light_client[1],
-                                 "api_key": light_client[2],
-                                 "type": light_client[3],
-                                 "display_name": light_client[4],
-                                 "seed_retry": light_client[5]}
+        return SQLiteStorage.get_client_values(cursor.fetchone())
 
-        return light_client_dict
+    def get_light_client_by_api_key(self, api_key: str):
+        cursor = self.conn.cursor()
+
+        cursor.execute(
+            """
+            SELECT
+                address,
+                password,
+                api_key,
+                type,
+                display_name,
+                seed_retry,
+                current_server_name,
+                pending_for_deletion
+            FROM client WHERE api_key = ?;
+            """,
+            (api_key,)
+        )
+
+        return SQLiteStorage.get_client_values(cursor.fetchone())
+
+    @staticmethod
+    def get_client_values(light_client_row):
+        if light_client_row is not None:
+            return {
+                "address": light_client_row[0],
+                "password": light_client_row[1],
+                "api_key": light_client_row[2],
+                "type": light_client_row[3],
+                "display_name": light_client_row[4],
+                "seed_retry": light_client_row[5],
+                "current_server_name": light_client_row[6],
+                "pending_for_deletion": light_client_row[7]
+            }
+        return None
 
     def save_light_client(self, **kwargs):
         with self.write_lock, self.conn:
@@ -449,14 +521,18 @@ class SQLiteStorage:
                 "api_key, "
                 "type, "
                 "display_name, "
-                "seed_retry)"
-                "VALUES(?, ?, ?, ?, ?, ?)",
+                "seed_retry, "
+                "current_server_name,"
+                "pending_for_deletion) "
+                "VALUES(?, ?, ?, ?, ?, ?, ?, ?)",
                 (kwargs['address'],
                  kwargs['encrypt_signed_password'],
                  kwargs['api_key'],
                  ClientType.LIGHT.value,
                  kwargs['encrypt_signed_display_name'],
-                 kwargs['encrypt_signed_seed_retry'],),
+                 kwargs['encrypt_signed_seed_retry'],
+                 kwargs['current_server_name'],
+                 kwargs['pending_for_deletion']),
             )
             last_id = cursor.lastrowid
 
@@ -851,7 +927,6 @@ class SQLiteStorage:
                                               event_type,
                                               limit,
                                               offset)
-
         result = [
             TimestampedEvent(self.serializer.deserialize(entry[0]), entry[1])
             for entry in entries
@@ -868,7 +943,7 @@ class SQLiteStorage:
                       '$.identifier') IN ({})
                    AND
                    json_extract(state_events.data,
-                      '$._type') IN ({})        
+                      '$._type') IN ({})
            """
 
         query = query.format("\'" + str(identifier) + "\'", "\'" + event_type + "\'")
@@ -913,11 +988,7 @@ class SQLiteStorage:
                                             to_date,
                                             limit,
                                             offset)
-
         cursor = self.conn.cursor()
-
-        print(query[0])
-        print(query[1])
 
         cursor.execute(
             query[0],
@@ -937,45 +1008,31 @@ class SQLiteStorage:
                                limit,
                                offset):
 
-        query = """ 
+        query = """
 
             SELECT
-                data, 
+                data,
                 log_time
             FROM
                 state_events
             WHERE
                 json_extract(state_events.data,
-                        '$._type') IN ({}) {} {} {} {} 
+                        '$._type') IN ({}) {} {} {}
             LIMIT ? OFFSET ?
 
                     """
 
-        target_query = ""
-        initiator_query = ""
-        or_conditional = False
+        nodes_query = self._get_query_for_node_addresses(target_address, initiator_address, our_address)
 
         event_type_result = self._get_event_type_query(event_type)
         token_network_identifier_result = self._get_token_network_identifier_query(token_network_identifier)
 
-        if target_address is not None and target_address.lower() == our_address.lower():
-            event_type_result = self._get_event_type_query(1)
-        elif target_address is not None:
-            target_query = self._get_query_for_node_address('target', or_conditional)
-
-        if initiator_address is not None and initiator_address.lower() == our_address.lower():
-            event_type_result = self._get_event_type_query(3)
-        elif initiator_address is not None:
-            if target_address:
-                or_conditional = True
-            initiator_query = self._get_query_for_node_address('initiator', or_conditional)
 
         event_range_query = self._get_date_range_query(from_date, to_date)
         query = query.format(', '.join(['"{}"'.format(value) for value in event_type_result]),
                              token_network_identifier_result,
                              event_range_query,
-                             target_query,
-                             initiator_query)
+                             nodes_query)
 
         tuple_for_execute = self._get_tuple_to_get_payments(token_network_identifier,
                                                             our_address,
@@ -984,30 +1041,37 @@ class SQLiteStorage:
                                                             from_date,
                                                             to_date,
                                                             limit,
-                                                            offset,
-                                                            or_conditional)
+                                                            offset)
 
         return query, tuple_for_execute
 
-    def _get_query_for_node_address(self, node_address_label, or_contiional):
+    @classmethod
+    def _get_query_for_node_addresses(cls, target_address, initiator_address, our_address):
+        if not target_address and not initiator_address:
+            return ""
+        nodes_query_parts = []
+        if target_address:
+            nodes_query_parts.append(cls._get_query_for_node_address("target", target_address, our_address))
+        if initiator_address:
+            nodes_query_parts.append(cls._get_query_for_node_address("initiator", initiator_address, our_address))
+        return " AND " + " AND ".join(nodes_query_parts)
 
-        result = " AND json_extract(state_events.data, '$.{}') = ? "
+    @staticmethod
+    def _get_query_for_node_address(label, address, our_address):
+        if address.lower() == our_address.lower():
+            return f" json_extract(state_events.data, '$.{label}') IS NULL "
+        return f" json_extract(state_events.data, '$.{label}') = ? "
 
-        if or_contiional:
-            result = " OR json_extract(state_events.data, '$.{}') = ?  " \
-                     " AND json_extract(state_events.data, '$.token_network_identifier') = ?"
 
-        if node_address_label is not None:
-            result = result.format(node_address_label)
-        return result
-
-    def _get_token_network_identifier_query(self, token_network_identifier):
+    @staticmethod
+    def _get_token_network_identifier_query(token_network_identifier):
         result = " "
         if token_network_identifier is not None:
             result = " AND json_extract(state_events.data,'$.token_network_identifier') = ? "
         return result
 
-    def _get_event_type_query(self, event_type: int = None):
+    @staticmethod
+    def _get_event_type_query(event_type: int = None):
 
         event_type_result = ['raiden.transfer.events.EventPaymentReceivedSuccess',
                              'raiden.transfer.events.EventPaymentSentFailed',
@@ -1022,7 +1086,8 @@ class SQLiteStorage:
 
         return event_type_result
 
-    def _get_date_range_query(self, from_date, to_date):
+    @staticmethod
+    def _get_date_range_query(from_date, to_date):
         date_range_result = " "
         if from_date is not None and to_date is not None:
             date_range_result = " AND log_time BETWEEN ? and ? "
@@ -1033,31 +1098,28 @@ class SQLiteStorage:
 
         return date_range_result
 
-    def _get_tuple_to_get_payments(self,
-                                   token_network_identifier,
+    @staticmethod
+    def _get_tuple_to_get_payments(token_network_identifier,
                                    our_address,
                                    initiator_address,
                                    target_address,
                                    from_date,
                                    to_date,
                                    limit,
-                                   offset,
-                                   or_conditional):
+                                   offset):
 
         result = [limit, offset]
 
-        if initiator_address is not None and initiator_address.lower() != our_address.lower():
-            if or_conditional:
-                result.insert(0, token_network_identifier)
+        if initiator_address and initiator_address.lower() != our_address.lower():
             result.insert(0, initiator_address)
-        if target_address is not None and target_address.lower() != our_address.lower():
+        if target_address and target_address.lower() != our_address.lower():
             result.insert(0, target_address)
         if from_date is not None and to_date is not None:
             result.insert(0, to_date)
             result.insert(0, from_date)
-        if from_date is not None and to_date is None:
+        elif from_date is not None:
             result.insert(0, from_date)
-        if to_date is not None and from_date is None:
+        elif to_date is not None:
             result.insert(0, to_date)
         if token_network_identifier is not None:
             result.insert(0, token_network_identifier)
@@ -1125,7 +1187,7 @@ class SQLiteStorage:
 
     def _get_general_data_payments(self):
 
-        query = """ 
+        query = """
             SELECT
                 CASE
                     {}
@@ -1136,8 +1198,8 @@ class SQLiteStorage:
                 state_events
             WHERE
                 json_extract(state_events.data,'$._type') IN ({})
-            GROUP BY                
-                json_extract(state_events.data,'$._type')          
+            GROUP BY
+                json_extract(state_events.data,'$._type')
         """
 
         event_type_result = self._get_event_type_query()
@@ -1152,19 +1214,21 @@ class SQLiteStorage:
 
         return cursor.fetchall()
 
-    def _get_sql_case_type_event_payment(self):
+    @staticmethod
+    def _get_sql_case_type_event_payment():
         case_type_event = """
 
         json_extract(state_events.data,'$._type')
                     WHEN 'raiden.transfer.events.EventPaymentReceivedSuccess' THEN '1'
                     WHEN 'raiden.transfer.events.EventPaymentSentFailed' THEN '2'
-                    WHEN 'raiden.transfer.events.EventPaymentSentSuccess' THEN '3' 
+                    WHEN 'raiden.transfer.events.EventPaymentSentSuccess' THEN '3'
 
         """
         return case_type_event
 
-    def _get_sql_case_type_label_event_type(self):
-        case_event_type_label = """        
+    @staticmethod
+    def _get_sql_case_type_label_event_type():
+        case_event_type_label = """
 
         json_extract(state_events.data,'$._type')
                     WHEN 'raiden.transfer.events.EventPaymentReceivedSuccess' THEN 'Payment Received'
@@ -1184,14 +1248,14 @@ class SQLiteStorage:
         base_query = '''
 
             SELECT
-                log_time, 
+                log_time,
                 data
             FROM
                 state_events
             WHERE
                 json_extract(state_events.data,
-                '$._type') IN ({})	
-            LIMIT ?	
+                '$._type') IN ({})
+            LIMIT ?
 
         '''
 
@@ -1237,9 +1301,9 @@ class SQLiteStorage:
 		        {}
 	        END event_type_label,
 	        COUNT(json_extract(state_events.data, '$._type')) AS quantity,
-	        log_time,	                   
+	        log_time,
 	        STRFTIME("%m", log_time) AS month_of_year_code,
-	        CASE 
+	        CASE
 	            STRFTIME("%m", log_time)
 	                WHEN '01' THEN 'JAN'
 	                WHEN '02' THEN 'FEB'
@@ -1253,7 +1317,7 @@ class SQLiteStorage:
 	                WHEN '10' THEN 'OCT'
 	                WHEN '11' THEN 'NOV'
 	                WHEN '12' THEN 'DIC'
-	        END month_of_year_label 	     
+	        END month_of_year_label
         FROM
 	        state_events
         WHERE
@@ -1293,10 +1357,18 @@ class SQLiteStorage:
         cursor = self.conn.cursor()
         cursor.execute(
             """
-            SELECT payment_id, light_client_address, partner_address, is_lc_initiator,
-            token_network_id, amount, created_on, payment_status
-            FROM light_client_payment
-            WHERE payment_id = ?
+            SELECT
+                lcp.payment_id,
+                lcpm.light_client_address,
+                lcp.partner_address as partner_address,
+                lcp.is_lc_initiator as is_lc_initiator,
+                lcp.token_network_id as token_network_id,
+                lcp.amount as amount,
+                lcp.created_on as created_on,
+                lcp.payment_status as payment_status
+            FROM light_client_payment lcp
+            INNER JOIN light_client_protocol_message lcpm ON lcpm.light_client_payment_id = lcp.payment_id
+            WHERE lcp.payment_id = ?
             """,
             (str(payment_id),),
         )
@@ -1305,53 +1377,117 @@ class SQLiteStorage:
     def get_light_client_messages(self, from_message, light_client):
         cursor = self.conn.cursor()
         cursor.execute(
-            "SELECT identifier, message_order, unsigned_message, signed_message, light_client_payment_id, internal_msg_identifier" +
-            " FROM light_client_protocol_message A INNER JOIN light_client_payment B" +
-            " ON A.light_client_payment_id = B.payment_id" +
-            " WHERE A.internal_msg_identifier >= ?" +
-            " AND B.light_client_address = ?" +
-            "ORDER BY light_client_payment_id, message_order ASC",
-            (from_message, light_client),
-
+            """
+            SELECT identifier,
+                   message_order,
+                   unsigned_message,
+                   signed_message,
+                   light_client_payment_id,
+                   internal_msg_identifier,
+                   message_type
+            FROM light_client_protocol_message
+            WHERE internal_msg_identifier >= ?
+            AND light_client_address = ?
+            AND (
+                message_type NOT IN ('SettlementRequired', 'RequestRegisterSecret', 'UnlockLightRequest')
+                OR signed_message IS NULL
+            )
+            ORDER BY light_client_payment_id, message_order ASC
+            """,
+            (from_message, to_checksum_address(light_client)),
         )
         return cursor.fetchall()
 
-    def get_light_client_protocol_message_by_identifier(self, identifier):
+    def get_message_by_identifier_for_lc(self,
+                                         identifier,
+                                         light_client_address):
         cursor = self.conn.cursor()
         cursor.execute(
             """
-            SELECT identifier, message_order, unsigned_message, signed_message, light_client_payment_id
+            SELECT identifier,
+                   message_order,
+                   unsigned_message,
+                   signed_message,
+                   light_client_payment_id,
+                   message_type,
+                   light_client_address,
+                   internal_msg_identifier
             FROM light_client_protocol_message
-            WHERE identifier  = ?
+            WHERE identifier = ? AND light_client_address = ?
             ORDER BY message_order ASC
             """,
-            (str(identifier),),
+            (str(identifier), to_checksum_address(light_client_address)),
         )
         return cursor.fetchone()
 
-    def get_latest_light_client_non_closing_balance_proof(self, channel_id):
+    def get_message_by_internal_identifier(self, internal_msg_identifier: int):
         cursor = self.conn.cursor()
         cursor.execute(
             """
-           SELECT internal_bp_identifier, sender, light_client_payment_id, secret_hash, nonce, channel_id, 
-            token_network_address, balance_proof, lc_balance_proof_signature
-            FROM light_client_balance_proof
-            WHERE channel_id  = ?
-            ORDER BY nonce DESC
+            SELECT identifier,
+                   message_order,
+                   unsigned_message,
+                   signed_message,
+                   light_client_payment_id,
+                   message_type,
+                   light_client_address,
+                   internal_msg_identifier
+            FROM light_client_protocol_message
+            WHERE internal_msg_identifier = ?
+            ORDER BY message_order ASC
             """,
-            (channel_id,),
+            (str(internal_msg_identifier),),
         )
         return cursor.fetchone()
 
-    def get_light_client_payment_locked_transfer(self, payment_identifier):
+    def get_latest_light_client_non_closing_balance_proof(self, channel_id, non_closing_participant,
+                                                          token_network_address):
         cursor = self.conn.cursor()
         cursor.execute(
-            "SELECT identifier, message_order, unsigned_message, signed_message, light_client_payment_id" +
-            " FROM light_client_protocol_message A INNER JOIN light_client_payment B" +
-            " ON A.light_client_payment_id = B.payment_id" +
-            " WHERE A.message_order = 1" +
-            " AND B.payment_id = ?",
-            (str(payment_identifier),),
+            """
+            SELECT internal_bp_identifier,
+                   sender,
+                   light_client_payment_id,
+                   secret_hash,
+                   nonce,
+                   channel_id,
+                   token_network_address,
+                   balance_proof,
+                   lc_balance_proof_signature
+            FROM light_client_balance_proof
+            WHERE channel_id  = ? AND sender = ? AND token_network_address = ?
+            ORDER BY nonce DESC
+            """,
+            (channel_id, to_checksum_address(non_closing_participant), to_checksum_address(token_network_address)),
+        )
+        return cursor.fetchone()
+
+    def delete_light_client_non_closing_balance_proof(self, channel_id, token_network_address):
+        with self.write_lock, self.conn:
+            self.conn.execute(
+                "DELETE FROM light_client_balance_proof WHERE channel_id = ? AND token_network_address = ?",
+                (channel_id, to_checksum_address(token_network_address),))
+
+    def get_light_client_payment_locked_transfer(self,
+                                                 payment_identifier,
+                                                 light_client_address):
+        cursor = self.conn.cursor()
+        cursor.execute(
+            """
+            SELECT identifier,
+                   message_order,
+                   unsigned_message,
+                   signed_message,
+                   light_client_payment_id,
+                   message_type,
+                   light_client_address,
+                   internal_msg_identifier
+            FROM light_client_protocol_message
+            WHERE message_order = 1
+            AND light_client_payment_id = ?
+            AND light_client_address = ?
+            """,
+            (str(payment_identifier), to_checksum_address(light_client_address)),
         )
         return cursor.fetchone()
 
@@ -1373,7 +1509,6 @@ class SerializedSQLiteStorage(SQLiteStorage):
                 signed = False
                 if message[3] is not None:
                     signed = True
-                if message[3] is not None:
                     serialized_signed_msg = self.serializer.deserialize(message[3])
                 else:
                     serialized_signed_msg = None
@@ -1383,36 +1518,53 @@ class SerializedSQLiteStorage(SQLiteStorage):
                     serialized_unsigned_msg = None
                 result.append(
                     (signed, message[1], message[4], serialized_unsigned_msg,
-                     serialized_signed_msg, message[0], message[5]))
+                     serialized_signed_msg, message[0], message[5], message[6]))
         return result
 
-    def update_light_client_protocol_message_set_signed_data(self, payment_id, msg_order, signed_message):
+    def update_offchain_light_client_protocol_message_set_signed_message(self,
+                                                                         payment_id,
+                                                                         msg_order,
+                                                                         signed_message,
+                                                                         message_type,
+                                                                         light_client_address):
         with self.write_lock, self.conn:
             cursor = self.conn.cursor()
             cursor.execute(
                 """
-                UPDATE  light_client_protocol_message set signed_message = ? WHERE light_client_payment_id = ? and message_order = ?;
+                UPDATE light_client_protocol_message
+                SET signed_message = ?
+                WHERE light_client_payment_id = ?
+                AND message_order = ?
+                AND message_type = ?
+                AND light_client_address = ?;
                 """,
-                (self.serializer.serialize(signed_message), str(payment_id), msg_order)
+                (self.serializer.serialize(signed_message),
+                 str(payment_id),
+                 msg_order,
+                 message_type,
+                 to_checksum_address(light_client_address))
             )
 
             last_id = cursor.lastrowid
         return last_id
+
+    def update_onchain_light_client_protocol_message_set_signed_transaction(self,
+                                                                            internal_msg_identifier: int,
+                                                                            signed_message: "SignedTransaction"):
+        return self.update(
+            """
+            UPDATE light_client_protocol_message
+            SET signed_message = ?
+            WHERE internal_msg_identifier = ?;
+            """,
+            (self.serializer.serialize(signed_message), internal_msg_identifier)
+        )
 
     def query_invoice(self, payment_hash_invoice):
         return super().query_invoice(payment_hash_invoice)
 
     def update_invoice(self, payment_hash_invoice):
         return super().update_invoice(payment_hash_invoice)
-
-    def write_light_client_protocol_messages(self, msg_dtos):
-        data = [
-            (msg_dto.identifier, msg_dto.message_order, self.serializer.serialize(msg_dto.unsigned_message),
-             self.serializer.serialize(msg_dto.signed_message),
-             msg_dto.state_change_id, msg_dto.light_client_payment_id)
-            for msg_dto in msg_dtos
-        ]
-        return super().write_light_client_protocol_messages(data)
 
     def write_light_client_protocol_message(self, new_message, msg_dto):
         serialized_data = self.serializer.serialize(new_message)
@@ -1421,6 +1573,10 @@ class SerializedSQLiteStorage(SQLiteStorage):
         else:
             msg_dto.unsigned_message = serialized_data
         return super().write_light_client_protocol_message(msg_dto)
+
+    def get_message_by_content(self, light_client_address, message_type, message):
+        message_string = self.serializer.serialize(message)
+        return super().get_message_by_content(light_client_address, message_type, message_string)
 
     def write_state_change(self, state_change, log_time):
         serialized_data = self.serializer.serialize(state_change)
@@ -1533,5 +1689,24 @@ class SerializedSQLiteStorage(SQLiteStorage):
                  light_client_balance_proof.lc_balance_proof_signature
                  )
             )
+            last_id = cursor.lastrowid
+        return last_id
+
+    def delete_light_client(self, address):
+        with self.write_lock, self.conn:
+            self.conn.execute("DELETE FROM client WHERE address = ?", (address,))
+
+    def flag_light_client_as_pending_for_deletion(self, address):
+        with self.write_lock, self.conn:
+            cursor = self.conn.execute("UPDATE client SET pending_for_deletion = TRUE WHERE address = ?", (address,))
+            last_id = cursor.lastrowid
+
+        return last_id
+
+    def update(self, update_sql: str, params: Any) -> int:
+        """ Aux method to generalize the update calls """
+        with self.write_lock, self.conn:
+            cursor = self.conn.cursor()
+            cursor.execute(update_sql, params)
             last_id = cursor.lastrowid
         return last_id

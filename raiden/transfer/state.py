@@ -1,12 +1,13 @@
 # pylint: disable=too-few-public-methods,too-many-arguments,too-many-instance-attributes
+import copy
 import random
 from collections import defaultdict
 from functools import total_ordering
 from random import Random
-from typing import TYPE_CHECKING, Tuple
+from typing import TYPE_CHECKING, Tuple, ValuesView, ItemsView
 
 import networkx
-from eth_utils import encode_hex, to_canonical_address, to_checksum_address, to_normalized_address
+from eth_utils import encode_hex, to_canonical_address, to_checksum_address
 
 from raiden.constants import EMPTY_MERKLE_ROOT, UINT64_MAX, UINT256_MAX
 from raiden.encoding import messages
@@ -292,7 +293,7 @@ class ChainState(State):
         self.identifiers_to_paymentnetworks: Dict[PaymentNetworkID, PaymentNetworkState] = dict()
         self.nodeaddresses_to_networkstates: Dict[Address, str] = dict()
         self.our_address = our_address
-        self.payment_mapping = PaymentMappingState()
+        self.payment_states_by_address : Dict[AddressHex, PaymentMappingState] = dict()
         self.pending_transactions: List[ContractSendEvent] = list()
         self.pseudo_random_generator = pseudo_random_generator
         self.queueids_to_queues: QueueIdsToQueues = dict()
@@ -310,7 +311,7 @@ class ChainState(State):
             self.block_number,
             pex(self.block_hash),
             lpex(self.identifiers_to_paymentnetworks.keys()),
-            len(self.payment_mapping.secrethashes_to_task),
+            1, #TODO fix this len
             self.chain_id,
         )
 
@@ -329,7 +330,7 @@ class ChainState(State):
             and self.queueids_to_queues == other.queueids_to_queues
             and self.identifiers_to_paymentnetworks == other.identifiers_to_paymentnetworks
             and self.nodeaddresses_to_networkstates == other.nodeaddresses_to_networkstates
-            and self.payment_mapping == other.payment_mapping
+            and self.payment_states_by_address == other.payment_states_by_address
             and self.chain_id == other.chain_id
             and self.last_node_transport_state_authdata == other.last_node_transport_state_authdata
             and our_tnpn == other_tnpn
@@ -351,7 +352,11 @@ class ChainState(State):
                 to_checksum_address, serialization.identity, self.nodeaddresses_to_networkstates
             ),
             "our_address": to_checksum_address(self.our_address),
-            "payment_mapping": self.payment_mapping,
+            "payment_states_by_address": map_dict(
+                serialization.checksum_address,
+                serialization.identity,
+                self.payment_states_by_address,
+            ),
             "pending_transactions": self.pending_transactions,
             "queueids_to_queues": serialization.serialize_queueid_to_queue(
                 self.queueids_to_queues
@@ -382,7 +387,9 @@ class ChainState(State):
         restored.nodeaddresses_to_networkstates = map_dict(
             to_canonical_address, serialization.identity, data["nodeaddresses_to_networkstates"]
         )
-        restored.payment_mapping = data["payment_mapping"]
+        restored.payment_states_by_address = map_dict(
+            to_canonical_address, serialization.identity, data["payment_states_by_address"]
+        )
         restored.pending_transactions = data["pending_transactions"]
         restored.queueids_to_queues = serialization.deserialize_queueid_to_queue(
             data["queueids_to_queues"]
@@ -395,6 +402,55 @@ class ChainState(State):
         )
 
         return restored
+
+    def get_payment_state(self, creator_address: Address) -> "PaymentMappingState":
+        result = None
+        if creator_address and creator_address in self.payment_states_by_address:
+            result = self.payment_states_by_address[creator_address]
+        return result
+
+    def get_payment_states(self) -> ValuesView:
+        return self.payment_states_by_address.values()
+
+    def get_payment_states_by_address(self) -> ItemsView:
+        return self.payment_states_by_address.items()
+
+    def get_payment_task(self, creator_address: Address, secret_hash: SecretHash) -> TransferTask:
+        result = None
+        payment_state = self.get_payment_state(creator_address)
+        if payment_state and secret_hash in payment_state.secrethashes_to_task:
+            result = payment_state.secrethashes_to_task[secret_hash]
+        return result
+
+    def get_payment_tasks(self, creator_address: Address) -> ValuesView:
+        result = None
+        if creator_address in self.payment_states_by_address:
+            return self.payment_states_by_address[creator_address].secrethashes_to_task.values()
+        return result
+
+    def get_payment_tasks_by_hash(self, creator_address: Address) -> ItemsView:
+        result = None
+        if creator_address in self.payment_states_by_address:
+            result = self.payment_states_by_address[creator_address].secrethashes_to_task.items()
+        return result
+
+    def create_payment_task(self, creator_address: Address, secret_hash: SecretHash, task: TransferTask):
+        self.payment_states_by_address.setdefault(
+            creator_address,
+            PaymentMappingState()
+        ).secrethashes_to_task[secret_hash] = task
+
+    def delete_payment_task(self, creator_address: Address, secret_hash: SecretHash):
+        payment_task = self.get_payment_task(creator_address, secret_hash)
+        if payment_task:
+            del self.payment_states_by_address[creator_address].secrethashes_to_task[secret_hash]
+
+    def clone_payment_task(self, creator_address: Address, secret_hash: SecretHash, new_secret_hash: SecretHash):
+        current_payment_task = self.get_payment_task(creator_address, secret_hash)
+        if current_payment_task:
+            self.payment_states_by_address[creator_address].secrethashes_to_task.update(
+                {new_secret_hash: copy.deepcopy(current_payment_task)}
+            )
 
 
 class LightClientTransportState(State):
@@ -672,11 +728,12 @@ class TokenNetworkGraphState(State):
     def __ne__(self, other: Any) -> bool:
         return not self.__eq__(other)
 
-    def _same_channel_tuple(self, participant1: Address, participant2: Address, graph_tuple: Tuple[Address, Address]) -> bool:
+    @staticmethod
+    def _same_channel_tuple(participant1: Address, participant2: Address, graph_tuple: Tuple[Address, Address]) -> bool:
         return graph_tuple[0] == participant1 and graph_tuple[1] == participant2 or graph_tuple[0] == participant2 and graph_tuple[1] == participant1
 
     def channel_exists(self, participant1: Address, participant2: Address) -> bool:
-        for key, val in self.channel_identifier_to_participants.items():
+        for _key, val in self.channel_identifier_to_participants.items():
             if self._same_channel_tuple(participant1, participant2, val):
                 return True
         return False
@@ -1509,6 +1566,9 @@ class NettingChannelState(State):
         "close_transaction",
         "settle_transaction",
         "update_transaction",
+        "is_light_channel",
+        "both_participants_are_light_clients"
+        ""
     )
 
     def __init__(
@@ -1525,6 +1585,8 @@ class NettingChannelState(State):
         close_transaction: TransactionExecutionStatus = None,
         settle_transaction: TransactionExecutionStatus = None,
         update_transaction: TransactionExecutionStatus = None,
+        is_light_channel: bool = False,
+        both_participants_are_light_clients: bool = False
     ) -> None:
         if reveal_timeout >= settle_timeout:
             raise ValueError("reveal_timeout must be smaller than settle_timeout")
@@ -1579,9 +1641,11 @@ class NettingChannelState(State):
         self.settle_transaction = settle_transaction
         self.update_transaction = update_transaction
         self.mediation_fee = mediation_fee
+        self.is_light_channel = is_light_channel
+        self.both_participants_are_light_clients = both_participants_are_light_clients
 
     def __repr__(self) -> str:
-        return "<NettingChannelState id:{} opened:{} closed:{} settled:{} updated:{}>".format(
+        return "<NettingChannelState id:{} opened:{} closed:{} settled:{} updated:{} is_light_channel>".format(
             self.canonical_identifier.channel_identifier,
             self.open_transaction,
             self.close_transaction,
@@ -1617,6 +1681,8 @@ class NettingChannelState(State):
             and self.close_transaction == other.close_transaction
             and self.settle_transaction == other.settle_transaction
             and self.update_transaction == other.update_transaction
+            and self.is_light_channel == other.is_light_channel
+            and self.both_participants_are_light_clients == other.both_participants_are_light_clients
         )
 
     @property
@@ -1643,6 +1709,8 @@ class NettingChannelState(State):
             "partner_state": self.partner_state,
             "open_transaction": self.open_transaction,
             "deposit_transaction_queue": self.deposit_transaction_queue,
+            "is_light_channel": self.is_light_channel,
+            "both_participants_are_light_clients": self.both_participants_are_light_clients
         }
 
         if self.close_transaction is not None:
@@ -1666,6 +1734,8 @@ class NettingChannelState(State):
             our_state=data["our_state"],
             partner_state=data["partner_state"],
             open_transaction=data["open_transaction"],
+            is_light_channel=data["is_light_channel"],
+            both_participants_are_light_clients=data["both_participants_are_light_clients"]
         )
         close_transaction = data.get("close_transaction")
         if close_transaction is not None:

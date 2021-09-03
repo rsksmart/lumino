@@ -28,6 +28,8 @@ from raiden.settings import (
     DEFAULT_TRANSPORT_UDP_RETRY_INTERVAL,
     INITIAL_PORT,
     RED_EYES_CONTRACT_VERSION,
+    DEFAULT_RIF_COMMS_GRPC_ENDPOINT,
+    DEFAULT_RIF_COMMS_GRPC_CLIENT_TIMEOUT
 )
 from raiden.utils import pex, typing
 from raiden.utils.typing import Address, Any, Dict
@@ -42,7 +44,7 @@ class App:  # pylint: disable=too-few-public-methods
         "settle_timeout": DEFAULT_SETTLE_TIMEOUT,
         "contracts_path": contracts_precompiled_path(RED_EYES_CONTRACT_VERSION),
         "database_path": "",
-        "transport_type": "udp",
+        "transport_type": "rif-comms",
         "blockchain": {"confirmation_blocks": DEFAULT_NUMBER_OF_BLOCK_CONFIRMATIONS},
         "transport": {
             "udp": {
@@ -69,6 +71,12 @@ class App:  # pylint: disable=too-few-public-methods
                 "retry_interval": DEFAULT_TRANSPORT_MATRIX_RETRY_INTERVAL,
                 "server": "auto",
             },
+            "rif_comms": {
+                "grpc_endpoint": DEFAULT_RIF_COMMS_GRPC_ENDPOINT,
+                "grpc_client_timeout": DEFAULT_RIF_COMMS_GRPC_CLIENT_TIMEOUT,
+                "retries_before_backoff": DEFAULT_TRANSPORT_RETRIES_BEFORE_BACKOFF,
+                "retry_interval": DEFAULT_TRANSPORT_MATRIX_RETRY_INTERVAL
+            }
         },
         "rpc": True,
         "console": False,

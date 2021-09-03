@@ -138,9 +138,10 @@ def replay_wal(storage, token_network_identifier, partner_address, translator=No
         chain_state = wal.state_manager.current_state
 
         channel_state = views.get_channelstate_by_token_network_and_partner(
-            chain_state,
-            to_canonical_address(token_network_identifier),
-            to_canonical_address(partner_address),
+            chain_state=chain_state,
+            token_network_id=to_canonical_address(token_network_identifier),
+            partner_address=to_canonical_address(partner_address),
+            creator_address=None
         )
 
         if not channel_state:

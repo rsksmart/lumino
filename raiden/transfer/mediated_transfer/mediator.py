@@ -32,10 +32,9 @@ from raiden.transfer.state import (
     CHANNEL_STATE_CLOSED,
     CHANNEL_STATE_OPENED,
     NODE_NETWORK_REACHABLE,
-    NODE_NETWORK_UNREACHABLE,
     NettingChannelState,
     RouteState,
-    message_identifier_from_prng,
+    message_identifier_from_prng
 )
 from raiden.transfer.state_change import (
     ActionChangeNodeNetworkState,
@@ -116,6 +115,7 @@ def is_safe_to_wait(
     )
     return False, msg
 
+
 def is_channel_usable(
     candidate_channel_state: NettingChannelState,
     transfer_amount: PaymentWithFeeAmount,
@@ -178,23 +178,6 @@ def has_secret_registration_started(
         pair.payer_state == "payer_waiting_secret_reveal" for pair in transfers_pair
     )
     return is_secret_registered_onchain or has_pending_transaction
-
-
-def filter_reachable_routes(
-    routes: List[RouteState], nodeaddresses_to_networkstates: NodeNetworkStateMap
-) -> List[RouteState]:
-    """This function makes sure we use reachable routes only."""
-    reachable_routes = []
-
-    for route in routes:
-        node_network_state = nodeaddresses_to_networkstates.get(
-            route.node_address, NODE_NETWORK_UNREACHABLE
-        )
-
-        if node_network_state == NODE_NETWORK_REACHABLE:
-            reachable_routes.append(route)
-
-    return reachable_routes
 
 
 def filter_used_routes(
@@ -930,6 +913,8 @@ def events_to_remove_expired_locks(
     for transfer_pair in mediator_state.transfers_pair:
         balance_proof = transfer_pair.payee_transfer.balance_proof
         channel_identifier = balance_proof.channel_identifier
+        # FIXME: channelidentifiers_to_channels it's a dic, we should get the value using
+        #  channelidentifiers_to_channels[someid] before calling get
         channel_state = channelidentifiers_to_channels.get(channel_identifier)
         if not channel_state:
             continue
@@ -959,6 +944,7 @@ def events_to_remove_expired_locks(
                     channel_state=channel_state,
                     locked_lock=lock,
                     pseudo_random_generator=pseudo_random_generator,
+                    payment_identifier=transfer_pair.payee_transfer.payment_identifier,
                 )
                 events.extend(expired_lock_events)
 
@@ -1023,7 +1009,6 @@ def mediate_transfer(
     possible_routes: List["RouteState"],
     payer_channel: NettingChannelState,
     channelidentifiers_to_channels: ChannelMap,
-    nodeaddresses_to_networkstates: NodeNetworkStateMap,
     pseudo_random_generator: random.Random,
     payer_transfer: LockedTransferSignedState,
     block_number: BlockNumber,
@@ -1036,8 +1021,8 @@ def mediate_transfer(
     send a refund back to the payer, allowing the payer to try a different
     route.
     """
-    reachable_routes = filter_reachable_routes(possible_routes, nodeaddresses_to_networkstates)
-    available_routes = filter_used_routes(state.transfers_pair, reachable_routes)
+
+    available_routes = filter_used_routes(state.transfers_pair, possible_routes)
 
     assert payer_channel.partner_state.address == payer_transfer.balance_proof.sender
 
@@ -1085,6 +1070,7 @@ def handle_init(
     nodeaddresses_to_networkstates: NodeNetworkStateMap,
     pseudo_random_generator: random.Random,
     block_number: BlockNumber,
+    storage=None
 ) -> TransitionResult[MediatorTransferState]:
     routes = state_change.routes
 
@@ -1098,7 +1084,7 @@ def handle_init(
 
     mediator_state = MediatorTransferState(secrethash=from_transfer.lock.secrethash, routes=routes)
 
-    is_valid, events, _, _ = channel.handle_receive_lockedtransfer(payer_channel, from_transfer, None)
+    is_valid, events, _, _ = channel.handle_receive_lockedtransfer(payer_channel, from_transfer, storage)
     if not is_valid:
         # If the balance proof is not valid, do *not* create a task. Otherwise it's
         # possible for an attacker to send multiple invalid transfers, and increase
@@ -1110,7 +1096,6 @@ def handle_init(
         routes,
         payer_channel,
         channelidentifiers_to_channels,
-        nodeaddresses_to_networkstates,
         pseudo_random_generator,
         from_transfer,
         block_number,
@@ -1207,10 +1192,9 @@ def handle_refundtransfer(
 
         iteration = mediate_transfer(
             mediator_state,
-            mediator_state_change.routes,
+            mediator_state.routes,
             payer_channel,
             channelidentifiers_to_channels,
-            nodeaddresses_to_networkstates,
             pseudo_random_generator,
             payer_transfer,
             block_number,
@@ -1237,7 +1221,6 @@ def handle_offchain_secretreveal(
         transfer_secrethash=mediator_state.secrethash,
         secret=mediator_state_change.secret,
     )
-    is_secret_unknown = mediator_state.secret is None
 
     # a SecretReveal should be rejected if the payer transfer
     # has expired. To check for this, we use the last
@@ -1255,7 +1238,8 @@ def handle_offchain_secretreveal(
         block_number=block_number,
     )
 
-    if is_secret_unknown and is_valid_reveal and not has_payer_transfer_expired:
+    # TODO marcosmartinez7 this condicton must include is_secret_unknown, that is mediator_state.secret is None
+    if is_valid_reveal and not has_payer_transfer_expired:
         iteration = secret_learned(
             state=mediator_state,
             channelidentifiers_to_channels=channelidentifiers_to_channels,
@@ -1438,7 +1422,6 @@ def handle_node_change_network_state(
         possible_routes=[route],
         payer_channel=payer_channel,
         channelidentifiers_to_channels=channelidentifiers_to_channels,
-        nodeaddresses_to_networkstates={state_change.node_address: state_change.network_state},
         pseudo_random_generator=pseudo_random_generator,
         payer_transfer=mediator_state.waiting_transfer.transfer,
         block_number=block_number,
@@ -1453,6 +1436,7 @@ def state_transition(
     pseudo_random_generator: random.Random,
     block_number: BlockNumber,
     block_hash: BlockHash,
+    storage=None
 ) -> TransitionResult[MediatorTransferState]:
     """ State machine for a node mediating a transfer. """
     # pylint: disable=too-many-branches
@@ -1473,6 +1457,7 @@ def state_transition(
                 nodeaddresses_to_networkstates=nodeaddresses_to_networkstates,
                 pseudo_random_generator=pseudo_random_generator,
                 block_number=block_number,
+                storage=storage
             )
 
     elif type(state_change) == Block:

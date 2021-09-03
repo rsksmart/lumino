@@ -1,4 +1,11 @@
-from eth_utils import decode_hex, encode_hex, to_canonical_address, to_normalized_address
+from binascii import hexlify
+
+from eth_utils import decode_hex, encode_hex, to_canonical_address, to_normalized_address, to_checksum_address
+from gevent import os
+
+from raiden.api.rest import RestAPI
+from raiden.tests.utils.factories import make_address
+from raiden.tests.utils.mocks import make_raiden_service_mock
 from raiden.utils.signer import LocalSigner, Signer, recover
 from ecies import encrypt, decrypt
 
@@ -25,7 +32,6 @@ def test_signer_sign_seed_retry():
 
 
 def test_signer_sign_display_user_matrix_client():
-
     privkey = decode_hex('0x51dd3591fb7ce95b0bd77ca14a5236a4989d399c80b8150d3799dd0afcb14282')
 
     rsk_address = "0x6d369723521B4080A19457D5Fdd2194d633B0c3A"
@@ -65,7 +71,7 @@ def test_recover_address_from_display_user_and_signature():
 
 
 def test_signer_sign_matrix_server_domain():
-    #Rsk Address 0x6d369723521B4080A19457D5Fdd2194d633B0c3A
+    # Rsk Address 0x6d369723521B4080A19457D5Fdd2194d633B0c3A
     privkey = decode_hex('0x51dd3591fb7ce95b0bd77ca14a5236a4989d399c80b8150d3799dd0afcb14282')
 
     message = 'transport02.raiden.network'
@@ -134,3 +140,48 @@ def test_descrypt_signature_with_saved_ecrypt_data():
     descrypt_data = decrypt(privkey, saved_encrypt_data)
 
     assert signed_data == descrypt_data
+
+
+def test_light_client_onboarding_new_user():
+    channel_identifier = 1
+    payment_network_identifier = make_address()
+    token_network_identifier = make_address()
+    participant = make_address()
+    raiden = make_raiden_service_mock(
+        payment_network_identifier=payment_network_identifier,
+        token_network_identifier=token_network_identifier,
+        channel_identifier=channel_identifier,
+        partner=participant,
+    )
+    pubhex = '0xc11b7ba56c50e93d0cd2b868a04489de8c0d4bbbf53871e0dcf1cbcbbfdbae4c55c4ba944a7708d7923a1c52b3ed983b51730155854df9c52aa4c09818477b34'
+
+    address = '0x5F4df703Da966E12d3068E1aCbe930f2E363c732'
+
+    signed_password = '0xabafc6f1928f4c633eff8e7829b09f4af54faeee458f2e84b8bb5167' \
+                      'aac6f43b2631706700869979d0bff416f00d95139be7f2feac566f478ed24efcf0f43d011c'
+
+    signed_display_name = '0x4bc11cb02137565e95272f2df389d4b894da6865ba05b999ce331d' \
+                          'fdb145ec015470034bcdff5e4adaac7617eea46d7642e3ab0ce0caf2c165696a0d20f40b731c'
+
+    signed_seed_retry = '0x5cfdfe57a782ca9a4f56ba3ce809238db6246afc7fd17090f1bbd' \
+                        'ccad5b120a841ea4d798627c42c2e1e261ec79591879edab4e7bbb2a062a95fdd83a753e9121b'
+
+    address = to_checksum_address(address)
+
+    encrypt_signed_password = encrypt(pubhex, signed_password.encode())
+    encrypt_signed_display_name = encrypt(pubhex, signed_display_name.encode())
+    encrypt_signed_seed_retry = encrypt(pubhex, signed_seed_retry.encode())
+
+    api_key = hexlify(os.urandom(20))
+    api_key = api_key.decode("utf-8")
+
+    result = raiden.wal.storage.save_light_client(
+        api_key=api_key,
+        address=address,
+        encrypt_signed_password=encrypt_signed_password.hex(),
+        encrypt_signed_display_name=encrypt_signed_display_name.hex(),
+        encrypt_signed_seed_retry=encrypt_signed_seed_retry.hex(),
+        current_server_name=None,
+        pending_for_deletion=0)
+
+    assert result is not None

@@ -660,6 +660,7 @@ class OnChainMixin:
             block_hash=factories.make_block_hash(),
             our_onchain_locksroot=EMPTY_MERKLE_ROOT,
             partner_onchain_locksroot=EMPTY_MERKLE_ROOT,
+            participant1=self.address,
         )
 
         node.state_transition(self.chain_state, channel_settled_state_change, None)

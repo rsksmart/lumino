@@ -7,8 +7,8 @@ from eth_utils import (
     encode_hex,
     to_canonical_address,
     to_normalized_address,
+    to_checksum_address
 )
-
 from raiden.constants import UINT64_MAX, UINT256_MAX, EMPTY_PAYMENT_HASH_INVOICE
 from raiden.encoding import messages
 from raiden.encoding.format import buffer_for
@@ -20,8 +20,7 @@ from raiden.transfer.balance_proof import (
     pack_reward_proof,
 )
 from raiden.transfer.identifiers import CanonicalIdentifier
-
-from raiden.transfer.state import BalanceProofSignedState, NettingChannelState
+from raiden.transfer.state import BalanceProofSignedState
 from raiden.transfer.utils import hash_balance_data
 from raiden.utils import ishash, pex, sha3
 from raiden.utils.signer import Signer, recover
@@ -34,7 +33,6 @@ from raiden.utils.typing import (
     ChainID,
     ChannelID,
     Dict,
-    FeeAmount,
     InitiatorAddress,
     Locksroot,
     MessageID,
@@ -73,12 +71,11 @@ __all__ = (
     "SecretRequest",
     "SignedBlindedBalanceProof",
     "SignedMessage",
+    "SignedRetrieableMessage",
     "ToDevice",
     "Unlock",
-    "UpdatePFS",
     "decode",
     "from_dict",
-    "message_from_sendevent",
 )
 
 _senders_cache = LRUCache(maxsize=128)
@@ -156,7 +153,6 @@ def from_dict(data: dict) -> "Message":
                 "Invalid message data. Can not find the data type"
             ) from None
     return klass.from_dict(data)
-
 
 
 class Message:
@@ -1368,7 +1364,7 @@ class RefundTransfer(LockedTransfer):
             "chain_id": self.chain_id,
             "message_identifier": self.message_identifier,
             "payment_identifier": self.payment_identifier,
-            "payment_hash_invoice" : self.payment_hash_invoice,
+            "payment_hash_invoice": encode_hex(self.payment_hash_invoice),
             "nonce": self.nonce,
             "token_network_address": to_normalized_address(self.token_network_address),
             "token": to_normalized_address(self.token),
@@ -1390,7 +1386,7 @@ class RefundTransfer(LockedTransfer):
             chain_id=data["chain_id"],
             message_identifier=data["message_identifier"],
             payment_identifier=data["payment_identifier"],
-            payment_hash_invoice=data["payment_hash_invoice"],
+            payment_hash_invoice=decode_hex(data["payment_hash_invoice"]),
             nonce=data["nonce"],
             token_network_address=to_canonical_address(data["token_network_address"]),
             token=to_canonical_address(data["token"]),
@@ -1430,7 +1426,6 @@ class LockExpired(EnvelopeMessage):
         secrethash: SecretHash,
         **kwargs,
     ):
-
         super().__init__(
             chain_id=chain_id,
             nonce=nonce,
@@ -1832,6 +1827,190 @@ class RequestMonitoring(SignedMessage):
             recover(balance_proof_data, self.balance_proof.signature) == partner_address
             and recover(blinded_data, self.non_closing_signature) == requesting_address
             and recover(reward_proof_data, self.reward_proof_signature) == requesting_address
+        )
+
+
+class UnlockLightRequest(Message):
+
+    def __init__(self, token_address: Address, channel_identifier: ChannelID, sender: Address, receiver: Address,
+                 merkle_tree_leaves: str, **kwargs):
+        super().__init__(**kwargs)
+        self.channel_identifier = channel_identifier
+        self.sender = sender
+        self.receiver = receiver
+        self.token_address = token_address
+        self.merkle_tree_leaves = merkle_tree_leaves
+
+    def __eq__(self, other):
+        return (
+            super().__eq__(other)
+            and isinstance(other, UnlockLightRequest)
+            and self.channel_identifier == other.channel_identifier
+            and self.sender == other.sender
+            and self.receiver == other.receiver
+            and self.token_address == other.token_address
+            and self.merkle_tree_leaves == other.merkle_tree_leaves
+        )
+
+    @classmethod
+    def unpack(cls, packed):
+        return cls(
+            token_address=packed.token_address,
+            channel_identifier=packed.channel_identifier,
+            receiver=packed.receiver,
+            sender=packed.sender,
+            merkle_tree_leaves=packed.merkle_tree_leaves
+        )
+
+    def pack(self, packed) -> None:
+        packed.channel_identifier = self.channel_identifier
+        packed.sender = self.sender
+        packed.receiver = self.receiver
+        packed.token_address = self.token_address
+        packed.merkle_tree_leaves = self.merkle_tree_leaves
+
+    def to_dict(self):
+        return {
+            "type": self.__class__.__name__,
+            "token_address": to_checksum_address(self.token_address),
+            "channel_identifier": self.channel_identifier,
+            "receiver": to_checksum_address(self.receiver),
+            "sender": to_checksum_address(self.sender),
+            "merkle_tree_leaves": str(self.merkle_tree_leaves)
+        }
+
+    @classmethod
+    def from_dict(cls, data):
+        msg = f'Cannot decode data. Provided type is {data["type"]}, expected {cls.__name__}'
+        assert data["type"] == cls.__name__, msg
+        return cls(
+            token_address=Address(decode_hex(data["token_address"])),
+            channel_identifier=data["channel_identifier"],
+            receiver=Address(decode_hex(data["receiver"])),
+            sender=Address(decode_hex(data["sender"])),
+            merkle_tree_leaves=data["merkle_tree_leaves"]
+        )
+
+
+class RequestRegisterSecret(Message):
+
+    def __init__(self, secret_registry_address: Address, **kwargs):
+        super().__init__(**kwargs)
+        self.secret_registry_address = secret_registry_address
+
+    def __eq__(self, other):
+        return (
+            super().__eq__(other)
+            and isinstance(other, RequestRegisterSecret)
+            and self.secret_registry_address == other.secret_registry_address
+        )
+
+    @classmethod
+    def unpack(cls, packed):
+        return cls(packed.secret_registry_address)
+
+    def pack(self, packed) -> None:
+        packed.secret_registry_address = self.secret_registry_address
+
+    @classmethod
+    def from_dict(cls, data):
+        return cls(data["secret_registry_address"])
+
+    def to_dict(self):
+        return {
+            "type": self.__class__.__name__,
+            "secret_registry_address": to_normalized_address(self.secret_registry_address)
+        }
+
+
+class SettlementRequiredLightMessage(Message):
+    """ Represents the settlement required message for the LC when we need the LC to sign and send a settlement """
+
+    def __init__(self, channel_identifier: ChannelID, channel_network_identifier: TokenNetworkAddress,
+                 participant1: Address, participant1_transferred_amount: TokenAmount,
+                 participant1_locked_amount: TokenAmount, participant1_locksroot: Locksroot, participant2: Address,
+                 participant2_transferred_amount: TokenAmount, participant2_locked_amount: TokenAmount,
+                 participant2_locksroot: Locksroot, **kwargs):
+        super().__init__(**kwargs)
+        self.channel_identifier = channel_identifier
+        self.channel_network_identifier = channel_network_identifier
+        self.participant1 = participant1
+        self.participant1_transferred_amount = participant1_transferred_amount
+        self.participant1_locked_amount = participant1_locked_amount
+        self.participant1_locksroot = participant1_locksroot
+        self.participant2 = participant2
+        self.participant2_transferred_amount = participant2_transferred_amount
+        self.participant2_locked_amount = participant2_locked_amount
+        self.participant2_locksroot = participant2_locksroot
+
+    @classmethod
+    def unpack(cls, packed) -> "SettlementRequiredLightMessage":
+        return cls(channel_identifier=packed.channel_identifier,
+                   channel_network_identifier=packed.channel_network_identifier,
+                   participant1=packed.participant1,
+                   participant1_transferred_amount=packed.participant1_transferred_amount,
+                   participant1_locked_amount=packed.participant1_locked_amount,
+                   participant1_locksroot=packed.participant1_locksroot,
+                   participant2=packed.participant2,
+                   participant2_transferred_amount=packed.participant2_transferred_amount,
+                   participant2_locked_amount=packed.participant2_locked_amount,
+                   participant2_locksroot=packed.participant2_locksroot)
+
+    def pack(self, packed) -> None:
+        packed.channel_identifier = self.channel_identifier
+        packed.channel_network_identifier = self.channel_network_identifier
+        packed.participant1 = self.participant1
+        packed.participant1_transferred_amount = self.participant1_transferred_amount
+        packed.participant1_locked_amount = self.participant1_locked_amount
+        packed.participant1_locksroot = self.participant1_locksroot
+        packed.participant2 = self.participant2
+        packed.participant2_transferred_amount = self.participant2_transferred_amount
+        packed.participant2_locked_amount = self.participant2_locked_amount
+        packed.participant2_locksroot = self.participant2_locksroot
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "type": self.__class__.__name__,
+            "channel_identifier": self.channel_identifier,
+            "channel_network_identifier": to_normalized_address(self.channel_network_identifier),
+            "participant1": to_normalized_address(self.participant1),
+            "participant1_transferred_amount": self.participant1_transferred_amount,
+            "participant1_locked_amount": self.participant1_locked_amount,
+            "participant1_locksroot": encode_hex(self.participant1_locksroot),
+            "participant2": to_normalized_address(self.participant2),
+            "participant2_transferred_amount": self.participant2_transferred_amount,
+            "participant2_locked_amount": self.participant2_locked_amount,
+            "participant2_locksroot": encode_hex(self.participant2_locksroot)
+        }
+
+    @classmethod
+    def from_dict(cls, data) -> "SettlementRequiredLightMessage":
+        error_message = f'Cannot decode data. Provided type is {data["type"]}, expected {cls.__name__}'
+        assert data["type"] == cls.__name__, error_message
+        return cls(channel_identifier=ChannelID(data["channel_identifier"]),
+                   channel_network_identifier=TokenNetworkAddress(decode_hex(data["channel_network_identifier"])),
+                   participant1=Address(decode_hex(data["participant1"])),
+                   participant1_transferred_amount=TokenAmount(int(data["participant1_transferred_amount"])),
+                   participant1_locked_amount=TokenAmount(int(data["participant1_locked_amount"])),
+                   participant1_locksroot=Locksroot(decode_hex(data["participant1_locksroot"])),
+                   participant2=Address(decode_hex(data["participant2"])),
+                   participant2_transferred_amount=TokenAmount(int(data["participant2_transferred_amount"])),
+                   participant2_locked_amount=TokenAmount(int(data["participant2_locked_amount"])),
+                   participant2_locksroot=Locksroot(decode_hex(data["participant2_locksroot"])))
+
+    def __eq__(self, other: Any) -> bool:
+        return (
+            isinstance(other, SettlementRequiredLightMessage)
+            and self.channel_identifier == other.channel_identifier
+            and self.channel_network_identifier == other.channel_network_identifier
+            and self.participant1 == other.participant1
+            and self.participant1_transferred_amount == other.participant1_transferred_amount
+            and self.participant1_locked_amount == other.participant1_locked_amount
+            and self.participant1_locksroot == other.participant1_locksroot
+            and self.participant2 == other.participant2
+            and self.participant2_transferred_amount == other.participant2_transferred_amount
+            and self.participant2_locked_amount == other.participant2_locked_amount
+            and self.participant2_locksroot == other.participant2_locksroot
         )
 
 

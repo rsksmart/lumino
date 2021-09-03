@@ -1,5 +1,7 @@
 import structlog
 from eth_utils import is_binary_address, to_checksum_address, to_normalized_address
+from raiden_contracts.constants import CONTRACT_HUMAN_STANDARD_TOKEN
+from raiden_contracts.contract_manager import ContractManager
 
 from raiden.constants import GAS_LIMIT_FOR_TOKEN_CONTRACT_CALL
 from raiden.exceptions import RaidenUnrecoverableError, TransactionThrew
@@ -8,8 +10,6 @@ from raiden.network.rpc.smartcontract_proxy import ContractProxy
 from raiden.network.rpc.transactions import check_transaction_threw
 from raiden.utils import pex, safe_gas_limit
 from raiden.utils.typing import Address, BlockSpecification, TokenAmount
-from raiden_contracts.constants import CONTRACT_HUMAN_STANDARD_TOKEN
-from raiden_contracts.contract_manager import ContractManager
 
 log = structlog.get_logger(__name__)  # pylint: disable=invalid-name
 
@@ -88,8 +88,7 @@ class Token:
                 address=self.node_address,
                 transaction_name="approve",
                 transaction_executed=transaction_executed,
-                required_gas=GAS_REQUIRED_FOR_APPROVE,
-                block_identifier=block,
+                required_gas=GAS_REQUIRED_FOR_APPROVE
             )
 
             msg = self._check_why_approved_failed(allowance, block)

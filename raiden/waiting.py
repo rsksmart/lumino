@@ -154,7 +154,10 @@ def wait_for_payment_balance(
         raise ValueError("target_address must be one of the channel participants")
 
     channel_state = views.get_channelstate_for(
-        views.state_from_raiden(raiden), payment_network_id, token_address, partner_address
+        chain_state=views.state_from_raiden(raiden),
+        payment_network_id=payment_network_id,
+        token_address=token_address,
+        partner_address=partner_address
     )
 
     while balance(channel_state) < target_balance:
@@ -164,7 +167,10 @@ def wait_for_payment_balance(
         log.critical("wait", b=balance(channel_state), t=target_balance)
         gevent.sleep(retry_timeout)
         channel_state = views.get_channelstate_for(
-            views.state_from_raiden(raiden), payment_network_id, token_address, partner_address
+            chain_state=views.state_from_raiden(raiden),
+            payment_network_id=payment_network_id,
+            token_address=token_address,
+            partner_address=partner_address
         )
 
 
@@ -277,6 +283,8 @@ def wait_for_settle(
     token_address: TokenAddress,
     channel_ids: List[ChannelID],
     retry_timeout: float,
+    partner_addresses: List[Address],
+
 ) -> None:
     """Wait until all channels are settled.
 
@@ -290,6 +298,7 @@ def wait_for_settle(
         channel_ids=channel_ids,
         retry_timeout=retry_timeout,
         target_states=(CHANNEL_STATE_SETTLED,),
+        partner_addresses=partner_addresses,
     )
 
 
@@ -310,12 +319,14 @@ def wait_for_settle_all_channels(raiden: "RaidenService", retry_timeout: float) 
                 List[ChannelID], token_network_state.channelidentifiers_to_channels.keys()
             )
 
+            # TODO: partner_addresses cant be None, we should specify a value here #jonaf2103
             wait_for_settle(
                 raiden=raiden,
                 payment_network_id=payment_network_id,
                 token_address=TokenAddress(token_network_id),
                 channel_ids=channel_ids,
                 retry_timeout=retry_timeout,
+                partner_addresses=None
             )
 
 

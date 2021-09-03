@@ -153,7 +153,7 @@ def construct_time_based_gas_price_strategy(max_wait_seconds,
         that the transaction will be mined within ``max_wait_seconds``.  0 means 0%
         and 100 means 100%.
     """
-    def time_based_gas_price_strategy(web3, transaction_params):
+    def time_based_gas_price_strategy(web3, _transaction_params):
         avg_block_time = _get_avg_block_time(web3, sample_size=sample_size)
         wait_blocks = int(math.ceil(max_wait_seconds / avg_block_time))
 
@@ -172,7 +172,12 @@ def construct_time_based_gas_price_strategy(max_wait_seconds,
         else:
             latest_block_gas_price = int(latest_block_gas_price)
         gas_price = _compute_gas_price(probabilities, probability / 100)
-        max_gas = max(gas_price, latest_block_gas_price)
+        # we multiply latest_block_gas_price * 1.10 because in RSK the computed gas price was lower than
+        # latest_block_gas_price and the latest_block_gas_price value was always the min gas price for the network.
+        # That was the root cause for the transactions to fail, so we add that extra 10% to avoid those gas price
+        # errors on mainnet.
+        # TODO: related with this issue https://jirainfuy.atlassian.net/browse/RLP-992
+        max_gas = max(gas_price, latest_block_gas_price * 1.10)
         return max_gas
     return time_based_gas_price_strategy
 

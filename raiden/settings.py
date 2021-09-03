@@ -21,10 +21,11 @@ DEFAULT_MATRIX_KNOWN_SERVERS = {
         "https://raw.githubusercontent.com/raiden-network/raiden-transport"
         "/master/known_servers.main.yaml"
     ),
-    Environment.DEVELOPMENT: (
-        "https://raw.githubusercontent.com/marcosmartinez7/matrix-known-servers/master/known_servers.test.yaml"
-    ),
+    Environment.DEVELOPMENT: ["http://64.225.11.151"],
 }
+
+DEFAULT_RIF_COMMS_GRPC_ENDPOINT = "localhost:5013"
+DEFAULT_RIF_COMMS_GRPC_CLIENT_TIMEOUT = 15  # in seconds
 
 DEFAULT_REVEAL_TIMEOUT = 50
 DEFAULT_SETTLE_TIMEOUT = 500
@@ -58,5 +59,3 @@ MONITORING_REWARD = TokenAmount(1)
 MONITORING_MIN_CAPACITY = TokenAmount(100)
 
 MEDIATION_FEE = FeeAmount(0)
-
-HUB_MAX_LIGHT_CLIENTS = 15

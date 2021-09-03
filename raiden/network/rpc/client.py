@@ -70,7 +70,6 @@ def logs_blocks_sanity_check(from_block: BlockSpecification, to_block: BlockSpec
 
 
 def geth_assert_rpc_interfaces(web3: Web3):
-
     try:
         web3.version.node
     except ValueError:
@@ -105,7 +104,6 @@ def geth_assert_rpc_interfaces(web3: Web3):
 
 
 def parity_assert_rpc_interfaces(web3: Web3):
-
     try:
         web3.version.node
     except ValueError:
@@ -182,7 +180,7 @@ def check_address_has_code(client: "JSONRPCClient", address: Address, contract_n
     """ Checks that the given address contains code. """
     result = client.web3.eth.getCode(to_checksum_address(address), "latest")
 
-    if not result:
+    if not result or result == b'\x00':
         if contract_name:
             formated_contract_name = "[{}]: ".format(contract_name)
         else:
@@ -817,7 +815,7 @@ class JSONRPCClient:
 
             # if the transaction was added to the pool and then removed
             if transaction is None and last_result is not None:
-                raise Exception("invalid transaction, check gas price")
+                log.error("invalid transaction, check gas price")
 
             # the transaction was added to the pool and mined
             if transaction and transaction["blockNumber"] is not None:
@@ -832,7 +830,7 @@ class JSONRPCClient:
                 if block_number >= confirmation_block:
                     return transaction
 
-            gevent.sleep(1.0)
+            gevent.sleep(10)
 
     def new_filter(
         self,
@@ -876,8 +874,7 @@ class JSONRPCClient:
         address: Address,
         transaction_name: str,
         transaction_executed: bool,
-        required_gas: int,
-        block_identifier: BlockSpecification,
+        required_gas: int
     ):
         """ After estimate gas failure checks if our address has enough balance.
 
@@ -892,8 +889,8 @@ class JSONRPCClient:
         if transaction_executed:
             return
 
-        our_address = to_checksum_address(self.address)
-        balance = self.web3.eth.getBalance(our_address, block_identifier)
+        our_address = to_checksum_address(address)
+        balance = self.web3.eth.getBalance(our_address, self.get_checking_block())
         required_balance = required_gas * self.gas_price()
         if balance < required_balance:
             msg = f"Failed to execute {transaction_name} due to insufficient ETH"

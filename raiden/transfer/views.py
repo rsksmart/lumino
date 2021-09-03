@@ -1,7 +1,7 @@
 from raiden.transfer import channel
 from raiden.transfer.architecture import ContractSendEvent
 from raiden.transfer.identifiers import CanonicalIdentifier
-from eth_utils import to_canonical_address, to_checksum_address
+from eth_utils import to_canonical_address
 
 from raiden.transfer.state import (
     CHANNEL_STATE_CLOSED,
@@ -274,8 +274,8 @@ def get_channelstate_for(
     chain_state: ChainState,
     payment_network_id: PaymentNetworkID,
     token_address: TokenAddress,
-    creator_address: Address,
-    partner_address: Address
+    creator_address: Address = None,
+    partner_address: Address = None
 ) -> Optional[NettingChannelState]:
     """ Return the NettingChannelState if it exists, None otherwise. """
     token_network = get_token_network_by_token_address(
@@ -283,30 +283,18 @@ def get_channelstate_for(
     )
 
     channel_state = None
-    address_to_get_channel_state = creator_address
-
-    # Dos casos el primer cuando un ligth client crea un canal con un nodo normal a traves del hub
-    # Cuando un light client crea una canal con un hub directamente
-
-    channel = None
-    if token_network and creator_address in token_network.channelidentifiers_to_channels or \
-        token_network and partner_address in token_network.channelidentifiers_to_channels:
-        channels = []
-        for channel_id in token_network.partneraddresses_to_channelidentifiers[partner_address]:
-
-            if creator_address in token_network.channelidentifiers_to_channels:
-                channel = token_network.channelidentifiers_to_channels[creator_address].get(channel_id)
-
-            if channel is None and partner_address in token_network.channelidentifiers_to_channels:
-                # Check if partner address had a open channel, can be a hub node.
-                channel = token_network.channelidentifiers_to_channels[partner_address].get(channel_id)
-                address_to_get_channel_state = partner_address
-
-            if channel is not None:
-                if channel.close_transaction is None or channel.close_transaction.result != 'success':
-                    channels.append(token_network.channelidentifiers_to_channels[address_to_get_channel_state][channel_id])
-            channel = None
-
+    if token_network:
+        channel_ids = list(filter(
+            lambda channel_id:
+            creator_address in token_network.channelidentifiers_to_channels
+            and channel_id in token_network.channelidentifiers_to_channels[creator_address],
+            token_network.partneraddresses_to_channelidentifiers[partner_address]
+        ))
+        channels = list(map(
+            lambda channel_id:
+            token_network.channelidentifiers_to_channels[creator_address].get(channel_id),
+            channel_ids
+        ))
         states = filter_channels_by_status(channels, [CHANNEL_STATE_UNUSABLE])
         # If multiple channel states are found, return the last one.
         if states:
@@ -422,6 +410,7 @@ def get_channelstate_filter(
     payment_network_id: PaymentNetworkID,
     token_address: TokenAddress,
     filter_fn: Callable,
+    creator_address=None
 ) -> List[NettingChannelState]:
     """ Return the state of channels that match the condition in `filter_fn` """
     token_network = get_token_network_by_token_address(
@@ -432,8 +421,11 @@ def get_channelstate_filter(
     if not token_network:
         return result
 
-    if chain_state.our_address in token_network.channelidentifiers_to_channels:
-        for channel_state in token_network.channelidentifiers_to_channels[chain_state.our_address].values():
+    if not creator_address:
+        creator_address = chain_state.our_address
+
+    if creator_address in token_network.channelidentifiers_to_channels:
+        for channel_state in token_network.channelidentifiers_to_channels[creator_address].values():
             if filter_fn(channel_state):
                 result.append(channel_state)
 
@@ -477,7 +469,7 @@ def get_channelstate_closed(
 
 
 def get_channelstate_settling(
-    chain_state: ChainState, payment_network_id: PaymentNetworkID, token_address: TokenAddress
+    chain_state: ChainState, payment_network_id: PaymentNetworkID, token_address: TokenAddress, creator_address=None
 ) -> List[NettingChannelState]:
     """Return the state of settling channels in a token network."""
     return get_channelstate_filter(
@@ -485,6 +477,7 @@ def get_channelstate_settling(
         payment_network_id,
         token_address,
         lambda channel_state: channel.get_status(channel_state) == CHANNEL_STATE_SETTLING,
+        creator_address=creator_address
     )
 
 
@@ -526,30 +519,22 @@ def secret_from_transfer_task(
     return transfer_state.transfer_description.secret
 
 
-def get_transfer_role(chain_state: ChainState, secrethash: SecretHash) -> Optional[str]:
+def get_transfer_role(chain_state: ChainState,
+                      message_receiver_address: AddressHex,
+                      secrethash: SecretHash) -> Optional[str]:
     """
     Returns 'initiator', 'mediator' or 'target' to signify the role the node has
     in a transfer. If a transfer task is not found for the secrethash then the
     function returns None
     """
-    task = chain_state.payment_mapping.secrethashes_to_task.get(secrethash)
+    task = chain_state.get_payment_task(message_receiver_address, secrethash)
     if not task:
         return None
     return role_from_transfer_task(task)
 
 
-def get_transfer_secret(chain_state: ChainState, secrethash: SecretHash) -> Optional[Secret]:
-    return secret_from_transfer_task(
-        chain_state.payment_mapping.secrethashes_to_task.get(secrethash), secrethash
-    )
-
-
-def get_transfer_task(chain_state: ChainState, secrethash: SecretHash) -> Optional[TransferTask]:
-    return chain_state.payment_mapping.secrethashes_to_task.get(secrethash)
-
-
-def get_all_transfer_tasks(chain_state: ChainState) -> Dict[SecretHash, TransferTask]:
-    return chain_state.payment_mapping.secrethashes_to_task
+def get_transfer_secret(chain_state: ChainState, node_address: AddressHex, secrethash: SecretHash) -> Optional[Secret]:
+    return secret_from_transfer_task(chain_state.get_payment_task(node_address, secrethash), secrethash)
 
 
 def list_channelstate_for_tokennetwork(
@@ -558,11 +543,11 @@ def list_channelstate_for_tokennetwork(
     token_network = get_token_network_by_token_address(
         chain_state, payment_network_id, token_address
     )
-
+    result = list()
     if token_network:
-        result = list(token_network.channelidentifiers_to_channels.values())
-    else:
-        result = []
+        for channel_address in token_network.channelidentifiers_to_channels.values():
+            for channel in channel_address.values():
+                result.append(channel)
 
     return result
 
@@ -570,8 +555,7 @@ def list_channelstate_for_tokennetwork(
 def list_channelstate_for_tokennetwork_lumino(
     chain_state: ChainState,
     payment_network_id: PaymentNetworkID,
-    token_addresses_split,
-    node_address
+    token_addresses_split
 ) -> List[NettingChannelState]:
     channels_by_token = []
 
@@ -618,25 +602,17 @@ def filter_channels_by_partneraddress(
     if not token_network:
         return result
 
-    channelsResult = []
-    # for partner in partner_addresses:
-
     for node_address in token_network.partneraddresses_to_channelidentifiers.keys():
         if node_address in token_network.channelidentifiers_to_channels:
             channels = token_network.channelidentifiers_to_channels[node_address]
             if channels is not None:
-                for channelId, channel in channels.items():
+                for _channelId, channel in channels.items():
                     for partner_address in partner_addresses:
                         if channel.partner_state.address == partner_address:
                             if channel.close_transaction is None or channel.close_transaction.result != 'success':
-                                channelsResult.append(channel)
+                                result.append(channel)
 
-    states = filter_channels_by_status(channelsResult, [CHANNEL_STATE_UNUSABLE])
-    # If multiple channel states are found, return the last one.
-    if states:
-        result.append(states[-1])
-
-    return result
+    return filter_channels_by_status(result, [CHANNEL_STATE_UNUSABLE])
 
 
 def filter_channels_by_status(
@@ -650,7 +626,7 @@ def filter_channels_by_status(
 
     states = []
     for channel_state in channel_states:
-        if channel.get_status(channel_state) not in exclude_states:
+        if channel_state and channel.get_status(channel_state) not in exclude_states:
             states.append(channel_state)
 
     return states

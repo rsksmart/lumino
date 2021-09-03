@@ -61,12 +61,12 @@ def test_log_filter():
         "": "WARN",
         "raiden": "DEBUG",
         "raiden.network": "INFO",
-        "raiden.network.transport": "DEBUG",
+        "transport": "DEBUG",
     }
     filter_ = LogFilter(rules, default_level="INFO")
 
-    assert filter_.should_log("raiden.network.transport.matrix", "DEBUG") is True
-    assert filter_.should_log("raiden.network.transport", "DEBUG") is True
+    assert filter_.should_log("transport.matrix", "DEBUG") is True
+    assert filter_.should_log("transport", "DEBUG") is True
     assert filter_.should_log("raiden.network", "DEBUG") is False
     assert filter_.should_log("raiden.network", "INFO") is True
     assert filter_.should_log("raiden.network", "INFO") is True
@@ -77,11 +77,11 @@ def test_log_filter():
     assert filter_.should_log("other", "DEBUG") is False
     assert filter_.should_log("other", "WARN") is True
 
-    rules = {"raiden": "DEBUG", "raiden.network": "INFO", "raiden.network.transport": "DEBUG"}
+    rules = {"raiden": "DEBUG", "raiden.network": "INFO", "transport": "DEBUG"}
     filter_ = LogFilter(rules, default_level="INFO")
 
-    assert filter_.should_log("raiden.network.transport.matrix", "DEBUG") is True
-    assert filter_.should_log("raiden.network.transport", "DEBUG") is True
+    assert filter_.should_log("transport.matrix", "DEBUG") is True
+    assert filter_.should_log("transport", "DEBUG") is True
     assert filter_.should_log("raiden.network", "DEBUG") is False
     assert filter_.should_log("raiden.network", "INFO") is True
     assert filter_.should_log("raiden.network", "INFO") is True

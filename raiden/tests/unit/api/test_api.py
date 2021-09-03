@@ -1,3 +1,5 @@
+from typing import Dict
+
 from raiden.api.python import transfer_tasks_view
 from raiden.tests.utils import factories
 from raiden.transfer.mediated_transfer.state import (
@@ -9,8 +11,9 @@ from raiden.transfer.mediated_transfer.state import (
     TransferDescriptionWithSecretState,
     WaitingTransferState,
 )
-from raiden.transfer.state import InitiatorTask, MediatorTask, TargetTask
+from raiden.transfer.state import InitiatorTask, MediatorTask, TargetTask, PaymentMappingState
 from raiden.transfer.views import list_channelstate_for_tokennetwork
+from raiden.utils import Address
 
 
 def test_list_channelstate_for_tokennetwork(chain_state, payment_network_id, token_id):
@@ -48,13 +51,16 @@ def test_initiator_task_view():
         transfer=transfer,
         revealsecret=None,
     )
-    payment_state = InitiatorPaymentState({secrethash: transfer_state})
+    payment_state = InitiatorPaymentState(routes=[], initiator_transfers={secrethash: transfer_state})
     task = InitiatorTask(
         token_network_identifier=factories.UNIT_TOKEN_NETWORK_ADDRESS, manager_state=payment_state
     )
-    payment_mapping = {secrethash: task}
+    payment_states_by_address: Dict[Address, PaymentMappingState] = dict()
 
-    view = transfer_tasks_view(payment_mapping)
+    payment_states_by_address[transfer.initiator] = PaymentMappingState()
+    payment_states_by_address[transfer.initiator].secrethashes_to_task[secrethash] = task
+
+    view = transfer_tasks_view(payment_states_by_address)
 
     assert len(view) == 1
     pending_transfer = view[0]
@@ -115,8 +121,13 @@ def test_mediator_task_view():
         mediator_state=transfer_state2,
     )
 
-    payment_mapping = {secrethash1: task1, secrethash2: task2}
-    view = transfer_tasks_view(payment_mapping)
+    payment_states_by_address: Dict[Address, PaymentMappingState] = dict()
+
+    payment_states_by_address[initiator] = PaymentMappingState()
+    payment_states_by_address[initiator].secrethashes_to_task[secrethash1] = task1
+    payment_states_by_address[initiator].secrethashes_to_task[secrethash2] = task2
+
+    view = transfer_tasks_view(payment_states_by_address)
 
     assert len(view) == 2
     if view[0].get("payment_identifier") == "1":
@@ -146,9 +157,13 @@ def test_target_task_view():
     task = TargetTask(
         canonical_identifier=mediator_channel.canonical_identifier, target_state=transfer_state
     )
-    payment_mapping = {secrethash: task}
 
-    view = transfer_tasks_view(payment_mapping)
+    payment_states_by_address: Dict[Address, PaymentMappingState] = dict()
+
+    payment_states_by_address[mediator] = PaymentMappingState()
+    payment_states_by_address[mediator].secrethashes_to_task[secrethash] = task
+
+    view = transfer_tasks_view(payment_states_by_address)
 
     assert len(view) == 1
     pending_transfer = view[0]
