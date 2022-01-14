@@ -9,6 +9,10 @@
 * [Install on Ubuntu](docs/0.1.0/install_ubuntu.md)
 * [Install on MacOS](docs/0.1.0/install_macos.md)
 
+## Run Lumino Node with docker
+
+The instructions to do this are [here](docker/docs/how-to-docker.md).
+
 ## Lumino Contracts
 
 The following are the addresses of the set of contracts for Lumino Network per release
@@ -40,8 +44,6 @@ The following are the addresses of the set of contracts for Lumino Network per r
 
 
 If you want to create your own RIF Lumino network for development or custom use on private networks, please refer to [Lumino Contracts](https://github.com/rsksmart/lumino-contracts)
-
-
 
 ## Useful Links
 

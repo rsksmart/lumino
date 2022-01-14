@@ -1,0 +1,23 @@
+#!/bin/bash
+
+ENV_NAME=$1
+
+if [ "" == "${ENV_NAME}" ]; then
+  ENV_NAME=nodeEnvironment
+fi
+
+trap ctrl_c INT
+
+function ctrl_c() {
+	rm -rf ${ENV_NAME}
+}
+
+python -m venv ${ENV_NAME}
+
+source ${ENV_NAME}/bin/activate
+
+pip install --upgrade pip -r requirements.txt -c constraints.txt -e .
+
+python setup.py develop
+
+deactivate
